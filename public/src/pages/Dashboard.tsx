@@ -103,18 +103,21 @@ export default function Dashboard() {
 
   const toggleServerStatus = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation(); // prevent row click opening drawer
+
     setInstances((prev) =>
       prev.map((inst) => {
         if (inst.id === id) {
           const nextStatus = inst.status === 'running' ? 'stopped' : 'running';
-          const updated = {
+          const updated: Instance = {
             ...inst,
             status: nextStatus,
             cpuUsage: nextStatus === 'running' ? 12 : 0,
           };
+
           if (selectedInstance?.id === id) {
             setSelectedInstance(updated);
           }
+
           return updated;
         }
         return inst;

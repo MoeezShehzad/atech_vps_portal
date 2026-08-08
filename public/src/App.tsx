@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import atcLogo from './assets/ATC_Logo.png';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import Footer from './components/Footer';
 
 function AppContent() {
   const location = useLocation();
@@ -97,11 +98,7 @@ function AppContent() {
       </main>
 
       {/* FOOTER (Hidden on Auth Pages) */}
-      {!isAuthPage && (
-        <footer className="border-t border-slate-200 bg-slate-50 py-8 px-10 text-center text-xs text-slate-500">
-          © {new Date().getFullYear()} Analytical Technical Consulting. All rights reserved.
-        </footer>
-      )}
+      {!isAuthPage && <Footer />}
     </div>
   );
 }
