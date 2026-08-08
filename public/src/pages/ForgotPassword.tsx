@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, ArrowRight, ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
 import atcLogo from '../assets/ATC_Logo.png';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Logic for sending password reset email goes here
-    setIsSubmitted(true);
+    if (email.trim()) {
+      setSubmitted(true);
+    }
   };
 
   return (
@@ -18,48 +19,38 @@ export default function ForgotPassword() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <Link to="/" className="inline-flex items-center gap-3">
           <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
-          {/* <span className="text-xl font-bold text-blue-950 font-poppins">ATC Portal</span> */}
         </Link>
         <h2 className="mt-6 text-3xl font-extrabold text-blue-950 font-poppins">
-          Reset your password
+          Reset Password
         </h2>
         <p className="mt-2 text-sm text-slate-600">
-          Enter your registered email address and we'll send you instructions to reset your password.
+          Enter your email address to receive password reset instructions.
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-6 shadow-xl shadow-blue-950/5 border border-slate-200 rounded-2xl sm:px-10">
           
-          {isSubmitted ? (
-            <div className="text-center py-4 space-y-4">
-              <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100">
+          {submitted ? (
+            <div className="text-center space-y-4 py-2">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 mb-2">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-blue-950">Check your inbox</h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                We have sent a password reset link to <span className="font-semibold text-slate-800">{email}</span>. Please check your email and follow the instructions.
+              <h3 className="text-lg font-bold text-slate-900 font-poppins">Reset Link Sent</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                We've sent password reset instructions to <span className="font-semibold text-slate-700">{email}</span> if an account exists.
               </p>
-              
-              <div className="pt-4 space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setIsSubmitted(false)}
-                  className="text-xs font-semibold text-blue-600 hover:underline block mx-auto"
-                >
-                  Didn't receive the email? Try again
-                </button>
-
+              <div className="pt-4">
                 <Link
                   to="/login"
-                  className="w-full py-2.5 rounded-full border border-slate-200 font-semibold text-xs text-slate-700 hover:border-blue-600 hover:text-blue-600 transition-all flex items-center justify-center gap-2"
+                  className="inline-flex items-center justify-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-500"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" /> Back to Sign In
+                  <ArrowLeft className="w-4 h-4" /> Back to Sign In
                 </Link>
               </div>
             </div>
           ) : (
-            <form className="space-y-5" onSubmit={handleSubmit}>
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Email Address
@@ -73,7 +64,7 @@ export default function ForgotPassword() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                    className="w-full pl-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                     placeholder="name@company.com"
                   />
                 </div>
@@ -81,17 +72,17 @@ export default function ForgotPassword() {
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-full bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-full bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 mt-2"
               >
-                Send Reset Link <ArrowRight className="w-4 h-4" />
+                Send Reset Link
               </button>
 
               <div className="text-center pt-2">
                 <Link
                   to="/login"
-                  className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors"
+                  className="inline-flex items-center justify-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-700"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" /> Back to Sign In
+                  <ArrowLeft className="w-4 h-4" /> Back to Sign In
                 </Link>
               </div>
             </form>
@@ -99,7 +90,7 @@ export default function ForgotPassword() {
 
           <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-center gap-2 text-xs text-slate-500">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Encrypted Password Recovery</span>
+            <span>Enterprise Data Protection</span>
           </div>
         </div>
       </div>
