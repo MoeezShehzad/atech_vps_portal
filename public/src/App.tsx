@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import Home from './pages/Home';
 import AboutUs from './pages/AboutUs';
 import Services from './pages/Services';
@@ -10,10 +10,20 @@ import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import atcLogo from './assets/ATC_Logo.png';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
-export default function App() {
+function AppContent() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, logout } = useAuth();
+  
   const isAuthPage = ['/login', '/signup', '/forgot-password'].includes(location.pathname);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="min-h-screen bg-white text-slate-900 flex flex-col justify-between font-sans">
@@ -30,16 +40,34 @@ export default function App() {
             <Link to="/about" className="hover:text-blue-600 transition-colors">About Us</Link>
             <Link to="/services" className="hover:text-blue-600 transition-colors">Services</Link>
             <Link to="/pricing" className="hover:text-blue-600 transition-colors">Pricing</Link>
-            <Link to="/contact" className="hover:text-blue-600 transition-colors">Contact</Link><Link to="/dashboard" className="hover:text-blue-600 transition-colors">Dashboard</Link>
+            <Link to="/contact" className="hover:text-blue-600 transition-colors">Contact</Link>
+            <Link to="/dashboard" className="hover:text-blue-600 transition-colors">Dashboard</Link>
           </div>
 
           <div className="flex gap-3 items-center">
-            <Link to="/login" className="px-5 py-2 rounded-full border border-slate-200 font-semibold text-sm text-blue-950 hover:border-blue-600 hover:text-blue-600 transition-all">
-              Log in
-            </Link>
-            <Link to="/signup" className="px-5 py-2 rounded-full bg-blue-600 text-white font-semibold text-sm shadow-md shadow-blue-500/20 hover:bg-blue-700 transition-all">
-              Get started
-            </Link>
+            {isAuthenticated ? (
+              <button
+                onClick={handleLogout}
+                className="px-5 py-2 rounded-full border border-rose-200 font-semibold text-sm text-rose-600 hover:bg-rose-50 transition-all"
+              >
+                Log out
+              </button>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="px-5 py-2 rounded-full border border-slate-200 font-semibold text-sm text-blue-950 hover:border-blue-600 hover:text-blue-600 transition-all"
+                >
+                  Log in
+                </Link>
+                <Link
+                  to="/signup"
+                  className="px-5 py-2 rounded-full bg-blue-600 text-white font-semibold text-sm shadow-md shadow-blue-500/20 hover:bg-blue-700 transition-all"
+                >
+                  Get started
+                </Link>
+              </>
+            )}
           </div>
         </nav>
       )}
@@ -55,7 +83,16 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+
+          {/* PROTECTED ROUTE */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </main>
 
@@ -66,5 +103,13 @@ export default function App() {
         </footer>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

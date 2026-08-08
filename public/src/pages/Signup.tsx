@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import atcLogo from '../assets/ATC_Logo.png';
 
 export default function Signup() {
@@ -8,6 +9,7 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSignup = (e: React.FormEvent) => {
@@ -16,18 +18,20 @@ export default function Signup() {
       alert("Passwords do not match!");
       return;
     }
-    // Proceed with account creation logic
-    navigate('/login');
+    
+    // Authenticate user & navigate straight to dashboard
+    login();
+    navigate('/dashboard');
   };
 
   const handleGoogleSignup = () => {
-    // OAuth Google Trigger
-    console.log("Signing up with Google...");
+    login();
+    navigate('/dashboard');
   };
 
   const handleGithubSignup = () => {
-    // OAuth GitHub Trigger
-    console.log("Signing up with GitHub...");
+    login();
+    navigate('/dashboard');
   };
 
   return (
@@ -35,7 +39,6 @@ export default function Signup() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <Link to="/" className="inline-flex items-center gap-3">
           <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
-          {/* <span className="text-xl font-bold text-blue-950 font-poppins">ATC Portal</span> */}
         </Link>
         <h2 className="mt-6 text-3xl font-extrabold text-blue-950 font-poppins">
           Create your account
@@ -79,7 +82,6 @@ export default function Signup() {
             </button>
           </div>
 
-          {/* DIVIDER */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-slate-200" />
