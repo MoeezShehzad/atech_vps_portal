@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Server, 
   Cpu, 
@@ -6,7 +6,6 @@ import {
   Activity, 
   Plus, 
   Power, 
-  RefreshCw, 
   Search,
   X,
   Terminal,
@@ -14,7 +13,10 @@ import {
   Check,
   MemoryStick,
   Clock,
-  ShieldCheck
+  ShieldCheck,
+  Trash2,
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -23,7 +25,7 @@ interface Instance {
   name: string;
   ip: string;
   os: string;
-  status: 'running' | 'stopped' | 'rebooting';
+  status: 'running' | 'stopped';
   cpuUsage: number;
   ramUsage: string;
   diskUsage: string;
@@ -33,13 +35,75 @@ interface Instance {
   createdAt: string;
 }
 
+const INITIAL_INSTANCES: Instance[] = [
+  {
+    id: 'vps-01',
+    name: 'Prod-DB-Primary',
+    ip: '192.168.10.45',
+    os: 'Ubuntu 24.04 LTS',
+    status: 'running',
+    cpuUsage: 18,
+    ramUsage: '4.2 / 8 GB',
+    diskUsage: '32 / 80 GB',
+    vCPU: 4,
+    ramGB: 8,
+    diskGB: 80,
+    createdAt: '2026-01-15'
+  },
+  {
+    id: 'vps-02',
+    name: 'Web-App-Frontend',
+    ip: '192.168.10.12',
+    os: 'Debian 12',
+    status: 'running',
+    cpuUsage: 42,
+    ramUsage: '2.1 / 4 GB',
+    diskUsage: '14 / 40 GB',
+    vCPU: 2,
+    ramGB: 4,
+    diskGB: 40,
+    createdAt: '2026-02-10'
+  },
+  {
+    id: 'vps-03',
+    name: 'Mail-Server-Relay',
+    ip: '192.168.10.88',
+    os: 'Ubuntu 22.04 LTS',
+    status: 'stopped',
+    cpuUsage: 0,
+    ramUsage: '0.0 / 4 GB',
+    diskUsage: '20 / 50 GB',
+    vCPU: 2,
+    ramGB: 4,
+    diskGB: 50,
+    createdAt: '2026-03-01'
+  },
+];
+
 export default function Dashboard() {
   const { logout } = useAuth();
+  
+  // 1. LOCALSTORAGE STATE INITIALIZATION
+  const [instances, setInstances] = useState<Instance[]>(() => {
+    const saved = localStorage.getItem('vps_instances');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse instances from localStorage', e);
+      }
+    }
+    return INITIAL_INSTANCES;
+  });
+
+  // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'stopped'>('all');
 
   // Modals & Drawers state
   const [isDeployOpen, setIsDeployOpen] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState<Instance | null>(null);
+  const [deletingInstance, setDeletingInstance] = useState<Instance | null>(null);
   const [copiedSSH, setCopiedSSH] = useState(false);
 
   // Deploy form state
@@ -52,57 +116,28 @@ export default function Dashboard() {
   });
   const [newDiskGB, setNewDiskGB] = useState(50);
 
-  // Initial infrastructure state
-  const [instances, setInstances] = useState<Instance[]>([
-    {
-      id: 'vps-01',
-      name: 'Prod-DB-Primary',
-      ip: '192.168.10.45',
-      os: 'Ubuntu 24.04 LTS',
-      status: 'running',
-      cpuUsage: 18,
-      ramUsage: '4.2 / 8 GB',
-      diskUsage: '32 / 80 GB',
-      vCPU: 4,
-      ramGB: 8,
-      diskGB: 80,
-      createdAt: '2026-01-15'
-    },
-    {
-      id: 'vps-02',
-      name: 'Web-App-Frontend',
-      ip: '192.168.10.12',
-      os: 'Debian 12',
-      status: 'running',
-      cpuUsage: 42,
-      ramUsage: '2.1 / 4 GB',
-      diskUsage: '14 / 40 GB',
-      vCPU: 2,
-      ramGB: 4,
-      diskGB: 40,
-      createdAt: '2026-02-10'
-    },
-    {
-      id: 'vps-03',
-      name: 'Mail-Server-Relay',
-      ip: '192.168.10.88',
-      os: 'Ubuntu 22.04 LTS',
-      status: 'stopped',
-      cpuUsage: 0,
-      ramUsage: '0.0 / 4 GB',
-      diskUsage: '20 / 50 GB',
-      vCPU: 2,
-      ramGB: 4,
-      diskGB: 50,
-      createdAt: '2026-03-01'
-    },
-  ]);
+  // Sync state changes to localStorage
+  useEffect(() => {
+    localStorage.setItem('vps_instances', JSON.stringify(instances));
+  }, [instances]);
 
-  // Aggregate stats calculations
+  // Reset demo state
+  const handleResetData = () => {
+    if (window.confirm('Reset all instances back to default initial state?')) {
+      setInstances(INITIAL_INSTANCES);
+      localStorage.removeItem('vps_instances');
+      setSelectedInstance(null);
+    }
+  };
+
+  // Aggregate stats
   const totalStorage = instances.reduce((acc, inst) => acc + inst.diskGB, 0);
+  const runningCount = instances.filter((i) => i.status === 'running').length;
+  const stoppedCount = instances.filter((i) => i.status === 'stopped').length;
 
+  // Power switch handler
   const toggleServerStatus = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation(); // prevent row click opening drawer
+    if (e) e.stopPropagation();
 
     setInstances((prev) =>
       prev.map((inst) => {
@@ -125,6 +160,7 @@ export default function Dashboard() {
     );
   };
 
+  // Deploy submit handler
   const handleDeploySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHostname.trim()) return;
@@ -153,16 +189,34 @@ export default function Dashboard() {
     setNewHostname('');
   };
 
+  // Terminate/Delete instance handler
+  const confirmDeleteInstance = () => {
+    if (!deletingInstance) return;
+
+    setInstances((prev) => prev.filter((inst) => inst.id !== deletingInstance.id));
+    if (selectedInstance?.id === deletingInstance.id) {
+      setSelectedInstance(null);
+    }
+    setDeletingInstance(null);
+  };
+
   const handleCopySSH = (ip: string) => {
     navigator.clipboard.writeText(`ssh root@${ip}`);
     setCopiedSSH(true);
     setTimeout(() => setCopiedSSH(false), 2000);
   };
 
-  const filteredInstances = instances.filter((inst) =>
-    inst.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inst.ip.includes(searchTerm)
-  );
+  // Filter pipeline
+  const filteredInstances = instances.filter((inst) => {
+    const matchesSearch = 
+      inst.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inst.ip.includes(searchTerm);
+
+    const matchesStatus = 
+      statusFilter === 'all' || inst.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-10 font-sans relative">
@@ -180,6 +234,13 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3">
             <button 
+              onClick={handleResetData}
+              title="Reset mock local storage data"
+              className="p-2.5 text-slate-500 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition-all"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+            <button 
               onClick={() => setIsDeployOpen(true)}
               className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm shadow-blue-500/20"
             >
@@ -196,7 +257,7 @@ export default function Dashboard() {
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total VPS</p>
-              <p className="text-xl font-bold text-slate-900 mt-0.5">{instances.length} Active</p>
+              <p className="text-xl font-bold text-slate-900 mt-0.5">{instances.length} Configured</p>
             </div>
           </div>
 
@@ -205,8 +266,8 @@ export default function Dashboard() {
               <Activity className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">System Status</p>
-              <p className="text-xl font-bold text-emerald-600 mt-0.5">Optimal</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Running Instances</p>
+              <p className="text-xl font-bold text-emerald-600 mt-0.5">{runningCount} Active</p>
             </div>
           </div>
 
@@ -234,12 +295,56 @@ export default function Dashboard() {
         {/* INSTANCE TABLE SECTION */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           
-          {/* TABLE CONTROLS */}
-          <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-lg font-bold text-slate-900 font-poppins">
-              Virtual Private Servers
-            </h2>
-            <div className="relative w-full sm:w-64">
+          {/* TABLE CONTROLS & FILTER TABS */}
+          <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            {/* STATUS FILTER TABS */}
+            <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl w-fit">
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                  statusFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                All
+                <span className="bg-slate-200/80 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
+                  {instances.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setStatusFilter('running')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                  statusFilter === 'running'
+                    ? 'bg-white text-emerald-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Running
+                <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md text-[10px]">
+                  {runningCount}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setStatusFilter('stopped')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                  statusFilter === 'stopped'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Stopped
+                <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
+                  {stoppedCount}
+                </span>
+              </button>
+            </div>
+
+            {/* SEARCH INPUT */}
+            <div className="relative w-full md:w-64">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -265,62 +370,82 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredInstances.map((inst) => (
-                  <tr 
-                    key={inst.id} 
-                    onClick={() => setSelectedInstance(inst)}
-                    className="hover:bg-slate-50 cursor-pointer transition-colors"
-                  >
-                    <td className="px-6 py-4 font-semibold text-slate-900 flex items-center gap-3">
-                      <Server className="w-4 h-4 text-slate-400" />
-                      {inst.name}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                          inst.status === 'running'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            inst.status === 'running' ? 'bg-emerald-500' : 'bg-slate-400'
-                          }`}
-                        />
-                        {inst.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-xs text-slate-600">{inst.ip}</td>
-                    <td className="px-6 py-4 text-xs">{inst.os}</td>
-                    <td className="px-6 py-4">
-                      <div className="w-24 bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${
-                            inst.cpuUsage > 75 ? 'bg-rose-500' : 'bg-blue-600'
-                          }`}
-                          style={{ width: `${inst.cpuUsage}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-slate-400 mt-1 block">{inst.cpuUsage}%</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={(e) => toggleServerStatus(inst.id, e)}
-                          title={inst.status === 'running' ? 'Power Off' : 'Power On'}
-                          className={`p-1.5 rounded-lg border transition-all ${
-                            inst.status === 'running'
-                              ? 'border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
-                              : 'border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200'
-                          }`}
-                        >
-                          <Power className="w-4 h-4" />
-                        </button>
-                      </div>
+                {filteredInstances.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-xs">
+                      No virtual servers found matching criteria.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  filteredInstances.map((inst) => (
+                    <tr 
+                      key={inst.id} 
+                      onClick={() => setSelectedInstance(inst)}
+                      className="hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      <td className="px-6 py-4 font-semibold text-slate-900 flex items-center gap-3">
+                        <Server className="w-4 h-4 text-slate-400" />
+                        {inst.name}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                            inst.status === 'running'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              inst.status === 'running' ? 'bg-emerald-500' : 'bg-slate-400'
+                            }`}
+                          />
+                          {inst.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 font-mono text-xs text-slate-600">{inst.ip}</td>
+                      <td className="px-6 py-4 text-xs">{inst.os}</td>
+                      <td className="px-6 py-4">
+                        <div className="w-24 bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${
+                              inst.cpuUsage > 75 ? 'bg-rose-500' : 'bg-blue-600'
+                            }`}
+                            style={{ width: `${inst.cpuUsage}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-1 block">{inst.cpuUsage}%</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={(e) => toggleServerStatus(inst.id, e)}
+                            title={inst.status === 'running' ? 'Power Off' : 'Power On'}
+                            className={`p-1.5 rounded-lg border transition-all ${
+                              inst.status === 'running'
+                                ? 'border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
+                                : 'border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200'
+                            }`}
+                          >
+                            <Power className="w-4 h-4" />
+                          </button>
+                          
+                          {/* DELETE ACTION BUTTON */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingInstance(inst);
+                            }}
+                            title="Terminate / Delete Instance"
+                            className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -430,9 +555,47 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ==================== DELETE / TERMINATE CONFIRMATION MODAL ==================== */}
+      {deletingInstance && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 text-rose-600 mb-3">
+              <div className="p-2.5 bg-rose-50 rounded-xl">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 font-poppins">
+                Terminate Instance
+              </h3>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              Are you sure you want to terminate <strong className="text-slate-900 font-mono">{deletingInstance.name}</strong> ({deletingInstance.ip})?
+              This action is permanent and all data will be destroyed.
+            </p>
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setDeletingInstance(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteInstance}
+                className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 shadow-md shadow-rose-500/20 transition-all"
+              >
+                Destroy Server
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== SERVER DETAIL SIDEBAR DRAWER ==================== */}
       {selectedInstance && (
-        <div className="fixed inset-0 z-50 bg-slate-900/30 backdrop-blur-xs flex justify-end">
+        <div className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-xs flex justify-end">
           <div className="bg-white w-full max-w-md h-full border-l border-slate-200 p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200">
             
             <div className="space-y-6">
@@ -520,13 +683,6 @@ export default function Dashboard() {
                       <p className="text-[10px] text-slate-400">Health checks passed 5m ago</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-2 border-t border-slate-200/60 pt-2">
-                    <RefreshCw className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="font-medium text-slate-800">System Boot Completed</p>
-                      <p className="text-[10px] text-slate-400">Initial boot sequence completed</p>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -538,12 +694,20 @@ export default function Dashboard() {
                 onClick={(e) => toggleServerStatus(selectedInstance.id, e)}
                 className={`w-full py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 border ${
                   selectedInstance.status === 'running'
-                    ? 'border-rose-200 text-rose-600 hover:bg-rose-50'
+                    ? 'border-slate-200 text-slate-700 hover:bg-slate-100'
                     : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
                 }`}
               >
                 <Power className="w-4 h-4" />
-                {selectedInstance.status === 'running' ? 'Power Down Instance' : 'Start Instance'}
+                {selectedInstance.status === 'running' ? 'Power Off' : 'Power On'}
+              </button>
+
+              <button
+                onClick={() => setDeletingInstance(selectedInstance)}
+                className="py-2.5 px-4 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-rose-200 text-rose-600 hover:bg-rose-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                Destroy
               </button>
             </div>
 
