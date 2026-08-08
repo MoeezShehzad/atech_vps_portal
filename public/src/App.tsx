@@ -8,6 +8,7 @@ import Pricing from './pages/Pricing';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
+import Dashboard from './pages/Dashboard';
 import atcLogo from './assets/ATC_Logo.png';
 
 export default function App() {
@@ -29,7 +30,7 @@ export default function App() {
             <Link to="/about" className="hover:text-blue-600 transition-colors">About Us</Link>
             <Link to="/services" className="hover:text-blue-600 transition-colors">Services</Link>
             <Link to="/pricing" className="hover:text-blue-600 transition-colors">Pricing</Link>
-            <Link to="/contact" className="hover:text-blue-600 transition-colors">Contact</Link>
+            <Link to="/contact" className="hover:text-blue-600 transition-colors">Contact</Link><Link to="/dashboard" className="hover:text-blue-600 transition-colors">Dashboard</Link>
           </div>
 
           <div className="flex gap-3 items-center">
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/dashboard" element={<Dashboard />} />
         </Routes>
       </main>
 
