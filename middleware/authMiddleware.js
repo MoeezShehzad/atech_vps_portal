@@ -8,11 +8,18 @@ export const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token missing or malformed.' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwt', (err, decoded) => {
     if (err) {
       return res.status(403).json({ error: 'Invalid or expired token.' });
     }
-    req.user = decoded;
+
+    req.user = {
+      ...decoded,
+      userId: decoded.userId || decoded.id || decoded.sub,
+    };
+
     next();
   });
 };
+
+export default authenticateToken;

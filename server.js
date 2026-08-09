@@ -2,26 +2,42 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
+import cors from 'cors'; // Added CORS import
 import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import userRoutes from './routes/user.js';
 
 const app = express();
 const prisma = new PrismaClient();
 
-// Session middleware
+// 1. CORS Configuration (Must be placed before routes & body parsers)
+app.use(cors({
+  origin: ['http://localhost:5174', 'http://localhost:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// 2. Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET || 'supersecret',
   resave: false,
   saveUninitialized: false,
 }));
 
+// 3. Passport & Body parser middlewares
 app.use(passport.initialize());
 app.use(passport.session());
+app.use(express.json());
 
-// Passport Google Strategy Setup
+// 4. User Routes mounting
+app.use('/api/users', userRoutes);
+app.use('/api/user', userRoutes);
+
+// 5. Passport Google Strategy Setup
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -61,7 +77,7 @@ passport.use(new GoogleStrategy({
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
-// --- OAUTH ROUTES ---
+// 6. OAuth Routes
 app.get('/api/auth/google',
   passport.authenticate('google', { scope: ['profile', 'email'] })
 );
@@ -69,17 +85,15 @@ app.get('/api/auth/google',
 app.get('/api/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: 'http://localhost:5174/login?error=oauth_failed' }),
   (req, res) => {
-    // 1. Generate a JWT token using the authenticated user's ID
+    // Generate JWT token using user.userId or user.id
+    const userId = req.user.userId || req.user.id;
     const token = jwt.sign(
-      { userId: req.user.userId, email: req.user.email },
+      { userId, email: req.user.email },
       process.env.JWT_SECRET || 'supersecretjwt',
       { expiresIn: '7d' }
     );
 
-    // 2. Encode user data safely for URL transport
     const userData = encodeURIComponent(JSON.stringify(req.user));
-
-    // 3. Redirect to frontend AuthCallback handler with token and user data
     res.redirect(`http://localhost:5174/auth/callback?token=${token}&user=${userData}`);
   }
 );

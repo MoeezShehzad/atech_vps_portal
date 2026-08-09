@@ -19,6 +19,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import Sidebar from '../components/Sidebar';
+import AccountSettings from '../components/AccountSettings';
 
 interface Instance {
   id: string;
@@ -83,7 +85,10 @@ const INITIAL_INSTANCES: Instance[] = [
 export default function Dashboard() {
   const { logout } = useAuth();
   
-  // 1. LOCALSTORAGE STATE INITIALIZATION
+  // Navigation active tab state
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  // LOCALSTORAGE STATE INITIALIZATION
   const [instances, setInstances] = useState<Instance[]>(() => {
     const saved = localStorage.getItem('vps_instances');
     if (saved) {
@@ -219,240 +224,261 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-10 font-sans relative">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="flex min-h-screen bg-slate-50 font-sans">
+      {/* PERSISTENT SIDEBAR */}
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      {/* DYNAMIC CONTENT CONTAINER */}
+      <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-blue-950 font-poppins">
-              Infrastructure Dashboard
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Manage virtual private servers, network configurations, and resource allocation.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={handleResetData}
-              title="Reset mock local storage data"
-              className="p-2.5 text-slate-500 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition-all"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => setIsDeployOpen(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm shadow-blue-500/20"
-            >
-              <Plus className="w-4 h-4" /> Deploy New Instance
-            </button>
-          </div>
-        </div>
+        {/* RENDER ACCOUNT SETTINGS WHEN TAB IS SETTINGS */}
+        {activeTab === 'settings' && <AccountSettings />}
 
-        {/* OVERVIEW METRICS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-              <Server className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total VPS</p>
-              <p className="text-xl font-bold text-slate-900 mt-0.5">{instances.length} Configured</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-              <Activity className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Running Instances</p>
-              <p className="text-xl font-bold text-emerald-600 mt-0.5">{runningCount} Active</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
-              <Cpu className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avg CPU Usage</p>
-              <p className="text-xl font-bold text-slate-900 mt-0.5">20%</p>
-            </div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-            <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
-              <HardDrive className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Storage Allocated</p>
-              <p className="text-xl font-bold text-slate-900 mt-0.5">{totalStorage} GB</p>
-            </div>
-          </div>
-        </div>
-
-        {/* INSTANCE TABLE SECTION */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          
-          {/* TABLE CONTROLS & FILTER TABS */}
-          <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* RENDER DASHBOARD / VMS VIEWS */}
+        {(activeTab === 'dashboard' || activeTab === 'vms') && (
+          <div className="max-w-7xl mx-auto space-y-8">
             
-            {/* STATUS FILTER TABS */}
-            <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl w-fit">
-              <button
-                onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                  statusFilter === 'all'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                All
-                <span className="bg-slate-200/80 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
-                  {instances.length}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setStatusFilter('running')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                  statusFilter === 'running'
-                    ? 'bg-white text-emerald-700 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Running
-                <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md text-[10px]">
-                  {runningCount}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setStatusFilter('stopped')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                  statusFilter === 'stopped'
-                    ? 'bg-white text-slate-800 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                Stopped
-                <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
-                  {stoppedCount}
-                </span>
-              </button>
+            {/* HEADER */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
+              <div>
+                <h1 className="text-2xl font-bold text-blue-950 font-poppins">
+                  Infrastructure Dashboard
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                  Manage virtual private servers, network configurations, and resource allocation.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={handleResetData}
+                  title="Reset mock local storage data"
+                  className="p-2.5 text-slate-500 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition-all"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => setIsDeployOpen(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm shadow-blue-500/20"
+                >
+                  <Plus className="w-4 h-4" /> Deploy New Instance
+                </button>
+              </div>
             </div>
 
-            {/* SEARCH INPUT */}
-            <div className="relative w-full md:w-64">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search instances or IP..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-              />
-            </div>
-          </div>
+            {/* OVERVIEW METRICS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                  <Server className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total VPS</p>
+                  <p className="text-xl font-bold text-slate-900 mt-0.5">{instances.length} Configured</p>
+                </div>
+              </div>
 
-          {/* TABLE */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600">
-              <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100">
-                <tr>
-                  <th className="px-6 py-3.5">Instance Name</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">IP Address</th>
-                  <th className="px-6 py-3.5">OS</th>
-                  <th className="px-6 py-3.5">CPU Load</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredInstances.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-xs">
-                      No virtual servers found matching criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredInstances.map((inst) => (
-                    <tr 
-                      key={inst.id} 
-                      onClick={() => setSelectedInstance(inst)}
-                      className="hover:bg-slate-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-6 py-4 font-semibold text-slate-900 flex items-center gap-3">
-                        <Server className="w-4 h-4 text-slate-400" />
-                        {inst.name}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                            inst.status === 'running'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              inst.status === 'running' ? 'bg-emerald-500' : 'bg-slate-400'
-                            }`}
-                          />
-                          {inst.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-xs text-slate-600">{inst.ip}</td>
-                      <td className="px-6 py-4 text-xs">{inst.os}</td>
-                      <td className="px-6 py-4">
-                        <div className="w-24 bg-slate-100 h-2 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${
-                              inst.cpuUsage > 75 ? 'bg-rose-500' : 'bg-blue-600'
-                            }`}
-                            style={{ width: `${inst.cpuUsage}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-slate-400 mt-1 block">{inst.cpuUsage}%</span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={(e) => toggleServerStatus(inst.id, e)}
-                            title={inst.status === 'running' ? 'Power Off' : 'Power On'}
-                            className={`p-1.5 rounded-lg border transition-all ${
-                              inst.status === 'running'
-                                ? 'border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
-                                : 'border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200'
-                            }`}
-                          >
-                            <Power className="w-4 h-4" />
-                          </button>
-                          
-                          {/* DELETE ACTION BUTTON */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeletingInstance(inst);
-                            }}
-                            title="Terminate / Delete Instance"
-                            className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Running Instances</p>
+                  <p className="text-xl font-bold text-emerald-600 mt-0.5">{runningCount} Active</p>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
+                  <Cpu className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avg CPU Usage</p>
+                  <p className="text-xl font-bold text-slate-900 mt-0.5">20%</p>
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                  <HardDrive className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Storage Allocated</p>
+                  <p className="text-xl font-bold text-slate-900 mt-0.5">{totalStorage} GB</p>
+                </div>
+              </div>
+            </div>
+
+            {/* INSTANCE TABLE SECTION */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              
+              {/* TABLE CONTROLS & FILTER TABS */}
+              <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                
+                {/* STATUS FILTER TABS */}
+                <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl w-fit">
+                  <button
+                    onClick={() => setStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                      statusFilter === 'all'
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    All
+                    <span className="bg-slate-200/80 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
+                      {instances.length}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setStatusFilter('running')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                      statusFilter === 'running'
+                        ? 'bg-white text-emerald-700 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Running
+                    <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md text-[10px]">
+                      {runningCount}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => setStatusFilter('stopped')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                      statusFilter === 'stopped'
+                        ? 'bg-white text-slate-800 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    Stopped
+                    <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
+                      {stoppedCount}
+                    </span>
+                  </button>
+                </div>
+
+                {/* SEARCH INPUT */}
+                <div className="relative w-full md:w-64">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search instances or IP..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* TABLE */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-600">
+                  <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                    <tr>
+                      <th className="px-6 py-3.5">Instance Name</th>
+                      <th className="px-6 py-3.5">Status</th>
+                      <th className="px-6 py-3.5">IP Address</th>
+                      <th className="px-6 py-3.5">OS</th>
+                      <th className="px-6 py-3.5">CPU Load</th>
+                      <th className="px-6 py-3.5 text-right">Actions</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredInstances.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-xs">
+                          No virtual servers found matching criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredInstances.map((inst) => (
+                        <tr 
+                          key={inst.id} 
+                          onClick={() => setSelectedInstance(inst)}
+                          className="hover:bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <td className="px-6 py-4 font-semibold text-slate-900 flex items-center gap-3">
+                            <Server className="w-4 h-4 text-slate-400" />
+                            {inst.name}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                inst.status === 'running'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  inst.status === 'running' ? 'bg-emerald-500' : 'bg-slate-400'
+                                }`}
+                              />
+                              {inst.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-mono text-xs text-slate-600">{inst.ip}</td>
+                          <td className="px-6 py-4 text-xs">{inst.os}</td>
+                          <td className="px-6 py-4">
+                            <div className="w-24 bg-slate-100 h-2 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${
+                                  inst.cpuUsage > 75 ? 'bg-rose-500' : 'bg-blue-600'
+                                }`}
+                                style={{ width: `${inst.cpuUsage}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-slate-400 mt-1 block">{inst.cpuUsage}%</span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={(e) => toggleServerStatus(inst.id, e)}
+                                title={inst.status === 'running' ? 'Power Off' : 'Power On'}
+                                className={`p-1.5 rounded-lg border transition-all ${
+                                  inst.status === 'running'
+                                    ? 'border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
+                                    : 'border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200'
+                                }`}
+                              >
+                                <Power className="w-4 h-4" />
+                              </button>
+                              
+                              {/* DELETE ACTION BUTTON */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingInstance(inst);
+                                }}
+                                title="Terminate / Delete Instance"
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* ==================== DEPLOY NEW INSTANCE MODAL ==================== */}
+        {/* PLACEHOLDER FOR OTHER TABS */}
+        {!['dashboard', 'vms', 'settings'].includes(activeTab) && (
+          <div className="max-w-7xl mx-auto bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-500 font-medium">
+            Section <strong className="capitalize text-slate-800">{activeTab}</strong> is under construction.
+          </div>
+        )}
+
+      </main>
+
+      {/* DEPLOY NEW INSTANCE MODAL */}
       {isDeployOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
@@ -555,7 +581,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ==================== DELETE / TERMINATE CONFIRMATION MODAL ==================== */}
+      {/* DELETE / TERMINATE CONFIRMATION MODAL */}
       {deletingInstance && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
@@ -593,7 +619,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ==================== SERVER DETAIL SIDEBAR DRAWER ==================== */}
+      {/* SERVER DETAIL SIDEBAR DRAWER */}
       {selectedInstance && (
         <div className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-xs flex justify-end">
           <div className="bg-white w-full max-w-md h-full border-l border-slate-200 p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200">

@@ -13,6 +13,10 @@ model User {
   email         String           @unique(map: "uq_users_email") @db.VarChar(255)
   passwordHash  String?           @map("password_hash") @db.VarChar(255)
   phone         String?          @db.VarChar(30)
+  address       String?
+  city          String?
+  country       String?
+  avatar_url    String?   @db.Text
   isActive      Boolean          @default(true) @map("is_active")
   emailVerified Boolean          @default(false) @map("email_verified")
   lastLoginAt   DateTime?        @map("last_login_at") @db.DateTime(0)
