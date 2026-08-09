@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import atcLogo from '../assets/ATC_Logo.png';
 
@@ -8,24 +8,48 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(); // Set authenticated state to true
-    navigate('/dashboard'); // Send user straight to dashboard
-  };
+    setError('');
+    setLoading(true);
 
-  const handleGoogleLogin = () => {
-    login();
-    navigate('/dashboard');
-  };
+    try {
+      // 1. Call Node.js Backend API
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-  const handleGithubLogin = () => {
-    login();
-    navigate('/dashboard');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid login credentials');
+      }
+
+      // 2. Save JWT Token & User Data
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // 3. Update Auth Context state (if applicable) & Navigate
+      if (typeof login === 'function') {
+        login(data.token, data.user);
+      }
+      
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Server error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -52,7 +76,7 @@ export default function Login() {
           <div className="space-y-3">
             <button
               type="button"
-              onClick={handleGoogleLogin}
+              onClick={() => setError('Social login unavailable. Please sign in with email.')}
               className="w-full py-2.5 px-4 border border-slate-200 rounded-xl bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -66,7 +90,7 @@ export default function Login() {
 
             <button
               type="button"
-              onClick={handleGithubLogin}
+              onClick={() => setError('Social login unavailable. Please sign in with email.')}
               className="w-full py-2.5 px-4 border border-slate-200 rounded-xl bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm"
             >
               <svg className="w-4 h-4 fill-slate-900" viewBox="0 0 24 24">
@@ -85,6 +109,14 @@ export default function Login() {
             </div>
           </div>
 
+          {/* DYNAMIC ERROR MESSAGE */}
+          {error && (
+            <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{error}</span>
+            </div>
+          )}
+
           {/* FORM */}
           <form className="space-y-4" onSubmit={handleLogin}>
             <div>
@@ -101,7 +133,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                  placeholder="name@company.com"
+                  placeholder="admin@atech.local"
                 />
               </div>
             </div>
@@ -111,7 +143,6 @@ export default function Login() {
                 Password
               </label>
 
-              {/* INPUT CONTAINER */}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                   <Lock className="h-4 w-4" />
@@ -133,7 +164,6 @@ export default function Login() {
                 </button>
               </div>
 
-              {/* FORGOT PASSWORD BELOW INPUT */}
               <div className="flex justify-end mt-1.5">
                 <Link
                   to="/forgot-password"
@@ -146,9 +176,10 @@ export default function Login() {
 
             <button
               type="submit"
-              className="w-full py-3 rounded-full bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 mt-2"
+              disabled={loading}
+              className="w-full py-3 rounded-full bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
             >
-              Sign In <ArrowRight className="w-4 h-4" />
+              {loading ? 'Authenticating...' : 'Sign In'} <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
