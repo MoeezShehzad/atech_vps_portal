@@ -51,12 +51,27 @@ export const register = async (req, res) => {
       return user;
     });
 
+    // Generate JWT token upon registration so user can immediately view/edit settings
+    const roles = customerRole ? [customerRole.roleName] : [];
+    const token = jwt.sign(
+      {
+        userId: newUser.userId,
+        email: newUser.email,
+        roles,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
     res.status(201).json({
       message: 'User registered successfully',
+      token,
       user: {
         userId: newUser.userId,
         fullName: newUser.fullName,
         email: newUser.email,
+        phone: newUser.phone, // <-- Explicitly included phone in response
+        roles,
         createdAt: newUser.createdAt,
       },
     });
@@ -123,6 +138,7 @@ export const login = async (req, res) => {
         userId: user.userId,
         fullName: user.fullName,
         email: user.email,
+        phone: user.phone, // <-- Included phone on login response
         roles,
       },
     });
@@ -157,7 +173,14 @@ export const getProfile = async (req, res) => {
 
     if (!user) return res.status(404).json({ error: 'User not found.' });
 
-    res.json(user);
+    // Format roles array cleanly for frontend consume
+    const roles = user.userRoles?.map((ur) => ur.role.roleName) || [];
+
+    res.json({
+      ...user,
+      role: roles[0] || 'Customer',
+      roles,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to retrieve profile', details: error.message });
   }

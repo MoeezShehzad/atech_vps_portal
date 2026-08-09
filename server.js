@@ -2,18 +2,19 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
-import cors from 'cors'; // Added CORS import
+import cors from 'cors';
 import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import userRoutes from './routes/user.js';
+import authRoutes from './routes/authRoutes.js';
 
 const app = express();
 const prisma = new PrismaClient();
 
-// 1. CORS Configuration (Must be placed before routes & body parsers)
+// 1. CORS Configuration
 app.use(cors({
   origin: ['http://localhost:5174', 'http://localhost:5173'],
   credentials: true,
@@ -33,7 +34,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.json());
 
-// 4. User Routes mounting
+// 4. Route Mounting (FIXED HERE)
+app.use('/api/auth', authRoutes); // Handlers: /register, /login, /me
 app.use('/api/users', userRoutes);
 app.use('/api/user', userRoutes);
 
@@ -52,12 +54,10 @@ passport.use(new GoogleStrategy({
         return done(new Error('No email found in Google profile'), null);
       }
 
-      // Check if user exists in database
       let user = await prisma.user.findUnique({
         where: { email }
       });
 
-      // If user doesn't exist, create a new record
       if (!user) {
         user = await prisma.user.create({
           data: {
@@ -85,7 +85,6 @@ app.get('/api/auth/google',
 app.get('/api/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: 'http://localhost:5174/login?error=oauth_failed' }),
   (req, res) => {
-    // Generate JWT token using user.userId or user.id
     const userId = req.user.userId || req.user.id;
     const token = jwt.sign(
       { userId, email: req.user.email },
