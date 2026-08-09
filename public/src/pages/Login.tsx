@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { apiCall } from '../services/api';
 import atcLogo from '../assets/ATC_Logo.png';
 
 export default function Login() {
@@ -20,24 +21,13 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const data = await apiCall('/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.error || 'Invalid login credentials');
-      }
-
-      if (data?.token) localStorage.setItem('token', data.token);
-      if (data?.user) localStorage.setItem('user', JSON.stringify(data.user));
-
-      login();
+      // Pass accessToken and user object required by AuthContext
+      login(data.accessToken || data.token, data.user);
       navigate('/dashboard');
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -48,6 +38,10 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleLogin = () => {
+    window.location.href = 'http://localhost:5000/api/auth/google';
   };
 
   return (
@@ -71,8 +65,9 @@ export default function Login() {
         <div className="bg-white py-8 px-6 shadow-xl shadow-blue-950/5 border border-slate-200 rounded-2xl sm:px-10">
 
           <div className="space-y-3">
-            <a
-              href="http://localhost:5000/api/auth/google"
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
               className="flex items-center justify-center gap-2 w-full py-2.5 px-4 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors font-medium text-slate-700"
             >
               {/* Google SVG Icon */}
@@ -83,7 +78,7 @@ export default function Login() {
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
               </svg>
               Continue with Google
-            </a>
+            </button>
 
             <button
               type="button"

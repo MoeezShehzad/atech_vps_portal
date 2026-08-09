@@ -3,6 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
@@ -22,24 +23,27 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 2. Session middleware
+// 2. Cookie Parser Middleware
+app.use(cookieParser());
+
+// 3. Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET || 'supersecret',
   resave: false,
   saveUninitialized: false,
 }));
 
-// 3. Passport & Body parser middlewares
+// 4. Passport & Body parser middlewares
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.json());
 
-// 4. Route Mounting (FIXED HERE)
-app.use('/api/auth', authRoutes); // Handlers: /register, /login, /me
+// 5. Route Mounting
+app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/user', userRoutes);
 
-// 5. Passport Google Strategy Setup
+// 6. Passport Google Strategy Setup
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
@@ -55,14 +59,44 @@ passport.use(new GoogleStrategy({
       }
 
       let user = await prisma.user.findUnique({
-        where: { email }
+        where: { email },
+        include: {
+          userRoles: {
+            include: { role: true }
+          }
+        }
       });
 
       if (!user) {
-        user = await prisma.user.create({
-          data: {
-            email,
-            fullName,
+        // Fetch or assign default Customer role
+        const customerRole = await prisma.role.findUnique({
+          where: { roleName: 'Customer' }
+        });
+
+        user = await prisma.$transaction(async (tx) => {
+          const createdUser = await tx.user.create({
+            data: { email, fullName }
+          });
+
+          if (customerRole) {
+            await tx.userRole.create({
+              data: {
+                userId: createdUser.userId,
+                roleId: customerRole.roleId
+              }
+            });
+          }
+
+          return createdUser;
+        });
+
+        // Re-fetch user with userRoles populated
+        user = await prisma.user.findUnique({
+          where: { userId: user.userId },
+          include: {
+            userRoles: {
+              include: { role: true }
+            }
           }
         });
       }
@@ -77,23 +111,71 @@ passport.use(new GoogleStrategy({
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
-// 6. OAuth Routes
+// 7. OAuth Routes
 app.get('/api/auth/google',
   passport.authenticate('google', { scope: ['profile', 'email'] })
 );
 
 app.get('/api/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: 'http://localhost:5174/login?error=oauth_failed' }),
-  (req, res) => {
-    const userId = req.user.userId || req.user.id;
-    const token = jwt.sign(
-      { userId, email: req.user.email },
-      process.env.JWT_SECRET || 'supersecretjwt',
-      { expiresIn: '7d' }
-    );
+  passport.authenticate('google', { failureRedirect: 'http://localhost:5174/login?error=oauth_failed', session: false }),
+  async (req, res) => {
+    try {
+      const user = req.user;
+      const roles = user.userRoles?.map((ur) => ur.role.roleName) || ['Customer'];
 
-    const userData = encodeURIComponent(JSON.stringify(req.user));
-    res.redirect(`http://localhost:5174/auth/callback?token=${token}&user=${userData}`);
+      // 1. Generate short-lived Access Token (15m)
+      const accessToken = jwt.sign(
+        { userId: user.userId, email: user.email, roles },
+        process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret',
+        { expiresIn: '15m' }
+      );
+
+      // 2. Generate long-lived Refresh Token (7d)
+      const refreshToken = jwt.sign(
+        { userId: user.userId },
+        process.env.JWT_REFRESH_SECRET || 'refresh-secret',
+        { expiresIn: '7d' }
+      );
+
+      // 3. Store Refresh Token in DB
+      await prisma.refreshToken.create({
+        data: {
+          token: refreshToken,
+          userId: user.userId,
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        }
+      });
+
+      // 4. Set HttpOnly Cookie for Refresh Token
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/api/auth',
+        maxAge: 7 * 24 * 60 * 60 * 1000
+      });
+
+      // 5. Update last login
+      await prisma.user.update({
+        where: { userId: user.userId },
+        data: { lastLoginAt: new Date() }
+      });
+
+      // 6. Redirect to frontend OAuth callback page with accessToken and user state
+      const userObj = {
+        userId: user.userId,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone || null,
+        roles
+      };
+
+      const userDataStr = encodeURIComponent(JSON.stringify(userObj));
+      res.redirect(`http://localhost:5174/auth/callback?token=${accessToken}&user=${userDataStr}`);
+    } catch (err) {
+      console.error('Google OAuth callback error:', err);
+      res.redirect('http://localhost:5174/login?error=oauth_failed');
+    }
   }
 );
 

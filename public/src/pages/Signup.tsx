@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { apiCall } from '../services/api';
+import atcLogo from '../assets/ATC_Logo.png';
+
 import { 
   Mail, 
   Lock, 
@@ -12,10 +16,9 @@ import {
   Check, 
   X,
   AlertCircle
-} from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { apiCall } from '../services/api';
-import atcLogo from '../assets/ATC_Logo.png';
+} 
+from 'lucide-react';
+
 
 export default function Signup() {
   const [fullName, setFullName] = useState('');
@@ -36,8 +39,8 @@ export default function Signup() {
 
   // Password validation criteria
   const hasMinLength = password.length >= 8;
-  const hasNumber = /\d/.exec(password) !== null;
-  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.exec(password) !== null;
+  const hasNumber = /\d/.test(password);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
   
   const passwordsMatch = password.length > 0 && password === confirmPassword;
 
@@ -66,7 +69,6 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      // API payload incorporating combined phone number
       const fullPhoneNumber = `${countryCode}${phone}`;
       
       const data = await apiCall('/auth/register', {
@@ -79,18 +81,15 @@ export default function Signup() {
         }),
       });
 
-      // Persist auth details locally if provided by the backend API
-      if (data.token) {
-        localStorage.setItem('token', data.token);
-      }
-      if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
-      }
-
-      login();
+      // Pass token and user object directly to AuthContext handler
+      login(data.token, data.user);
       navigate('/dashboard');
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Server error during registration. Please try again.');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setErrorMsg(err.message);
+      } else {
+        setErrorMsg('Server error during registration. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
