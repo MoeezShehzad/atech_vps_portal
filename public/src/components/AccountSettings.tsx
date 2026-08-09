@@ -13,7 +13,7 @@ interface UserProfile {
   country?: string;
   role?: string;
   avatarUrl?: string;
-  hasPassword?: boolean; // Set by backend to false if user signed up with Google OAuth
+  hasPassword?: boolean;
   authProvider?: string;
 }
 
@@ -22,7 +22,6 @@ interface FeedbackMessage {
   text: string;
 }
 
-// Ensure request targets Express backend port 5000
 const API_BASE_URL = 'http://localhost:5000';
 
 export default function AccountSettings() {
@@ -54,7 +53,8 @@ export default function AccountSettings() {
   const populateUserData = (data: UserProfile) => {
     setProfile(data);
     setFullName(data.fullName || data.name || '');
-    setPhone(data.phone || '');
+    // Ensure phone string is set cleanly even if backend returns null
+    setPhone(data.phone ?? '');
     setAddress(data.address || '');
     setCity(data.city || '');
     setCountry(data.country || '');
@@ -76,6 +76,13 @@ export default function AccountSettings() {
       if (response.ok) {
         const data: UserProfile = await response.json();
         populateUserData(data);
+
+        // Update local cache so phone number persists on refresh
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const parsed = JSON.parse(storedUser);
+          localStorage.setItem('user', JSON.stringify({ ...parsed, phone: data.phone }));
+        }
         return;
       }
 
