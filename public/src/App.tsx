@@ -5,7 +5,7 @@ import AboutUs from './pages/AboutUs';
 import Services from './pages/Services';
 import ContactUs from './pages/ContactUs';
 import Pricing from './pages/Pricing';
-import Login from './pages/Login';
+import Login from './pages/Login.tsx';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
