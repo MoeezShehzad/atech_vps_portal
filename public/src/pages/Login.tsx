@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { apiCall } from '../services/api';
+import { apiCall, setAccessToken } from '../services/api';
 import atcLogo from '../assets/ATC_Logo.png';
 
 export default function Login() {
@@ -14,6 +14,10 @@ export default function Login() {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Retrieve route user was attempting to visit
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,9 +30,23 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       });
 
-      // Pass accessToken and user object required by AuthContext
-      login(data.accessToken || data.token, data.user);
-      navigate('/dashboard');
+      const token = data.accessToken || data.token;
+
+      // 1. Store access token into memory immediately
+      if (token) {
+        setAccessToken(token);
+        localStorage.setItem('token', token);
+      }
+
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+
+      // 2. Pass accessToken and user object required by AuthContext
+      login(token, data.user);
+
+      // 3. Navigate to requested route
+      navigate(from, { replace: true });
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);

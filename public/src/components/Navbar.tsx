@@ -5,10 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import atcLogo from '../assets/ATC_Logo.png';
 
 export default function Navbar() {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Strict check: Only consider logged in if both isAuthenticated is true AND user exists
+  const isLoggedIn = Boolean(isAuthenticated && user);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -49,7 +52,9 @@ export default function Navbar() {
               {link.name}
             </Link>
           ))}
-          {isAuthenticated && (
+          
+          {/* Render Dashboard ONLY when genuinely logged in */}
+          {isLoggedIn && (
             <Link
               to="/dashboard"
               className={`text-sm font-medium transition-colors ${
@@ -65,7 +70,7 @@ export default function Navbar() {
 
         {/* DESKTOP AUTH ACTION BUTTONS */}
         <div className="hidden md:flex items-center gap-3">
-          {isAuthenticated ? (
+          {isLoggedIn ? (
             <>
               <Link
                 to="/dashboard"
@@ -122,7 +127,7 @@ export default function Navbar() {
               {link.name}
             </Link>
           ))}
-          {isAuthenticated && (
+          {isLoggedIn && (
             <Link
               to="/dashboard"
               onClick={() => setMobileMenuOpen(false)}
@@ -135,7 +140,7 @@ export default function Navbar() {
           )}
 
           <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
-            {isAuthenticated ? (
+            {isLoggedIn ? (
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);

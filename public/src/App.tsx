@@ -1,11 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Home from './pages/Home';
 import AboutUs from './pages/AboutUs';
 import Services from './pages/Services';
 import ContactUs from './pages/ContactUs';
 import Pricing from './pages/Pricing';
-import Login from './pages/Login.tsx';
+import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
@@ -19,34 +19,45 @@ function AuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const userParam = searchParams.get('user');
+    const handleOAuth = async () => {
+      const token = searchParams.get('token') || searchParams.get('accessToken');
+      const userParam = searchParams.get('user');
 
-    if (token) {
-      localStorage.setItem('token', token);
-      if (userParam) {
+      if (token && userParam) {
         try {
-          localStorage.setItem('user', userParam);
+          const userData = JSON.parse(decodeURIComponent(userParam));
+          login(token, userData);
+          navigate('/dashboard', { replace: true });
+          return;
         } catch (e) {
-          console.error("Failed to store user data", e);
+          console.error("Failed to parse OAuth user parameter:", e);
         }
       }
 
-      // Update state & navigate cleanly to dashboard
-      login();
-      navigate('/dashboard', { replace: true });
-    } else {
-      navigate('/login?error=oauth_failed', { replace: true });
-    }
+      // If parameters are missing or failed
+      setErrorMessage("Google Sign-In failed or session information was missing.");
+      setTimeout(() => {
+        navigate('/login?error=oauth_failed', { replace: true });
+      }, 2000);
+    };
+
+    handleOAuth();
   }, [searchParams, navigate, login]);
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center font-sans">
-      <div className="text-center">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-slate-600 text-sm font-semibold">Completing Google Sign In...</p>
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center font-sans text-white">
+      <div className="text-center max-w-sm px-4">
+        {errorMessage ? (
+          <p className="text-rose-500 text-sm font-semibold">{errorMessage}</p>
+        ) : (
+          <>
+            <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-300 text-sm font-semibold">Completing Google Sign In...</p>
+          </>
+        )}
       </div>
     </div>
   );
@@ -55,10 +66,13 @@ function AuthCallback() {
 function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   
   // Hide Navbar/Footer on Auth pages and Callback route
   const isAuthPage = ['/login', '/signup', '/forgot-password', '/auth/callback'].includes(location.pathname);
+
+  // Check if user is actively logged in
+  const isLoggedIn = Boolean(isAuthenticated && user);
 
   const handleLogout = () => {
     logout();
@@ -81,11 +95,17 @@ function AppContent() {
             <Link to="/services" className="hover:text-blue-600 transition-colors">Services</Link>
             <Link to="/pricing" className="hover:text-blue-600 transition-colors">Pricing</Link>
             <Link to="/contact" className="hover:text-blue-600 transition-colors">Contact</Link>
-            <Link to="/dashboard" className="hover:text-blue-600 transition-colors">Dashboard</Link>
+
+            {/* Render Dashboard ONLY when signed in */}
+            {isLoggedIn && (
+              <Link to="/dashboard" className="hover:text-blue-600 transition-colors">
+                Dashboard
+              </Link>
+            )}
           </div>
 
           <div className="flex gap-3 items-center">
-            {isAuthenticated ? (
+            {isLoggedIn ? (
               <button
                 onClick={handleLogout}
                 className="px-5 py-2 rounded-full border border-rose-200 font-semibold text-sm text-rose-600 hover:bg-rose-50 transition-all"
@@ -137,7 +157,7 @@ function AppContent() {
         </Routes>
       </main>
 
-      {/* FOOTER (Hidden on Auth Pages & Callback) */}
+      {/* FOOTER */}
       {!isAuthPage && <Footer />}
     </div>
   );

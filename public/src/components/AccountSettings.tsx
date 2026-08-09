@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Phone, Lock, CheckCircle, AlertCircle, Loader2, Camera, MapPin, ShieldCheck } from 'lucide-react';
+import { apiCall, getAccessToken } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 interface UserProfile {
   id?: string | number;
@@ -22,9 +24,8 @@ interface FeedbackMessage {
   text: string;
 }
 
-const API_BASE_URL = 'http://localhost:5000';
-
 export default function AccountSettings() {
+  const { isAuthenticated, user: authUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   // Profile details state
@@ -46,14 +47,9 @@ export default function AccountSettings() {
   const [savingPassword, setSavingPassword] = useState<boolean>(false);
   const [message, setMessage] = useState<FeedbackMessage | null>(null);
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
   const populateUserData = (data: UserProfile) => {
     setProfile(data);
     setFullName(data.fullName || data.name || '');
-    // Ensure phone string is set cleanly even if backend returns null
     setPhone(data.phone ?? '');
     setAddress(data.address || '');
     setCity(data.city || '');
@@ -64,46 +60,42 @@ export default function AccountSettings() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
 
-      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Check endpoints in order of standard NestJS route structure
+      let data: UserProfile;
+      try {
+        data = await apiCall('/users/me');
+      } catch {
+        // Fallback endpoint check if apiCall doesn't strip global prefix
+        data = await apiCall('/auth/me');
+      }
 
-      if (response.ok) {
-        const data: UserProfile = await response.json();
-        populateUserData(data);
+      populateUserData(data);
 
-        // Update local cache so phone number persists on refresh
+      // Keep cache synced
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        localStorage.setItem('user', JSON.stringify({ ...parsed, ...data }));
+      }
+    } catch (err: any) {
+      console.error("Profile fetch error:", err);
+      // Fallback to AuthContext or localStorage if API endpoint fails
+      if (authUser) {
+        populateUserData(authUser as UserProfile);
+      } else {
         const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const parsed = JSON.parse(storedUser);
-          localStorage.setItem('user', JSON.stringify({ ...parsed, phone: data.phone }));
-        }
-        return;
-      }
-
-      // LocalStorage fallback
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        populateUserData(JSON.parse(storedUser));
-      } else {
-        throw new Error('Failed to fetch profile');
-      }
-    } catch (err) {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        populateUserData(JSON.parse(storedUser));
-      } else {
-        setMessage({ type: 'error', text: 'Could not load account details.' });
+        if (storedUser) populateUserData(JSON.parse(storedUser));
+        else setMessage({ type: 'error', text: 'Could not load account details from backend.' });
       }
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchProfile();
+  }, [isAuthenticated]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -121,7 +113,6 @@ export default function AccountSettings() {
     try {
       setSavingProfile(true);
       setMessage(null);
-      const token = localStorage.getItem('token');
 
       const payload = {
         fullName,
@@ -132,49 +123,43 @@ export default function AccountSettings() {
         avatarUrl: avatarPreview,
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/users/me`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      // Try PATCH first, fallback to PUT if route demands full replacement
+      let responseData;
+      try {
+        responseData = await apiCall('/users/me', {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+      } catch {
+        responseData = await apiCall('/users/me', {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+      }
 
-      if (!response.ok) throw new Error('Failed to update profile');
-
-      const responseData = await response.json();
       const updatedUser: UserProfile = responseData.user || responseData;
       setProfile((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
 
-      // Sync local storage cache
+      // Update localStorage cache
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
-        const updatedCache = { ...parsed, ...payload };
-        localStorage.setItem('user', JSON.stringify(updatedCache));
+        localStorage.setItem('user', JSON.stringify({ ...parsed, ...payload }));
       }
 
       setMessage({ type: 'success', text: 'Profile details updated successfully!' });
-    } catch (err) {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const parsed = JSON.parse(storedUser);
-        const updatedCache = { ...parsed, fullName, phone, address, city, country, avatarUrl: avatarPreview };
-        localStorage.setItem('user', JSON.stringify(updatedCache));
-        setProfile(updatedCache);
-        setMessage({ type: 'success', text: 'Profile details updated successfully!' });
-      } else {
-        setMessage({ type: 'error', text: 'Failed to update profile details.' });
-      }
+    } catch (err: any) {
+      console.error("Profile update error:", err);
+      setMessage({ type: 'error', text: err.message || 'Failed to update profile details in database.' });
     } finally {
       setSavingProfile(false);
     }
   };
 
-  const userHasPassword = Boolean(
-    profile?.hasPassword || (profile as any)?.password_hash || (profile as any)?.passwordHash
-  );
+  // Improved password detector: Check explicit flag or fallback to authProvider
+  const userHasPassword = profile?.hasPassword !== undefined 
+    ? profile.hasPassword 
+    : profile?.authProvider !== 'google';
 
   const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,24 +180,14 @@ export default function AccountSettings() {
     try {
       setSavingPassword(true);
       setMessage(null);
-      const token = localStorage.getItem('token');
 
-      const response = await fetch(`${API_BASE_URL}/api/users/me/password`, {
+      await apiCall('/users/me/password', {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           ...(userHasPassword && { currentPassword }),
           newPassword,
         }),
       });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || 'Failed to update password');
-      }
 
       setProfile((prev) => (prev ? { ...prev, hasPassword: true } : prev));
       setCurrentPassword('');

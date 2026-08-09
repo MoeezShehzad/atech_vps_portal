@@ -4,7 +4,9 @@ import {
   login, 
   getProfile, 
   refreshTokenHandler, 
-  logoutHandler 
+  logoutHandler,
+  googleAuth,
+  googleAuthCallback
 } from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
@@ -15,6 +17,10 @@ router.post('/register', register);
 router.post('/login', login);
 router.post('/refresh', refreshTokenHandler);
 router.post('/logout', logoutHandler);
+
+// Google OAuth Routes
+router.get('/google', googleAuth);
+router.get('/google/callback', googleAuthCallback);
 
 // Protected User Routes
 router.get('/me', authenticateToken, getProfile);

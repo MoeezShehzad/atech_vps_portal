@@ -45,10 +45,10 @@ app.use('/api/user', userRoutes);
 
 // 6. Passport Google Strategy Setup
 passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "http://localhost:5000/api/auth/google/callback"
-  },
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: "http://localhost:5000/api/auth/google/callback"
+},
   async (accessToken, refreshToken, profile, done) => {
     try {
       const email = profile.emails[0]?.value;
@@ -116,7 +116,7 @@ app.get('/api/auth/google',
   passport.authenticate('google', { scope: ['profile', 'email'] })
 );
 
-app.get('/api/auth/google/callback', 
+app.get('/api/auth/google/callback',
   passport.authenticate('google', { failureRedirect: 'http://localhost:5174/login?error=oauth_failed', session: false }),
   async (req, res) => {
     try {
@@ -150,8 +150,8 @@ app.get('/api/auth/google/callback',
       res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/api/auth',
+        sameSite: 'lax',
+        path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000
       });
 

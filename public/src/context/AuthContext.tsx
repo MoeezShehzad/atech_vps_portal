@@ -1,5 +1,12 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiCall, setAccessToken } from '../services/api';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from 'react';
+
+import { apiCall, setAccessToken } from '../services/api.ts';
 
 interface User {
   userId: number;
@@ -19,58 +26,127 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Set memory access token and React auth state
-  const login = (accessToken: string, userData: User) => {
-    setAccessToken(accessToken);
-    setUser(userData);
-    setIsAuthenticated(true);
-  };
+  /*
+   * LOGIN
+   *
+   * Access token stays ONLY in memory.
+   * Refresh token is handled by the HttpOnly cookie.
+   */
+  const login = useCallback(
+    (accessToken: string, userData: User) => {
+      setAccessToken(accessToken);
+      setUser(userData);
+      setIsAuthenticated(true);
+    },
+    []
+  );
 
-  // Revoke session in DB & clear HttpOnly cookie via backend
-  const logout = async () => {
+  /*
+   * LOGOUT
+   *
+   * Backend:
+   * - Revokes refresh token/session
+   * - Clears HttpOnly refresh cookie
+   *
+   * Frontend:
+   * - Clears in-memory access token
+   * - Clears React authentication state
+   */
+  const logout = useCallback(async (): Promise<void> => {
     try {
-      await apiCall('/auth/logout', { method: 'POST' });
+      await apiCall('/auth/logout', {
+        method: 'POST',
+      });
     } catch (err) {
-      console.error('Logout failed on server:', err);
+      console.warn('Logout request failed:', err);
     } finally {
       setAccessToken(null);
       setUser(null);
       setIsAuthenticated(false);
+
       window.location.href = '/login';
     }
-  };
+  }, []);
 
-  // Silent Refresh on Initial Application Load / Mount
+  /*
+   * INITIAL AUTHENTICATION
+   *
+   * When the application starts:
+   *
+   * 1. Ask backend to validate the HttpOnly refresh cookie.
+   * 2. If valid -> receive a new access token.
+   * 3. If no cookie / expired cookie -> 401 is normal.
+   * 4. User remains logged out.
+   */
   useEffect(() => {
+    let isMounted = true;
+
     const initializeAuth = async () => {
       try {
-        const data = await apiCall('/auth/refresh', { method: 'POST' });
-        if (data.accessToken && data.user) {
+        const data = await apiCall('/auth/refresh', {
+          method: 'POST',
+        });
+
+        if (
+          isMounted &&
+          data?.accessToken &&
+          data?.user
+        ) {
           login(data.accessToken, data.user);
         }
-      } catch (err) {
-        // No active session cookie or token revoked
-        setAccessToken(null);
-        setUser(null);
-        setIsAuthenticated(false);
+      } catch (err: any) {
+        /*
+         * 401 here simply means:
+         *
+         * "There is currently no valid login session."
+         *
+         * This is completely normal for a guest visiting
+         * the website for the first time.
+         */
+
+        if (err?.message !== 'Session expired') {
+          console.debug('No active authentication session.');
+        }
+
+        if (isMounted) {
+          setAccessToken(null);
+          setUser(null);
+          setIsAuthenticated(false);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     initializeAuth();
-  }, []);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [login]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        loading,
+        login,
+        logout,
+      }}
+    >
       {loading ? (
-        <div className="flex h-screen items-center justify-center bg-gray-900 text-white">
-          <p>Loading session...</p>
+        <div className="min-h-screen flex items-center justify-center">
+          Loading session...
         </div>
       ) : (
         children
@@ -81,8 +157,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+
   return context;
 };

@@ -39,10 +39,143 @@ const setRefreshTokenCookie = (res, token) => {
   res.cookie('refreshToken', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/api/auth',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    path: '/',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
+};
+
+// --- GOOGLE OAUTH: STEP 1 (REDIRECT TO GOOGLE) ---
+export const googleAuth = (req, res) => {
+  const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
+  const options = {
+    redirect_uri: 'http://localhost:5000/api/auth/google/callback',
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    access_type: 'offline',
+    response_type: 'code',
+    prompt: 'consent',
+    scope: [
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/userinfo.email',
+    ].join(' '),
+  };
+
+  const queryString = new URLSearchParams(options).toString();
+  return res.redirect(`${rootUrl}?${queryString}`);
+};
+
+// --- GOOGLE OAUTH: STEP 2 (CALLBACK & TOKEN EXCHANGE) ---
+export const googleAuthCallback = async (req, res) => {
+  const { code } = req.query;
+
+  if (!code) {
+    return res.redirect('http://localhost:5174/login?error=no_code');
+  }
+
+  try {
+    // 1. Exchange code for Google access token
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: 'http://localhost:5000/api/auth/google/callback',
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    const tokenData = await tokenResponse.json();
+
+    if (!tokenResponse.ok) {
+      console.error('Google Token Exchange Error:', tokenData);
+      return res.redirect('http://localhost:5174/login?error=token_exchange_failed');
+    }
+
+    // 2. Get user info from Google
+    const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+
+    const googleUser = await userResponse.json();
+
+    // 3. Check if user exists or create new one
+    let user = await prisma.user.findUnique({
+      where: { email: googleUser.email },
+      include: {
+        userRoles: {
+          include: { role: true },
+        },
+      },
+    });
+
+    if (!user) {
+      const customerRole = await prisma.role.findUnique({
+        where: { roleName: 'Customer' },
+      });
+
+      user = await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            fullName: googleUser.name || 'Google User',
+            email: googleUser.email,
+            avatarUrl: googleUser.picture || null,
+            emailVerified: true,
+          },
+        });
+
+        if (customerRole) {
+          await tx.userRole.create({
+            data: {
+              userId: newUser.userId,
+              roleId: customerRole.roleId,
+            },
+          });
+        }
+
+        return newUser;
+      });
+
+      user = await prisma.user.findUnique({
+        where: { userId: user.userId },
+        include: {
+          userRoles: {
+            include: { role: true },
+          },
+        },
+      });
+    }
+
+    const roles = user.userRoles?.map((ur) => ur.role.roleName) || ['Customer'];
+
+    // 4. Issue App JWT & Refresh Cookie
+    const accessToken = generateAccessToken(user.userId, user.email, roles);
+    const refreshToken = await createAndStoreRefreshToken(user.userId);
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    await prisma.user.update({
+      where: { userId: user.userId },
+      data: { lastLoginAt: new Date() },
+    });
+
+    const userPayload = encodeURIComponent(
+      JSON.stringify({
+        userId: user.userId,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        roles,
+      })
+    );
+
+    // 5. Redirect back to Vite frontend
+    return res.redirect(`http://localhost:5174/auth/callback?token=${accessToken}&user=${userPayload}`);
+  } catch (error) {
+    console.error('Google Callback Processing Error:', error);
+    return res.redirect('http://localhost:5174/login?error=oauth_failed');
+  }
 };
 
 // --- REGISTER USER ---
@@ -92,7 +225,6 @@ export const register = async (req, res) => {
 
     const roles = customerRole ? [customerRole.roleName] : ['Customer'];
 
-    // Issue short-lived access token and long-lived refresh token
     const accessToken = generateAccessToken(newUser.userId, newUser.email, roles);
     const refreshToken = await createAndStoreRefreshToken(newUser.userId);
 
@@ -139,6 +271,12 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or account is inactive.' });
     }
 
+    if (!user.passwordHash) {
+      return res.status(400).json({
+        error: 'This account was created via Google Sign-In. Please sign in with Google.',
+      });
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials.' });
@@ -146,7 +284,6 @@ export const login = async (req, res) => {
 
     const roles = user.userRoles.map((ur) => ur.role.roleName);
 
-    // Issue short-lived access token and long-lived refresh token
     const accessToken = generateAccessToken(user.userId, user.email, roles);
     const refreshToken = await createAndStoreRefreshToken(user.userId);
 
@@ -176,13 +313,14 @@ export const login = async (req, res) => {
 // --- REFRESH TOKEN (Silent Refresh & Rotation) ---
 export const refreshTokenHandler = async (req, res) => {
   try {
-    const oldRefreshToken = req.cookies.refreshToken;
+    console.log('REFRESH COOKIES:', req.cookies);
+    console.log('REFRESH TOKEN:', req.cookies?.refreshToken);
+    const oldRefreshToken = req.cookies?.refreshToken;
 
     if (!oldRefreshToken) {
       return res.status(401).json({ error: 'Refresh token missing.' });
     }
 
-    // Find token in DB
     const storedToken = await prisma.refreshToken.findUnique({
       where: { token: oldRefreshToken },
       include: {
@@ -195,30 +333,33 @@ export const refreshTokenHandler = async (req, res) => {
         },
       },
     });
+    console.log('REFRESH TOKEN FOUND:', !!storedToken);
+    console.log('REFRESH TOKEN REVOKED:', storedToken?.isRevoked);
 
-    // Check token validity
     if (!storedToken || storedToken.isRevoked || new Date() > storedToken.expiresAt) {
       if (storedToken?.isRevoked) {
-        // Reuse breach detection -> Revoke ALL tokens for this user
         await prisma.refreshToken.updateMany({
           where: { userId: storedToken.userId },
           data: { isRevoked: true },
         });
       }
-      res.clearCookie('refreshToken', { path: '/api/auth' });
-      return res.status(403).json({ error: 'Invalid or revoked session.' });
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+        path: '/',
+      });
+      return res.status(401).json({ error: 'Invalid or revoked session.' });
     }
 
-    // Revoke old token (Rotation)
+    // Revoke old token for rotation
     await prisma.refreshToken.update({
       where: { id: storedToken.id },
       data: { isRevoked: true },
     });
 
-    // Extract roles
     const roles = storedToken.user.userRoles.map((ur) => ur.role.roleName);
 
-    // Create new token pair
     const newAccessToken = generateAccessToken(storedToken.user.userId, storedToken.user.email, roles);
     const newRefreshToken = await createAndStoreRefreshToken(storedToken.user.userId);
 
@@ -235,29 +376,28 @@ export const refreshTokenHandler = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ error: 'Refresh failed', details: error.message });
+    console.error('Refresh Token Handler Error:', error);
+    return res.status(401).json({ error: 'Refresh failed', details: error.message });
   }
 };
 
 // --- LOGOUT USER ---
 export const logoutHandler = async (req, res) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
 
     if (refreshToken) {
-      // Revoke token in DB
       await prisma.refreshToken.updateMany({
         where: { token: refreshToken },
         data: { isRevoked: true },
       });
     }
 
-    // Clear HttpOnly Cookie
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/api/auth',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      path: '/',
     });
 
     return res.status(200).json({ message: 'Logged out successfully' });
