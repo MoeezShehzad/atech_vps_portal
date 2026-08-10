@@ -95,7 +95,7 @@ export default function ServerConfigure() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/pricing')}
             className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

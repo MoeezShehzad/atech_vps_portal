@@ -168,9 +168,6 @@ export default function Pricing() {
       <div className="max-w-6xl mx-auto space-y-16">
         {/* HEADER & TOGGLE */}
         <div className="text-center space-y-4">
-          <span className="text-xs font-bold uppercase tracking-widest text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-            IONOS VPS PERFORMANCE
-          </span>
           <h1 className="text-4xl font-extrabold text-slate-950 sm:text-5xl tracking-tight">
             Affordable & Secure VPS Hosting
           </h1>

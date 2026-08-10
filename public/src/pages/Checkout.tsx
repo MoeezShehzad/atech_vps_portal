@@ -19,35 +19,54 @@ export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Retrieve incoming server configuration from ServerConfigure.tsx or fallback defaults
+  // Mock Authentication State (Toggle to test Logged In vs Guest flows)
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+
+  // Retrieve incoming server configuration or fallback defaults
   const orderData = location.state?.configurationOrder || {
     plan: {
-      name: 'VPS L+',
-      monthlyPrice: 21,
-      promoPriceMonthly: 6,
-      cpuCores: 6,
-      ramGb: 8,
-      storageGb: 240,
+      name: 'VPS M+',
+      monthlyPrice: 11,
+      cpuCores: 4,
+      ramGb: 6,
+      storageGb: 160,
       storageType: 'NVMe',
     },
     os: { name: 'Ubuntu 22.04 LTS', fee: 0 },
     location: { name: 'United States (US East)', flag: '🇺🇸' },
-    term: { label: '12 Months', id: '12m' },
-    addons: [{ name: 'Cloud Backup Storage', price: 3.00 }],
-    monthlyTotal: 9.00,
+    term: { label: '1 Month', id: '1m' },
+    addons: [],
+    monthlyTotal: 11.00,
   };
 
   // State Management
   const [currentStep, setCurrentStep] = useState<StepId>('details');
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  // Logged-in user pre-filled profile
+  const [savedUser] = useState({
+    name: 'Moeez Shahzad',
+    email: 'moeez@example.com',
+    phone: '+92 300 1234567',
+    address: 'Faqir abad peshawar',
+    city: 'Peshawar',
+    zip: '25000',
+    country: 'Pakistan',
+  });
+
+  // Guest Registration / Form State
   const [customerInfo, setCustomerInfo] = useState({
     firstName: '',
     lastName: '',
+    phone: '',
     email: '',
-    company: '',
+    password: '',
+    confirmPassword: '',
     address: '',
     city: '',
-    country: 'United States',
     zip: '',
+    country: 'United States',
+    termsAccepted: false,
   });
 
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'paypal'>('card');
@@ -56,13 +75,46 @@ export default function Checkout() {
   const stepOrder: StepId[] = ['details', 'review', 'payment'];
   const currentIndex = stepOrder.indexOf(currentStep);
 
+  // FORM VALIDATION GUARD
+  const validateStep = (): boolean => {
+    const newErrors: { [key: string]: string } = {};
+
+    if (currentStep === 'details' && !isLoggedIn) {
+      if (!customerInfo.firstName.trim()) newErrors.firstName = 'First name is required';
+      if (!customerInfo.lastName.trim()) newErrors.lastName = 'Last name is required';
+      if (!customerInfo.email.trim()) newErrors.email = 'Email address is required';
+      if (!customerInfo.phone.trim()) newErrors.phone = 'Phone number is required';
+      if (!customerInfo.password) newErrors.password = 'Password is required';
+      if (customerInfo.password !== customerInfo.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
+      if (!customerInfo.address.trim()) newErrors.address = 'Street address is required';
+      if (!customerInfo.city.trim()) newErrors.city = 'City is required';
+      if (!customerInfo.zip.trim()) newErrors.zip = 'Postal code is required';
+      if (!customerInfo.termsAccepted) newErrors.termsAccepted = 'You must accept terms & conditions';
+    }
+
+    if (currentStep === 'payment' && paymentMethod === 'card') {
+      if (!cardDetails.name.trim()) newErrors.cardName = 'Cardholder name is required';
+      if (!cardDetails.number.trim()) newErrors.cardNumber = 'Card number is required';
+      if (!cardDetails.expiry.trim()) newErrors.cardExpiry = 'Expiry date is required';
+      if (!cardDetails.cvc.trim()) newErrors.cardCvc = 'CVC is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const nextStep = () => {
+    if (!validateStep()) return;
+
     if (currentIndex < stepOrder.length - 1) {
       setCurrentStep(stepOrder[currentIndex + 1]);
     }
   };
 
   const prevStep = () => {
+    setErrors({});
     if (currentIndex > 0) {
       setCurrentStep(stepOrder[currentIndex - 1]);
     } else {
@@ -70,70 +122,46 @@ export default function Checkout() {
     }
   };
 
+  const handleCompleteAndDeploy = () => {
+    if (!validateStep()) return;
+
+    // NestJS Backend API Payload structure:
+    // { user: customerInfo, order: orderData, payment: cardDetails }
+    alert('Account Created & Order Placed Successfully! Redirecting to Dashboard...');
+    navigate('/dashboard');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-24">
       
-      {/* TOP BRAND NAVIGATION BAR (Matching exact design) */}
+      {/* SUB-HEADER STEP BAR */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          
-          {/* ATC Brand Logo */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center font-black text-xl text-white shadow-md shadow-blue-500/20">
-                ATC
-              </div>
-              <span className="font-extrabold text-slate-900 text-lg tracking-tight">
-                Analytical Technical Consulting
-              </span>
-            </div>
-          </div>
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <button
+            onClick={prevStep}
+            className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+            </svg>
+            {currentStep === 'details' ? 'Back to Configuration' : 'Back'}
+          </button>
 
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
-            <button onClick={() => navigate('/')} className="hover:text-slate-900 transition-colors">Home</button>
-            <button onClick={() => navigate('/about')} className="hover:text-slate-900 transition-colors">About Us</button>
-            <button onClick={() => navigate('/services')} className="hover:text-slate-900 transition-colors">Services</button>
-            <button onClick={() => navigate('/pricing')} className="hover:text-slate-900 transition-colors">Pricing</button>
-            <button onClick={() => navigate('/contact')} className="hover:text-slate-900 transition-colors">Contact</button>
-          </nav>
+          <span className="text-xs font-black uppercase tracking-widest text-slate-400">
+            Checkout & Deployment
+          </span>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/login')}
-              className="px-5 py-2 rounded-full border border-slate-300 text-slate-800 text-xs font-bold hover:bg-slate-50 transition-colors"
+              onClick={() => {
+                setIsLoggedIn(!isLoggedIn);
+                setErrors({});
+              }}
+              className="hidden sm:block text-[11px] font-bold text-slate-400 hover:text-blue-600 underline underline-offset-4"
             >
-              Log in
+              {isLoggedIn ? '⚡ Test: Switch to Guest' : '⚡ Test: Switch to Logged In'}
             </button>
-            <button
-              onClick={() => navigate('/register')}
-              className="px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all"
-            >
-              Get started
-            </button>
-          </div>
-
-        </div>
-
-        {/* SUB-HEADER STEP BAR (Matches Configure Header) */}
-        <div className="border-t border-slate-100 bg-slate-50/50">
-          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-            <button
-              onClick={prevStep}
-              className="flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
-              {currentStep === 'details' ? 'Back to Configuration' : 'Back'}
-            </button>
-
-            <span className="text-xs font-black uppercase tracking-widest text-slate-400">
-              Checkout & Deployment
-            </span>
-
-            <div className="text-xs text-slate-500 font-bold">Step 3 of 3</div>
+            <div className="text-xs text-slate-500 font-bold">Step {currentIndex + 1} of 3</div>
           </div>
         </div>
       </header>
@@ -188,90 +216,222 @@ export default function Checkout() {
             {/* STEP 1: CUSTOMER DETAILS */}
             {currentStep === 'details' && (
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
-                <div>
-                  <h2 className="text-xl font-extrabold text-slate-950 tracking-tight">1. Customer Information</h2>
-                  <p className="text-xs text-slate-500 mt-1">Provide your details to associate with this server instance.</p>
-                </div>
+                
+                {/* CASE 1: LOGGED-IN USER */}
+                {isLoggedIn ? (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h2 className="text-xl font-extrabold text-slate-950 tracking-tight">Account & Billing Profile</h2>
+                        <p className="text-xs text-slate-500 mt-1">Logged in as <span className="font-bold text-slate-900">{savedUser.email}</span></p>
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1 rounded-full">
+                        Authenticated User
+                      </span>
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1.5">First Name *</label>
-                    <input
-                      type="text"
-                      value={customerInfo.firstName}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, firstName: e.target.value })}
-                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors font-medium placeholder:text-slate-400"
-                      placeholder="Alex"
-                    />
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 flex items-center justify-between">
+                      <div className="space-y-1 text-xs">
+                        <p className="font-extrabold text-slate-900 text-sm">{savedUser.name}</p>
+                        <p className="text-slate-600 font-medium">{savedUser.phone}</p>
+                        <p className="text-slate-600 font-medium">{savedUser.address}</p>
+                        <p className="text-slate-500">{savedUser.city} - {savedUser.zip}, {savedUser.country}</p>
+                      </div>
+                      <button
+                        onClick={() => alert('Update profile modal')}
+                        className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors shadow-sm"
+                      >
+                        Update
+                      </button>
+                    </div>
+
+                    <div className="pt-4 flex justify-between items-center border-t border-slate-100">
+                      <button onClick={prevStep} className="text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors">
+                        ← Back to Configuration
+                      </button>
+                      <button
+                        onClick={nextStep}
+                        className="px-6 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-blue-500/20 transition-all"
+                      >
+                        Continue to Order Review
+                      </button>
+                    </div>
                   </div>
+                ) : (
+                  
+                  /* CASE 2: GUEST USER */
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 pb-4">
+                      <div>
+                        <h2 className="text-xl font-extrabold text-slate-950 tracking-tight">1. Create Account & Billing Details</h2>
+                        <p className="text-xs text-slate-500 mt-1">Set up your credentials to manage your server dashboard after payment.</p>
+                      </div>
+                      <button
+                        onClick={() => navigate('/login')}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors self-start sm:self-auto"
+                      >
+                        Already have an account? Log in
+                      </button>
+                    </div>
 
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1.5">Last Name *</label>
-                    <input
-                      type="text"
-                      value={customerInfo.lastName}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, lastName: e.target.value })}
-                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors font-medium placeholder:text-slate-400"
-                      placeholder="Morgan"
-                    />
+                    {/* Account Setup Fields */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">First Name *</label>
+                        <input
+                          type="text"
+                          value={customerInfo.firstName}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, firstName: e.target.value })}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.firstName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="Alex"
+                        />
+                        {errors.firstName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.firstName}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">Last Name *</label>
+                        <input
+                          type="text"
+                          value={customerInfo.lastName}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, lastName: e.target.value })}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.lastName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="Morgan"
+                        />
+                        {errors.lastName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.lastName}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">Email Address (Username) *</label>
+                        <input
+                          type="email"
+                          value={customerInfo.email}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.email ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="alex.morgan@company.com"
+                        />
+                        {errors.email && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.email}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">Phone Number *</label>
+                        <input
+                          type="tel"
+                          value={customerInfo.phone}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.phone ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="+1 (555) 000-0000"
+                        />
+                        {errors.phone && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.phone}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">Create Password *</label>
+                        <input
+                          type="password"
+                          value={customerInfo.password}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, password: e.target.value })}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.password ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="••••••••••••"
+                        />
+                        {errors.password && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.password}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">Confirm Password *</label>
+                        <input
+                          type="password"
+                          value={customerInfo.confirmPassword}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, confirmPassword: e.target.value })}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.confirmPassword ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="••••••••••••"
+                        />
+                        {errors.confirmPassword && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.confirmPassword}</p>}
+                      </div>
+
+                      <div className="sm:col-span-2 pt-2 border-t border-slate-100">
+                        <label className="block font-bold text-slate-700 mb-1.5">Street Address *</label>
+                        <input
+                          type="text"
+                          value={customerInfo.address}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.address ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="1360 Brentwood Trl"
+                        />
+                        {errors.address && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.address}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">City *</label>
+                        <input
+                          type="text"
+                          value={customerInfo.city}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, city: e.target.value })}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.city ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="Bolingbrook"
+                        />
+                        {errors.city && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.city}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">Postal / ZIP Code *</label>
+                        <input
+                          type="text"
+                          value={customerInfo.zip}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, zip: e.target.value })}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.zip ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="60490"
+                        />
+                        {errors.zip && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.zip}</p>}
+                      </div>
+
+                      <div className="sm:col-span-2 pt-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={customerInfo.termsAccepted}
+                            onChange={(e) => setCustomerInfo({ ...customerInfo, termsAccepted: e.target.checked })}
+                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                          />
+                          <span className="text-slate-600 text-xs font-medium">
+                            I agree to the <a href="/terms" className="text-blue-600 underline">Terms of Service</a> & <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>
+                          </span>
+                        </label>
+                        {errors.termsAccepted && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.termsAccepted}</p>}
+                      </div>
+                    </div>
+
+                    <div className="pt-6 flex justify-between items-center border-t border-slate-100">
+                      <button onClick={prevStep} className="text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors">
+                        ← Back to Configuration
+                      </button>
+                      <button
+                        onClick={nextStep}
+                        className="px-6 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-blue-500/20 transition-all"
+                      >
+                        Continue to Order Review
+                      </button>
+                    </div>
                   </div>
+                )}
 
-                  <div className="sm:col-span-2">
-                    <label className="block font-bold text-slate-700 mb-1.5">Email Address *</label>
-                    <input
-                      type="email"
-                      value={customerInfo.email}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors font-medium placeholder:text-slate-400"
-                      placeholder="alex.morgan@company.com"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block font-bold text-slate-700 mb-1.5">Street Address *</label>
-                    <input
-                      type="text"
-                      value={customerInfo.address}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors font-medium placeholder:text-slate-400"
-                      placeholder="1360 Brentwood Trl"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1.5">City *</label>
-                    <input
-                      type="text"
-                      value={customerInfo.city}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, city: e.target.value })}
-                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors font-medium placeholder:text-slate-400"
-                      placeholder="Bolingbrook"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-slate-700 mb-1.5">Postal Code *</label>
-                    <input
-                      type="text"
-                      value={customerInfo.zip}
-                      onChange={(e) => setCustomerInfo({ ...customerInfo, zip: e.target.value })}
-                      className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors font-medium placeholder:text-slate-400"
-                      placeholder="60490"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-6 flex justify-between items-center border-t border-slate-100">
-                  <button onClick={prevStep} className="text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors">
-                    ← Back to Configuration
-                  </button>
-                  <button
-                    onClick={nextStep}
-                    className="px-6 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-blue-500/20 transition-all"
-                  >
-                    Continue to Order Review
-                  </button>
-                </div>
               </div>
             )}
 
@@ -309,23 +469,26 @@ export default function Checkout() {
                     </div>
                     <div className="flex justify-between border-b border-slate-100 pb-2">
                       <span className="text-slate-500">Billing Term</span>
-                      <span className="font-bold text-slate-900">{orderData.term?.label || '12 Months'}</span>
+                      <span className="font-bold text-slate-900">{orderData.term?.label || '1 Month'}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="border border-slate-200 rounded-xl p-4 text-xs space-y-2 bg-slate-50">
                   <div className="flex justify-between font-bold text-slate-800 border-b border-slate-200 pb-2">
-                    <span>Billing Contact</span>
+                    <span>Account & Billing Contact</span>
                     <button onClick={() => setCurrentStep('details')} className="text-blue-600 hover:text-blue-700 text-[11px] font-bold transition-colors">
                       Edit
                     </button>
                   </div>
                   <p className="text-slate-900 font-bold">
-                    {customerInfo.firstName || 'Alex'} {customerInfo.lastName || 'Morgan'} ({customerInfo.email || 'alex.morgan@company.com'})
+                    {isLoggedIn ? savedUser.name : `${customerInfo.firstName} ${customerInfo.lastName}`} ({isLoggedIn ? savedUser.email : customerInfo.email})
+                  </p>
+                  <p className="text-slate-600 font-medium">
+                    Phone: {isLoggedIn ? savedUser.phone : customerInfo.phone}
                   </p>
                   <p className="text-slate-500 font-medium">
-                    {customerInfo.address || '1360 Brentwood Trl'}, {customerInfo.city || 'Bolingbrook'}, {customerInfo.zip || '60490'}
+                    {isLoggedIn ? savedUser.address : customerInfo.address}, {isLoggedIn ? savedUser.city : customerInfo.city}, {isLoggedIn ? savedUser.zip : customerInfo.zip}
                   </p>
                 </div>
 
@@ -378,47 +541,59 @@ export default function Checkout() {
                 {paymentMethod === 'card' ? (
                   <div className="space-y-4 text-xs pt-2">
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1.5">Cardholder Name</label>
+                      <label className="block font-bold text-slate-700 mb-1.5">Cardholder Name *</label>
                       <input
                         type="text"
                         value={cardDetails.name}
                         onChange={(e) => setCardDetails({ ...cardDetails, name: e.target.value })}
-                        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors font-medium placeholder:text-slate-400"
+                        className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                          errors.cardName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                        }`}
                         placeholder="Alex Morgan"
                       />
+                      {errors.cardName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardName}</p>}
                     </div>
 
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1.5">Card Number</label>
+                      <label className="block font-bold text-slate-700 mb-1.5">Card Number *</label>
                       <input
                         type="text"
                         value={cardDetails.number}
                         onChange={(e) => setCardDetails({ ...cardDetails, number: e.target.value })}
-                        className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors font-medium placeholder:text-slate-400"
+                        className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                          errors.cardNumber ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                        }`}
                         placeholder="4532 •••• •••• 8892"
                       />
+                      {errors.cardNumber && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardNumber}</p>}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Expiration (MM/YY)</label>
+                        <label className="block font-bold text-slate-700 mb-1.5">Expiration (MM/YY) *</label>
                         <input
                           type="text"
                           value={cardDetails.expiry}
                           onChange={(e) => setCardDetails({ ...cardDetails, expiry: e.target.value })}
-                          className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors font-medium placeholder:text-slate-400"
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.cardExpiry ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
                           placeholder="08/28"
                         />
+                        {errors.cardExpiry && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardExpiry}</p>}
                       </div>
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">CVC Code</label>
+                        <label className="block font-bold text-slate-700 mb-1.5">CVC Code *</label>
                         <input
                           type="text"
                           value={cardDetails.cvc}
                           onChange={(e) => setCardDetails({ ...cardDetails, cvc: e.target.value })}
-                          className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-colors font-medium placeholder:text-slate-400"
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.cardCvc ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
                           placeholder="312"
                         />
+                        {errors.cardCvc && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardCvc}</p>}
                       </div>
                     </div>
                   </div>
@@ -434,7 +609,7 @@ export default function Checkout() {
                     ← Back
                   </button>
                   <button
-                    onClick={() => alert('Order Placed Successfully! Deploying server...')}
+                    onClick={handleCompleteAndDeploy}
                     className="px-8 py-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/20 transition-all"
                   >
                     Complete & Deploy (${orderData.monthlyTotal.toFixed(2)}/mo)
@@ -461,7 +636,7 @@ export default function Checkout() {
               {/* Item Details */}
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between text-slate-600 font-medium">
-                  <span>{orderData.plan.name} ({orderData.term?.label || '12 Months'})</span>
+                  <span>{orderData.plan.name} ({orderData.term?.label || '1 Month'})</span>
                   <span className="font-bold text-slate-900">${orderData.plan.monthlyPrice?.toFixed(2)}/mo</span>
                 </div>
 
