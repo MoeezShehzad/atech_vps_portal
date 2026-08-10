@@ -9,6 +9,8 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
+import AddtoCart from './pages/AddtoCart';
+import Checkout from './pages/Checkout';
 import atcLogo from './assets/ATC_Logo.png';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -152,6 +154,8 @@ function AppContent() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/configure" element={<AddtoCart />} />
+          <Route path="/checkout" element={<Checkout />} />
 
           {/* PROTECTED ROUTE */}
           <Route
