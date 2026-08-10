@@ -13,6 +13,7 @@ import atcLogo from './assets/ATC_Logo.png';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Footer from './components/Footer';
+import { setAccessToken } from './services/api';
 
 // OAuth Callback Handler Component
 function AuthCallback() {
@@ -22,14 +23,21 @@ function AuthCallback() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleOAuth = async () => {
+    const handleOAuth = () => {
       const token = searchParams.get('token') || searchParams.get('accessToken');
       const userParam = searchParams.get('user');
 
       if (token && userParam) {
         try {
           const userData = JSON.parse(decodeURIComponent(userParam));
+
+          // 1. Crucial: Sync access token into api.ts in-memory variable
+          setAccessToken(token);
+
+          // 2. Update React Auth Context state
           login(token, userData);
+
+          // 3. Navigate directly to dashboard
           navigate('/dashboard', { replace: true });
           return;
         } catch (e) {
@@ -37,7 +45,7 @@ function AuthCallback() {
         }
       }
 
-      // If parameters are missing or failed
+      // If parameters are missing or parsing failed
       setErrorMessage("Google Sign-In failed or session information was missing.");
       setTimeout(() => {
         navigate('/login?error=oauth_failed', { replace: true });
@@ -54,7 +62,7 @@ function AuthCallback() {
           <p className="text-rose-500 text-sm font-semibold">{errorMessage}</p>
         ) : (
           <>
-            <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-gray-300 text-sm font-semibold">Completing Google Sign In...</p>
           </>
         )}

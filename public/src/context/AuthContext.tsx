@@ -86,53 +86,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
    * 4. User remains logged out.
    */
   useEffect(() => {
-    let isMounted = true;
+  let isMounted = true;
 
-    const initializeAuth = async () => {
-      try {
-        const data = await apiCall('/auth/refresh', {
-          method: 'POST',
-        });
+  const currentUrl = window.location.href;
+const currentPath = window.location.pathname;
 
-        if (
-          isMounted &&
-          data?.accessToken &&
-          data?.user
-        ) {
-          login(data.accessToken, data.user);
-        }
-      } catch (err: any) {
-        /*
-         * 401 here simply means:
-         *
-         * "There is currently no valid login session."
-         *
-         * This is completely normal for a guest visiting
-         * the website for the first time.
-         */
+console.log('[AuthInit] Initializing AuthProvider check...');
+console.log('[AuthInit] Current Pathname:', currentPath);
+console.log('[AuthInit] Current Full URL:', currentUrl);
 
-        if (err?.message !== 'Session expired') {
-          console.debug('No active authentication session.');
-        }
+// Catch /auth/callback whether in pathname or full URL
+if (currentPath.includes('/auth/callback') || currentUrl.includes('/auth/callback')) {
+  console.log('[AuthInit] OAuth callback route detected! Skipping /auth/refresh.');
+  setLoading(false);
+  return;
+}
 
-        if (isMounted) {
-          setAccessToken(null);
-          setUser(null);
-          setIsAuthenticated(false);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+  const initializeAuth = async () => {
+    console.log('[AuthInit] Sending silent refresh request to /auth/refresh...');
+
+    try {
+      const data = await apiCall('/auth/refresh', {
+        method: 'POST',
+      });
+
+      console.log('[AuthInit] /auth/refresh Response Received:', data);
+
+      if (isMounted && data?.accessToken && data?.user) {
+        console.log('[AuthInit] Session restored successfully for user:', data.user.email || data.user.fullName);
+        login(data.accessToken, data.user);
+      } else {
+        console.warn('[AuthInit] Refresh succeeded but payload missing token or user data:', data);
       }
-    };
+    } catch (err: any) {
+      console.warn('[AuthInit] Session restore failed or no active session found.');
+      console.error('[AuthInit] Refresh Error Details:', err?.message || err);
 
-    initializeAuth();
+      if (isMounted) {
+        console.log('[AuthInit] Resetting auth state to unauthenticated...');
+        setAccessToken(null);
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    } finally {
+      if (isMounted) {
+        console.log('[AuthInit] Authentication initialization complete. Setting loading to false.');
+        setLoading(false);
+      }
+    }
+  };
 
-    return () => {
-      isMounted = false;
-    };
-  }, [login]);
+  initializeAuth();
+
+  return () => {
+    console.log('[AuthInit] Cleaning up AuthProvider useEffect (unmounted).');
+    isMounted = false;
+  };
+}, [login]);
 
   return (
     <AuthContext.Provider
