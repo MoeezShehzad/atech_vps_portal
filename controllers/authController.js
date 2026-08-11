@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
+import { registerUser, handleGoogleAuth } from '../services/authService.js';
 
 // --- HELPER FUNCTIONS ---
 
@@ -64,7 +65,7 @@ export const googleAuth = (req, res) => {
   return res.redirect(`${rootUrl}?${queryString}`);
 };
 
-// --- GOOGLE OAUTH: STEP 2 (CALLBACK & TOKEN EXCHANGE) ---
+// --- GOOGLE OAUTH: STEP 2 (CALLBACK & ACCOUNT LINKING) ---
 export const googleAuthCallback = async (req, res) => {
   const { code } = req.query;
 
@@ -99,10 +100,16 @@ export const googleAuthCallback = async (req, res) => {
     });
 
     const googleUser = await userResponse.json();
+    const normalizedEmail = googleUser.email.toLowerCase().trim();
 
-    // 3. Check if user exists or create new one
-    let user = await prisma.user.findUnique({
-      where: { email: googleUser.email },
+    // 3. Search for existing user by Google ID or Email
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { googleId: googleUser.id },
+          { email: normalizedEmail }
+        ]
+      },
       include: {
         userRoles: {
           include: { role: true },
@@ -110,7 +117,25 @@ export const googleAuthCallback = async (req, res) => {
       },
     });
 
-    if (!user) {
+    if (user) {
+      // LINK ACCOUNT STRATEGY: Update existing manual user with googleId & provider status
+      const updatedProvider = user.passwordHash ? 'BOTH' : 'GOOGLE';
+      user = await prisma.user.update({
+        where: { userId: user.userId },
+        data: {
+          googleId: googleUser.id,
+          emailVerified: true,
+          provider: updatedProvider,
+          avatar_url: user.avatar_url || googleUser.picture || null,
+        },
+        include: {
+          userRoles: {
+            include: { role: true },
+          },
+        },
+      });
+    } else {
+      // Create new user via Google
       const customerRole = await prisma.role.findUnique({
         where: { roleName: 'Customer' },
       });
@@ -119,9 +144,11 @@ export const googleAuthCallback = async (req, res) => {
         const newUser = await tx.user.create({
           data: {
             fullName: googleUser.name || 'Google User',
-            email: googleUser.email,
-            avatarUrl: googleUser.picture || null,
+            email: normalizedEmail,
+            googleId: googleUser.id,
+            avatar_url: googleUser.picture || null,
             emailVerified: true,
+            provider: 'GOOGLE',
           },
         });
 
@@ -166,6 +193,10 @@ export const googleAuthCallback = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
+        address: user.address,
+        city: user.city,
+        postalCode: user.postalCode,
+        country: user.country,
         roles,
       })
     );
@@ -180,15 +211,29 @@ export const googleAuthCallback = async (req, res) => {
 
 // --- REGISTER USER ---
 export const register = async (req, res) => {
-  const { fullName, email, password, phone } = req.body;
+  const {
+    fullName,
+    email,
+    password,
+    phone,
+    address,
+    city,
+    postalCode,
+    country,
+  } = req.body;
 
+  // Validation Guard
   if (!fullName || !email || !password) {
-    return res.status(400).json({ error: 'Full name, email, and password are required.' });
+    return res.status(400).json({
+      error: 'Validation failed. Full name, email and password are required.',
+    });
   }
+
+  const normalizedEmail = email.toLowerCase().trim();
 
   try {
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
@@ -205,9 +250,14 @@ export const register = async (req, res) => {
       const user = await tx.user.create({
         data: {
           fullName,
-          email,
+          email: normalizedEmail,
           passwordHash,
           phone: phone || null,
+          address: address || null,
+          city: city || null,
+          postalCode: postalCode || null,
+          country: country || null,
+          provider: 'LOCAL',
         },
       });
 
@@ -238,6 +288,10 @@ export const register = async (req, res) => {
         fullName: newUser.fullName,
         email: newUser.email,
         phone: newUser.phone,
+        address: newUser.address,
+        city: newUser.city,
+        postalCode: newUser.postalCode,
+        country: newUser.country,
         roles,
         createdAt: newUser.createdAt,
       },
@@ -257,7 +311,7 @@ export const login = async (req, res) => {
 
   try {
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email.toLowerCase().trim() },
       include: {
         userRoles: {
           include: {
@@ -302,6 +356,10 @@ export const login = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
+        address: user.address,
+        city: user.city,
+        postalCode: user.postalCode,
+        country: user.country,
         roles,
       },
     });
@@ -372,6 +430,10 @@ export const refreshTokenHandler = async (req, res) => {
         fullName: storedToken.user.fullName,
         email: storedToken.user.email,
         phone: storedToken.user.phone,
+        address: storedToken.user.address,
+        city: storedToken.user.city,
+        postalCode: storedToken.user.postalCode,
+        country: storedToken.user.country,
         roles,
       },
     });
@@ -416,6 +478,10 @@ export const getProfile = async (req, res) => {
         fullName: true,
         email: true,
         phone: true,
+        address: true,
+        city: true,
+        postalCode: true,
+        country: true,
         isActive: true,
         emailVerified: true,
         lastLoginAt: true,

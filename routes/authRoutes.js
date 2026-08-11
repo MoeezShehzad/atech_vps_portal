@@ -12,17 +12,20 @@ import { authenticateToken } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Public Authentication Routes
+// --- PUBLIC AUTHENTICATION ROUTES ---
 router.post('/register', register);
 router.post('/login', login);
+
+// --- SESSION MANAGEMENT ROUTES ---
 router.post('/refresh', refreshTokenHandler);
+router.post('/refresh-token', refreshTokenHandler); // Alias for compatibility
 router.post('/logout', logoutHandler);
 
-// Google OAuth Routes
+// --- GOOGLE OAUTH ROUTES ---
 router.get('/google', googleAuth);
 router.get('/google/callback', googleAuthCallback);
 
-// Protected User Routes
+// --- PROTECTED USER ROUTES ---
 router.get('/me', authenticateToken, getProfile);
 
 export default router;
