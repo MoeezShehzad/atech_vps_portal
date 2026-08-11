@@ -26,16 +26,13 @@ const refreshAccessToken = async (): Promise<string> => {
 
   refreshPromise = (async () => {
     try {
-      const refreshResponse = await fetch(
-        `${API_BASE_URL}/auth/refresh`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        }
-      );
+      const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
 
       if (!refreshResponse.ok) {
         throw new Error('Session expired');
@@ -44,9 +41,7 @@ const refreshAccessToken = async (): Promise<string> => {
       const refreshData = await refreshResponse.json();
 
       if (!refreshData.accessToken) {
-        throw new Error(
-          'Refresh response did not contain an access token'
-        );
+        throw new Error('Refresh response did not contain an access token');
       }
 
       // Store access token ONLY in memory.
@@ -66,10 +61,12 @@ export const apiCall = async (
   endpoint: string,
   options: RequestInit = {}
 ): Promise<any> => {
+  // Added /auth/logout to prevent auto-refreshing during logout flow
   const isAuthEndpoint =
     endpoint === '/auth/refresh' ||
     endpoint === '/auth/login' ||
-    endpoint === '/auth/register';
+    endpoint === '/auth/register' ||
+    endpoint === '/auth/logout';
 
   const makeRequest = async (token: string | null) => {
     const headers: Record<string, string> = {
@@ -130,11 +127,15 @@ export const apiCall = async (
    * Handle HTTP errors
    */
   if (!response.ok) {
-    throw new Error(
+    // Handle 401 for auth check silently
+    const errorMessage =
       data?.error ||
-        data?.message ||
-        `Request failed with status ${response.status}`
-    );
+      data?.message ||
+      `Request failed with status ${response.status}`;
+
+    const error = new Error(errorMessage) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
 
   return data;

@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
 } from 'react';
 
 import { apiCall, setAccessToken } from '../services/api.ts';
@@ -33,11 +34,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Store the active promise to handle Strict Mode remounts without duplicate calls
+  const refreshPromiseRef = useRef<Promise<any> | null>(null);
+
   /*
    * LOGIN
-   *
-   * Access token stays ONLY in memory.
-   * Refresh token is handled by the HttpOnly cookie.
    */
   const login = useCallback(
     (accessToken: string, userData: User) => {
@@ -50,14 +51,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   /*
    * LOGOUT
-   *
-   * Backend:
-   * - Revokes refresh token/session
-   * - Clears HttpOnly refresh cookie
-   *
-   * Frontend:
-   * - Clears in-memory access token
-   * - Clears React authentication state
    */
   const logout = useCallback(async (): Promise<void> => {
     try {
@@ -77,72 +70,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   /*
    * INITIAL AUTHENTICATION
-   *
-   * When the application starts:
-   *
-   * 1. Ask backend to validate the HttpOnly refresh cookie.
-   * 2. If valid -> receive a new access token.
-   * 3. If no cookie / expired cookie -> 401 is normal.
-   * 4. User remains logged out.
    */
   useEffect(() => {
-  let isMounted = true;
+    let isMounted = true;
 
-  const currentUrl = window.location.href;
-const currentPath = window.location.pathname;
+    const currentUrl = window.location.href;
+    const currentPath = window.location.pathname;
 
-console.log('[AuthInit] Initializing AuthProvider check...');
-console.log('[AuthInit] Current Pathname:', currentPath);
-console.log('[AuthInit] Current Full URL:', currentUrl);
+    console.log('[AuthInit] Initializing AuthProvider check...');
 
-// Catch /auth/callback whether in pathname or full URL
-if (currentPath.includes('/auth/callback') || currentUrl.includes('/auth/callback')) {
-  console.log('[AuthInit] OAuth callback route detected! Skipping /auth/refresh.');
-  setLoading(false);
-  return;
-}
-
-  const initializeAuth = async () => {
-    console.log('[AuthInit] Sending silent refresh request to /auth/refresh...');
-
-    try {
-      const data = await apiCall('/auth/refresh', {
-        method: 'POST',
-      });
-
-      console.log('[AuthInit] /auth/refresh Response Received:', data);
-
-      if (isMounted && data?.accessToken && data?.user) {
-        console.log('[AuthInit] Session restored successfully for user:', data.user.email || data.user.fullName);
-        login(data.accessToken, data.user);
-      } else {
-        console.warn('[AuthInit] Refresh succeeded but payload missing token or user data:', data);
-      }
-    } catch (err: any) {
-      console.warn('[AuthInit] Session restore failed or no active session found.');
-      console.error('[AuthInit] Refresh Error Details:', err?.message || err);
-
-      if (isMounted) {
-        console.log('[AuthInit] Resetting auth state to unauthenticated...');
-        setAccessToken(null);
-        setUser(null);
-        setIsAuthenticated(false);
-      }
-    } finally {
-      if (isMounted) {
-        console.log('[AuthInit] Authentication initialization complete. Setting loading to false.');
-        setLoading(false);
-      }
+    // Catch /auth/callback whether in pathname or full URL
+    if (currentPath.includes('/auth/callback') || currentUrl.includes('/auth/callback')) {
+      console.log('[AuthInit] OAuth callback route detected! Skipping /auth/refresh.');
+      setLoading(false);
+      return;
     }
-  };
 
-  initializeAuth();
+    const initializeAuth = async () => {
+      // Reuse ongoing request if Strict Mode remounts
+      if (!refreshPromiseRef.current) {
+        console.log('[AuthInit] Sending silent refresh request to /auth/refresh...');
+        refreshPromiseRef.current = apiCall('/auth/refresh', { method: 'POST' });
+      } else {
+        console.log('[AuthInit] Attaching to existing /auth/refresh request...');
+      }
 
-  return () => {
-    console.log('[AuthInit] Cleaning up AuthProvider useEffect (unmounted).');
-    isMounted = false;
-  };
-}, [login]);
+      try {
+        const data = await refreshPromiseRef.current;
+
+        if (isMounted && data?.accessToken && data?.user) {
+          console.log(
+            '[AuthInit] Session restored successfully for user:',
+            data.user.email || data.user.fullName
+          );
+          login(data.accessToken, data.user);
+        } else if (isMounted) {
+          console.warn('[AuthInit] Refresh succeeded but payload missing token/user');
+        }
+      } catch (err: any) {
+        // Quiet expected 401 log when no active session cookie exists
+        console.log('[AuthInit] No active session found. User unauthenticated.');
+
+        if (isMounted) {
+          setAccessToken(null);
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (isMounted) {
+          console.log('[AuthInit] Auth initialization complete. Setting loading to false.');
+          setLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      console.log('[AuthInit] Cleaning up AuthProvider useEffect (unmounted).');
+      isMounted = false;
+    };
+  }, [login]);
 
   return (
     <AuthContext.Provider

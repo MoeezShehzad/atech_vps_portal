@@ -27,7 +27,7 @@ const IONOS_VPS_PLANS: ExtendedPlan[] = [
     monthlyPrice: 11,
     promoPriceMonthly: 4,
     regularPriceMonthly: 11,
-    yearlyTotalPrice: 105, // 3 mos @ $4 + 9 mos @ $11
+    yearlyTotalPrice: 105,
     promoSaveText: 'Save 16%',
     currency: 'USD',
     isActive: true,
@@ -47,7 +47,7 @@ const IONOS_VPS_PLANS: ExtendedPlan[] = [
     monthlyPrice: 21,
     promoPriceMonthly: 6,
     regularPriceMonthly: 21,
-    yearlyTotalPrice: 207, // 3 mos @ $6 + 9 mos @ $21
+    yearlyTotalPrice: 207,
     promoSaveText: 'Save 18%',
     tag: 'BESTSELLER',
     currency: 'USD',
@@ -68,7 +68,7 @@ const IONOS_VPS_PLANS: ExtendedPlan[] = [
     monthlyPrice: 44,
     promoPriceMonthly: 11,
     regularPriceMonthly: 44,
-    yearlyTotalPrice: 429, // 3 mos @ $11 + 9 mos @ $44
+    yearlyTotalPrice: 429,
     promoSaveText: 'Save 19%',
     tag: 'BEST VALUE',
     currency: 'USD',
@@ -89,7 +89,7 @@ const IONOS_VPS_PLANS: ExtendedPlan[] = [
     monthlyPrice: 68,
     promoPriceMonthly: 18,
     regularPriceMonthly: 68,
-    yearlyTotalPrice: 666, // 3 mos @ $18 + 9 mos @ $68
+    yearlyTotalPrice: 666,
     promoSaveText: 'Save 18%',
     currency: 'USD',
     isActive: true,
@@ -114,7 +114,6 @@ export default function Pricing() {
       try {
         const data = await fetchVpsPlans();
         if (Array.isArray(data) && data.length > 0) {
-          // Merge API data with IONOS marketing badges
           const merged = data.map((plan, index) => ({
             ...plan,
             ...IONOS_VPS_PLANS[index % IONOS_VPS_PLANS.length],
@@ -139,8 +138,8 @@ export default function Pricing() {
   };
 
   const handleSelectPreset = (plan: ExtendedPlan) => {
-  navigate('/configure', { state: { selectedPlan: plan } });
-};
+    navigate('/configure', { state: { selectedPlan: plan } });
+  };
 
   const handleSelectCustom = () => {
     const customConfig = {
@@ -175,33 +174,41 @@ export default function Pricing() {
             Full virtualization, unmetered bandwidth, and high-speed NVMe SSD storage.
           </p>
 
-          {/* MONTHLY / YEARLY TOGGLE */}
-          <div className="pt-6 flex justify-center items-center gap-3">
-            <div className="inline-flex p-1 bg-slate-100 rounded-full border border-slate-200">
-              <button
-                onClick={() => setBillingCycle('monthly')}
-                className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${
-                  billingCycle === 'monthly'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
+          {/* SMOOTH PILL SWITCH TOGGLE */}
+          <div className="pt-4 flex items-center justify-center gap-3">
+            <span
+              className={`text-xs font-bold transition-colors cursor-pointer select-none ${
+                billingCycle === 'monthly' ? 'text-slate-950' : 'text-slate-400'
+              }`}
+              onClick={() => setBillingCycle('monthly')}
+            >
+              Monthly
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
+              className="w-12 h-6 bg-slate-200 rounded-full p-1 relative transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+              aria-label="Toggle Billing Cycle"
+            >
+              <div
+                className={`w-4 h-4 bg-blue-600 rounded-full transition-transform duration-200 ease-in-out ${
+                  billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-0'
                 }`}
-              >
-                Monthly Term
-              </button>
-              <button
-                onClick={() => setBillingCycle('yearly')}
-                className={`px-6 py-2 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  billingCycle === 'yearly'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span>1-Year Term</span>
-                <span className="bg-emerald-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black uppercase">
-                  Promo
-                </span>
-              </button>
-            </div>
+              />
+            </button>
+
+            <span
+              className={`text-xs font-bold transition-colors cursor-pointer select-none flex items-center gap-1.5 ${
+                billingCycle === 'yearly' ? 'text-slate-950' : 'text-slate-400'
+              }`}
+              onClick={() => setBillingCycle('yearly')}
+            >
+              <span>1-Year Term</span>
+              <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                Save 15%
+              </span>
+            </span>
           </div>
         </div>
 
