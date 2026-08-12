@@ -1,5 +1,3 @@
-// This file defines the authentication-related routes for the API, including user registration, login, profile retrieval, token refresh, logout, and Google OAuth authentication. It uses Express.js for routing and imports controller functions to handle the logic for each route. Some routes are protected by an authentication middleware that verifies JWT tokens.
-
 import express from 'express';
 import { 
   register, 
@@ -8,7 +6,8 @@ import {
   refreshTokenHandler, 
   logoutHandler,
   googleAuth,
-  googleAuthCallback
+  googleAuthCallback,
+  verifyEmailHandler
 } from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
@@ -29,5 +28,8 @@ router.get('/google/callback', googleAuthCallback);
 
 // --- PROTECTED USER ROUTES ---
 router.get('/me', authenticateToken, getProfile);
+router.get('/verify-email', verifyEmailHandler);
 
 export default router;
+
+

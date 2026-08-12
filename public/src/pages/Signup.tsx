@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 import { apiCall } from '../services/api';
 import atcLogo from '../assets/ATC_Logo.png';
 
@@ -15,10 +14,10 @@ import {
   EyeOff, 
   Check, 
   X,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2
 } 
 from 'lucide-react';
-
 
 export default function Signup() {
   const [fullName, setFullName] = useState('');
@@ -32,10 +31,8 @@ export default function Signup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState(''); // Added success state
   const [loading, setLoading] = useState(false);
-
-  const { login } = useAuth();
-  const navigate = useNavigate();
 
   // Password validation criteria
   const hasMinLength = password.length >= 8;
@@ -50,6 +47,7 @@ export default function Signup() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setSuccessMsg('');
 
     if (strengthScore < 3) {
       setErrorMsg('Please ensure your password meets all security requirements.');
@@ -81,9 +79,8 @@ export default function Signup() {
         }),
       });
 
-      // Pass token and user object directly to AuthContext handler
-      login(data.token, data.user);
-      navigate('/dashboard');
+      // Show success message directing user to check their email inbox
+      setSuccessMsg(data.message || 'Registration successful! Please check your email to verify your account.');
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMsg(err.message);
@@ -116,10 +113,22 @@ export default function Signup() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
         <div className="bg-white py-8 px-6 shadow-xl shadow-blue-950/5 border border-slate-200 rounded-2xl sm:px-10">
           
+          {/* ERROR ALERT */}
           {errorMsg && (
             <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* SUCCESS VERIFICATION ALERT */}
+          {successMsg && (
+            <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-start gap-3 shadow-sm">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold text-sm">Verification Link Sent!</p>
+                <p className="text-emerald-700 leading-relaxed">{successMsg}</p>
+              </div>
             </div>
           )}
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Home from './pages/Home';
 import AboutUs from './pages/AboutUs';
 import Services from './pages/Services';
@@ -16,6 +16,17 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Footer from './components/Footer';
 import { setAccessToken } from './services/api';
+
+// Scroll Reset Component for Route Navigation
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
 
 // OAuth Callback Handler Component
 function AuthCallback() {
@@ -91,6 +102,9 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 flex flex-col justify-between font-sans">
+      {/* Resets scroll position on every page navigation */}
+      <ScrollToTop />
+
       {/* NAVBAR (Hidden on Auth Pages & Callback) */}
       {!isAuthPage && (
         <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 px-10 py-4 flex items-center justify-between">

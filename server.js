@@ -13,6 +13,7 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import userRoutes from './routes/user.js';
 import authRoutes from './routes/authRoutes.js';
+import contactRoutes from './routes/contact.js'; // Correct router import from project routes directory
 
 const app = express();
 const prisma = new PrismaClient();
@@ -44,6 +45,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/contact', contactRoutes);
+
 
 // 6. Passport Google Strategy Setup
 passport.use(new GoogleStrategy({

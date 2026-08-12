@@ -2,8 +2,18 @@
 
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import prisma from '../lib/prisma.1.js';
+import nodemailer from 'nodemailer';
+import prisma from '../lib/prisma.js';
 import { registerUser, handleGoogleAuth } from '../services/authService.js';
+
+// --- NODEMAILER TRANSPORTER SETUP (GMAIL OPTIMIZED) ---
+const transporter = nodemailer.createTransport({
+  service: 'gmail', // Automatically configures smtp.gmail.com & SSL port 465
+  auth: {
+    user: process.env.SMTP_USER, // moeezshehzad26@gmail.com
+    pass: process.env.SMTP_PASS, // 16-character Google App Password
+  },
+});
 
 // --- HELPER FUNCTIONS ---
 
@@ -211,7 +221,7 @@ export const googleAuthCallback = async (req, res) => {
   }
 };
 
-// --- REGISTER USER ---
+// --- REGISTER USER (WITH EMAIL VERIFICATION LINK) ---
 export const register = async (req, res) => {
   const {
     fullName,
@@ -259,6 +269,7 @@ export const register = async (req, res) => {
           city: city || null,
           postalCode: postalCode || null,
           country: country || null,
+          emailVerified: false, // Explicitly set unverified
           provider: 'LOCAL',
         },
       });
@@ -275,31 +286,110 @@ export const register = async (req, res) => {
       return user;
     });
 
-    const roles = customerRole ? [customerRole.roleName] : ['Customer'];
+    // Generate Email Verification Token (Expires in 24 hours)
+    const verificationToken = jwt.sign(
+      { userId: newUser.userId, email: newUser.email },
+      process.env.JWT_VERIFY_SECRET || process.env.JWT_SECRET || 'verify-secret-key',
+      { expiresIn: '24h' }
+    );
 
-    const accessToken = generateAccessToken(newUser.userId, newUser.email, roles);
-    const refreshToken = await createAndStoreRefreshToken(newUser.userId);
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+    const verifyUrl = `${backendUrl}/api/auth/verify-email?token=${verificationToken}`;
 
-    setRefreshTokenCookie(res, refreshToken);
+    // Send verification email via Nodemailer
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || '"ATC Portal" <no-reply@atechconsult.com>',
+      to: newUser.email,
+      subject: 'Verify your ATC Portal account',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2>Welcome, ${newUser.fullName}!</h2>
+          <p>Thank you for signing up. Please verify your email address to complete your registration and activate your dashboard access.</p>
+          <div style="margin: 30px 0;">
+            <a href="${verifyUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+              Verify Email Address
+            </a>
+          </div>
+          <p style="font-size: 13px; color: #666;">
+            Or copy and paste this link in your browser: <br/>
+            <a href="${verifyUrl}">${verifyUrl}</a>
+          </p>
+          <p style="font-size: 12px; color: #999; margin-top: 30px;">This link will expire in 24 hours.</p>
+        </div>
+      `,
+    });
 
     res.status(201).json({
-      message: 'User registered successfully',
-      accessToken,
+      message: 'Registration successful! Please check your email to verify your account.',
       user: {
         userId: newUser.userId,
         fullName: newUser.fullName,
         email: newUser.email,
-        phone: newUser.phone,
-        address: newUser.address,
-        city: newUser.city,
-        postalCode: newUser.postalCode,
-        country: newUser.country,
-        roles,
-        createdAt: newUser.createdAt,
+        emailVerified: false,
       },
     });
   } catch (error) {
+    console.error('Registration Error:', error);
     res.status(500).json({ error: 'Registration failed', details: error.message });
+  }
+};
+
+// --- EMAIL VERIFICATION HANDLER ---
+export const verifyEmailHandler = async (req, res) => {
+  const { token } = req.query;
+
+  if (!token) {
+    return res.redirect('http://localhost:5174/login?error=missing_token');
+  }
+
+  try {
+    // 1. Verify token signature
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_VERIFY_SECRET || process.env.JWT_SECRET || 'verify-secret-key'
+    );
+
+    // 2. Mark emailVerified as true in MariaDB
+    let user = await prisma.user.update({
+      where: { userId: decoded.userId },
+      data: { 
+        emailVerified: true,
+        lastLoginAt: new Date(),
+      },
+      include: {
+        userRoles: {
+          include: { role: true },
+        },
+      },
+    });
+
+    const roles = user.userRoles?.map((ur) => ur.role.roleName) || ['Customer'];
+
+    // 3. Issue Access Token & Refresh Token (Cookie)
+    const accessToken = generateAccessToken(user.userId, user.email, roles);
+    const refreshToken = await createAndStoreRefreshToken(user.userId);
+
+    setRefreshTokenCookie(res, refreshToken);
+
+    const userPayload = encodeURIComponent(
+      JSON.stringify({
+        userId: user.userId,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        address: user.address,
+        city: user.city,
+        postalCode: user.postalCode,
+        country: user.country,
+        roles,
+      })
+    );
+
+    // 4. Redirect directly to frontend auth callback (log user in & redirect to dashboard)
+    return res.redirect(`http://localhost:5174/auth/callback?token=${accessToken}&user=${userPayload}`);
+  } catch (error) {
+    console.error('Email Verification Error:', error);
+    return res.redirect('http://localhost:5174/login?error=invalid_or_expired_token');
   }
 };
 
@@ -325,6 +415,12 @@ export const login = async (req, res) => {
 
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'Invalid email or account is inactive.' });
+    }
+
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        error: 'Please verify your email address before logging in. Check your inbox for the verification link.',
+      });
     }
 
     if (!user.passwordHash) {
@@ -373,8 +469,6 @@ export const login = async (req, res) => {
 // --- REFRESH TOKEN (Silent Refresh & Rotation) ---
 export const refreshTokenHandler = async (req, res) => {
   try {
-    console.log('REFRESH COOKIES:', req.cookies);
-    console.log('REFRESH TOKEN:', req.cookies?.refreshToken);
     const oldRefreshToken = req.cookies?.refreshToken;
 
     if (!oldRefreshToken) {
@@ -393,8 +487,6 @@ export const refreshTokenHandler = async (req, res) => {
         },
       },
     });
-    console.log('REFRESH TOKEN FOUND:', !!storedToken);
-    console.log('REFRESH TOKEN REVOKED:', storedToken?.isRevoked);
 
     if (!storedToken || storedToken.isRevoked || new Date() > storedToken.expiresAt) {
       if (storedToken?.isRevoked) {
