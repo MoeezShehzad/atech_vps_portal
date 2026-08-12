@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Phone, Lock, CheckCircle, AlertCircle, Loader2, Camera, MapPin, ShieldCheck } from 'lucide-react';
-import { apiCall, getAccessToken } from '../services/api';
+import { apiCall } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 interface UserProfile {
@@ -12,6 +12,9 @@ interface UserProfile {
   phone?: string;
   address?: string;
   city?: string;
+  postalCode?: string;
+  postal_code?: string;
+  zip?: string;
   country?: string;
   role?: string;
   avatarUrl?: string;
@@ -25,7 +28,7 @@ interface FeedbackMessage {
 }
 
 export default function AccountSettings() {
-  const { isAuthenticated, user: authUser } = useAuth();
+  const { isAuthenticated, user: authUser, updateUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   // Profile details state
@@ -33,6 +36,7 @@ export default function AccountSettings() {
   const [phone, setPhone] = useState<string>('');
   const [address, setAddress] = useState<string>('');
   const [city, setCity] = useState<string>('');
+  const [postalCode, setPostalCode] = useState<string>('');
   const [country, setCountry] = useState<string>('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
@@ -53,6 +57,7 @@ export default function AccountSettings() {
     setPhone(data.phone ?? '');
     setAddress(data.address || '');
     setCity(data.city || '');
+    setPostalCode(data.postalCode || (data as any).postal_code || (data as any).zip || '');
     setCountry(data.country || '');
     setAvatarPreview(data.avatarUrl || null);
   };
@@ -61,7 +66,7 @@ export default function AccountSettings() {
     try {
       setLoading(true);
 
-      // Check endpoints in order of standard NestJS route structure
+      // Check endpoints in order of standard NestJS/Express route structure
       let data: UserProfile;
       try {
         data = await apiCall('/users/me');
@@ -114,11 +119,14 @@ export default function AccountSettings() {
       setSavingProfile(true);
       setMessage(null);
 
+      // Send both postalCode and postal_code to ensure full compatibility with Express/Prisma
       const payload = {
         fullName,
         phone,
         address,
         city,
+        postalCode,
+        postal_code: postalCode,
         country,
         avatarUrl: avatarPreview,
       };
@@ -138,7 +146,14 @@ export default function AccountSettings() {
       }
 
       const updatedUser: UserProfile = responseData.user || responseData;
+      
+      // Update local component state
       setProfile((prev) => (prev ? { ...prev, ...updatedUser } : updatedUser));
+
+      // Update global AuthContext state so memory context stays synced
+      if (updateUser) {
+        updateUser(updatedUser as any);
+      }
 
       // Update localStorage cache
       const storedUser = localStorage.getItem('user');
@@ -156,7 +171,7 @@ export default function AccountSettings() {
     }
   };
 
-  // Improved password detector: Check explicit flag or fallback to authProvider
+  // Password detector: Check explicit flag or fallback to authProvider
   const userHasPassword = profile?.hasPassword !== undefined 
     ? profile.hasPassword 
     : profile?.authProvider !== 'google';
@@ -331,7 +346,19 @@ export default function AccountSettings() {
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all text-slate-900"
               />
             </div>
-            <div className="sm:col-span-2">
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Postal / ZIP Code</label>
+              <input
+                type="text"
+                placeholder="60000"
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all text-slate-900"
+              />
+            </div>
+
+            <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">Country / Region</label>
               <input
                 type="text"

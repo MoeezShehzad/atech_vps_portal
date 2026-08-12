@@ -1,3 +1,5 @@
+// This file defines the authentication service functions for the API, including user registration with hashed passwords, Google OAuth authentication with automatic account linking, and JWT token generation. It uses bcryptjs for password hashing, jsonwebtoken for token generation, and Prisma Client for database interactions with MariaDB.
+
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';

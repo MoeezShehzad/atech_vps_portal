@@ -1,3 +1,5 @@
+// This file sets up the Express.js server, configures middleware for CORS, cookie parsing, session management, and Passport.js for authentication. It defines routes for user and authentication-related operations, including Google OAuth integration. The server listens on a specified port and handles incoming requests accordingly.
+
 import dotenv from 'dotenv';
 dotenv.config();
 

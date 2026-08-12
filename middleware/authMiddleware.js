@@ -1,3 +1,5 @@
+/*This file defines the authentication middleware for the API, which verifies JWT tokens in incoming requests. It checks for the presence of an authorization header, extracts the token, and verifies it using a secret key. If the token is valid, it attaches the decoded user information to the request object for further processing in subsequent route handlers. */
+
 import jwt from 'jsonwebtoken';
 
 export const authenticateToken = (req, res, next) => {

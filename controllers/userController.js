@@ -1,3 +1,5 @@
+// This file defines the user-related controller functions for the API, including fetching the current user's profile, updating profile details, and setting/updating the password. It uses Prisma Client for database interactions with MariaDB and bcryptjs for password hashing. The controller functions are designed to handle requests from authenticated users, with error handling and logging for debugging purposes.
+
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const bcrypt = require('bcryptjs');
@@ -5,7 +7,6 @@ const bcrypt = require('bcryptjs');
 // 1. Fetch current logged-in user profile
 exports.getMe = async (req, res) => {
   try {
-    // Read user ID from JWT payload
     const userId = Number(req.user.id || req.user.userId);
 
     const user = await prisma.user.findUnique({
@@ -23,7 +24,6 @@ exports.getMe = async (req, res) => {
       return res.status(404).json({ error: 'User not found in database.' });
     }
 
-    // Determine primary role name (e.g. 'ADMIN', 'USER')
     const primaryRole = user.userRoles?.[0]?.role?.roleName || 'USER';
 
     res.json({
@@ -33,10 +33,12 @@ exports.getMe = async (req, res) => {
       phone: user.phone || '',
       address: user.address || '',
       city: user.city || '',
+      postalCode: user.postalCode || '', // <--- Returns postal code to frontend
       country: user.country || '',
       role: primaryRole,
       avatarUrl: user.avatar_url || null,
       hasPassword: Boolean(user.passwordHash),
+      authProvider: user.provider || 'LOCAL',
     });
   } catch (error) {
     console.error('Error fetching profile:', error);
@@ -48,9 +50,12 @@ exports.getMe = async (req, res) => {
 exports.updateMe = async (req, res) => {
   try {
     const userId = Number(req.user.id || req.user.userId);
-    const { fullName, phone, address, city, country, avatarUrl } = req.body;
+    
+    // Safely parse incoming payload whether frontend sends postalCode or postal_code
+    const { fullName, phone, address, city, postalCode, postal_code, country, avatarUrl } = req.body;
+    const valueForPostalCode = postalCode ?? postal_code ?? null;
 
-    console.log(`[UPDATE PROFILE] Updating userId: ${userId}`);
+    console.log(`[UPDATE PROFILE] Updating userId: ${userId} with postalCode: "${valueForPostalCode}"`);
 
     const updatedUser = await prisma.user.update({
       where: { userId: userId },
@@ -59,6 +64,7 @@ exports.updateMe = async (req, res) => {
         phone: phone,
         address: address,
         city: city,
+        postalCode: valueForPostalCode, // <--- Maps directly to Prisma's postalCode property
         country: country,
         avatar_url: avatarUrl,
       },
@@ -82,10 +88,12 @@ exports.updateMe = async (req, res) => {
       phone: updatedUser.phone,
       address: updatedUser.address,
       city: updatedUser.city,
+      postalCode: updatedUser.postalCode || '', // <--- Returns updated postal code
       country: updatedUser.country,
       role: primaryRole,
       avatarUrl: updatedUser.avatar_url,
       hasPassword: Boolean(updatedUser.passwordHash),
+      authProvider: updatedUser.provider || 'LOCAL',
     });
   } catch (error) {
     console.error('[UPDATE PROFILE ERROR]:', error);
@@ -107,7 +115,6 @@ exports.updatePassword = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Verify existing password if set
     if (user.passwordHash) {
       if (!currentPassword) {
         return res.status(400).json({ error: 'Current password is required.' });
@@ -118,7 +125,6 @@ exports.updatePassword = async (req, res) => {
       }
     }
 
-    // Hash new password and save to passwordHash field
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 

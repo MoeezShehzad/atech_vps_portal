@@ -1,3 +1,5 @@
+// This file defines the user-related routes for the API, including fetching the current user's profile, updating profile details, and setting/updating the password. It uses Express.js for routing, bcryptjs for password hashing, and Prisma Client for database interactions with MariaDB. The routes are protected by an authentication middleware that verifies JWT tokens.
+
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
@@ -20,6 +22,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         phone: true,
         address: true,
         city: true,
+        postalCode: true, // <-- Retrieve postalCode from MariaDB
         country: true,
         avatar_url: true,
         passwordHash: true,
@@ -38,6 +41,7 @@ router.get('/me', authenticateToken, async (req, res) => {
       phone: user.phone || '',
       address: user.address || '',
       city: user.city || '',
+      postalCode: user.postalCode || '', // <-- Return postal code to frontend
       country: user.country || '',
       avatarUrl: user.avatar_url || null,
       hasPassword: Boolean(user.passwordHash),
@@ -51,8 +55,12 @@ router.get('/me', authenticateToken, async (req, res) => {
 
 // 2. Update Profile Details (PATCH /api/users/me)
 router.patch('/me', authenticateToken, async (req, res) => {
-  const { fullName, phone, address, city, country, avatarUrl } = req.body;
+  // Extract postalCode or postal_code from req.body
+  const { fullName, phone, address, city, postalCode, postal_code, country, avatarUrl } = req.body;
   const userId = Number(req.user.userId || req.user.id);
+
+  // Fallback check if frontend sends key as postalCode or postal_code
+  const valueForPostalCode = postalCode !== undefined ? postalCode : postal_code;
 
   try {
     console.log(`[UPDATE PROFILE] Updating userId: ${userId} with:`, req.body);
@@ -64,6 +72,7 @@ router.patch('/me', authenticateToken, async (req, res) => {
         phone,
         address,
         city,
+        postalCode: valueForPostalCode, // <-- Persist postalCode into MariaDB
         country,
         avatar_url: avatarUrl,
       },
@@ -78,6 +87,7 @@ router.patch('/me', authenticateToken, async (req, res) => {
         phone: updatedUser.phone,
         address: updatedUser.address,
         city: updatedUser.city,
+        postalCode: updatedUser.postalCode || '', // <-- Return updated postalCode
         country: updatedUser.country,
         avatarUrl: updatedUser.avatar_url,
         hasPassword: Boolean(updatedUser.passwordHash),

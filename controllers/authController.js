@@ -1,6 +1,8 @@
+// This file defines the authentication controller functions for the API, including user registration, login, profile retrieval, token refresh, logout, and Google OAuth authentication. It uses bcryptjs for password hashing, jsonwebtoken for token generation, and Prisma Client for database interactions with MariaDB. The controller functions handle requests from clients, perform necessary validations and operations, and return appropriate responses.
+
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import prisma from '../lib/prisma.js';
+import prisma from '../lib/prisma.1.js';
 import { registerUser, handleGoogleAuth } from '../services/authService.js';
 
 // --- HELPER FUNCTIONS ---

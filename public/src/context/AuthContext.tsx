@@ -9,12 +9,21 @@ import React, {
 
 import { apiCall, setAccessToken } from '../services/api.ts';
 
-interface User {
+export interface User {
   userId: number;
   fullName: string;
   email: string;
   phone?: string;
-  roles: string[];
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  zip?: string;
+  postal_code?: string;
+  country?: string;
+  role?: string;
+  roles?: string[];
+  avatarUrl?: string;
+  hasPassword?: boolean;
 }
 
 interface AuthContextType {
@@ -23,6 +32,8 @@ interface AuthContextType {
   loading: boolean;
   login: (accessToken: string, userData: User) => void;
   logout: () => Promise<void>;
+  updateUser: (updatedData: Partial<User>) => void; // <--- Added to manually update local context
+  refreshUser: () => Promise<void>;                  // <--- Added to re-fetch profile from API
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,6 +59,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     },
     []
   );
+
+  /*
+   * UPDATE LOCAL USER STATE
+   */
+  const updateUser = useCallback((updatedData: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...updatedData } : null));
+  }, []);
+
+  /*
+   * RE-FETCH USER PROFILE FROM BACKEND
+   */
+  const refreshUser = useCallback(async () => {
+    try {
+      const freshUser = await apiCall('/users/me', { method: 'GET' });
+      if (freshUser) {
+        setUser(freshUser);
+      }
+    } catch (err) {
+      console.error('[AuthContext] Failed to re-fetch user profile:', err);
+    }
+  }, []);
 
   /*
    * LOGOUT
@@ -79,7 +111,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     console.log('[AuthInit] Initializing AuthProvider check...');
 
-    // Catch /auth/callback whether in pathname or full URL
     if (currentPath.includes('/auth/callback') || currentUrl.includes('/auth/callback')) {
       console.log('[AuthInit] OAuth callback route detected! Skipping /auth/refresh.');
       setLoading(false);
@@ -87,7 +118,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     const initializeAuth = async () => {
-      // Reuse ongoing request if Strict Mode remounts
       if (!refreshPromiseRef.current) {
         console.log('[AuthInit] Sending silent refresh request to /auth/refresh...');
         refreshPromiseRef.current = apiCall('/auth/refresh', { method: 'POST' });
@@ -108,7 +138,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           console.warn('[AuthInit] Refresh succeeded but payload missing token/user');
         }
       } catch (err: any) {
-        // Quiet expected 401 log when no active session cookie exists
         console.log('[AuthInit] No active session found. User unauthenticated.');
 
         if (isMounted) {
@@ -140,6 +169,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         loading,
         login,
         logout,
+        updateUser,
+        refreshUser,
       }}
     >
       {loading ? (
