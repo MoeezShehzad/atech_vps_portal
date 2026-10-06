@@ -13,6 +13,7 @@ import {
   previewResize,
   resizeVM,
   destroyVM,
+  getVMMetrics,
 } from '../controllers/vmController.js';
 
 const router = express.Router();
@@ -40,5 +41,8 @@ router.patch('/:id/resize', resizeVM);
 
 // 6. Terminate & destroy VM
 router.delete('/:id', destroyVM);
+
+// 7. Live resource telemetry & metrics
+router.get('/:id/metrics', getVMMetrics);
 
 export default router;

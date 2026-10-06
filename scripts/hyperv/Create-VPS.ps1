@@ -85,6 +85,11 @@ try {
     Start-VM -Name $VMName
     Write-Output "[STATUS] VM '$VMName' started successfully."
 
+    # Enable Resource Metering for real-time telemetry
+    try {
+        Enable-VMResourceMetering -VMName $VMName -ErrorAction SilentlyContinue
+    } catch {}
+
     # 9. Audit Logging
     $LogFile = Join-Path -Path $SystemLogsRoot -ChildPath "provision.log"
     Add-Content -Path $LogFile -Value "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Provisioned and started $VMName successfully."

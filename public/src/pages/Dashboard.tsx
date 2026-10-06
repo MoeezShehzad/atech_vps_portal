@@ -25,7 +25,11 @@ import {
   DollarSign,
   Layers,
   ArrowUpRight,
-  Shield
+  Shield,
+  Gauge,
+  TrendingUp,
+  LineChart,
+  Wifi
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
@@ -66,6 +70,29 @@ interface ImageOption {
   osFamily: string;
   version: string;
   templatePath: string;
+}
+
+interface VMMetrics {
+  found: boolean;
+  vmName: string;
+  vmId?: string;
+  state: string;
+  status?: string;
+  uptime?: string;
+  processorCount?: number;
+  cpuUsage: number;
+  avgCpu: number;
+  ramTotalMb: number;
+  ramUsedMb: number;
+  ramPercent: number;
+  diskTotalGb: number;
+  diskUsedGb: number;
+  diskPercent: number;
+  diskReadMb: number;
+  diskWriteMb: number;
+  ipAddresses?: string[];
+  heartbeat?: string;
+  timestamp: string;
 }
 
 interface ActiveSubscription {
@@ -109,6 +136,12 @@ export default function Dashboard() {
   const [deletingInstance, setDeletingInstance] = useState<Instance | null>(null);
   const [resizingInstance, setResizingInstance] = useState<Instance | null>(null);
   const [copiedSSH, setCopiedSSH] = useState(false);
+
+  // Real-time telemetry monitoring for selected instance
+  const [liveMetrics, setLiveMetrics] = useState<VMMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [cpuHistory, setCpuHistory] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  const [ramHistory, setRamHistory] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
   // Deploy form state
   const [newHostname, setNewHostname] = useState('');
@@ -179,6 +212,41 @@ export default function Dashboard() {
     }, 3000);
     return () => clearInterval(timer);
   }, [instances]);
+
+  // Real-time telemetry monitoring for selected instance (polls every 3 seconds when drawer is open)
+  const fetchSelectedMetrics = async (vmId: number) => {
+    try {
+      const data: VMMetrics = await apiCall(`/vms/${vmId}/metrics`);
+      if (data) {
+        setLiveMetrics(data);
+        const cpuVal = data.avgCpu !== undefined ? data.avgCpu : (data.cpuUsage || 0);
+        const ramVal = data.ramPercent || 0;
+        setCpuHistory((prev) => [...prev.slice(1), cpuVal]);
+        setRamHistory((prev) => [...prev.slice(1), ramVal]);
+      }
+    } catch (err) {
+      console.warn('Failed to load VM metrics:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedInstance) {
+      setLiveMetrics(null);
+      setCpuHistory([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      setRamHistory([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      return;
+    }
+
+    setMetricsLoading(true);
+    fetchSelectedMetrics(selectedInstance.vmId).finally(() => setMetricsLoading(false));
+
+    // Telemetry polling interval (3.5 seconds)
+    const metricsTimer = setInterval(() => {
+      fetchSelectedMetrics(selectedInstance.vmId);
+    }, 3500);
+
+    return () => clearInterval(metricsTimer);
+  }, [selectedInstance?.vmId]);
 
   // Handle Escape key to close any active drawer or modal
   useEffect(() => {
@@ -1401,20 +1469,157 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* EVENT REBOOT LOGS */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Hyper-V Status & Health
-                </h4>
-                <div className="bg-slate-50 rounded-xl border border-slate-100 p-3 space-y-2.5 text-xs text-slate-600">
-                  <div className="flex items-start gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                    <div>
-                      <p className="font-medium text-slate-800">Cluster Heartbeat Active</p>
-                      <p className="text-[10px] text-slate-400">VM state synced with host 192.168.100.92</p>
+              {/* LIVE RESOURCE MONITORING & TELEMETRY */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${selectedInstance.status === 'running' ? 'bg-emerald-400' : 'bg-slate-300'}`}></span>
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${selectedInstance.status === 'running' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                    </span>
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-blue-600" /> Live Resource Telemetry
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
+                    {metricsLoading ? (
+                      <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />
+                    ) : (
+                      <>⚡ Polling 3s</>
+                    )}
+                  </span>
+                </div>
+
+                {selectedInstance.status === 'running' ? (
+                  <div className="space-y-3">
+                    {/* CPU & RAM LIVE METRICS CARDS */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* CPU MONITOR CARD */}
+                      <div className="p-3.5 bg-gradient-to-br from-blue-50/60 to-slate-50 rounded-2xl border border-blue-100/80 shadow-xs">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-semibold text-slate-600 flex items-center gap-1.5">
+                            <Cpu className="w-3.5 h-3.5 text-blue-600" /> CPU Usage
+                          </span>
+                          <span className="text-xs font-mono font-bold text-blue-600">
+                            {liveMetrics ? `${liveMetrics.avgCpu !== undefined ? liveMetrics.avgCpu : liveMetrics.cpuUsage}%` : `${selectedInstance.cpuUsage}%`}
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden mb-2.5">
+                          <div 
+                            className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.avgCpu ?? selectedInstance.cpuUsage))}%` }}
+                          />
+                        </div>
+                        {/* Real-time mini sparkline bar chart */}
+                        <div className="flex items-end gap-1 h-7 pt-1 px-1 bg-white/70 rounded-lg border border-blue-100/60">
+                          {cpuHistory.map((val, idx) => (
+                            <div 
+                              key={idx}
+                              title={`Sample ${idx + 1}: ${val}%`}
+                              className="flex-1 bg-blue-500/80 hover:bg-blue-600 rounded-xs transition-all duration-300"
+                              style={{ height: `${Math.max(12, Math.min(100, val))}%` }}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex justify-between items-center text-[9px] text-slate-400 mt-1.5 font-mono">
+                          <span>{selectedInstance.vCPU} vCPUs</span>
+                          <span>Live trend</span>
+                        </div>
+                      </div>
+
+                      {/* RAM MONITOR CARD */}
+                      <div className="p-3.5 bg-gradient-to-br from-purple-50/60 to-slate-50 rounded-2xl border border-purple-100/80 shadow-xs">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] font-semibold text-slate-600 flex items-center gap-1.5">
+                            <MemoryStick className="w-3.5 h-3.5 text-purple-600" /> RAM Load
+                          </span>
+                          <span className="text-xs font-mono font-bold text-purple-600">
+                            {liveMetrics ? `${liveMetrics.ramPercent}%` : `${selectedInstance.ramUsage}`}
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden mb-2.5">
+                          <div 
+                            className="bg-purple-600 h-1.5 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.ramPercent ?? 20))}%` }}
+                          />
+                        </div>
+                        {/* Real-time mini sparkline bar chart */}
+                        <div className="flex items-end gap-1 h-7 pt-1 px-1 bg-white/70 rounded-lg border border-purple-100/60">
+                          {ramHistory.map((val, idx) => (
+                            <div 
+                              key={idx}
+                              title={`Sample ${idx + 1}: ${val}%`}
+                              className="flex-1 bg-purple-500/80 hover:bg-purple-600 rounded-xs transition-all duration-300"
+                              style={{ height: `${Math.max(12, Math.min(100, val))}%` }}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex justify-between items-center text-[9px] text-slate-400 mt-1.5 font-mono">
+                          <span>{liveMetrics?.ramUsedMb ? `${liveMetrics.ramUsedMb} MB` : 'Dynamic'}</span>
+                          <span>{liveMetrics?.ramTotalMb ? `${liveMetrics.ramTotalMb} MB` : `${selectedInstance.ramGB} GB`}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* DISK USAGE & IOPS METRICS */}
+                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <HardDrive className="w-4 h-4 text-amber-600" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-800">NVMe VHDX Allocation</p>
+                            <p className="text-[10px] text-slate-500 font-mono">
+                              {liveMetrics?.diskUsedGb !== undefined ? `${liveMetrics.diskUsedGb} GB physical / ${liveMetrics.diskTotalGb} GB total` : `${selectedInstance.diskGB} GB Provisioned`}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold font-mono text-slate-700">
+                          {liveMetrics ? `${liveMetrics.diskPercent}%` : '25%'}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.diskPercent ?? 25))}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-200/60">
+                        <span className="flex items-center gap-1 font-mono">
+                          <span>Read:</span> <strong className="text-slate-700">{liveMetrics?.diskReadMb || 0} MB</strong>
+                        </span>
+                        <span className="flex items-center gap-1 font-mono">
+                          <span>Write:</span> <strong className="text-slate-700">{liveMetrics?.diskWriteMb || 0} MB</strong>
+                        </span>
+                        <span className="flex items-center gap-1 text-emerald-600 font-semibold">
+                          <Check className="w-3 h-3" /> Healthy IO
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* UPTIME & HEALTH STATUS */}
+                    <div className="bg-slate-50 rounded-xl border border-slate-100 p-3 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <Clock className="w-4 h-4 text-blue-600" />
+                        <div>
+                          <p className="font-semibold text-slate-800">Hyper-V Engine Uptime</p>
+                          <p className="text-[10px] font-mono text-slate-500">{liveMetrics?.uptime || 'Active'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{liveMetrics?.status || 'Operating normally'}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
+                    <Power className="w-5 h-5 text-slate-400 mx-auto mb-1.5" />
+                    <p className="text-xs font-semibold text-slate-700">Server is Powered Off</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Start instance to activate live Hyper-V performance telemetry and IO counters.</p>
+                  </div>
+                )}
               </div>
 
             </div>

@@ -182,6 +182,18 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify(result));
     }
 
+    // 7. Live Telemetry & Resource Metrics (CPU, RAM, Disk, IO)
+    if (req.method === 'GET' && pathname === '/api/hyperv/metrics') {
+      const vmName = url.searchParams.get('vmName') || '';
+      if (!vmName) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'vmName query param is required' }));
+      }
+      const result = await runPowerShell('Get-Metrics.ps1', { VMName: vmName });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(result));
+    }
+
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Endpoint not found' }));
   } catch (error) {

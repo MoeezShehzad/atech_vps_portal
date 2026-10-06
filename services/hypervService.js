@@ -185,6 +185,15 @@ class HyperVService {
     const qs = vmName ? `?vmName=${encodeURIComponent(vmName)}` : '';
     return await this.dispatchToHost(`/api/hyperv/status${qs}`, 'GET');
   }
+
+  /**
+   * Query live detailed resource metrics (CPU, RAM, Disk, IO) from Hyper-V
+   */
+  async getMetrics(vmName) {
+    if (!vmName) throw new Error('vmName is required to query metrics');
+    const qs = `?vmName=${encodeURIComponent(vmName)}`;
+    return await this.dispatchToHost(`/api/hyperv/metrics${qs}`, 'GET');
+  }
 }
 
 export default new HyperVService();
