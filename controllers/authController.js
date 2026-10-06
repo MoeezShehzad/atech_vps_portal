@@ -1,10 +1,18 @@
 // This file defines the authentication controller functions for the API, including user registration, login, profile retrieval, token refresh, logout, and Google OAuth authentication. It uses bcryptjs for password hashing, jsonwebtoken for token generation, and Prisma Client for database interactions with MariaDB. The controller functions handle requests from clients, perform necessary validations and operations, and return appropriate responses.
 
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import prisma from '../lib/prisma.js';
-import { registerUser, handleGoogleAuth } from '../services/authService.js';
+
+// --- CENTRALIZED AUTH CONFIGURATION ---
+const JWT_SECRET = process.env.JWT_SECRET || 'atech_vps_default_jwt_secret_must_change';
+const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
+const JWT_VERIFY_SECRET = process.env.JWT_VERIFY_SECRET || JWT_SECRET;
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://172.23.28.242';
+const BACKEND_URL = process.env.BACKEND_URL || process.env.SERVER_URL || 'http://172.23.28.242';
 
 // --- NODEMAILER TRANSPORTER SETUP (GMAIL OPTIMIZED) ---
 const transporter = nodemailer.createTransport({
@@ -21,7 +29,7 @@ const transporter = nodemailer.createTransport({
 const generateAccessToken = (userId, email, roles) => {
   return jwt.sign(
     { userId, email, roles },
-    process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret',
+    JWT_ACCESS_SECRET,
     { expiresIn: '15m' }
   );
 };
@@ -30,7 +38,7 @@ const generateAccessToken = (userId, email, roles) => {
 const createAndStoreRefreshToken = async (userId) => {
   const refreshToken = jwt.sign(
     { userId },
-    process.env.JWT_REFRESH_SECRET || 'refresh-secret',
+    JWT_REFRESH_SECRET,
     { expiresIn: '7d' }
   );
 
@@ -58,15 +66,42 @@ const setRefreshTokenCookie = (res, token) => {
   });
 };
 
-// --- GOOGLE OAUTH: STEP 1 (REDIRECT TO GOOGLE) ---
+// --- GOOGLE OAUTH: STEP 1 (REDIRECT TO GOOGLE WITH CSRF STATE) ---
 export const googleAuth = (req, res) => {
+  // Generate cryptographically secure state parameter to prevent OAuth Login CSRF
+  const state = crypto.randomBytes(32).toString('hex');
+  
+  // Dynamically capture originating frontend URL (port 80 IP, dev port, or domain)
+  let returnTo = FRONTEND_URL;
+  if (req.headers.referer) {
+    try {
+      const refUrl = new URL(req.headers.referer);
+      returnTo = `${refUrl.protocol}//${refUrl.host}`;
+    } catch (_) {}
+  }
+
+  res.cookie('oauth_state', state, {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax',
+    maxAge: 10 * 60 * 1000, // 10 minutes
+  });
+
+  res.cookie('oauth_return_to', returnTo, {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax',
+    maxAge: 10 * 60 * 1000,
+  });
+
   const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
   const options = {
-    redirect_uri: 'http://localhost:5000/api/auth/google/callback',
+    redirect_uri: `${BACKEND_URL}/api/auth/google/callback`,
     client_id: process.env.GOOGLE_CLIENT_ID,
     access_type: 'offline',
     response_type: 'code',
     prompt: 'consent',
+    state: state,
     scope: [
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/userinfo.email',
@@ -79,10 +114,22 @@ export const googleAuth = (req, res) => {
 
 // --- GOOGLE OAUTH: STEP 2 (CALLBACK & ACCOUNT LINKING) ---
 export const googleAuthCallback = async (req, res) => {
-  const { code } = req.query;
+  const { code, state } = req.query;
+  const storedState = req.cookies?.oauth_state;
+  const returnTo = req.cookies?.oauth_return_to || FRONTEND_URL;
+
+  // Clear state and return cookies immediately
+  res.clearCookie('oauth_state');
+  res.clearCookie('oauth_return_to');
+
+  // Verify OAuth CSRF state
+  if (!state || !storedState || state !== storedState) {
+    console.error('OAuth CSRF Error: State parameter mismatch or missing.');
+    return res.redirect(`${returnTo}/login?error=oauth_csrf_detected`);
+  }
 
   if (!code) {
-    return res.redirect('http://localhost:5174/login?error=no_code');
+    return res.redirect(`${returnTo}/login?error=no_code`);
   }
 
   try {
@@ -94,7 +141,7 @@ export const googleAuthCallback = async (req, res) => {
         code,
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: 'http://localhost:5000/api/auth/google/callback',
+        redirect_uri: `${BACKEND_URL}/api/auth/google/callback`,
         grant_type: 'authorization_code',
       }),
     });
@@ -103,7 +150,7 @@ export const googleAuthCallback = async (req, res) => {
 
     if (!tokenResponse.ok) {
       console.error('Google Token Exchange Error:', tokenData);
-      return res.redirect('http://localhost:5174/login?error=token_exchange_failed');
+      return res.redirect(`${FRONTEND_URL}/login?error=token_exchange_failed`);
     }
 
     // 2. Get user info from Google
@@ -186,12 +233,8 @@ export const googleAuthCallback = async (req, res) => {
       });
     }
 
-    const roles = user.userRoles?.map((ur) => ur.role.roleName) || ['Customer'];
-
-    // 4. Issue App JWT & Refresh Cookie
-    const accessToken = generateAccessToken(user.userId, user.email, roles);
+    // 4. Issue Refresh Token in HttpOnly cookie
     const refreshToken = await createAndStoreRefreshToken(user.userId);
-
     setRefreshTokenCookie(res, refreshToken);
 
     await prisma.user.update({
@@ -199,25 +242,12 @@ export const googleAuthCallback = async (req, res) => {
       data: { lastLoginAt: new Date() },
     });
 
-    const userPayload = encodeURIComponent(
-      JSON.stringify({
-        userId: user.userId,
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone,
-        address: user.address,
-        city: user.city,
-        postalCode: user.postalCode,
-        country: user.country,
-        roles,
-      })
-    );
-
-    // 5. Redirect back to Vite frontend
-    return res.redirect(`http://localhost:5174/auth/callback?token=${accessToken}&user=${userPayload}`);
+    // 5. Redirect back to Vite frontend securely WITHOUT tokens or PII in URL.
+    // The HttpOnly cookie will safely restore the session via /api/auth/refresh.
+    return res.redirect(`${returnTo}/auth/callback`);
   } catch (error) {
     console.error('Google Callback Processing Error:', error);
-    return res.redirect('http://localhost:5174/login?error=oauth_failed');
+    return res.redirect(`${returnTo}/login?error=oauth_failed`);
   }
 };
 
@@ -289,12 +319,11 @@ export const register = async (req, res) => {
     // Generate Email Verification Token (Expires in 24 hours)
     const verificationToken = jwt.sign(
       { userId: newUser.userId, email: newUser.email },
-      process.env.JWT_VERIFY_SECRET || process.env.JWT_SECRET || 'verify-secret-key',
+      JWT_VERIFY_SECRET,
       { expiresIn: '24h' }
     );
 
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
-    const verifyUrl = `${backendUrl}/api/auth/verify-email?token=${verificationToken}`;
+    const verifyUrl = `${BACKEND_URL}/api/auth/verify-email?token=${verificationToken}`;
 
     // Send verification email via Nodemailer
     await transporter.sendMail({
@@ -339,15 +368,12 @@ export const verifyEmailHandler = async (req, res) => {
   const { token } = req.query;
 
   if (!token) {
-    return res.redirect('http://localhost:5174/login?error=missing_token');
+    return res.redirect(`${FRONTEND_URL}/login?error=missing_token`);
   }
 
   try {
     // 1. Verify token signature
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_VERIFY_SECRET || process.env.JWT_SECRET || 'verify-secret-key'
-    );
+    const decoded = jwt.verify(token, JWT_VERIFY_SECRET);
 
     // 2. Mark emailVerified as true in MariaDB
     let user = await prisma.user.update({
@@ -363,33 +389,15 @@ export const verifyEmailHandler = async (req, res) => {
       },
     });
 
-    const roles = user.userRoles?.map((ur) => ur.role.roleName) || ['Customer'];
-
-    // 3. Issue Access Token & Refresh Token (Cookie)
-    const accessToken = generateAccessToken(user.userId, user.email, roles);
+    // 3. Issue Refresh Token in HttpOnly cookie
     const refreshToken = await createAndStoreRefreshToken(user.userId);
-
     setRefreshTokenCookie(res, refreshToken);
 
-    const userPayload = encodeURIComponent(
-      JSON.stringify({
-        userId: user.userId,
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone,
-        address: user.address,
-        city: user.city,
-        postalCode: user.postalCode,
-        country: user.country,
-        roles,
-      })
-    );
-
-    // 4. Redirect directly to frontend auth callback (log user in & redirect to dashboard)
-    return res.redirect(`http://localhost:5174/auth/callback?token=${accessToken}&user=${userPayload}`);
+    // 4. Redirect directly to frontend auth callback (cookie will authenticate session)
+    return res.redirect(`${FRONTEND_URL}/auth/callback?verified=true`);
   } catch (error) {
     console.error('Email Verification Error:', error);
-    return res.redirect('http://localhost:5174/login?error=invalid_or_expired_token');
+    return res.redirect(`${FRONTEND_URL}/login?error=invalid_or_expired_token`);
   }
 };
 

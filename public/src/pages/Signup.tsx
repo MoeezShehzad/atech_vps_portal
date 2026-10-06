@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiCall } from '../services/api';
+import { apiCall, API_BASE_URL } from '../services/api';
 import atcLogo from '../assets/ATC_Logo.png';
 
 import { 
@@ -134,7 +134,7 @@ export default function Signup() {
 
           {/* GOOGLE SIGN UP BUTTON */}
           <a
-            href="http://localhost:5000/api/auth/google"
+            href={`${API_BASE_URL}/auth/google`}
             className="w-full py-3 px-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-medium text-slate-700 text-sm flex items-center justify-center gap-3 shadow-sm mb-6"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">

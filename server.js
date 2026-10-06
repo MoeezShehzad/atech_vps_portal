@@ -1,188 +1,104 @@
-// This file sets up the Express.js server, configures middleware for CORS, cookie parsing, session management, and Passport.js for authentication. It defines routes for user and authentication-related operations, including Google OAuth integration. The server listens on a specified port and handles incoming requests accordingly.
-
 import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import session from 'express-session';
-import passport from 'passport';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+
 import userRoutes from './routes/user.js';
 import authRoutes from './routes/authRoutes.js';
-import contactRoutes from './routes/contact.js'; // Correct router import from project routes directory
+import contactRoutes from './routes/contact.js';
+import pricingRoutes from './routes/pricing.js';
+import vmRoutes from './routes/vmRoutes.js';
 
 const app = express();
-const prisma = new PrismaClient();
 
-// 1. CORS Configuration
+// 1. Security Headers Middleware (Helmet)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+// 2. CORS Configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.CLIENT_URL,
+  'http://localhost:5174',
+  'http://localhost:5173',
+].filter(Boolean);
+
 app.use(cors({
-  origin: ['http://localhost:5174', 'http://localhost:5173'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    const isAllowed =
+      allowedOrigins.includes(origin) ||
+      allowedOrigins.includes(origin.replace(/\/$/, '')) ||
+      /^https?:\/\/(localhost|127\.0\.0\.1|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin);
+
+    if (isAllowed) {
+      return callback(null, true);
+    }
+
+    console.warn(`[CORS Blocked] Origin not allowed: ${origin}`);
+    return callback(null, false);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// 2. Cookie Parser Middleware
+// 3. Body & Cookie Parsing Middlewares
 app.use(cookieParser());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// 3. Session middleware
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'supersecret',
-  resave: false,
-  saveUninitialized: false,
-}));
+// 4. Rate Limiting Configurations
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // 20 attempts per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts. Please try again after 15 minutes.' },
+});
 
-// 4. Passport & Body parser middlewares
-app.use(passport.initialize());
-app.use(passport.session());
-app.use(express.json());
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 contact submissions per IP per hour
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many contact messages submitted. Please try again in an hour.' },
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply rate limiting
+app.use('/api/', apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/contact', contactLimiter);
 
 // 5. Route Mounting
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/user', userRoutes);
+app.use('/api/user', userRoutes); // Alias for compatibility
 app.use('/api/contact', contactRoutes);
+app.use('/api/pricing', pricingRoutes);
+app.use('/api/vms', vmRoutes);
 
-
-// 6. Passport Google Strategy Setup
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: "http://localhost:5000/api/auth/google/callback"
-},
-  async (accessToken, refreshToken, profile, done) => {
-    try {
-      const email = profile.emails[0]?.value;
-      const fullName = profile.displayName;
-
-      if (!email) {
-        return done(new Error('No email found in Google profile'), null);
-      }
-
-      let user = await prisma.user.findUnique({
-        where: { email },
-        include: {
-          userRoles: {
-            include: { role: true }
-          }
-        }
-      });
-
-      if (!user) {
-        // Fetch or assign default Customer role
-        const customerRole = await prisma.role.findUnique({
-          where: { roleName: 'Customer' }
-        });
-
-        user = await prisma.$transaction(async (tx) => {
-          const createdUser = await tx.user.create({
-            data: { email, fullName }
-          });
-
-          if (customerRole) {
-            await tx.userRole.create({
-              data: {
-                userId: createdUser.userId,
-                roleId: customerRole.roleId
-              }
-            });
-          }
-
-          return createdUser;
-        });
-
-        // Re-fetch user with userRoles populated
-        user = await prisma.user.findUnique({
-          where: { userId: user.userId },
-          include: {
-            userRoles: {
-              include: { role: true }
-            }
-          }
-        });
-      }
-
-      return done(null, user);
-    } catch (err) {
-      return done(err, null);
-    }
-  }
-));
-
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((user, done) => done(null, user));
-
-// 7. OAuth Routes
-app.get('/api/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
-
-app.get('/api/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: 'http://localhost:5174/login?error=oauth_failed', session: false }),
-  async (req, res) => {
-    try {
-      const user = req.user;
-      const roles = user.userRoles?.map((ur) => ur.role.roleName) || ['Customer'];
-
-      // 1. Generate short-lived Access Token (15m)
-      const accessToken = jwt.sign(
-        { userId: user.userId, email: user.email, roles },
-        process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret',
-        { expiresIn: '15m' }
-      );
-
-      // 2. Generate long-lived Refresh Token (7d)
-      const refreshToken = jwt.sign(
-        { userId: user.userId },
-        process.env.JWT_REFRESH_SECRET || 'refresh-secret',
-        { expiresIn: '7d' }
-      );
-
-      // 3. Store Refresh Token in DB
-      await prisma.refreshToken.create({
-        data: {
-          token: refreshToken,
-          userId: user.userId,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        }
-      });
-
-      // 4. Set HttpOnly Cookie for Refresh Token
-      res.cookie('refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 7 * 24 * 60 * 60 * 1000
-      });
-
-      // 5. Update last login
-      await prisma.user.update({
-        where: { userId: user.userId },
-        data: { lastLoginAt: new Date() }
-      });
-
-      // 6. Redirect to frontend OAuth callback page with accessToken and user state
-      const userObj = {
-        userId: user.userId,
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone || null,
-        roles
-      };
-
-      const userDataStr = encodeURIComponent(JSON.stringify(userObj));
-      res.redirect(`http://localhost:5174/auth/callback?token=${accessToken}&user=${userDataStr}`);
-    } catch (err) {
-      console.error('Google OAuth callback error:', err);
-      res.redirect('http://localhost:5174/login?error=oauth_failed');
-    }
-  }
-);
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

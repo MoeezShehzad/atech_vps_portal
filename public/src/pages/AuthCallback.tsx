@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { setAccessToken } from '../services/api';
+import { apiCall, setAccessToken } from '../services/api';
 
 export const AuthCallback = () => {
   const [searchParams] = useSearchParams();
@@ -11,47 +11,49 @@ export const AuthCallback = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // Prevent React 18 StrictMode double-execution
     if (processed.current) return;
 
-    const handleOAuth = async () => {
-      console.log('=== GOOGLE CALLBACK START ===');
+    const handleAuth = async () => {
+      processed.current = true;
 
+      // 1. Legacy query parameters fallback (if present in cached browser links)
       const token = searchParams.get('token') || searchParams.get('accessToken');
       const userParam = searchParams.get('user');
 
-      console.log('TOKEN EXISTS:', !!token);
-      console.log('USER PARAM EXISTS:', !!userParam);
-
       if (token && userParam) {
         try {
-          processed.current = true;
           const userData = JSON.parse(decodeURIComponent(userParam));
-
-          console.log('GOOGLE USER:', userData);
-
-          // Update interceptor token + AuthContext state
           setAccessToken(token);
           login(token, userData);
-
-          console.log('LOGIN STATE SET, NAVIGATING TO DASHBOARD');
           navigate('/dashboard', { replace: true });
           return;
-        } catch (error) {
-          console.error('GOOGLE CALLBACK ERROR:', error);
+        } catch (e) {
+          console.error('[AuthCallback] Failed parsing legacy user payload:', e);
         }
       }
 
-      console.error('GOOGLE CALLBACK: TOKEN OR USER MISSING');
-      setAccessToken(null);
-      setErrorMessage('Google Authentication failed.');
+      // 2. Primary Secure Flow: Restore session using HttpOnly refreshToken cookie
+      try {
+        const data = await apiCall('/auth/refresh', { method: 'POST' });
+        if (data?.accessToken && data?.user) {
+          setAccessToken(data.accessToken);
+          login(data.accessToken, data.user);
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+      } catch (error) {
+        console.error('[AuthCallback] Session exchange failed:', error);
+      }
 
+      // If both methods failed
+      setAccessToken(null);
+      setErrorMessage('Authentication session could not be established.');
       setTimeout(() => {
-        navigate('/login?error=oauth_failed', { replace: true });
+        navigate('/login?error=auth_failed', { replace: true });
       }, 2000);
     };
 
-    handleOAuth();
+    handleAuth();
   }, [searchParams, navigate, login]);
 
   return (
@@ -65,7 +67,7 @@ export const AuthCallback = () => {
         ) : (
           <>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto" />
-            <p className="text-sm font-medium text-slate-300">Completing Google Sign In...</p>
+            <p className="text-sm font-medium text-slate-300">Completing Sign In...</p>
           </>
         )}
       </div>

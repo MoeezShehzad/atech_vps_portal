@@ -168,7 +168,7 @@ export default function Home() {
             <span className={`text-xs font-bold ${billingCycle === 'monthly' ? 'text-slate-900' : 'text-slate-400'}`}>Monthly</span>
             <button
               onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annually' : 'monthly')}
-              className="w-12 h-6 bg-slate-200 rounded-full p-1 relative transition-colors focus:outline-none"
+              className="w-12 h-6 bg-slate-200 rounded-full p-1 relative transition-colors focus:outline-none cursor-pointer"
             >
               <div className={`w-4 h-4 bg-blue-600 rounded-full transition-transform ${billingCycle === 'annually' ? 'translate-x-6' : ''}`} />
             </button>
@@ -228,7 +228,7 @@ export default function Home() {
 
                 <button
                   onClick={() => handleConfigure(plan)}
-                  className={`w-full py-3.5 rounded-full font-extrabold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+                  className={`w-full py-3.5 rounded-full font-extrabold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
                     plan.popular
                       ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-600/20'
                       : 'bg-slate-100 text-slate-800 hover:bg-slate-200'

@@ -105,6 +105,10 @@ export default function AccountSettings() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 50 * 1024) {
+        setMessage({ type: 'error', text: 'Avatar image is too large. Please select an image under 50 KB.' });
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setAvatarPreview(reader.result as string);

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+export const API_BASE_URL = '/api';
 
 let inMemoryAccessToken: string | null = null;
 

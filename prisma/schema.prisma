@@ -3,38 +3,28 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlserver"
   url      = env("DATABASE_URL")
 }
 
-// 1. Add AuthProvider Enum
-enum AuthProvider {
-  LOCAL
-  GOOGLE
-  BOTH
-}
-
 model User {
-  userId        Int        @id @default(autoincrement()) @map("user_id")
-  fullName      String     @map("full_name") @db.VarChar(100)
-  email         String     @unique(map: "uq_users_email") @db.VarChar(255)
-  passwordHash  String?    @map("password_hash") @db.VarChar(255)
-  phone         String?    @db.VarChar(30)
-  address       String?
-  city          String?
-  postalCode    String?    @map("postal_code") @db.VarChar(20)  // <-- Added
-  country       String?
-  
-  // OAuth & Identity additions
-  googleId      String?    @unique(map: "uq_users_google_id") @map("google_id") @db.VarChar(255) // <-- Added
-  provider      AuthProvider @default(LOCAL) @map("provider")                                    // <-- Added
-
-  avatar_url    String?    @db.Text
-  isActive      Boolean    @default(true) @map("is_active")
-  emailVerified Boolean    @default(false) @map("email_verified")
-  lastLoginAt   DateTime?  @map("last_login_at") @db.DateTime(0)
-  createdAt     DateTime   @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt     DateTime   @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  userId        Int       @id @default(autoincrement()) @map("user_id")
+  fullName      String    @map("full_name") @db.VarChar(100)
+  email         String    @unique(map: "uq_users_email") @db.VarChar(255)
+  passwordHash  String?   @map("password_hash") @db.VarChar(255)
+  phone         String?   @db.VarChar(30)
+  address       String?   @db.VarChar(255)
+  city          String?   @db.VarChar(100)
+  postalCode    String?   @map("postal_code") @db.VarChar(20)
+  country       String?   @db.VarChar(100)
+  googleId      String?   @unique(map: "uq_users_google_id") @map("google_id") @db.VarChar(255)
+  provider      String    @default("LOCAL") @map("provider") @db.VarChar(20)
+  avatar_url    String?   @db.NVarChar(Max)
+  isActive      Boolean   @default(true) @map("is_active")
+  emailVerified Boolean   @default(false) @map("email_verified")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
 
   userRoles       UserRole[]
   subscriptions   Subscription[]
@@ -52,7 +42,7 @@ model Role {
   roleId      Int      @id @default(autoincrement()) @map("role_id")
   roleName    String   @unique(map: "uq_roles_name") @map("role_name") @db.VarChar(50)
   description String?  @db.VarChar(255)
-  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  createdAt   DateTime @default(now()) @map("created_at")
 
   userRoles UserRole[]
 
@@ -62,7 +52,7 @@ model Role {
 model UserRole {
   userId     Int      @map("user_id")
   roleId     Int      @map("role_id")
-  assignedAt DateTime @default(now()) @map("assigned_at") @db.DateTime(0)
+  assignedAt DateTime @default(now()) @map("assigned_at")
 
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
   role Role @relation(fields: [roleId], references: [roleId], onDelete: Cascade)
@@ -87,8 +77,8 @@ model VPSPlan {
   monthlyPrice    Decimal  @map("monthly_price") @db.Decimal(10, 2)
   currency        String   @default("USD") @db.Char(3)
   isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
 
   subscriptions   Subscription[]
   virtualMachines VirtualMachine[]
@@ -103,8 +93,8 @@ model OSImage {
   version      String   @db.VarChar(50)
   templatePath String   @map("template_path") @db.VarChar(500)
   isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
 
   virtualMachines VirtualMachine[]
 
@@ -117,8 +107,8 @@ model HyperVHost {
   ipAddress String   @map("ip_address") @db.VarChar(45)
   status    String   @db.VarChar(20)
   location  String?  @db.VarChar(100)
-  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   virtualMachines VirtualMachine[]
 
@@ -130,13 +120,13 @@ model Subscription {
   userId          Int       @map("user_id")
   planId          Int       @map("plan_id")
   status          String    @db.VarChar(30)
-  startDate       DateTime  @map("start_date") @db.DateTime(0)
-  nextBillingDate DateTime? @map("next_billing_date") @db.DateTime(0)
-  endDate         DateTime? @map("end_date") @db.DateTime(0)
+  startDate       DateTime  @map("start_date")
+  nextBillingDate DateTime? @map("next_billing_date")
+  endDate         DateTime? @map("end_date")
   monthlyPrice    Decimal   @map("monthly_price") @db.Decimal(10, 2)
   currency        String    @db.Char(3)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
 
   user            User             @relation(fields: [userId], references: [userId])
   plan            VPSPlan          @relation(fields: [planId], references: [planId])
@@ -161,18 +151,18 @@ model VirtualMachine {
   storageGb          Int       @map("storage_gb")
   status             String    @db.VarChar(30)
   provisioningStatus String    @map("provisioning_status") @db.VarChar(30)
-  provisioningError  String?   @map("provisioning_error") @db.Text
-  createdAt          DateTime  @default(now()) @map("created_at") @db.DateTime(0)
-  startedAt          DateTime? @map("started_at") @db.DateTime(0)
-  stoppedAt          DateTime? @map("stopped_at") @db.DateTime(0)
-  terminatedAt       DateTime? @map("terminated_at") @db.DateTime(0)
-  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  provisioningError  String?   @map("provisioning_error") @db.NVarChar(Max)
+  createdAt          DateTime  @default(now()) @map("created_at")
+  startedAt          DateTime? @map("started_at")
+  stoppedAt          DateTime? @map("stopped_at")
+  terminatedAt       DateTime? @map("terminated_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  user             User              @relation(fields: [userId], references: [userId])
-  subscription     Subscription      @relation(fields: [subscriptionId], references: [subscriptionId])
-  plan             VPSPlan           @relation(fields: [planId], references: [planId])
-  image            OSImage           @relation(fields: [imageId], references: [imageId])
-  host             HyperVHost        @relation(fields: [hostId], references: [hostId])
+  user             User              @relation(fields: [userId], references: [userId], onUpdate: NoAction, onDelete: NoAction)
+  subscription     Subscription      @relation(fields: [subscriptionId], references: [subscriptionId], onUpdate: NoAction, onDelete: NoAction)
+  plan             VPSPlan           @relation(fields: [planId], references: [planId], onUpdate: NoAction, onDelete: NoAction)
+  image            OSImage           @relation(fields: [imageId], references: [imageId], onUpdate: NoAction, onDelete: NoAction)
+  host             HyperVHost        @relation(fields: [hostId], references: [hostId], onUpdate: NoAction, onDelete: NoAction)
   ipPool           IPPool[]
   snapshots        VMSnapshot[]
   backups          Backup[]
@@ -190,10 +180,10 @@ model IPPool {
   ipType       String   @map("ip_type") @db.VarChar(20)
   status       String   @db.VarChar(20)
   assignedVmId Int?     @map("assigned_vm_id")
-  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 
-  assignedVm VirtualMachine? @relation(fields: [assignedVmId], references: [vmId], onDelete: SetNull)
+  assignedVm VirtualMachine? @relation(fields: [assignedVmId], references: [vmId], onUpdate: NoAction, onDelete: NoAction)
 
   @@map("IP_Pool")
 }
@@ -204,8 +194,8 @@ model VMSnapshot {
   name        String    @db.VarChar(100)
   description String?   @db.VarChar(500)
   status      String    @db.VarChar(20)
-  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(0)
-  deletedAt   DateTime? @map("deleted_at") @db.DateTime(0)
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime? @map("deleted_at")
 
   vm VirtualMachine @relation(fields: [vmId], references: [vmId])
 
@@ -219,9 +209,9 @@ model Backup {
   backupLocation String    @map("backup_location") @db.VarChar(500)
   backupSizeGb   Decimal?  @map("backup_size_gb") @db.Decimal(12, 2)
   status         String    @db.VarChar(20)
-  startedAt      DateTime? @map("started_at") @db.DateTime(0)
-  completedAt    DateTime? @map("completed_at") @db.DateTime(0)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+  startedAt      DateTime? @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+  createdAt      DateTime  @default(now())
 
   vm VirtualMachine @relation(fields: [vmId], references: [vmId])
 
@@ -234,10 +224,10 @@ model ProvisioningJob {
   jobType      String    @map("job_type") @db.VarChar(30)
   status       String    @db.VarChar(20)
   currentStep  String?   @map("current_step") @db.VarChar(100)
-  errorMessage String?   @map("error_message") @db.Text
-  startedAt    DateTime? @map("started_at") @db.DateTime(0)
-  completedAt  DateTime? @map("completed_at") @db.DateTime(0)
-  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+  errorMessage String?   @map("error_message") @db.NVarChar(Max)
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  createdAt    DateTime  @default(now())
 
   vm VirtualMachine @relation(fields: [vmId], references: [vmId])
 
@@ -255,13 +245,13 @@ model Invoice {
   total          Decimal   @db.Decimal(10, 2)
   currency       String    @db.Char(3)
   status         String    @db.VarChar(20)
-  issueDate      DateTime  @map("issue_date") @db.DateTime(0)
-  dueDate        DateTime? @map("due_date") @db.DateTime(0)
-  paidDate       DateTime? @map("paid_date") @db.DateTime(0)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+  issueDate      DateTime  @map("issue_date")
+  dueDate        DateTime? @map("due_date")
+  paidDate       DateTime? @map("paid_date")
+  createdAt      DateTime  @default(now())
 
-  user         User         @relation(fields: [userId], references: [userId])
-  subscription Subscription @relation(fields: [subscriptionId], references: [subscriptionId])
+  user         User         @relation(fields: [userId], references: [userId], onUpdate: NoAction, onDelete: NoAction)
+  subscription Subscription @relation(fields: [subscriptionId], references: [subscriptionId], onUpdate: NoAction, onDelete: NoAction)
   payments     Payment[]
 
   @@map("Invoices")
@@ -276,11 +266,11 @@ model Payment {
   amount         Decimal   @db.Decimal(10, 2)
   currency       String    @db.Char(3)
   status         String    @db.VarChar(20)
-  paymentDate    DateTime? @map("payment_date") @db.DateTime(0)
-  createdAt      DateTime  @default(now()) @map("created_at") @db.DateTime(0)
+  paymentDate    DateTime? @map("payment_date")
+  createdAt      DateTime  @default(now())
 
-  user    User    @relation(fields: [userId], references: [userId])
-  invoice Invoice @relation(fields: [invoiceId], references: [invoiceId])
+  user    User    @relation(fields: [userId], references: [userId], onUpdate: NoAction, onDelete: NoAction)
+  invoice Invoice @relation(fields: [invoiceId], references: [invoiceId], onUpdate: NoAction, onDelete: NoAction)
 
   @@map("Payments")
 }
@@ -291,10 +281,10 @@ model SecurityLog {
   action    String   @db.VarChar(100)
   ipAddress String?  @map("ip_address") @db.VarChar(45)
   result    String   @db.VarChar(20)
-  details   String?  @db.Text
-  timestamp DateTime @default(now()) @db.DateTime(0)
+  details   String?  @db.NVarChar(Max)
+  timestamp DateTime @default(now())
 
-  user User? @relation(fields: [userId], references: [userId], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [userId], onUpdate: NoAction, onDelete: NoAction)
 
   @@map("Security_Logs")
 }
@@ -305,11 +295,11 @@ model ActivityLog {
   vmId       Int?     @map("vm_id")
   action     String   @db.VarChar(100)
   status     String   @db.VarChar(20)
-  details    String?  @db.Text
-  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  details    String?  @db.NVarChar(Max)
+  createdAt  DateTime @default(now())
 
-  user User?           @relation(fields: [userId], references: [userId], onDelete: SetNull)
-  vm   VirtualMachine? @relation(fields: [vmId], references: [vmId], onDelete: SetNull)
+  user User?           @relation(fields: [userId], references: [userId], onUpdate: NoAction, onDelete: NoAction)
+  vm   VirtualMachine? @relation(fields: [vmId], references: [vmId], onUpdate: NoAction, onDelete: NoAction)
 
   @@map("Activity_Logs")
 }
@@ -318,10 +308,10 @@ model RefreshToken {
   id        String   @id @default(uuid())
   token     String   @unique(map: "uq_refresh_token") @db.VarChar(500)
   userId    Int      @map("user_id")
-  expiresAt DateTime @map("expires_at") @db.DateTime(0)
+  expiresAt DateTime @map("expires_at")
   isRevoked Boolean  @default(false) @map("is_revoked")
-  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 

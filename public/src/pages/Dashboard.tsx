@@ -16,193 +16,304 @@ import {
   ShieldCheck,
   Trash2,
   AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  Sliders,
+  Sparkles,
+  Zap,
+  ChevronRight,
+  RefreshCw,
+  DollarSign,
+  Layers,
+  ArrowUpRight,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import AccountSettings from '../components/AccountSettings';
+import { apiCall } from '../services/api';
 
 interface Instance {
   id: string;
+  vmId: number;
   name: string;
+  hostname: string;
   ip: string;
   os: string;
-  status: 'running' | 'stopped';
+  status: 'running' | 'stopped' | 'provisioning';
   cpuUsage: number;
   ramUsage: string;
   diskUsage: string;
   vCPU: number;
   ramGB: number;
   diskGB: number;
+  monthlyPrice: number;
   createdAt: string;
 }
 
-const INITIAL_INSTANCES: Instance[] = [
-  {
-    id: 'vps-01',
-    name: 'Prod-DB-Primary',
-    ip: '192.168.10.45',
-    os: 'Ubuntu 24.04 LTS',
-    status: 'running',
-    cpuUsage: 18,
-    ramUsage: '4.2 / 8 GB',
-    diskUsage: '32 / 80 GB',
-    vCPU: 4,
-    ramGB: 8,
-    diskGB: 80,
-    createdAt: '2026-01-15'
-  },
-  {
-    id: 'vps-02',
-    name: 'Web-App-Frontend',
-    ip: '192.168.10.12',
-    os: 'Debian 12',
-    status: 'running',
-    cpuUsage: 42,
-    ramUsage: '2.1 / 4 GB',
-    diskUsage: '14 / 40 GB',
-    vCPU: 2,
-    ramGB: 4,
-    diskGB: 40,
-    createdAt: '2026-02-10'
-  },
-  {
-    id: 'vps-03',
-    name: 'Mail-Server-Relay',
-    ip: '192.168.10.88',
-    os: 'Ubuntu 22.04 LTS',
-    status: 'stopped',
-    cpuUsage: 0,
-    ramUsage: '0.0 / 4 GB',
-    diskUsage: '20 / 50 GB',
-    vCPU: 2,
-    ramGB: 4,
-    diskGB: 50,
-    createdAt: '2026-03-01'
-  },
-];
+interface PlanOption {
+  planId: number;
+  name: string;
+  description: string;
+  cpuCores: number;
+  ramGb: number;
+  storageGb: number;
+  monthlyPrice: string | number;
+}
+
+interface ImageOption {
+  imageId: number;
+  name: string;
+  osFamily: string;
+  version: string;
+  templatePath: string;
+}
 
 export default function Dashboard() {
-  const { logout } = useAuth();
+  const { user } = useAuth();
   
   // Navigation active tab state
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // LOCALSTORAGE STATE INITIALIZATION
-  const [instances, setInstances] = useState<Instance[]>(() => {
-    const saved = localStorage.getItem('vps_instances');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse instances from localStorage', e);
-      }
-    }
-    return INITIAL_INSTANCES;
-  });
+  // Real-time server state from API
+  const [instances, setInstances] = useState<Instance[]>([]);
+  const [catalogPlans, setCatalogPlans] = useState<PlanOption[]>([]);
+  const [catalogImages, setCatalogImages] = useState<ImageOption[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'stopped'>('all');
 
-  // Modals & Drawers state
+  // Modals state
   const [isDeployOpen, setIsDeployOpen] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState<Instance | null>(null);
   const [deletingInstance, setDeletingInstance] = useState<Instance | null>(null);
+  const [resizingInstance, setResizingInstance] = useState<Instance | null>(null);
   const [copiedSSH, setCopiedSSH] = useState(false);
 
   // Deploy form state
   const [newHostname, setNewHostname] = useState('');
-  const [selectedOS, setSelectedOS] = useState('Ubuntu 24.04 LTS');
-  const [selectedPlan, setSelectedPlan] = useState<{ vCPU: number; ramGB: number; label: string }>({
-    vCPU: 2,
-    ramGB: 4,
-    label: 'Standard - 2 vCPU / 4GB RAM'
-  });
-  const [newDiskGB, setNewDiskGB] = useState(50);
+  const [selectedPlanId, setSelectedPlanId] = useState<number>(1);
+  const [selectedImageId, setSelectedImageId] = useState<number>(1);
+  const [customCpu, setCustomCpu] = useState<number>(2);
+  const [customRam, setCustomRam] = useState<number>(4);
+  const [deployLoading, setDeployLoading] = useState(false);
 
-  // Sync state changes to localStorage
-  useEffect(() => {
-    localStorage.setItem('vps_instances', JSON.stringify(instances));
-  }, [instances]);
+  // Resize form state
+  const [resizeCpu, setResizeCpu] = useState<number>(2);
+  const [resizeRam, setResizeRam] = useState<number>(4);
+  const [resizePricing, setResizePricing] = useState<{ newPrice: number; priceDelta: number } | null>(null);
+  const [resizeLoading, setResizeLoading] = useState(false);
 
-  // Reset demo state
-  const handleResetData = () => {
-    if (window.confirm('Reset all instances back to default initial state?')) {
-      setInstances(INITIAL_INSTANCES);
-      localStorage.removeItem('vps_instances');
-      setSelectedInstance(null);
+  // 1. Fetch user VMs and catalog from API
+  const fetchVMs = async () => {
+    try {
+      const data = await apiCall('/vms');
+      if (data && data.vms) {
+        setInstances(data.vms);
+      }
+    } catch (err) {
+      console.error('Failed to load user VMs:', err);
     }
   };
 
-  // Aggregate stats
-  const totalStorage = instances.reduce((acc, inst) => acc + inst.diskGB, 0);
-  const runningCount = instances.filter((i) => i.status === 'running').length;
-  const stoppedCount = instances.filter((i) => i.status === 'stopped').length;
-
-  // Power switch handler
-  const toggleServerStatus = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-
-    setInstances((prev) =>
-      prev.map((inst) => {
-        if (inst.id === id) {
-          const nextStatus = inst.status === 'running' ? 'stopped' : 'running';
-          const updated: Instance = {
-            ...inst,
-            status: nextStatus,
-            cpuUsage: nextStatus === 'running' ? 12 : 0,
-          };
-
-          if (selectedInstance?.id === id) {
-            setSelectedInstance(updated);
-          }
-
-          return updated;
+  const fetchCatalog = async () => {
+    try {
+      const data = await apiCall('/vms/catalog');
+      if (data) {
+        if (data.plans) setCatalogPlans(data.plans);
+        if (data.images) setCatalogImages(data.images);
+        if (data.plans?.[0]) {
+          setSelectedPlanId(data.plans[0].planId);
+          setCustomCpu(data.plans[0].cpuCores);
+          setCustomRam(data.plans[0].ramGb);
         }
-        return inst;
-      })
-    );
+        if (data.images?.[0]) {
+          setSelectedImageId(data.images[0].imageId);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load catalog:', err);
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      setIsLoading(true);
+      await Promise.all([fetchVMs(), fetchCatalog()]);
+      setIsLoading(false);
+    };
+    init();
+  }, []);
+
+  // Poll if any VM is currently provisioning
+  useEffect(() => {
+    const hasProvisioning = instances.some((i) => i.status === 'provisioning');
+    if (!hasProvisioning) return;
+
+    const timer = setInterval(() => {
+      fetchVMs();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [instances]);
+
+  // Handle Escape key to close any active drawer or modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedInstance(null);
+        setResizingInstance(null);
+        setIsDeployOpen(false);
+        setDeletingInstance(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Update plan specs when plan selection changes in Deploy modal
+  const handlePlanChange = (planId: number) => {
+    setSelectedPlanId(planId);
+    const plan = catalogPlans.find((p) => p.planId === planId);
+    if (plan) {
+      setCustomCpu(plan.cpuCores);
+      setCustomRam(plan.ramGb);
+    }
+  };
+
+  // Open deploy modal pre-filled with a specific plan
+  const handleQuickDeploy = (plan: PlanOption) => {
+    setSelectedPlanId(plan.planId);
+    setCustomCpu(plan.cpuCores);
+    setCustomRam(plan.ramGb);
+    setNewHostname(`vps-${plan.name.toLowerCase().replace(/\s+/g, '-')}-${Math.floor(Math.random() * 899 + 100)}`);
+    setIsDeployOpen(true);
+  };
+
+  // Power action (START / STOP / RESTART)
+  const handlePowerAction = async (vmId: number, action: 'START' | 'STOP' | 'RESTART', e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setActionLoadingId(vmId);
+    try {
+      await apiCall(`/vms/${vmId}/power`, {
+        method: 'POST',
+        body: JSON.stringify({ action }),
+      });
+      await fetchVMs();
+      if (selectedInstance && selectedInstance.vmId === vmId) {
+        const nextStatus = action === 'START' || action === 'RESTART' ? 'running' : 'stopped';
+        setSelectedInstance({ ...selectedInstance, status: nextStatus });
+      }
+    } catch (err: any) {
+      alert(`Power action failed: ${err.message || 'Error executing command'}`);
+    } finally {
+      setActionLoadingId(null);
+    }
   };
 
   // Deploy submit handler
-  const handleDeploySubmit = (e: React.FormEvent) => {
+  const handleDeploySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHostname.trim()) return;
 
-    const newId = `vps-0${instances.length + 1}`;
-    const randomHost = Math.floor(Math.random() * 200) + 10;
-    const newIp = `192.168.10.${randomHost}`;
+    setDeployLoading(true);
+    try {
+      await apiCall('/vms/deploy', {
+        method: 'POST',
+        body: JSON.stringify({
+          vmName: newHostname.trim(),
+          planId: selectedPlanId,
+          imageId: selectedImageId,
+          customCpu,
+          customRam,
+        }),
+      });
+      setIsDeployOpen(false);
+      setNewHostname('');
+      await fetchVMs();
+    } catch (err: any) {
+      alert(`Deployment failed: ${err.message || 'Check cluster capacity'}`);
+    } finally {
+      setDeployLoading(false);
+    }
+  };
 
-    const newServer: Instance = {
-      id: newId,
-      name: newHostname.trim(),
-      ip: newIp,
-      os: selectedOS,
-      status: 'running',
-      cpuUsage: 8,
-      ramUsage: `0.5 / ${selectedPlan.ramGB} GB`,
-      diskUsage: `4 / ${newDiskGB} GB`,
-      vCPU: selectedPlan.vCPU,
-      ramGB: selectedPlan.ramGB,
-      diskGB: Number(newDiskGB),
-      createdAt: new Date().toISOString().split('T')[0]
+  // Open resize modal and calculate initial pricing
+  const openResizeModal = (inst: Instance, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setResizingInstance(inst);
+    setResizeCpu(inst.vCPU);
+    setResizeRam(inst.ramGB);
+    setResizePricing({ newPrice: inst.monthlyPrice, priceDelta: 0 });
+  };
+
+  // Update resize price preview
+  useEffect(() => {
+    if (!resizingInstance) return;
+    const updatePreview = async () => {
+      try {
+        const data = await apiCall(`/vms/${resizingInstance.vmId}/preview-resize`, {
+          method: 'POST',
+          body: JSON.stringify({ cpuCores: resizeCpu, ramGb: resizeRam }),
+        });
+        if (data) {
+          setResizePricing({ newPrice: data.newPrice, priceDelta: data.priceDelta });
+        }
+      } catch (err) {
+        console.error('Preview resize error:', err);
+      }
     };
+    updatePreview();
+  }, [resizeCpu, resizeRam, resizingInstance]);
 
-    setInstances([newServer, ...instances]);
-    setIsDeployOpen(false);
-    setNewHostname('');
+  // Apply resize submit
+  const handleResizeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resizingInstance) return;
+
+    setResizeLoading(true);
+    try {
+      await apiCall(`/vms/${resizingInstance.vmId}/resize`, {
+        method: 'PATCH',
+        body: JSON.stringify({ cpuCores: resizeCpu, ramGb: resizeRam }),
+      });
+      setResizingInstance(null);
+      await fetchVMs();
+      if (selectedInstance && selectedInstance.vmId === resizingInstance.vmId) {
+        setSelectedInstance({
+          ...selectedInstance,
+          vCPU: resizeCpu,
+          ramGB: resizeRam,
+          monthlyPrice: resizePricing?.newPrice || selectedInstance.monthlyPrice,
+        });
+      }
+    } catch (err: any) {
+      alert(`Resize failed: ${err.message}`);
+    } finally {
+      setResizeLoading(false);
+    }
   };
 
   // Terminate/Delete instance handler
-  const confirmDeleteInstance = () => {
+  const confirmDeleteInstance = async () => {
     if (!deletingInstance) return;
 
-    setInstances((prev) => prev.filter((inst) => inst.id !== deletingInstance.id));
-    if (selectedInstance?.id === deletingInstance.id) {
-      setSelectedInstance(null);
+    setActionLoadingId(deletingInstance.vmId);
+    try {
+      await apiCall(`/vms/${deletingInstance.vmId}`, {
+        method: 'DELETE',
+      });
+      if (selectedInstance?.vmId === deletingInstance.vmId) {
+        setSelectedInstance(null);
+      }
+      setDeletingInstance(null);
+      await fetchVMs();
+    } catch (err: any) {
+      alert(`Failed to delete server: ${err.message}`);
+    } finally {
+      setActionLoadingId(null);
     }
-    setDeletingInstance(null);
   };
 
   const handleCopySSH = (ip: string) => {
@@ -210,6 +321,11 @@ export default function Dashboard() {
     setCopiedSSH(true);
     setTimeout(() => setCopiedSSH(false), 2000);
   };
+
+  // Aggregate stats
+  const totalStorage = instances.reduce((acc, inst) => acc + inst.diskGB, 0);
+  const runningCount = instances.filter((i) => i.status === 'running').length;
+  const stoppedCount = instances.filter((i) => i.status === 'stopped').length;
 
   // Filter pipeline
   const filteredInstances = instances.filter((inst) => {
@@ -241,24 +357,29 @@ export default function Dashboard() {
             {/* HEADER */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
               <div>
-                <h1 className="text-2xl font-bold text-blue-950 font-poppins">
-                  Infrastructure Dashboard
-                </h1>
+                <div className="flex items-center gap-2.5">
+                  <h1 className="text-2xl font-bold text-blue-950 font-poppins">
+                    Infrastructure Dashboard
+                  </h1>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                    Hyper-V Cluster Online
+                  </span>
+                </div>
                 <p className="text-sm text-slate-500 mt-1">
-                  Manage virtual private servers, network configurations, and resource allocation.
+                  Manage your virtual machines, scale RAM & CPU resources, and control power cycles.
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <button 
-                  onClick={handleResetData}
-                  title="Reset mock local storage data"
+                  onClick={() => fetchVMs()}
+                  title="Refresh instances"
                   className="p-2.5 text-slate-500 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition-all"
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
                 </button>
                 <button 
                   onClick={() => setIsDeployOpen(true)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm shadow-blue-500/20"
+                  className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm shadow-blue-500/20"
                 >
                   <Plus className="w-4 h-4" /> Deploy New Instance
                 </button>
@@ -272,7 +393,7 @@ export default function Dashboard() {
                   <Server className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total VPS</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Servers</p>
                   <p className="text-xl font-bold text-slate-900 mt-0.5">{instances.length} Configured</p>
                 </div>
               </div>
@@ -292,8 +413,10 @@ export default function Dashboard() {
                   <Cpu className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Avg CPU Usage</p>
-                  <p className="text-xl font-bold text-slate-900 mt-0.5">20%</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Allocated vCPUs</p>
+                  <p className="text-xl font-bold text-slate-900 mt-0.5">
+                    {instances.reduce((acc, i) => acc + i.vCPU, 0)} Cores
+                  </p>
                 </div>
               </div>
 
@@ -303,169 +426,313 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Storage Allocated</p>
-                  <p className="text-xl font-bold text-slate-900 mt-0.5">{totalStorage} GB</p>
+                  <p className="text-xl font-bold text-slate-900 mt-0.5">{totalStorage} GB NVMe</p>
                 </div>
               </div>
             </div>
 
-            {/* INSTANCE TABLE SECTION */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              
-              {/* TABLE CONTROLS & FILTER TABS */}
-              <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                
-                {/* STATUS FILTER TABS */}
-                <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl w-fit">
-                  <button
-                    onClick={() => setStatusFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                      statusFilter === 'all'
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    All
-                    <span className="bg-slate-200/80 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
-                      {instances.length}
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => setStatusFilter('running')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                      statusFilter === 'running'
-                        ? 'bg-white text-emerald-700 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    Running
-                    <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md text-[10px]">
-                      {runningCount}
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => setStatusFilter('stopped')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                      statusFilter === 'stopped'
-                        ? 'bg-white text-slate-800 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
-                    }`}
-                  >
-                    Stopped
-                    <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
-                      {stoppedCount}
-                    </span>
-                  </button>
+            {/* CREATIVE EMPTY STATE (When user has 0 machines purchased) */}
+            {instances.length === 0 && !isLoading && (
+              <div className="space-y-8">
+                {/* HERO PROMO CARD */}
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-950 via-slate-900 to-indigo-950 p-8 md:p-12 text-white shadow-xl border border-slate-800">
+                  <div className="relative z-10 max-w-2xl space-y-4">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold">
+                      <Sparkles className="w-3.5 h-3.5" /> High-Performance Gen 2 Hyper-V Cloud
+                    </div>
+                    <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight font-poppins">
+                      Launch Your First Virtual Private Server
+                    </h2>
+                    <p className="text-slate-300 text-sm md:text-base leading-relaxed">
+                      You don't have any active virtual servers yet. Select a certified package below to provision dedicated vCPUs, enterprise NVMe storage, and static IPv4 in seconds.
+                    </p>
+                    <div className="pt-2 flex flex-wrap gap-4">
+                      <button
+                        onClick={() => setIsDeployOpen(true)}
+                        className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
+                      >
+                        <Zap className="w-4 h-4" /> Quick Deploy Server
+                      </button>
+                      <a
+                        href="/pricing"
+                        className="px-6 py-3 bg-slate-800/80 hover:bg-slate-800 text-slate-200 rounded-xl font-semibold text-sm border border-slate-700 transition-all flex items-center gap-2"
+                      >
+                        View Full Pricing Specs <ChevronRight className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
+                  {/* Subtle Background Glow */}
+                  <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
                 </div>
 
-                {/* SEARCH INPUT */}
-                <div className="relative w-full md:w-64">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search instances or IP..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                  />
-                </div>
-              </div>
+                {/* PACKAGE PURCHASE CARDS */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900 font-poppins">
+                        Available Cloud Server Packages
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Select a package to launch your machine instantly on our local cluster.
+                      </p>
+                    </div>
+                  </div>
 
-              {/* TABLE */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-600">
-                  <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100">
-                    <tr>
-                      <th className="px-6 py-3.5">Instance Name</th>
-                      <th className="px-6 py-3.5">Status</th>
-                      <th className="px-6 py-3.5">IP Address</th>
-                      <th className="px-6 py-3.5">OS</th>
-                      <th className="px-6 py-3.5">CPU Load</th>
-                      <th className="px-6 py-3.5 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredInstances.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-xs">
-                          No virtual servers found matching criteria.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredInstances.map((inst) => (
-                        <tr 
-                          key={inst.id} 
-                          onClick={() => setSelectedInstance(inst)}
-                          className="hover:bg-slate-50 cursor-pointer transition-colors"
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {catalogPlans.map((plan) => {
+                      const isPopular = plan.name.toLowerCase().includes('pro');
+                      return (
+                        <div
+                          key={plan.planId}
+                          className={`relative bg-white rounded-2xl border p-6 flex flex-col justify-between transition-all hover:shadow-lg ${
+                            isPopular
+                              ? 'border-blue-600 shadow-md shadow-blue-500/10 ring-2 ring-blue-600/20'
+                              : 'border-slate-200'
+                          }`}
                         >
-                          <td className="px-6 py-4 font-semibold text-slate-900 flex items-center gap-3">
-                            <Server className="w-4 h-4 text-slate-400" />
-                            {inst.name}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                                inst.status === 'running'
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          {isPopular && (
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[10px] font-extrabold uppercase px-3 py-0.5 rounded-full shadow-sm">
+                              Most Popular
+                            </div>
+                          )}
+
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="font-bold text-slate-900 text-base font-poppins">{plan.name}</h4>
+                              <p className="text-xs text-slate-500 mt-1 line-clamp-2">{plan.description}</p>
+                            </div>
+
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-3xl font-extrabold text-blue-950 font-poppins">
+                                ${plan.monthlyPrice}
+                              </span>
+                              <span className="text-xs text-slate-500 font-medium">/ month</span>
+                            </div>
+
+                            <div className="space-y-2.5 pt-3 border-t border-slate-100 text-xs text-slate-600">
+                              <div className="flex items-center gap-2">
+                                <Cpu className="w-3.5 h-3.5 text-blue-600" />
+                                <span><strong>{plan.cpuCores}</strong> vCPU Cores</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <MemoryStick className="w-3.5 h-3.5 text-blue-600" />
+                                <span><strong>{plan.ramGb} GB</strong> High-Speed RAM</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <HardDrive className="w-3.5 h-3.5 text-blue-600" />
+                                <span><strong>{plan.storageGb} GB</strong> Fast NVMe Disk</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>1 Dedicated Static IPv4</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-6">
+                            <button
+                              onClick={() => handleQuickDeploy(plan)}
+                              className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                                isPopular
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
                               }`}
                             >
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full ${
-                                  inst.status === 'running' ? 'bg-emerald-500' : 'bg-slate-400'
-                                }`}
-                              />
-                              {inst.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 font-mono text-xs text-slate-600">{inst.ip}</td>
-                          <td className="px-6 py-4 text-xs">{inst.os}</td>
-                          <td className="px-6 py-4">
-                            <div className="w-24 bg-slate-100 h-2 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full ${
-                                  inst.cpuUsage > 75 ? 'bg-rose-500' : 'bg-blue-600'
-                                }`}
-                                style={{ width: `${inst.cpuUsage}%` }}
-                              />
-                            </div>
-                            <span className="text-[10px] text-slate-400 mt-1 block">{inst.cpuUsage}%</span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={(e) => toggleServerStatus(inst.id, e)}
-                                title={inst.status === 'running' ? 'Power Off' : 'Power On'}
-                                className={`p-1.5 rounded-lg border transition-all ${
-                                  inst.status === 'running'
-                                    ? 'border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
-                                    : 'border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200'
-                                }`}
-                              >
-                                <Power className="w-4 h-4" />
-                              </button>
-                              
-                              {/* DELETE ACTION BUTTON */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeletingInstance(inst);
-                                }}
-                                title="Terminate / Delete Instance"
-                                className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                              Deploy Plan <ArrowUpRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* INSTANCE TABLE SECTION (When user has active VMs) */}
+            {instances.length > 0 && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                
+                {/* TABLE CONTROLS & FILTER TABS */}
+                <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  
+                  {/* STATUS FILTER TABS */}
+                  <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl w-fit">
+                    <button
+                      onClick={() => setStatusFilter('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                        statusFilter === 'all'
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      All
+                      <span className="bg-slate-200/80 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
+                        {instances.length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setStatusFilter('running')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                        statusFilter === 'running'
+                          ? 'bg-white text-emerald-700 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Running
+                      <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md text-[10px]">
+                        {runningCount}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setStatusFilter('stopped')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                        statusFilter === 'stopped'
+                          ? 'bg-white text-slate-800 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      Stopped
+                      <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
+                        {stoppedCount}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* SEARCH INPUT */}
+                  <div className="relative w-full md:w-64">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search instances or IP..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* TABLE */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm text-slate-600">
+                    <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                      <tr>
+                        <th className="px-6 py-3.5">Instance Name</th>
+                        <th className="px-6 py-3.5">Status</th>
+                        <th className="px-6 py-3.5">IP Address</th>
+                        <th className="px-6 py-3.5">Hardware Specs</th>
+                        <th className="px-6 py-3.5">Monthly Rate</th>
+                        <th className="px-6 py-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredInstances.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-xs">
+                            No virtual servers found matching criteria.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        filteredInstances.map((inst) => (
+                          <tr 
+                            key={inst.id} 
+                            onClick={() => setSelectedInstance(inst)}
+                            className="hover:bg-slate-50 cursor-pointer transition-colors"
+                          >
+                            <td className="px-6 py-4 font-semibold text-slate-900 flex items-center gap-3">
+                              <Server className="w-4 h-4 text-slate-400" />
+                              <div>
+                                <p>{inst.name}</p>
+                                <p className="text-[10px] text-slate-400 font-normal">{inst.os}</p>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                  inst.status === 'running'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : inst.status === 'provisioning'
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    inst.status === 'running'
+                                      ? 'bg-emerald-500'
+                                      : inst.status === 'provisioning'
+                                      ? 'bg-blue-500 animate-ping'
+                                      : 'bg-slate-400'
+                                  }`}
+                                />
+                                {inst.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 font-mono text-xs text-slate-600">{inst.ip}</td>
+                            <td className="px-6 py-4 text-xs font-medium text-slate-700">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Cpu className="w-3.5 h-3.5 text-blue-600" /> {inst.vCPU} vCPU
+                                <span className="text-slate-300">•</span>
+                                <MemoryStick className="w-3.5 h-3.5 text-purple-600" /> {inst.ramGB} GB RAM
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 font-bold text-slate-900 font-poppins text-xs">
+                              ${inst.monthlyPrice}/mo
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {/* POWER BUTTON */}
+                                <button
+                                  onClick={(e) =>
+                                    handlePowerAction(
+                                      inst.vmId,
+                                      inst.status === 'running' ? 'STOP' : 'START',
+                                      e
+                                    )
+                                  }
+                                  disabled={actionLoadingId === inst.vmId}
+                                  title={inst.status === 'running' ? 'Power Off' : 'Power On'}
+                                  className={`p-1.5 rounded-lg border transition-all ${
+                                    inst.status === 'running'
+                                      ? 'border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
+                                      : 'border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200'
+                                  }`}
+                                >
+                                  <Power className={`w-4 h-4 ${actionLoadingId === inst.vmId ? 'animate-spin' : ''}`} />
+                                </button>
+
+                                {/* RESIZE SPECS BUTTON */}
+                                <button
+                                  onClick={(e) => openResizeModal(inst, e)}
+                                  title="Scale CPU & RAM Specs"
+                                  className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-all"
+                                >
+                                  <Sliders className="w-4 h-4" />
+                                </button>
+                                
+                                {/* DELETE ACTION BUTTON */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingInstance(inst);
+                                  }}
+                                  title="Terminate / Destroy Server"
+                                  className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -478,9 +745,133 @@ export default function Dashboard() {
 
       </main>
 
+      {/* SCALE / RESIZE HARDWARE SPECS MODAL */}
+      {resizingInstance && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
+            <button 
+              onClick={() => setResizingInstance(null)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 text-blue-600 mb-2">
+              <div className="p-2.5 bg-blue-50 rounded-xl">
+                <Sliders className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 font-poppins">
+                  Scale Hardware Specs
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Target VM: <strong className="text-slate-800">{resizingInstance.name}</strong>
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleResizeSubmit} className="space-y-6 mt-6">
+              {/* CPU CORES SLIDER */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-slate-700 flex items-center gap-1.5">
+                    <Cpu className="w-4 h-4 text-blue-600" /> vCPU Cores
+                  </span>
+                  <span className="text-blue-600 font-bold text-sm">{resizeCpu} Cores</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="16"
+                  step="1"
+                  value={resizeCpu}
+                  onChange={(e) => setResizeCpu(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>1 Core</span>
+                  <span>4 Cores</span>
+                  <span>8 Cores</span>
+                  <span>16 Cores</span>
+                </div>
+              </div>
+
+              {/* RAM SLIDER */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-slate-700 flex items-center gap-1.5">
+                    <MemoryStick className="w-4 h-4 text-purple-600" /> RAM Memory
+                  </span>
+                  <span className="text-purple-600 font-bold text-sm">{resizeRam} GB RAM</span>
+                </div>
+                <input
+                  type="range"
+                  min="2"
+                  max="64"
+                  step="2"
+                  value={resizeRam}
+                  onChange={(e) => setResizeRam(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>2 GB</span>
+                  <span>16 GB</span>
+                  <span>32 GB</span>
+                  <span>64 GB</span>
+                </div>
+              </div>
+
+              {/* DYNAMIC PRICE PREVIEW */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Updated Monthly Rate</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Current: ${resizingInstance.monthlyPrice}/mo
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-extrabold text-blue-950 font-poppins">
+                    ${resizePricing?.newPrice || resizingInstance.monthlyPrice}
+                    <span className="text-xs font-normal text-slate-500">/mo</span>
+                  </p>
+                  {resizePricing && resizePricing.priceDelta !== 0 && (
+                    <span className={`text-[10px] font-bold ${resizePricing.priceDelta > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
+                      {resizePricing.priceDelta > 0 ? `+$${resizePricing.priceDelta}/mo upgrade` : `-$${Math.abs(resizePricing.priceDelta)}/mo downgrade`}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setResizingInstance(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resizeLoading}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
+                >
+                  {resizeLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Adjusting Specs...
+                    </>
+                  ) : (
+                    'Apply Specification Changes'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* DEPLOY NEW INSTANCE MODAL */}
       {isDeployOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button 
               onClick={() => setIsDeployOpen(false)}
@@ -490,21 +881,21 @@ export default function Dashboard() {
             </button>
 
             <h3 className="text-xl font-bold text-slate-900 font-poppins mb-1">
-              Deploy New Instance
+              Deploy New Virtual Machine
             </h3>
             <p className="text-xs text-slate-500 mb-6">
-              Select your server distribution, hardware sizing, and hostname.
+              Instant Generation 2 Hyper-V provisioning from enterprise image templates.
             </p>
 
             <form onSubmit={handleDeploySubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Hostname / Server Name
+                  Server Hostname / Tag
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. App-Server-01"
+                  placeholder="e.g. app-prod-01"
                   value={newHostname}
                   onChange={(e) => setNewHostname(e.target.value)}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
@@ -513,53 +904,97 @@ export default function Dashboard() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Operating System
+                  Operating System / Master Image
                 </label>
                 <select
-                  value={selectedOS}
-                  onChange={(e) => setSelectedOS(e.target.value)}
+                  value={selectedImageId}
+                  onChange={(e) => setSelectedImageId(Number(e.target.value))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                 >
-                  <option value="Ubuntu 24.04 LTS">Ubuntu 24.04 LTS</option>
-                  <option value="Ubuntu 22.04 LTS">Ubuntu 22.04 LTS</option>
-                  <option value="Debian 12">Debian 12</option>
-                  <option value="CentOS Stream 9">CentOS Stream 9</option>
+                  {catalogImages.map((img) => (
+                    <option key={img.imageId} value={img.imageId}>
+                      {img.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Hardware Plan
+                  Base Plan Tier
                 </label>
                 <select
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === 'starter') setSelectedPlan({ vCPU: 1, ramGB: 2, label: 'Starter' });
-                    if (val === 'standard') setSelectedPlan({ vCPU: 2, ramGB: 4, label: 'Standard' });
-                    if (val === 'pro') setSelectedPlan({ vCPU: 4, ramGB: 8, label: 'Pro' });
-                  }}
-                  defaultValue="standard"
+                  value={selectedPlanId}
+                  onChange={(e) => handlePlanChange(Number(e.target.value))}
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                 >
-                  <option value="starter">Starter - 1 vCPU / 2GB RAM</option>
-                  <option value="standard">Standard - 2 vCPU / 4GB RAM</option>
-                  <option value="pro">Pro - 4 vCPU / 8GB RAM</option>
+                  {catalogPlans.map((p) => (
+                    <option key={p.planId} value={p.planId}>
+                      {p.name} — {p.cpuCores} vCPU / {p.ramGb}GB RAM (${p.monthlyPrice}/mo)
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Disk Storage (GB)
-                </label>
-                <input
-                  type="number"
-                  min="20"
-                  max="500"
-                  value={newDiskGB}
-                  onChange={(e) => setNewDiskGB(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    vCPU Cores
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="16"
+                    value={customCpu}
+                    onChange={(e) => setCustomCpu(Number(e.target.value))}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    RAM (GB)
+                  </label>
+                  <input
+                    type="number"
+                    min="2"
+                    max="64"
+                    value={customRam}
+                    onChange={(e) => setCustomRam(Number(e.target.value))}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  />
+                </div>
               </div>
+
+              {/* REAL-TIME DYNAMIC PRICING PREVIEW */}
+              {(() => {
+                const plan = catalogPlans.find((p) => p.planId === selectedPlanId) || catalogPlans[0];
+                if (!plan) return null;
+                const extraCpu = Math.max(0, customCpu - plan.cpuCores);
+                const extraRam = Math.max(0, customRam - plan.ramGb);
+                const delta = extraCpu * 2.5 + extraRam * 1.5;
+                const total = Number(plan.monthlyPrice) + delta;
+
+                return (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Base Plan ({plan.name})</span>
+                      <span className="font-semibold text-slate-700">${plan.monthlyPrice}/mo</span>
+                    </div>
+                    {delta > 0 && (
+                      <div className="flex items-center justify-between text-[11px] text-blue-600 font-medium">
+                        <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM)</span>
+                        <span>+${delta.toFixed(2)}/mo</span>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700">Live Estimated Rate</span>
+                      <span className="text-sm font-extrabold text-blue-600 font-poppins">
+                        ${total.toFixed(2)}/mo
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
@@ -571,9 +1006,16 @@ export default function Dashboard() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all"
+                  disabled={deployLoading}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
                 >
-                  Provision Server
+                  {deployLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Provisioning Server...
+                    </>
+                  ) : (
+                    'Provision Server'
+                  )}
                 </button>
               </div>
             </form>
@@ -583,20 +1025,20 @@ export default function Dashboard() {
 
       {/* DELETE / TERMINATE CONFIRMATION MODAL */}
       {deletingInstance && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 text-rose-600 mb-3">
               <div className="p-2.5 bg-rose-50 rounded-xl">
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-slate-900 font-poppins">
-                Terminate Instance
+                Destroy Virtual Machine
               </h3>
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed mb-4">
-              Are you sure you want to terminate <strong className="text-slate-900 font-mono">{deletingInstance.name}</strong> ({deletingInstance.ip})?
-              This action is permanent and all data will be destroyed.
+              Are you sure you want to permanently terminate <strong className="text-slate-900 font-mono">{deletingInstance.name}</strong> ({deletingInstance.ip})?
+              The Hyper-V VM and all associated VHDX storage will be unlinked and deleted.
             </p>
 
             <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
@@ -610,7 +1052,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={confirmDeleteInstance}
-                className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 shadow-md shadow-rose-500/20 transition-all"
+                className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 shadow-md shadow-rose-500/20 transition-all"
               >
                 Destroy Server
               </button>
@@ -621,12 +1063,18 @@ export default function Dashboard() {
 
       {/* SERVER DETAIL SIDEBAR DRAWER */}
       {selectedInstance && (
-        <div className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-xs flex justify-end">
-          <div className="bg-white w-full max-w-md h-full border-l border-slate-200 p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200">
+        <div 
+          className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-xs flex justify-end transition-all"
+          onClick={() => setSelectedInstance(null)}
+        >
+          <div 
+            className="bg-white w-full max-w-lg h-full border-l border-slate-200 p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             
             <div className="space-y-6">
-              {/* DRAWER HEADER */}
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              {/* DRAWER HEADER (Never hidden behind navbar; elevated z-index & prominent close button) */}
+              <div className="sticky -top-6 -mx-6 px-6 py-4 bg-white/95 backdrop-blur-md z-30 border-b border-slate-100 flex items-center justify-between shadow-xs">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
                     <Server className="w-5 h-5" />
@@ -635,14 +1083,16 @@ export default function Dashboard() {
                     <h3 className="font-bold text-slate-900 text-lg font-poppins">
                       {selectedInstance.name}
                     </h3>
-                    <p className="text-xs font-mono text-slate-500">{selectedInstance.id}</p>
+                    <p className="text-xs font-mono text-slate-500">{selectedInstance.hostname}</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => setSelectedInstance(null)}
-                  className="text-slate-400 hover:text-slate-600 p-1"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200"
+                  title="Close Details Panel (Esc)"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
+                  <span>Close</span>
                 </button>
               </div>
 
@@ -665,15 +1115,23 @@ export default function Dashboard() {
 
               {/* SPECS GRID */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Hardware Specifications
-                </h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Hardware Specifications
+                  </h4>
+                  <button
+                    onClick={(e) => openResizeModal(selectedInstance, e)}
+                    className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                  >
+                    <Sliders className="w-3 h-3" /> Resize Specs
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
                       <Cpu className="w-3.5 h-3.5" /> vCPU Cores
                     </div>
-                    <p className="font-semibold text-slate-900 text-sm">{selectedInstance.vCPU} vCPU</p>
+                    <p className="font-semibold text-slate-900 text-sm">{selectedInstance.vCPU} Cores</p>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
@@ -689,9 +1147,9 @@ export default function Dashboard() {
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
-                      <Clock className="w-3.5 h-3.5" /> Created Date
+                      <DollarSign className="w-3.5 h-3.5" /> Monthly Rate
                     </div>
-                    <p className="font-semibold text-slate-900 text-sm">{selectedInstance.createdAt}</p>
+                    <p className="font-semibold text-slate-900 text-sm">${selectedInstance.monthlyPrice}/mo</p>
                   </div>
                 </div>
               </div>
@@ -699,14 +1157,14 @@ export default function Dashboard() {
               {/* EVENT REBOOT LOGS */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  Recent Logs & Events
+                  Hyper-V Status & Health
                 </h4>
                 <div className="bg-slate-50 rounded-xl border border-slate-100 p-3 space-y-2.5 text-xs text-slate-600">
                   <div className="flex items-start gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
                     <div>
-                      <p className="font-medium text-slate-800">Server Status Verified</p>
-                      <p className="text-[10px] text-slate-400">Health checks passed 5m ago</p>
+                      <p className="font-medium text-slate-800">Cluster Heartbeat Active</p>
+                      <p className="text-[10px] text-slate-400">VM state synced with host 192.168.100.92</p>
                     </div>
                   </div>
                 </div>
@@ -715,16 +1173,30 @@ export default function Dashboard() {
             </div>
 
             {/* DRAWER FOOTER ACTIONS */}
-            <div className="pt-6 border-t border-slate-100 flex items-center gap-3">
+            <div className="pt-6 border-t border-slate-100 flex items-center gap-2.5">
               <button
-                onClick={(e) => toggleServerStatus(selectedInstance.id, e)}
-                className={`w-full py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 border ${
+                onClick={() => setSelectedInstance(null)}
+                className="py-2.5 px-4 rounded-xl font-semibold text-xs transition-all border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              >
+                Close
+              </button>
+
+              <button
+                onClick={(e) =>
+                  handlePowerAction(
+                    selectedInstance.vmId,
+                    selectedInstance.status === 'running' ? 'STOP' : 'START',
+                    e
+                  )
+                }
+                disabled={actionLoadingId === selectedInstance.vmId}
+                className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 border ${
                   selectedInstance.status === 'running'
                     ? 'border-slate-200 text-slate-700 hover:bg-slate-100'
                     : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
                 }`}
               >
-                <Power className="w-4 h-4" />
+                <Power className={`w-4 h-4 ${actionLoadingId === selectedInstance.vmId ? 'animate-spin' : ''}`} />
                 {selectedInstance.status === 'running' ? 'Power Off' : 'Power On'}
               </button>
 

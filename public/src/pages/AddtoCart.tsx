@@ -64,7 +64,11 @@ export default function ServerConfigure() {
   const activeTermObj = BILLING_TERMS.find((t) => t.id === selectedTerm);
 
   const basePrice =
-    selectedTerm === '1m' ? selectedPlan.monthlyPrice : selectedPlan.promoPriceMonthly;
+    Number(
+      selectedTerm === '1m'
+        ? (selectedPlan.monthlyPrice ?? selectedPlan.price ?? 6)
+        : (selectedPlan.promoPriceMonthly ?? selectedPlan.monthlyPrice ?? selectedPlan.price ?? 6)
+    ) || 0;
 
   const osPrice = activeOsObj?.fee || 0;
 

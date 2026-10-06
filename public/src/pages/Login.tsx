@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { apiCall, setAccessToken } from '../services/api';
+import { apiCall, setAccessToken, API_BASE_URL } from '../services/api';
 import atcLogo from '../assets/ATC_Logo.png';
 
 export default function Login() {
@@ -59,7 +59,7 @@ export default function Login() {
   };
 
   const handleGoogleLogin = () => {
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    window.location.href = `${API_BASE_URL}/auth/google`;
   };
 
   return (
@@ -100,7 +100,7 @@ export default function Login() {
 
             <button
               type="button"
-              onClick={() => { window.location.href = 'http://localhost:5000/api/auth/github'; }}
+              onClick={() => { window.location.href = `${API_BASE_URL}/auth/github`; }}
               className="w-full py-2.5 px-4 border border-slate-200 rounded-xl bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 shadow-sm"
             >
               <svg className="w-4 h-4 fill-slate-900" viewBox="0 0 24 24">
