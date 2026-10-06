@@ -68,6 +68,23 @@ interface ImageOption {
   templatePath: string;
 }
 
+interface ActiveSubscription {
+  subscriptionId: number;
+  planId: number;
+  planName: string;
+  monthlyPrice: number;
+  startDate: string;
+  endDate: string | null;
+  daysRemaining: number;
+  activeVmCount: number;
+  hasAvailableSlot: boolean;
+  specs: {
+    cpuCores: number;
+    ramGb: number;
+    storageGb: number;
+  };
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   
@@ -76,6 +93,7 @@ export default function Dashboard() {
 
   // Real-time server state from API
   const [instances, setInstances] = useState<Instance[]>([]);
+  const [activeSubscriptions, setActiveSubscriptions] = useState<ActiveSubscription[]>([]);
   const [catalogPlans, setCatalogPlans] = useState<PlanOption[]>([]);
   const [catalogImages, setCatalogImages] = useState<ImageOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,8 +128,9 @@ export default function Dashboard() {
   const fetchVMs = async () => {
     try {
       const data = await apiCall('/vms');
-      if (data && data.vms) {
-        setInstances(data.vms);
+      if (data) {
+        if (data.vms) setInstances(data.vms);
+        if (data.activeSubscriptions) setActiveSubscriptions(data.activeSubscriptions);
       }
     } catch (err) {
       console.error('Failed to load user VMs:', err);
@@ -295,24 +314,27 @@ export default function Dashboard() {
     }
   };
 
-  // Terminate/Delete instance handler
+  // Terminate/Delete instance handler (Hostinger standard)
   const confirmDeleteInstance = async () => {
     if (!deletingInstance) return;
+    const targetId = deletingInstance.vmId;
 
-    setActionLoadingId(deletingInstance.vmId);
+    setActionLoadingId(targetId);
     try {
-      await apiCall(`/vms/${deletingInstance.vmId}`, {
+      await apiCall(`/vms/${targetId}`, {
         method: 'DELETE',
       });
-      if (selectedInstance?.vmId === deletingInstance.vmId) {
+    } catch (err: any) {
+      console.warn('Destroy notice:', err);
+    } finally {
+      // Guaranteed local state cleanup so modal never gets stuck
+      setInstances((prev) => prev.filter((i) => i.vmId !== targetId));
+      if (selectedInstance?.vmId === targetId) {
         setSelectedInstance(null);
       }
       setDeletingInstance(null);
-      await fetchVMs();
-    } catch (err: any) {
-      alert(`Failed to delete server: ${err.message}`);
-    } finally {
       setActionLoadingId(null);
+      await fetchVMs();
     }
   };
 
@@ -326,6 +348,7 @@ export default function Dashboard() {
   const totalStorage = instances.reduce((acc, inst) => acc + inst.diskGB, 0);
   const runningCount = instances.filter((i) => i.status === 'running').length;
   const stoppedCount = instances.filter((i) => i.status === 'stopped').length;
+  const activeSlot = activeSubscriptions.find((s) => s.hasAvailableSlot);
 
   // Filter pipeline
   const filteredInstances = instances.filter((inst) => {
@@ -430,6 +453,48 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* ACTIVE SUBSCRIPTION AVAILABLE SLOT BANNER (Hostinger Model) */}
+            {activeSlot && (
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white border border-emerald-500/40 shadow-xl relative overflow-hidden mb-6">
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-1.5">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-semibold">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Active Plan: {activeSlot.planName} (Prepaid)
+                    </div>
+                    <h2 className="text-xl md:text-2xl font-bold font-poppins text-white">
+                      1 Server Slot Available — Ready to Deploy
+                    </h2>
+                    <p className="text-slate-300 text-xs leading-relaxed max-w-2xl">
+                      You have an active 30-day package with <strong>{activeSlot.daysRemaining} days remaining</strong> (valid until {activeSlot.endDate}). You can deploy a fresh virtual server slot at zero extra charge ($0.00).
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300 pt-1 font-mono">
+                      <span>⚡ {activeSlot.specs?.cpuCores} vCPU</span>
+                      <span>•</span>
+                      <span>💾 {activeSlot.specs?.ramGb} GB RAM</span>
+                      <span>•</span>
+                      <span>🚀 {activeSlot.specs?.storageGb} GB NVMe</span>
+                      <span>•</span>
+                      <span>🌐 1 Static IPv4</span>
+                    </div>
+                  </div>
+                  <div className="shrink-0">
+                    <button
+                      onClick={() => {
+                        setSelectedPlanId(activeSlot.planId);
+                        setCustomCpu(activeSlot.specs?.cpuCores || 2);
+                        setCustomRam(activeSlot.specs?.ramGb || 4);
+                        setNewHostname(`srv-${activeSlot.planName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(Math.random() * 899 + 100)}`);
+                        setIsDeployOpen(true);
+                      }}
+                      className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2"
+                    >
+                      <Zap className="w-4 h-4" /> Set Up VPS ($0.00)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* CREATIVE EMPTY STATE (When user has 0 machines purchased) */}
             {instances.length === 0 && !isLoading && (
@@ -965,8 +1030,24 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* REAL-TIME DYNAMIC PRICING PREVIEW */}
-              {(() => {
+              {/* REAL-TIME DYNAMIC PRICING PREVIEW / PREPAID ACTIVE SLOT */}
+              {activeSlot ? (
+                <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3.5 space-y-1.5">
+                  <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Included in Active Plan: {activeSlot.planName}</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700 leading-relaxed">
+                    You have an active VPS slot with <strong>{activeSlot.daysRemaining} days remaining</strong> (valid until {activeSlot.endDate}). This instance will be provisioned under your prepaid package at zero additional charge.
+                  </p>
+                  <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Estimated Due Now</span>
+                    <span className="text-sm font-extrabold text-emerald-600 font-poppins">
+                      $0.00 (Prepaid Slot)
+                    </span>
+                  </div>
+                </div>
+              ) : (() => {
                 const plan = catalogPlans.find((p) => p.planId === selectedPlanId) || catalogPlans[0];
                 if (!plan) return null;
                 const extraCpu = Math.max(0, customCpu - plan.cpuCores);
@@ -1036,10 +1117,20 @@ export default function Dashboard() {
               </h3>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed mb-4">
+            <p className="text-xs text-slate-600 leading-relaxed mb-3">
               Are you sure you want to permanently terminate <strong className="text-slate-900 font-mono">{deletingInstance.name}</strong> ({deletingInstance.ip})?
-              The Hyper-V VM and all associated VHDX storage will be unlinked and deleted.
+              The Hyper-V VM and all associated VHDX storage will be unlinked and deleted, and its IP will be released.
             </p>
+
+            <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3 mb-4">
+              <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs mb-0.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Your Active Subscription Stays Intact</span>
+              </div>
+              <p className="text-[11px] text-emerald-700 leading-relaxed">
+                Destroying this instance frees up your server slot. You can deploy a fresh VPS anytime at <strong>$0.00</strong> during your 30-day billing cycle.
+              </p>
+            </div>
 
             <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
               <button

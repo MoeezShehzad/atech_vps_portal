@@ -31,6 +31,47 @@ export async function getUserVMs(req, res) {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Query active subscriptions and slot availability (Hostinger model)
+    const now = new Date();
+    const activeSubscriptions = await prisma.subscription.findMany({
+      where: {
+        userId,
+        status: 'ACTIVE',
+        endDate: { gt: now },
+      },
+      include: {
+        plan: true,
+        virtualMachines: {
+          where: { status: { not: 'TERMINATED' } },
+        },
+      },
+      orderBy: { endDate: 'desc' },
+    });
+
+    const activeSubsFormatted = activeSubscriptions.map((sub) => {
+      const activeVmCount = sub.virtualMachines.length;
+      const daysRemaining = Math.max(
+        0,
+        Math.ceil((new Date(sub.endDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      );
+      return {
+        subscriptionId: sub.subscriptionId,
+        planId: sub.planId,
+        planName: sub.plan.name,
+        monthlyPrice: Number(sub.monthlyPrice),
+        startDate: sub.startDate.toISOString().split('T')[0],
+        endDate: sub.endDate ? sub.endDate.toISOString().split('T')[0] : null,
+        daysRemaining,
+        activeVmCount,
+        hasAvailableSlot: activeVmCount === 0,
+        specs: {
+          cpuCores: sub.plan.cpuCores,
+          ramGb: sub.plan.ramGb,
+          storageGb: sub.plan.storageGb,
+        },
+      };
+    });
+
     // Format for frontend
     const formatted = vms.map((vm) => {
       const assignedIp = vm.ipPool && vm.ipPool.length > 0 ? vm.ipPool[0].ipAddress : '192.168.10.' + (100 + vm.vmId);
@@ -53,7 +94,12 @@ export async function getUserVMs(req, res) {
       };
     });
 
-    return res.json({ success: true, count: formatted.length, vms: formatted });
+    return res.json({
+      success: true,
+      count: formatted.length,
+      vms: formatted,
+      activeSubscriptions: activeSubsFormatted,
+    });
   } catch (error) {
     console.error('[VM Controller] Error fetching user VMs:', error);
     return res.status(500).json({ error: 'Failed to retrieve virtual machines.' });
@@ -139,17 +185,39 @@ export async function deployVM(req, res) {
       storageGb: finalStorage,
     });
 
-    // 1. Create Subscription
-    const subscription = await prisma.subscription.create({
-      data: {
+    // Check if user has an existing active subscription with an available server slot (Hostinger model)
+    const now = new Date();
+    let subscription = await prisma.subscription.findFirst({
+      where: {
         userId,
-        planId: plan.planId,
         status: 'ACTIVE',
-        startDate: new Date(),
-        monthlyPrice: pricing.totalMonthlyPrice,
-        currency: 'USD',
+        endDate: { gt: now },
+        virtualMachines: {
+          none: { status: { not: 'TERMINATED' } },
+        },
       },
+      include: { plan: true },
+      orderBy: { endDate: 'desc' },
     });
+
+    let isSlotReused = false;
+    if (subscription) {
+      isSlotReused = true;
+      console.log(`[Deploy VM] Reusing active subscription slot #${subscription.subscriptionId} (${subscription.plan.name}) for user #${userId}`);
+    } else {
+      // 1. Create new 30-day Subscription
+      subscription = await prisma.subscription.create({
+        data: {
+          userId,
+          planId: plan.planId,
+          status: 'ACTIVE',
+          startDate: now,
+          endDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30-day cycle
+          monthlyPrice: pricing.totalMonthlyPrice,
+          currency: 'USD',
+        },
+      });
+    }
 
     // 2. Assign IP from pool (or generate one)
     let ipRecord = await prisma.iPPool.findFirst({
@@ -188,7 +256,7 @@ export async function deployVM(req, res) {
         vmId: newVm.vmId,
         action: 'DEPLOY_VM',
         status: 'PENDING',
-        details: `Provisioning ${cleanVmName} (${finalCpu} vCPU / ${finalRam} GB RAM / ${pricing.totalMonthlyPrice} USD/mo)`,
+        details: `Provisioning ${cleanVmName} (${finalCpu} vCPU / ${finalRam} GB RAM / ${isSlotReused ? 'Covered by Active Subscription ($0.00)' : `${pricing.totalMonthlyPrice} USD/mo`})`,
       },
     });
 
@@ -417,7 +485,7 @@ export async function resizeVM(req, res) {
 }
 
 /**
- * 7. DELETE /api/vms/:id - Destroy VM, free IP & cancel subscription
+ * 7. DELETE /api/vms/:id - Destroy VM, free IP & retain active subscription slot (Hostinger model)
  */
 export async function destroyVM(req, res) {
   try {
@@ -426,10 +494,16 @@ export async function destroyVM(req, res) {
 
     const vm = await prisma.virtualMachine.findFirst({
       where: { vmId, userId },
+      include: { subscription: true },
     });
 
     if (!vm) {
-      return res.status(404).json({ error: 'Virtual machine not found.' });
+      // Idempotent: VM is already removed from DB, return 200 OK so UI clears smoothly
+      return res.json({
+        success: true,
+        message: 'Virtual machine is already removed.',
+        alreadyRemoved: true,
+      });
     }
 
     // 1. Call Hyper-V destroy service (gracefully handles if already deleted on host)
@@ -445,22 +519,20 @@ export async function destroyVM(req, res) {
       data: { status: 'AVAILABLE', assignedVmId: null },
     });
 
-    // 3. Clean up provisioning jobs
+    // 3. Clean up provisioning jobs referencing this VM
     await prisma.provisioningJob.deleteMany({
       where: { vmId },
     }).catch(() => {});
 
-    // 4. Cancel Subscription
-    if (vm.subscriptionId) {
-      await prisma.subscription.update({
-        where: { subscriptionId: vm.subscriptionId },
-        data: { status: 'CANCELLED', endDate: new Date() },
-      }).catch(() => {});
-    }
-
-    // 5. Delete activity logs referencing this VM
-    await prisma.activityLog.deleteMany({
+    // 4. Clean up backups referencing this VM
+    await prisma.backup.deleteMany({
       where: { vmId },
+    }).catch(() => {});
+
+    // 5. Detach activity logs from this VM (set vmId to null) so audit history is kept without FK conflict
+    await prisma.activityLog.updateMany({
+      where: { vmId },
+      data: { vmId: null },
     }).catch(() => {});
 
     // 6. Delete the VirtualMachine record from DB
@@ -468,23 +540,46 @@ export async function destroyVM(req, res) {
       where: { vmId },
     });
 
-    // Log Activity
+    // 7. Industry Standard Lifecycle (Hostinger): DO NOT CANCEL ACTIVE SUBSCRIPTION!
+    // The user paid for a 30-day billing cycle. Destroying the VM frees up the slot for fresh re-deployment.
+    let isSubscriptionActive = false;
+    let subscriptionEndDate = null;
+    if (vm.subscriptionId && vm.subscription) {
+      const now = new Date();
+      if (vm.subscription.endDate && new Date(vm.subscription.endDate) > now) {
+        isSubscriptionActive = true;
+        subscriptionEndDate = vm.subscription.endDate;
+        await prisma.subscription.update({
+          where: { subscriptionId: vm.subscriptionId },
+          data: { status: 'ACTIVE' },
+        }).catch(() => {});
+      } else {
+        await prisma.subscription.update({
+          where: { subscriptionId: vm.subscriptionId },
+          data: { status: 'EXPIRED' },
+        }).catch(() => {});
+      }
+    }
+
+    // 8. Log Activity
     await prisma.activityLog.create({
       data: {
         userId,
-        vmId,
+        vmId: null,
         action: 'DESTROY_VM',
         status: 'SUCCESS',
-        details: `Terminated and destroyed virtual machine ${vm.vmName}`,
+        details: `Permanently destroyed virtual machine ${vm.vmName} and released IP. ${isSubscriptionActive ? 'Active subscription slot preserved for re-deployment.' : ''}`,
       },
-    });
+    }).catch(() => {});
 
     return res.json({
       success: true,
-      message: `Virtual Machine ${vm.vmName} permanently destroyed and resources freed.`,
+      message: `Virtual Machine ${vm.vmName} permanently destroyed and resources freed. Your VPS subscription slot remains active for re-deployment.`,
+      subscriptionActive: isSubscriptionActive,
+      subscriptionEndDate,
     });
   } catch (error) {
     console.error('[VM Controller] Destroy error:', error);
-    return res.status(500).json({ error: 'Failed to destroy virtual machine.' });
+    return res.status(500).json({ error: error.message || 'Failed to destroy virtual machine.' });
   }
 }
