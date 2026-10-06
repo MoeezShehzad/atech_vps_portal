@@ -138,7 +138,7 @@ export async function deployVM(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { planId, imageId, vmName, customCpu, customRam } = req.body;
+    const { planId, imageId, vmName, customCpu, customRam, customStorage } = req.body;
 
     if (!vmName) {
       return res.status(400).json({ error: 'A valid VM hostname or name is required.' });
@@ -177,7 +177,7 @@ export async function deployVM(req, res) {
     // Specs calculation
     const finalCpu = customCpu ? Number(customCpu) : plan.cpuCores;
     const finalRam = customRam ? Number(customRam) : plan.ramGb;
-    const finalStorage = plan.storageGb;
+    const finalStorage = customStorage ? Number(customStorage) : plan.storageGb;
 
     const pricing = calculateCustomPrice(plan, {
       cpuCores: finalCpu,
@@ -390,7 +390,7 @@ export async function previewResize(req, res) {
   try {
     const userId = req.user?.userId;
     const vmId = Number(req.params.id);
-    const { cpuCores, ramGb } = req.body;
+    const { cpuCores, ramGb, storageGb } = req.body;
 
     const vm = await prisma.virtualMachine.findFirst({
       where: { vmId, userId },
@@ -401,7 +401,8 @@ export async function previewResize(req, res) {
       return res.status(404).json({ error: 'Virtual machine not found.' });
     }
 
-    const calculation = calculateResizePrice(vm, Number(cpuCores), Number(ramGb));
+    const targetStorage = storageGb ? Number(storageGb) : vm.storageGb;
+    const calculation = calculateResizePrice(vm, Number(cpuCores), Number(ramGb), targetStorage);
     return res.json({ success: true, ...calculation });
   } catch (error) {
     console.error('[VM Controller] Error calculating resize price:', error);
@@ -416,7 +417,7 @@ export async function resizeVM(req, res) {
   try {
     const userId = req.user?.userId;
     const vmId = Number(req.params.id);
-    const { cpuCores, ramGb } = req.body;
+    const { cpuCores, ramGb, storageGb } = req.body;
 
     const targetCpu = Number(cpuCores);
     const targetRam = Number(ramGb);
@@ -434,14 +435,24 @@ export async function resizeVM(req, res) {
       return res.status(404).json({ error: 'Virtual machine not found.' });
     }
 
-    // Calculate price changes
-    const priceInfo = calculateResizePrice(vm, targetCpu, targetRam);
+    const targetStorage = storageGb ? Number(storageGb) : vm.storageGb;
 
-    // Call Hyper-V resize service
+    // Disallow disk shrinking
+    if (targetStorage < vm.storageGb) {
+      return res.status(400).json({
+        error: `Disk storage cannot be reduced below current size (${vm.storageGb} GB). Disk shrinking is not supported to protect file system data.`,
+      });
+    }
+
+    // Calculate price changes
+    const priceInfo = calculateResizePrice(vm, targetCpu, targetRam, targetStorage);
+
+    // Call Hyper-V resize service (handles CPU, RAM, and VHDX disk expansion)
     await hypervService.resizeVM({
       vmName: vm.vmName,
       cpuCores: targetCpu,
       ramGb: targetRam,
+      storageGb: targetStorage,
     });
 
     // Update Virtual Machine in DB
@@ -450,6 +461,7 @@ export async function resizeVM(req, res) {
       data: {
         cpuCores: targetCpu,
         ramGb: targetRam,
+        storageGb: targetStorage,
       },
     });
 
@@ -468,19 +480,19 @@ export async function resizeVM(req, res) {
         vmId,
         action: 'RESIZE_SPECS',
         status: 'SUCCESS',
-        details: `Resized specs to ${targetCpu} vCPU, ${targetRam} GB RAM. New monthly rate: $${priceInfo.newPrice}/mo (Delta: $${priceInfo.priceDelta})`,
+        details: `Resized specs to ${targetCpu} vCPU, ${targetRam} GB RAM, ${targetStorage} GB NVMe. New monthly rate: $${priceInfo.newPrice}/mo (Delta: $${priceInfo.priceDelta})`,
       },
     });
 
     return res.json({
       success: true,
-      message: `Hardware specs upgraded to ${targetCpu} vCPU and ${targetRam} GB RAM.`,
+      message: `Hardware specs upgraded to ${targetCpu} vCPU, ${targetRam} GB RAM, and ${targetStorage} GB NVMe Storage.`,
       vm: updatedVm,
       pricing: priceInfo,
     });
   } catch (error) {
     console.error('[VM Controller] Resize error:', error);
-    return res.status(500).json({ error: 'Failed to adjust virtual machine specifications.' });
+    return res.status(500).json({ error: error.message || 'Failed to adjust virtual machine specifications.' });
   }
 }
 

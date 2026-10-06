@@ -53,8 +53,14 @@ try {
     if ($DiskGB -gt 0) {
         $CustomerVHDXPath = Join-Path -Path (Join-Path -Path $CustomerVMsRoot -ChildPath $VMName) -ChildPath "Virtual Hard Disks\$VMName-disk0.vhdx"
         if (Test-Path $CustomerVHDXPath) {
-            Write-Output "[DISK] Resizing disk to $DiskGB GB"
-            Resize-VHD -Path $CustomerVHDXPath -SizeBytes ([int64]$DiskGB * 1GB)
+            $CurrentVHD = Get-VHD -Path $CustomerVHDXPath
+            $TargetBytes = [int64]$DiskGB * 1GB
+            if ($TargetBytes -gt $CurrentVHD.Size) {
+                Write-Output "[DISK] Expanding virtual disk from $([math]::Round($CurrentVHD.Size / 1GB)) GB to $DiskGB GB"
+                Resize-VHD -Path $CustomerVHDXPath -SizeBytes $TargetBytes
+            } else {
+                Write-Output "[DISK] Disk size ($DiskGB GB) is equal or smaller than current ($([math]::Round($CurrentVHD.Size / 1GB)) GB); expansion skipped."
+            }
         }
     }
 

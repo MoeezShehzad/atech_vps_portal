@@ -116,11 +116,13 @@ export default function Dashboard() {
   const [selectedImageId, setSelectedImageId] = useState<number>(1);
   const [customCpu, setCustomCpu] = useState<number>(2);
   const [customRam, setCustomRam] = useState<number>(4);
+  const [customStorage, setCustomStorage] = useState<number>(50);
   const [deployLoading, setDeployLoading] = useState(false);
 
   // Resize form state
   const [resizeCpu, setResizeCpu] = useState<number>(2);
   const [resizeRam, setResizeRam] = useState<number>(4);
+  const [resizeStorage, setResizeStorage] = useState<number>(50);
   const [resizePricing, setResizePricing] = useState<{ newPrice: number; priceDelta: number } | null>(null);
   const [resizeLoading, setResizeLoading] = useState(false);
 
@@ -147,6 +149,7 @@ export default function Dashboard() {
           setSelectedPlanId(data.plans[0].planId);
           setCustomCpu(data.plans[0].cpuCores);
           setCustomRam(data.plans[0].ramGb);
+          setCustomStorage(data.plans[0].storageGb);
         }
         if (data.images?.[0]) {
           setSelectedImageId(data.images[0].imageId);
@@ -198,6 +201,7 @@ export default function Dashboard() {
     if (plan) {
       setCustomCpu(plan.cpuCores);
       setCustomRam(plan.ramGb);
+      setCustomStorage(plan.storageGb);
     }
   };
 
@@ -206,6 +210,7 @@ export default function Dashboard() {
     setSelectedPlanId(plan.planId);
     setCustomCpu(plan.cpuCores);
     setCustomRam(plan.ramGb);
+    setCustomStorage(plan.storageGb);
     setNewHostname(`vps-${plan.name.toLowerCase().replace(/\s+/g, '-')}-${Math.floor(Math.random() * 899 + 100)}`);
     setIsDeployOpen(true);
   };
@@ -246,6 +251,7 @@ export default function Dashboard() {
           imageId: selectedImageId,
           customCpu,
           customRam,
+          customStorage,
         }),
       });
       setIsDeployOpen(false);
@@ -264,6 +270,7 @@ export default function Dashboard() {
     setResizingInstance(inst);
     setResizeCpu(inst.vCPU);
     setResizeRam(inst.ramGB);
+    setResizeStorage(inst.diskGB);
     setResizePricing({ newPrice: inst.monthlyPrice, priceDelta: 0 });
   };
 
@@ -274,7 +281,7 @@ export default function Dashboard() {
       try {
         const data = await apiCall(`/vms/${resizingInstance.vmId}/preview-resize`, {
           method: 'POST',
-          body: JSON.stringify({ cpuCores: resizeCpu, ramGb: resizeRam }),
+          body: JSON.stringify({ cpuCores: resizeCpu, ramGb: resizeRam, storageGb: resizeStorage }),
         });
         if (data) {
           setResizePricing({ newPrice: data.newPrice, priceDelta: data.priceDelta });
@@ -284,7 +291,7 @@ export default function Dashboard() {
       }
     };
     updatePreview();
-  }, [resizeCpu, resizeRam, resizingInstance]);
+  }, [resizeCpu, resizeRam, resizeStorage, resizingInstance]);
 
   // Apply resize submit
   const handleResizeSubmit = async (e: React.FormEvent) => {
@@ -295,7 +302,7 @@ export default function Dashboard() {
     try {
       await apiCall(`/vms/${resizingInstance.vmId}/resize`, {
         method: 'PATCH',
-        body: JSON.stringify({ cpuCores: resizeCpu, ramGb: resizeRam }),
+        body: JSON.stringify({ cpuCores: resizeCpu, ramGb: resizeRam, storageGb: resizeStorage }),
       });
       setResizingInstance(null);
       await fetchVMs();
@@ -304,6 +311,7 @@ export default function Dashboard() {
           ...selectedInstance,
           vCPU: resizeCpu,
           ramGB: resizeRam,
+          diskGB: resizeStorage,
           monthlyPrice: resizePricing?.newPrice || selectedInstance.monthlyPrice,
         });
       }
@@ -484,6 +492,7 @@ export default function Dashboard() {
                         setSelectedPlanId(activeSlot.planId);
                         setCustomCpu(activeSlot.specs?.cpuCores || 2);
                         setCustomRam(activeSlot.specs?.ramGb || 4);
+                        setCustomStorage(activeSlot.specs?.storageGb || 50);
                         setNewHostname(`srv-${activeSlot.planName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(Math.random() * 899 + 100)}`);
                         setIsDeployOpen(true);
                       }}
@@ -886,6 +895,34 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {/* NVME STORAGE SLIDER */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-slate-700 flex items-center gap-1.5">
+                    <HardDrive className="w-4 h-4 text-amber-600" /> NVMe Storage Disk
+                  </span>
+                  <span className="text-amber-600 font-bold text-sm">{resizeStorage} GB NVMe</span>
+                </div>
+                <input
+                  type="range"
+                  min={resizingInstance.diskGB}
+                  max="500"
+                  step="10"
+                  value={resizeStorage}
+                  onChange={(e) => setResizeStorage(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>{resizingInstance.diskGB} GB (Current)</span>
+                  <span>100 GB</span>
+                  <span>250 GB</span>
+                  <span>500 GB</span>
+                </div>
+                <p className="text-[10px] text-slate-400 italic">
+                  * Dynamic expansion: Virtual disks can be scaled up dynamically without data loss. Disk shrinking is not supported to protect file system data.
+                </p>
+              </div>
+
               {/* DYNAMIC PRICE PREVIEW */}
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
                 <div>
@@ -1001,7 +1038,7 @@ export default function Dashboard() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     vCPU Cores
@@ -1012,7 +1049,7 @@ export default function Dashboard() {
                     max="16"
                     value={customCpu}
                     onChange={(e) => setCustomCpu(Number(e.target.value))}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                   />
                 </div>
                 <div>
@@ -1025,7 +1062,21 @@ export default function Dashboard() {
                     max="64"
                     value={customRam}
                     onChange={(e) => setCustomRam(Number(e.target.value))}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    NVMe Disk (GB)
+                  </label>
+                  <input
+                    type="number"
+                    min="20"
+                    max="500"
+                    step="10"
+                    value={customStorage}
+                    onChange={(e) => setCustomStorage(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
                   />
                 </div>
               </div>
@@ -1052,7 +1103,8 @@ export default function Dashboard() {
                 if (!plan) return null;
                 const extraCpu = Math.max(0, customCpu - plan.cpuCores);
                 const extraRam = Math.max(0, customRam - plan.ramGb);
-                const delta = extraCpu * 2.5 + extraRam * 1.5;
+                const extraStorage = Math.max(0, customStorage - plan.storageGb);
+                const delta = extraCpu * 2.5 + extraRam * 1.5 + extraStorage * 0.10;
                 const total = Number(plan.monthlyPrice) + delta;
 
                 return (
@@ -1063,7 +1115,7 @@ export default function Dashboard() {
                     </div>
                     {delta > 0 && (
                       <div className="flex items-center justify-between text-[11px] text-blue-600 font-medium">
-                        <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM)</span>
+                        <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM{extraStorage > 0 ? `, +${extraStorage}GB NVMe` : ''})</span>
                         <span>+${delta.toFixed(2)}/mo</span>
                       </div>
                     )}

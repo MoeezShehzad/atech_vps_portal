@@ -43,17 +43,20 @@ export function calculateCustomPrice(plan, targetSpecs) {
 /**
  * Calculates price change between current VM specs and proposed new specs.
  */
-export function calculateResizePrice(currentVm, newCpuCores, newRamGb) {
+export function calculateResizePrice(currentVm, newCpuCores, newRamGb, newStorageGb) {
   const currentRam = currentVm.ramGb;
   const currentCpu = currentVm.cpuCores;
+  const currentStorage = currentVm.storageGb;
   const currentPrice = Number(currentVm.subscription?.monthlyPrice || currentVm.plan?.monthlyPrice || 0);
 
   const ramDelta = newRamGb - currentRam;
   const cpuDelta = newCpuCores - currentCpu;
+  const storageDelta = (newStorageGb ? Number(newStorageGb) : currentStorage) - currentStorage;
 
   const ramCostDelta = ramDelta * SPEC_UNIT_RATES.ramPerGbMonth;
   const cpuCostDelta = cpuDelta * SPEC_UNIT_RATES.cpuPerCoreMonth;
-  const totalDelta = Number((ramCostDelta + cpuCostDelta).toFixed(2));
+  const storageCostDelta = Math.max(0, storageDelta) * SPEC_UNIT_RATES.storagePerGbMonth;
+  const totalDelta = Number((ramCostDelta + cpuCostDelta + storageCostDelta).toFixed(2));
 
   const newPrice = Math.max(4.99, Number((currentPrice + totalDelta).toFixed(2)));
 
@@ -63,6 +66,7 @@ export function calculateResizePrice(currentVm, newCpuCores, newRamGb) {
     priceDelta: totalDelta,
     ramDelta,
     cpuDelta,
+    storageDelta,
     currency: 'USD',
   };
 }
