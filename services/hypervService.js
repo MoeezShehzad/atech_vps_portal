@@ -179,10 +179,11 @@ class HyperVService {
   }
 
   /**
-   * Query live telemetry from Hyper-V
+   * Query live telemetry from Hyper-V (specific VM or all host VMs)
    */
-  async getStatus(vmName) {
-    return await this.dispatchToHost(`/api/hyperv/status?vmName=${encodeURIComponent(vmName)}`, 'GET');
+  async getStatus(vmName = '') {
+    const qs = vmName ? `?vmName=${encodeURIComponent(vmName)}` : '';
+    return await this.dispatchToHost(`/api/hyperv/status${qs}`, 'GET');
   }
 }
 

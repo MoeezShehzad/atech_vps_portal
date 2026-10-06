@@ -31,6 +31,61 @@ export async function getUserVMs(req, res) {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Reconcile with Hyper-V Host (auto-clean manual host deletions & sync power states)
+    let reconciledVms = vms;
+    try {
+      const hvData = await hypervService.getStatus();
+      let liveList = [];
+      if (Array.isArray(hvData)) {
+        liveList = hvData;
+      } else if (hvData && hvData.VMName) {
+        liveList = [hvData];
+      }
+
+      if (liveList.length > 0 || hvData) {
+        const hostVmMap = new Map();
+        liveList.forEach((hv) => {
+          if (hv.VMName) hostVmMap.set(hv.VMName.toLowerCase(), hv);
+        });
+
+        const synced = [];
+        for (const vm of vms) {
+          const liveInfo = hostVmMap.get(vm.vmName.toLowerCase());
+
+          // If the VM was manually deleted directly from Hyper-V Manager
+          if (!liveInfo && vm.status !== 'PROVISIONING') {
+            console.log(`[RECONCILE] VM '${vm.vmName}' not found in Hyper-V. Purging orphaned DB record and freeing IP.`);
+            await prisma.iPPool.updateMany({
+              where: { assignedVmId: vm.vmId },
+              data: { status: 'AVAILABLE', assignedVmId: null },
+            }).catch(() => {});
+            await prisma.provisioningJob.deleteMany({ where: { vmId: vm.vmId } }).catch(() => {});
+            await prisma.backup.deleteMany({ where: { vmId: vm.vmId } }).catch(() => {});
+            await prisma.activityLog.updateMany({ where: { vmId: vm.vmId }, data: { vmId: null } }).catch(() => {});
+            await prisma.virtualMachine.delete({ where: { vmId: vm.vmId } }).catch(() => {});
+            continue;
+          }
+
+          // If state changed in Hyper-V (e.g. stopped/started outside portal)
+          if (liveInfo && liveInfo.State) {
+            const liveStatus = liveInfo.State.toUpperCase() === 'RUNNING' ? 'RUNNING' : 'STOPPED';
+            if (liveStatus !== vm.status) {
+              await prisma.virtualMachine.update({
+                where: { vmId: vm.vmId },
+                data: { status: liveStatus },
+              }).catch(() => {});
+              vm.status = liveStatus;
+            }
+          }
+
+          synced.push(vm);
+        }
+        reconciledVms = synced;
+      }
+    } catch (reconcileErr) {
+      // Hyper-V Host Agent temporarily busy or offline; fallback to DB
+    }
+
     // Query active subscriptions and slot availability (Hostinger model)
     const now = new Date();
     const activeSubscriptions = await prisma.subscription.findMany({
@@ -73,7 +128,7 @@ export async function getUserVMs(req, res) {
     });
 
     // Format for frontend
-    const formatted = vms.map((vm) => {
+    const formatted = reconciledVms.map((vm) => {
       const assignedIp = vm.ipPool && vm.ipPool.length > 0 ? vm.ipPool[0].ipAddress : '192.168.10.' + (100 + vm.vmId);
       return {
         id: `vps-${vm.vmId}`,
@@ -520,8 +575,19 @@ export async function destroyVM(req, res) {
 
     const force = req.query.force === 'true' || req.body?.force === true;
 
+    // Check if VM is physically active in Hyper-V
+    let isPhysicallyRunning = false;
+    try {
+      const hvStatus = await hypervService.getStatus(vm.vmName);
+      if (hvStatus && hvStatus.Found && hvStatus.State && hvStatus.State.toUpperCase() === 'RUNNING') {
+        isPhysicallyRunning = true;
+      }
+    } catch (e) {
+      isPhysicallyRunning = vm.status === 'RUNNING';
+    }
+
     // Enterprise safety guard: Active running VMs must be stopped or forcefully confirmed
-    if (vm.status === 'RUNNING' && !force) {
+    if (isPhysicallyRunning && !force) {
       return res.status(400).json({
         error: `Virtual machine '${vm.vmName}' is currently running. For safety and data integrity, please power off the server first, or select 'Force Stop & Destroy'.`,
         requiresStop: true,
