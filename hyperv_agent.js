@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.HYPERV_AGENT_PORT || 5050;
 const HOST = '0.0.0.0';
 const SCRIPTS_DIR = path.join(__dirname, 'scripts', 'hyperv');
-const DEFAULT_ISO = 'D:\\00_Master_Template\\ubuntu-22.04.5-live-server-amd64.iso';
+const DEFAULT_TEMPLATE = 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx';
 
 function runPowerShell(scriptName, params = {}) {
   return new Promise((resolve, reject) => {
@@ -111,7 +111,7 @@ const server = http.createServer(async (req, res) => {
         RAMMB: data.ramMb || 2048,
         CPUCount: data.cpuCount || 2,
         DiskGB: data.diskGb || 40,
-        TemplatePath: data.templatePath || DEFAULT_ISO,
+        TemplatePath: data.templatePath || DEFAULT_TEMPLATE,
         SwitchName: data.switchName || 'Default Switch',
       });
 

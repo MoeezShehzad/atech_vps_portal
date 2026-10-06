@@ -6,14 +6,15 @@
 
 import prisma from '../lib/prisma.js';
 
-// Try both default gateway (172.25.80.1) and Wi-Fi host IP (192.168.100.92)
+// Try gateway IPs and Wi-Fi host IP
 const HOST_CANDIDATES = [
   process.env.HYPERV_AGENT_URL,
+  'http://192.168.0.1:5050',
   'http://172.25.80.1:5050',
   'http://192.168.100.92:5050',
 ].filter(Boolean);
 
-const DEFAULT_ISO = 'D:\\00_Master_Template\\ubuntu-22.04.5-live-server-amd64.iso';
+const DEFAULT_TEMPLATE = 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx';
 
 class HyperVService {
   /**
@@ -87,7 +88,7 @@ class HyperVService {
         ramMb,
         cpuCount: cpuCores,
         diskGb: storageGb,
-        templatePath: templatePath || DEFAULT_ISO,
+        templatePath: templatePath || DEFAULT_TEMPLATE,
         switchName,
       });
 
