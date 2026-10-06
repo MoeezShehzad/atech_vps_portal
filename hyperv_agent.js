@@ -37,9 +37,9 @@ function runPowerShell(scriptName, params = {}) {
         return reject({ error: err.message, stderr, stdout });
       }
 
-      // Try parsing JSON from script output
+      // Try parsing JSON from script output (array or object)
       try {
-        const jsonMatch = stdout.match(/\{[\s\S]*\}/);
+        const jsonMatch = stdout.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
         if (jsonMatch) {
           return resolve(JSON.parse(jsonMatch[0]));
         }

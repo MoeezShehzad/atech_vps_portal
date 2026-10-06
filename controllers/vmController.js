@@ -38,11 +38,19 @@ export async function getUserVMs(req, res) {
       let liveList = [];
       if (Array.isArray(hvData)) {
         liveList = hvData;
+      } else if (hvData && Array.isArray(hvData.output)) {
+        liveList = hvData.output;
+      } else if (hvData && typeof hvData.output === 'string') {
+        try {
+          const parsed = JSON.parse(hvData.output);
+          if (Array.isArray(parsed)) liveList = parsed;
+          else if (parsed && parsed.VMName) liveList = [parsed];
+        } catch {}
       } else if (hvData && hvData.VMName) {
         liveList = [hvData];
       }
 
-      if (liveList.length > 0 || hvData) {
+      if (liveList.length > 0) {
         const hostVmMap = new Map();
         liveList.forEach((hv) => {
           if (hv.VMName) hostVmMap.set(hv.VMName.toLowerCase(), hv);
@@ -50,11 +58,21 @@ export async function getUserVMs(req, res) {
 
         const synced = [];
         for (const vm of vms) {
-          const liveInfo = hostVmMap.get(vm.vmName.toLowerCase());
+          let liveInfo = hostVmMap.get(vm.vmName.toLowerCase());
 
-          // If the VM was manually deleted directly from Hyper-V Manager
+          // If not in the bulk list, perform a targeted check specifically for this VM
           if (!liveInfo && vm.status !== 'PROVISIONING') {
-            console.log(`[RECONCILE] VM '${vm.vmName}' not found in Hyper-V. Purging orphaned DB record and freeing IP.`);
+            try {
+              const specificCheck = await hypervService.getStatus(vm.vmName);
+              if (specificCheck && specificCheck.Found) {
+                liveInfo = specificCheck;
+              }
+            } catch {}
+          }
+
+          // Only purge if confirmed non-existent by specific check
+          if (!liveInfo && vm.status !== 'PROVISIONING') {
+            console.log(`[RECONCILE] VM '${vm.vmName}' confirmed NOT in Hyper-V. Purging orphaned DB record and freeing IP.`);
             await prisma.iPPool.updateMany({
               where: { assignedVmId: vm.vmId },
               data: { status: 'AVAILABLE', assignedVmId: null },

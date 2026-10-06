@@ -87,6 +87,10 @@ try {
 
     if ($VMName -and ($List.Count -eq 1)) {
         Write-Output ($List[0] | ConvertTo-Json -Compress)
+    } elseif ($List.Count -eq 1) {
+        # Force JSON array format for single item when listing all VMs
+        $SingleJson = $List[0] | ConvertTo-Json -Compress
+        Write-Output "[$SingleJson]"
     } else {
         Write-Output ($List | ConvertTo-Json -Compress)
     }
