@@ -111,6 +111,8 @@ const server = http.createServer(async (req, res) => {
         RAMMB: data.ramMb || 2048,
         CPUCount: data.cpuCount || 2,
         DiskGB: data.diskGb || 40,
+        AdminUsername: data.adminUsername || 'ubuntu',
+        AdminPassword: data.adminPassword || '',
         TemplatePath: data.templatePath || DEFAULT_TEMPLATE,
         SwitchName: data.switchName || 'Default Switch',
       });
@@ -207,6 +209,6 @@ server.listen(PORT, HOST, () => {
   console.log(`================================================================`);
   console.log(`[HYPER-V AGENT] Running on http://${HOST}:${PORT}`);
   console.log(`[HYPER-V AGENT] Ready to receive commands from Ubuntu Portal`);
-  console.log(`[HYPER-V AGENT] Master ISO Path: ${DEFAULT_ISO}`);
+  console.log(`[HYPER-V AGENT] Master Template Path: ${DEFAULT_TEMPLATE}`);
   console.log(`================================================================`);
 });

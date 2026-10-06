@@ -34,13 +34,9 @@ try {
         $VHD = $VM.HardDrives | Get-VHD -ErrorAction SilentlyContinue | Select-Object -First 1
     } catch {}
 
-    # CPU Calculation
-    $CpuUsage = [int]$VM.CPUUsage
-    $AvgCpu = if ($Measure -and $Measure.AverageProcessorUsage -ne $null) {
-        [int]$Measure.AverageProcessorUsage
-    } else {
-        $CpuUsage
-    }
+    # CPU Calculation (Get-VM CPUUsage is direct 0-100% guest CPU percentage; Measure-VM is raw MHz)
+    $CpuUsage = [math]::Min(100, [math]::Max(0, [int]$VM.CPUUsage))
+    $AvgCpu = $CpuUsage
 
     # RAM Calculation
     $RamAssignedMB = [math]::Round($VM.MemoryAssigned / 1MB)
@@ -71,7 +67,14 @@ try {
     $Net = Get-VMNetworkAdapter -VMName $VMName -ErrorAction SilentlyContinue
     $IPs = @()
     if ($Net -and $Net.IPAddresses) {
-        $IPs = $Net.IPAddresses | Where-Object { $_ -notlike '*:*' }
+        $IPs = @($Net.IPAddresses | Where-Object { $_ -notlike '*:*' })
+    }
+    if (-not $IPs -and $Net -and $Net.MacAddress) {
+        $MacFormatted = [regex]::Replace($Net.MacAddress, '..(?!$)', '$&-').ToLower()
+        $Neighbor = Get-NetNeighbor -ErrorAction SilentlyContinue | Where-Object { $_.LinkLayerAddress -and ($_.LinkLayerAddress.ToLower() -eq $MacFormatted) -and ($_.State -ne 'Permanent') }
+        if ($Neighbor) {
+            $IPs = @($Neighbor.IPAddress | Where-Object { $_ -notlike '*:*' })
+        }
     }
 
     $Metrics = @{

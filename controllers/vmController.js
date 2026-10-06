@@ -211,7 +211,9 @@ export async function deployVM(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { planId, imageId, vmName, customCpu, customRam, customStorage } = req.body;
+    const { planId, imageId, vmName, customCpu, customRam, customStorage, username, password } = req.body;
+    const adminUsername = (username && username.trim()) ? username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') : 'ubuntu';
+    const adminPassword = (password && password.trim()) ? password.trim() : '';
 
     if (!vmName) {
       return res.status(400).json({ error: 'A valid VM hostname or name is required.' });
@@ -342,6 +344,8 @@ export async function deployVM(req, res) {
         ramGb: finalRam,
         storageGb: finalStorage,
         templatePath: image.templatePath,
+        adminUsername,
+        adminPassword,
       });
 
       await prisma.activityLog.create({
@@ -742,8 +746,8 @@ export async function getVMMetrics(req, res) {
           status: liveData.Status || 'Operating normally',
           uptime: liveData.Uptime || '00:00:00',
           processorCount: liveData.CPUCount || vm.cpuCores,
-          cpuUsage: liveData.CPUUsage ?? 0,
-          avgCpu: liveData.AvgCPU ?? liveData.CPUUsage ?? 0,
+          cpuUsage: Math.min(100, Math.max(0, liveData.CPUUsage ?? 0)),
+          avgCpu: Math.min(100, Math.max(0, liveData.CPUUsage ?? liveData.AvgCPU ?? 0)),
           ramTotalMb: liveData.RAMTotalMB || liveData.RAMAssignedMB || ((vm.ramGb || 2) * 1024),
           ramUsedMb: liveData.RAMUsedMB || Math.round(((vm.ramGb || 2) * 1024) * 0.25),
           ramPercent: liveData.RAMPercent ?? 25,

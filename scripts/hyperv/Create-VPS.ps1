@@ -8,6 +8,8 @@ param (
     [Parameter(Mandatory=$false)][int]$RAMMB = 2048,
     [Parameter(Mandatory=$false)][int]$CPUCount = 2,
     [Parameter(Mandatory=$false)][int]$DiskGB = 40,
+    [Parameter(Mandatory=$false)][string]$AdminUsername = "ubuntu",
+    [Parameter(Mandatory=$false)][string]$AdminPassword = "",
     [Parameter(Mandatory=$false)][string]$TemplatePath = "D:\00_Master_Template\ubuntu-22.04.5-live-server-amd64.iso",
     [Parameter(Mandatory=$false)][string]$SwitchName = "Default Switch",
     [Parameter(Mandatory=$false)][string]$CustomerVMsRoot = "D:\CUSTOMER-VMS",
@@ -49,6 +51,16 @@ try {
         # Differencing disk based on master VHDX template
         New-VHD -Path $CustomerVHDXPath -ParentPath $TemplatePath -Differencing | Out-Null
         Write-Output "[DISK] Created differencing VHDX attached to master $TemplatePath"
+
+        # Expand differencing disk capacity if requested package disk is larger than template
+        if ($DiskGB -gt 0) {
+            $TargetBytes = [int64]$DiskGB * 1GB
+            $ParentVHD = Get-VHD -Path $TemplatePath -ErrorAction SilentlyContinue
+            if ($ParentVHD -and ($TargetBytes -gt $ParentVHD.Size)) {
+                Resize-VHD -Path $CustomerVHDXPath -SizeBytes $TargetBytes | Out-Null
+                Write-Output "[DISK] Resized differencing VHDX to $DiskGB GB"
+            }
+        }
     }
 
     # 4. Create Generation 2 VM
@@ -90,7 +102,17 @@ try {
         Enable-VMResourceMetering -VMName $VMName -ErrorAction SilentlyContinue
     } catch {}
 
-    # 9. Audit Logging
+    # 9. Asynchronously run guest configuration (disk filesystem expansion & credential setup)
+    $GuestScript = Join-Path $PSScriptRoot "Configure-Guest.ps1"
+    if (Test-Path $GuestScript) {
+        Start-Job -ScriptBlock {
+            param($Script, $Name, $User, $Pass)
+            & $Script -VMName $Name -AdminUsername $User -AdminPassword $Pass -TimeoutSeconds 120
+        } -ArgumentList $GuestScript, $VMName, $AdminUsername, $AdminPassword | Out-Null
+        Write-Output "[GUEST] Spawned background job for guest initialization and filesystem expansion."
+    }
+
+    # 10. Audit Logging
     $LogFile = Join-Path -Path $SystemLogsRoot -ChildPath "provision.log"
     Add-Content -Path $LogFile -Value "$((Get-Date).ToString('yyyy-MM-dd HH:mm:ss')) - Provisioned and started $VMName successfully."
 

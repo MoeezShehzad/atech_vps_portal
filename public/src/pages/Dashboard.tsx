@@ -29,7 +29,10 @@ import {
   Gauge,
   TrendingUp,
   LineChart,
-  Wifi
+  Wifi,
+  Key,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
@@ -42,6 +45,7 @@ interface Instance {
   name: string;
   hostname: string;
   ip: string;
+  adminUser?: string;
   os: string;
   status: 'running' | 'stopped' | 'provisioning';
   cpuUsage: number;
@@ -150,7 +154,20 @@ export default function Dashboard() {
   const [customCpu, setCustomCpu] = useState<number>(2);
   const [customRam, setCustomRam] = useState<number>(4);
   const [customStorage, setCustomStorage] = useState<number>(50);
+  const [deployUsername, setDeployUsername] = useState('ubuntu');
+  const [deployPassword, setDeployPassword] = useState('root');
+  const [showPassword, setShowPassword] = useState(false);
   const [deployLoading, setDeployLoading] = useState(false);
+
+  const generateStrongPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*';
+    let pass = '';
+    for (let i = 0; i < 12; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setDeployPassword(pass);
+    setShowPassword(true);
+  };
 
   // Resize form state
   const [resizeCpu, setResizeCpu] = useState<number>(2);
@@ -213,14 +230,34 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, [instances]);
 
-  // Real-time telemetry monitoring for selected instance (polls every 3 seconds when drawer is open)
-  const fetchSelectedMetrics = async (vmId: number) => {
+  // Active VM selected for live dashboard telemetry
+  const [activeTelemetryVmId, setActiveTelemetryVmId] = useState<number | null>(null);
+
+  // Auto-select first running VM (or first VM) for main dashboard telemetry
+  useEffect(() => {
+    if (instances.length > 0) {
+      const runningVm = instances.find((i) => i.status === 'running');
+      if (runningVm) {
+        if (!activeTelemetryVmId || !instances.some((i) => i.vmId === activeTelemetryVmId)) {
+          setActiveTelemetryVmId(runningVm.vmId);
+        }
+      } else if (!activeTelemetryVmId || !instances.some((i) => i.vmId === activeTelemetryVmId)) {
+        setActiveTelemetryVmId(instances[0].vmId);
+      }
+    } else {
+      setActiveTelemetryVmId(null);
+      setLiveMetrics(null);
+    }
+  }, [instances]);
+
+  // Real-time telemetry monitoring (polls every 3 seconds for active dashboard VM)
+  const fetchTelemetryMetrics = async (vmId: number) => {
     try {
       const data: VMMetrics = await apiCall(`/vms/${vmId}/metrics`);
       if (data) {
         setLiveMetrics(data);
-        const cpuVal = data.avgCpu !== undefined ? data.avgCpu : (data.cpuUsage || 0);
-        const ramVal = data.ramPercent || 0;
+        const cpuVal = Math.min(100, Math.max(0, data.avgCpu !== undefined ? data.avgCpu : (data.cpuUsage || 0)));
+        const ramVal = Math.min(100, Math.max(0, data.ramPercent || 0));
         setCpuHistory((prev) => [...prev.slice(1), cpuVal]);
         setRamHistory((prev) => [...prev.slice(1), ramVal]);
       }
@@ -230,7 +267,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (!selectedInstance) {
+    if (!activeTelemetryVmId) {
       setLiveMetrics(null);
       setCpuHistory([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       setRamHistory([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -238,15 +275,15 @@ export default function Dashboard() {
     }
 
     setMetricsLoading(true);
-    fetchSelectedMetrics(selectedInstance.vmId).finally(() => setMetricsLoading(false));
+    fetchTelemetryMetrics(activeTelemetryVmId).finally(() => setMetricsLoading(false));
 
     // Telemetry polling interval (3.5 seconds)
     const metricsTimer = setInterval(() => {
-      fetchSelectedMetrics(selectedInstance.vmId);
+      fetchTelemetryMetrics(activeTelemetryVmId);
     }, 3500);
 
     return () => clearInterval(metricsTimer);
-  }, [selectedInstance?.vmId]);
+  }, [activeTelemetryVmId]);
 
   // Handle Escape key to close any active drawer or modal
   useEffect(() => {
@@ -320,10 +357,14 @@ export default function Dashboard() {
           customCpu,
           customRam,
           customStorage,
+          username: deployUsername.trim() || 'ubuntu',
+          password: deployPassword.trim() || 'root',
         }),
       });
       setIsDeployOpen(false);
       setNewHostname('');
+      setDeployUsername('ubuntu');
+      setDeployPassword('root');
       await fetchVMs();
     } catch (err: any) {
       alert(`Deployment failed: ${err.message || 'Check cluster capacity'}`);
@@ -438,17 +479,40 @@ export default function Dashboard() {
     }
   };
 
-  const handleCopySSH = (ip: string) => {
-    navigator.clipboard.writeText(`ssh root@${ip}`);
-    setCopiedSSH(true);
-    setTimeout(() => setCopiedSSH(false), 2000);
-  };
-
   // Aggregate stats
   const totalStorage = instances.reduce((acc, inst) => acc + inst.diskGB, 0);
   const runningCount = instances.filter((i) => i.status === 'running').length;
   const stoppedCount = instances.filter((i) => i.status === 'stopped').length;
   const activeSlot = activeSubscriptions.find((s) => s.hasAvailableSlot);
+
+  const handleOpenDeployModal = () => {
+    if (activeSlot) {
+      setSelectedPlanId(activeSlot.planId);
+      setCustomCpu(activeSlot.specs?.cpuCores || 2);
+      setCustomRam(activeSlot.specs?.ramGb || 4);
+      setCustomStorage(activeSlot.specs?.storageGb || 50);
+      setNewHostname(`srv-${activeSlot.planName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(Math.random() * 899 + 100)}`);
+    } else {
+      const defaultPlan = catalogPlans[0];
+      if (defaultPlan) {
+        setSelectedPlanId(defaultPlan.planId);
+        setCustomCpu(defaultPlan.cpuCores);
+        setCustomRam(defaultPlan.ramGb);
+        setCustomStorage(defaultPlan.storageGb);
+        setNewHostname(`srv-vps-${Math.floor(Math.random() * 899 + 100)}`);
+      }
+    }
+    setDeployUsername('ubuntu');
+    setDeployPassword('root');
+    setIsDeployOpen(true);
+  };
+
+  const handleCopySSH = (target: string) => {
+    const cmd = target.startsWith('ssh ') ? target : `ssh ${target}`;
+    navigator.clipboard.writeText(cmd);
+    setCopiedSSH(true);
+    setTimeout(() => setCopiedSSH(false), 2000);
+  };
 
   // Filter pipeline
   const filteredInstances = instances.filter((inst) => {
@@ -501,7 +565,7 @@ export default function Dashboard() {
                   <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
                 </button>
                 <button 
-                  onClick={() => setIsDeployOpen(true)}
+                  onClick={handleOpenDeployModal}
                   className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-sm shadow-blue-500/20"
                 >
                   <Plus className="w-4 h-4" /> Deploy New Instance
@@ -714,6 +778,195 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* LIVE HYPER-V RESOURCE MONITORING & PERFORMANCE DASHBOARD */}
+            {instances.length > 0 && (() => {
+              const activeMonitoringVm = instances.find((i) => i.vmId === activeTelemetryVmId) || instances[0];
+              const isVmRunning = activeMonitoringVm?.status === 'running';
+
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+                  {/* MONITORING HEADER WITH VM SELECTOR */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                        <Activity className="w-5 h-5 animate-pulse" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-base font-bold text-slate-900 font-poppins">
+                            Live Hyper-V Telemetry & Resource Load
+                          </h2>
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isVmRunning ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isVmRunning ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
+                            {isVmRunning ? 'Real-Time Active' : 'Instance Standby'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          High-resolution telemetry stream directly from Windows Hyper-V Host cluster
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* TARGET VM SELECTOR & REFRESH */}
+                    <div className="flex items-center gap-3">
+                      {instances.length > 1 && (
+                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+                          <Server className="w-3.5 h-3.5 text-slate-500" />
+                          <select
+                            value={activeTelemetryVmId || activeMonitoringVm.vmId}
+                            onChange={(e) => setActiveTelemetryVmId(Number(e.target.value))}
+                            className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                          >
+                            {instances.map((inst) => (
+                              <option key={inst.vmId} value={inst.vmId}>
+                                {inst.name} ({inst.status.toUpperCase()})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                        {metricsLoading ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                        ) : (
+                          <span className="text-emerald-600 font-bold">⚡ 3.5s stream</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {isVmRunning ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                      {/* 1. CPU LOAD & HISTORICAL SPARKLINE */}
+                      <div className="p-4 bg-gradient-to-br from-blue-50/70 to-slate-50 rounded-2xl border border-blue-100/90 shadow-xs flex flex-col justify-between space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                              <Cpu className="w-4 h-4 text-blue-600" /> Processor (vCPU)
+                            </span>
+                            <span className="text-lg font-mono font-extrabold text-blue-600">
+                              {liveMetrics ? `${Math.min(100, Math.max(0, liveMetrics.avgCpu !== undefined ? liveMetrics.avgCpu : liveMetrics.cpuUsage))}%` : `${Math.min(100, activeMonitoringVm.cpuUsage)}%`}
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden mb-3">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.avgCpu ?? activeMonitoringVm.cpuUsage))}%` }}
+                            />
+                          </div>
+                          {/* Live 10-sample Sparkline */}
+                          <div className="flex items-end gap-1.5 h-12 pt-2 px-2 bg-white/80 rounded-xl border border-blue-100/70">
+                            {cpuHistory.map((val, idx) => (
+                              <div 
+                                key={idx}
+                                title={`Sample ${idx + 1}: ${val}%`}
+                                className="flex-1 bg-blue-500 hover:bg-blue-600 rounded-xs transition-all duration-300"
+                                style={{ height: `${Math.max(10, Math.min(100, val))}%` }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1 border-t border-blue-100/60">
+                          <span>{activeMonitoringVm.vCPU} Cores Assigned</span>
+                          <span className="text-blue-600 font-semibold">Live 10-tick trend</span>
+                        </div>
+                      </div>
+
+                      {/* 2. RAM ALLOCATION & WORKLOAD */}
+                      <div className="p-4 bg-gradient-to-br from-purple-50/70 to-slate-50 rounded-2xl border border-purple-100/90 shadow-xs flex flex-col justify-between space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                              <MemoryStick className="w-4 h-4 text-purple-600" /> Memory (RAM)
+                            </span>
+                            <span className="text-lg font-mono font-extrabold text-purple-600">
+                              {liveMetrics ? `${liveMetrics.ramPercent}%` : `${activeMonitoringVm.ramUsage}`}
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden mb-3">
+                            <div 
+                              className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.ramPercent ?? 20))}%` }}
+                            />
+                          </div>
+                          {/* Live 10-sample Sparkline */}
+                          <div className="flex items-end gap-1.5 h-12 pt-2 px-2 bg-white/80 rounded-xl border border-purple-100/70">
+                            {ramHistory.map((val, idx) => (
+                              <div 
+                                key={idx}
+                                title={`Sample ${idx + 1}: ${val}%`}
+                                className="flex-1 bg-purple-500 hover:bg-purple-600 rounded-xs transition-all duration-300"
+                                style={{ height: `${Math.max(10, Math.min(100, val))}%` }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1 border-t border-purple-100/60">
+                          <span>{liveMetrics?.ramUsedMb ? `${liveMetrics.ramUsedMb} MB` : 'Active'} used</span>
+                          <span>{liveMetrics?.ramTotalMb ? `${liveMetrics.ramTotalMb} MB` : `${activeMonitoringVm.ramGB} GB`} Cap</span>
+                        </div>
+                      </div>
+
+                      {/* 3. NVME STORAGE VHDX & DISK THROUGHPUT */}
+                      <div className="p-4 bg-gradient-to-br from-amber-50/50 to-slate-50 rounded-2xl border border-amber-100/90 shadow-xs flex flex-col justify-between space-y-3">
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                              <HardDrive className="w-4 h-4 text-amber-600" /> NVMe Virtual Storage
+                            </span>
+                            <span className="text-lg font-mono font-extrabold text-amber-600">
+                              {liveMetrics ? `${liveMetrics.diskPercent}%` : '20%'}
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden mb-3">
+                            <div 
+                              className="bg-amber-500 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.diskPercent ?? 20))}%` }}
+                            />
+                          </div>
+                          <div className="bg-white/80 p-3 rounded-xl border border-amber-100/70 space-y-2">
+                            <div className="flex items-center justify-between text-xs font-mono">
+                              <span className="text-slate-500">Physical Size:</span>
+                              <strong className="text-slate-800">
+                                {liveMetrics?.diskUsedGb !== undefined ? `${liveMetrics.diskUsedGb} GB` : `${Math.round(activeMonitoringVm.diskGB * 0.2)} GB`}
+                              </strong>
+                            </div>
+                            <div className="flex items-center justify-between text-xs font-mono">
+                              <span className="text-slate-500">Allocated Cap:</span>
+                              <strong className="text-slate-800">{activeMonitoringVm.diskGB} GB NVMe</strong>
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100 font-mono">
+                              <span className="text-slate-500">Read: <strong className="text-slate-700">{liveMetrics?.diskReadMb || 0} MB</strong></span>
+                              <span className="text-slate-500">Write: <strong className="text-slate-700">{liveMetrics?.diskWriteMb || 0} MB</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1 border-t border-amber-100/60">
+                          <span className="flex items-center gap-1 text-emerald-600 font-semibold">
+                            <ShieldCheck className="w-3.5 h-3.5" /> Uptime: {liveMetrics?.uptime || 'Active'}
+                          </span>
+                          <span>Status: {liveMetrics?.status || 'Normal'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center">
+                      <Power className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                      <h3 className="text-sm font-bold text-slate-800">
+                        {activeMonitoringVm.name} is Powered Off
+                      </h3>
+                      <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                        Power on this virtual machine to start streaming real-time Hyper-V CPU usage, memory demand, and NVMe disk throughput directly to this dashboard.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* INSTANCE TABLE SECTION (When user has active VMs) */}
             {instances.length > 0 && (
@@ -1113,113 +1366,196 @@ export default function Dashboard() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Base Plan Tier
-                </label>
-                <select
-                  value={selectedPlanId}
-                  onChange={(e) => handlePlanChange(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                >
-                  {catalogPlans.map((p) => (
-                    <option key={p.planId} value={p.planId}>
-                      {p.name} — {p.cpuCores} vCPU / {p.ramGb}GB RAM (${p.monthlyPrice}/mo)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    vCPU Cores
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="16"
-                    value={customCpu}
-                    onChange={(e) => setCustomCpu(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    RAM (GB)
-                  </label>
-                  <input
-                    type="number"
-                    min="2"
-                    max="64"
-                    value={customRam}
-                    onChange={(e) => setCustomRam(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    NVMe Disk (GB)
-                  </label>
-                  <input
-                    type="number"
-                    min="20"
-                    max="500"
-                    step="10"
-                    value={customStorage}
-                    onChange={(e) => setCustomStorage(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* REAL-TIME DYNAMIC PRICING PREVIEW / PREPAID ACTIVE SLOT */}
+              {/* PLAN SELECTION OR ACTIVE PREPAID SLOT */}
               {activeSlot ? (
-                <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3.5 space-y-1.5">
-                  <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span>Included in Active Plan: {activeSlot.planName}</span>
-                  </div>
-                  <p className="text-[11px] text-emerald-700 leading-relaxed">
-                    You have an active VPS slot with <strong>{activeSlot.daysRemaining} days remaining</strong> (valid until {activeSlot.endDate}). This instance will be provisioned under your prepaid package at zero additional charge.
-                  </p>
-                  <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700">Estimated Due Now</span>
-                    <span className="text-sm font-extrabold text-emerald-600 font-poppins">
-                      $0.00 (Prepaid Slot)
+                <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white rounded-2xl p-4 border border-emerald-500/40 shadow-md space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" /> Active Prepaid Package
+                    </span>
+                    <span className="text-xs font-mono font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-400/30">
+                      $0.00 / Free Slot
                     </span>
                   </div>
-                </div>
-              ) : (() => {
-                const plan = catalogPlans.find((p) => p.planId === selectedPlanId) || catalogPlans[0];
-                if (!plan) return null;
-                const extraCpu = Math.max(0, customCpu - plan.cpuCores);
-                const extraRam = Math.max(0, customRam - plan.ramGb);
-                const extraStorage = Math.max(0, customStorage - plan.storageGb);
-                const delta = extraCpu * 2.5 + extraRam * 1.5 + extraStorage * 0.10;
-                const total = Number(plan.monthlyPrice) + delta;
-
-                return (
-                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>Base Plan ({plan.name})</span>
-                      <span className="font-semibold text-slate-700">${plan.monthlyPrice}/mo</span>
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>{activeSlot.planName} Plan</span>
+                      <span className="text-xs font-normal text-slate-300 font-mono">({activeSlot.daysRemaining} days remaining)</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                      You have an active subscription package. Your instance will be provisioned directly under your plan at zero extra charge ($0.00).
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-xs text-slate-200 bg-white/5 p-2.5 rounded-xl border border-white/10">
+                    <div className="text-center">
+                      <span className="block text-[10px] text-slate-400 font-sans">vCPU Cores</span>
+                      <strong className="text-white text-xs">{activeSlot.specs?.cpuCores} vCPU</strong>
                     </div>
-                    {delta > 0 && (
-                      <div className="flex items-center justify-between text-[11px] text-blue-600 font-medium">
-                        <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM{extraStorage > 0 ? `, +${extraStorage}GB NVMe` : ''})</span>
-                        <span>+${delta.toFixed(2)}/mo</span>
-                      </div>
-                    )}
-                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700">Live Estimated Rate</span>
-                      <span className="text-sm font-extrabold text-blue-600 font-poppins">
-                        ${total.toFixed(2)}/mo
-                      </span>
+                    <div className="text-center border-x border-white/10">
+                      <span className="block text-[10px] text-slate-400 font-sans">RAM</span>
+                      <strong className="text-white text-xs">{activeSlot.specs?.ramGb} GB</strong>
+                    </div>
+                    <div className="text-center">
+                      <span className="block text-[10px] text-slate-400 font-sans">NVMe Storage</span>
+                      <strong className="text-emerald-300 text-xs">{activeSlot.specs?.storageGb} GB NVMe</strong>
                     </div>
                   </div>
-                );
-              })()}
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Base Plan Tier
+                    </label>
+                    <select
+                      value={selectedPlanId}
+                      onChange={(e) => handlePlanChange(Number(e.target.value))}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                    >
+                      {catalogPlans.map((p) => (
+                        <option key={p.planId} value={p.planId}>
+                          {p.name} — {p.cpuCores} vCPU / {p.ramGb}GB RAM (${p.monthlyPrice}/mo)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        vCPU Cores
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="16"
+                        value={customCpu}
+                        onChange={(e) => setCustomCpu(Number(e.target.value))}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        RAM (GB)
+                      </label>
+                      <input
+                        type="number"
+                        min="2"
+                        max="64"
+                        value={customRam}
+                        onChange={(e) => setCustomRam(Number(e.target.value))}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        NVMe Disk (GB)
+                      </label>
+                      <input
+                        type="number"
+                        min="20"
+                        max="500"
+                        step="10"
+                        value={customStorage}
+                        onChange={(e) => setCustomStorage(Number(e.target.value))}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const plan = catalogPlans.find((p) => p.planId === selectedPlanId) || catalogPlans[0];
+                    if (!plan) return null;
+                    const extraCpu = Math.max(0, customCpu - plan.cpuCores);
+                    const extraRam = Math.max(0, customRam - plan.ramGb);
+                    const extraStorage = Math.max(0, customStorage - plan.storageGb);
+                    const delta = extraCpu * 2.5 + extraRam * 1.5 + extraStorage * 0.10;
+                    const total = Number(plan.monthlyPrice) + delta;
+
+                    return (
+                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs text-slate-500">
+                          <span>Base Plan ({plan.name})</span>
+                          <span className="font-semibold text-slate-700">${plan.monthlyPrice}/mo</span>
+                        </div>
+                        {delta > 0 && (
+                          <div className="flex items-center justify-between text-[11px] text-blue-600 font-medium">
+                            <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM{extraStorage > 0 ? `, +${extraStorage}GB NVMe` : ''})</span>
+                            <span>+${delta.toFixed(2)}/mo</span>
+                          </div>
+                        )}
+                        <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-700">Live Estimated Rate</span>
+                          <span className="text-sm font-extrabold text-blue-600 font-poppins">
+                            ${total.toFixed(2)}/mo
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+
+              {/* SERVER CREDENTIALS (USERNAME & PASSWORD) */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-blue-600" /> Server Login Credentials
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">SSH & Root Access</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Admin Username
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={deployUsername}
+                      onChange={(e) => setDeployUsername(e.target.value)}
+                      placeholder="ubuntu"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-0.5">Template default: <code className="text-slate-600">ubuntu</code></p>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-semibold text-slate-600">
+                        Root / Admin Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={generateStrongPassword}
+                        className="text-[10px] text-blue-600 hover:underline font-semibold"
+                      >
+                        Generate Strong
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={deployPassword}
+                        onChange={(e) => setDeployPassword(e.target.value)}
+                        placeholder="Default: root"
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 pr-8 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Template default: <code className="text-slate-600">root</code></p>
+                  </div>
+                </div>
+              </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
@@ -1411,20 +1747,32 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {/* SSH CONNECTION STRING */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                  <Terminal className="w-3.5 h-3.5 text-slate-500" /> Terminal SSH Access
+              {/* SSH CONNECTION STRING & SERVER CREDENTIALS */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-slate-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Terminal className="w-3.5 h-3.5 text-blue-600" /> Terminal SSH Access
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">Port 22</span>
                 </label>
-                <div className="bg-slate-900 text-slate-200 p-3 rounded-xl text-xs font-mono flex items-center justify-between gap-2 border border-slate-800">
-                  <span>ssh root@{selectedInstance.ip}</span>
+                <div className="bg-slate-900 text-slate-200 p-3 rounded-xl text-xs font-mono flex items-center justify-between gap-2 border border-slate-800 shadow-inner">
+                  <span>ssh {selectedInstance.adminUser || 'ubuntu'}@{selectedInstance.ip}</span>
                   <button
-                    onClick={() => handleCopySSH(selectedInstance.ip)}
-                    className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all"
+                    onClick={() => handleCopySSH(`ssh ${selectedInstance.adminUser || 'ubuntu'}@${selectedInstance.ip}`)}
+                    className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1"
                     title="Copy SSH Command"
                   >
                     {copiedSSH ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                   </button>
+                </div>
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 flex items-center justify-between text-[11px] text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <Key className="w-3.5 h-3.5 text-slate-400" />
+                    <span>User: <strong className="text-slate-800 font-mono">{selectedInstance.adminUser || 'ubuntu'}</strong></span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 font-mono">
+                    Password: <span className="bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-700">Set on deploy (default: root)</span>
+                  </div>
                 </div>
               </div>
 
@@ -1501,7 +1849,7 @@ export default function Dashboard() {
                             <Cpu className="w-3.5 h-3.5 text-blue-600" /> CPU Usage
                           </span>
                           <span className="text-xs font-mono font-bold text-blue-600">
-                            {liveMetrics ? `${liveMetrics.avgCpu !== undefined ? liveMetrics.avgCpu : liveMetrics.cpuUsage}%` : `${selectedInstance.cpuUsage}%`}
+                            {liveMetrics ? `${Math.min(100, Math.max(0, liveMetrics.avgCpu !== undefined ? liveMetrics.avgCpu : liveMetrics.cpuUsage))}%` : `${Math.min(100, selectedInstance.cpuUsage)}%`}
                           </span>
                         </div>
                         {/* Progress bar */}

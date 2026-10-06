@@ -26,7 +26,14 @@ try {
         $Net = Get-VMNetworkAdapter -VMName $v.Name -ErrorAction SilentlyContinue
         $IPs = @()
         if ($Net -and $Net.IPAddresses) {
-            $IPs = $Net.IPAddresses | Where-Object { $_ -notlike '*:*' }
+            $IPs = @($Net.IPAddresses | Where-Object { $_ -notlike '*:*' })
+        }
+        if (-not $IPs -and $Net -and $Net.MacAddress) {
+            $MacFormatted = [regex]::Replace($Net.MacAddress, '..(?!$)', '$&-').ToLower()
+            $Neighbor = Get-NetNeighbor -ErrorAction SilentlyContinue | Where-Object { $_.LinkLayerAddress -and ($_.LinkLayerAddress.ToLower() -eq $MacFormatted) -and ($_.State -ne 'Permanent') }
+            if ($Neighbor) {
+                $IPs = @($Neighbor.IPAddress | Where-Object { $_ -notlike '*:*' })
+            }
         }
 
         # Real-time resource metering and telemetry
@@ -55,7 +62,8 @@ try {
         $DiskUsed = if ($VHD -and $VHD.FileSize) { [math]::Round($VHD.FileSize / 1GB, 1) } else { 0 }
         $DiskPct = if ($DiskTotal -gt 0) { [math]::Round(($DiskUsed / $DiskTotal) * 100) } else { 0 }
 
-        $AvgCpu = if ($Measure -and $Measure.AverageProcessorUsage -ne $null) { [int]$Measure.AverageProcessorUsage } else { [int]$v.CPUUsage }
+        # Clamp CPU % to valid 0-100% range (Measure-VM AverageProcessorUsage is in MHz, not %, so use Get-VM CPUUsage)
+        $CpuPct = [math]::Min(100, [math]::Max(0, [int]$v.CPUUsage))
         $DiskRead = if ($Measure) { [math]::Round($Measure.AggregatedDiskDataRead / 1MB, 2) } else { 0 }
         $DiskWrite = if ($Measure) { [math]::Round($Measure.AggregatedDiskDataWritten / 1MB, 2) } else { 0 }
 
@@ -66,8 +74,8 @@ try {
             State = $v.State.ToString()
             Status = $v.Status
             CPUCount = $v.ProcessorCount
-            CPUUsage = [int]$v.CPUUsage
-            AvgCPU = $AvgCpu
+            CPUUsage = $CpuPct
+            AvgCPU = $CpuPct
             RAMMB = $RamStartup
             RAMAssignedMB = $RamAssigned
             RAMTotalMB = $RamTotal
