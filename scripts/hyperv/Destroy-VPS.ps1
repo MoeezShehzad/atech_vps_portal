@@ -18,9 +18,21 @@ try {
 
     if ($VM) {
         if ($VM.State -ne 'Off') {
-            Write-Output "[POWER] Turning off VM: $VMName"
+            Write-Output "[POWER] Forcing immediate shutdown for VM: $VMName"
             Stop-VM -Name $VMName -TurnOff -Force -Confirm:$false
-            Start-Sleep -Seconds 1
+            
+            # Poll Hyper-V to ensure state transitions to 'Off' before deletion
+            $MaxWaitSec = 15
+            $Elapsed = 0
+            while ($Elapsed -lt $MaxWaitSec) {
+                Start-Sleep -Seconds 1
+                $CurrentVM = Get-VM -Name $VMName -ErrorAction SilentlyContinue
+                if (-not $CurrentVM -or $CurrentVM.State -eq 'Off') {
+                    Write-Output "[POWER] VM '$VMName' successfully powered off."
+                    break
+                }
+                $Elapsed++
+            }
         }
 
         Write-Output "[HYPERV] Removing VM definition: $VMName"

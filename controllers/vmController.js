@@ -518,6 +518,16 @@ export async function destroyVM(req, res) {
       });
     }
 
+    const force = req.query.force === 'true' || req.body?.force === true;
+
+    // Enterprise safety guard: Active running VMs must be stopped or forcefully confirmed
+    if (vm.status === 'RUNNING' && !force) {
+      return res.status(400).json({
+        error: `Virtual machine '${vm.vmName}' is currently running. For safety and data integrity, please power off the server first, or select 'Force Stop & Destroy'.`,
+        requiresStop: true,
+      });
+    }
+
     // 1. Call Hyper-V destroy service (gracefully handles if already deleted on host)
     try {
       await hypervService.destroyVM(vm.vmName);

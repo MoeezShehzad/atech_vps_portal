@@ -322,14 +322,14 @@ export default function Dashboard() {
     }
   };
 
-  // Terminate/Delete instance handler (Hostinger standard)
-  const confirmDeleteInstance = async () => {
+  // Terminate/Delete instance handler (Hostinger standard with optional force flag)
+  const confirmDeleteInstance = async (force: boolean = false) => {
     if (!deletingInstance) return;
     const targetId = deletingInstance.vmId;
 
     setActionLoadingId(targetId);
     try {
-      await apiCall(`/vms/${targetId}`, {
+      await apiCall(`/vms/${targetId}${force ? '?force=true' : ''}`, {
         method: 'DELETE',
       });
     } catch (err: any) {
@@ -343,6 +343,30 @@ export default function Dashboard() {
       setDeletingInstance(null);
       setActionLoadingId(null);
       await fetchVMs();
+    }
+  };
+
+  // Helper to power off the server directly from the Destroy modal
+  const handleStopThenDestroy = async () => {
+    if (!deletingInstance) return;
+    setActionLoadingId(deletingInstance.vmId);
+    try {
+      await apiCall(`/vms/${deletingInstance.vmId}/power`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'STOP' }),
+      });
+      // Transition deleting instance state to stopped so modal advances to final confirmation
+      setDeletingInstance({ ...deletingInstance, status: 'stopped' });
+      setInstances((prev) =>
+        prev.map((i) => (i.vmId === deletingInstance.vmId ? { ...i, status: 'stopped' } : i))
+      );
+      if (selectedInstance?.vmId === deletingInstance.vmId) {
+        setSelectedInstance({ ...selectedInstance, status: 'stopped' });
+      }
+    } catch (err: any) {
+      alert(`Failed to power off server: ${err.message}`);
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -1156,50 +1180,130 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* DELETE / TERMINATE CONFIRMATION MODAL */}
+      {/* DELETE / TERMINATE CONFIRMATION MODAL (ENTERPRISE GUARD) */}
       {deletingInstance && (
         <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 text-rose-600 mb-3">
-              <div className="p-2.5 bg-rose-50 rounded-xl">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 font-poppins">
-                Destroy Virtual Machine
-              </h3>
-            </div>
+            {deletingInstance.status === 'running' ? (
+              /* ACTIVE RUNNING SERVER GUARD */
+              <>
+                <div className="flex items-center gap-3 text-amber-600 mb-3">
+                  <div className="p-2.5 bg-amber-50 rounded-xl">
+                    <Power className="w-6 h-6 text-amber-600 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 font-poppins">
+                      Server is Currently Running
+                    </h3>
+                    <p className="text-[11px] text-amber-600 font-semibold">
+                      Power off required before termination
+                    </p>
+                  </div>
+                </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed mb-3">
-              Are you sure you want to permanently terminate <strong className="text-slate-900 font-mono">{deletingInstance.name}</strong> ({deletingInstance.ip})?
-              The Hyper-V VM and all associated VHDX storage will be unlinked and deleted, and its IP will be released.
-            </p>
+                <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                  <strong className="text-slate-900 font-mono">{deletingInstance.name}</strong> ({deletingInstance.ip}) is currently active and running. For cloud data protection and hypervisor integrity, active virtual machines must be powered off before permanent termination.
+                </p>
 
-            <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3 mb-4">
-              <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs mb-0.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Your Active Subscription Stays Intact</span>
-              </div>
-              <p className="text-[11px] text-emerald-700 leading-relaxed">
-                Destroying this instance frees up your server slot. You can deploy a fresh VPS anytime at <strong>$0.00</strong> during your 30-day billing cycle.
-              </p>
-            </div>
+                <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 mb-5 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Recommended Enterprise Procedure</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Click <strong>"Power Off Server First"</strong> to shut down the machine cleanly. Once stopped, you can complete the destruction.
+                  </p>
+                </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setDeletingInstance(null)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmDeleteInstance}
-                className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 shadow-md shadow-rose-500/20 transition-all"
-              >
-                Destroy Server
-              </button>
-            </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setDeletingInstance(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all text-center"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={actionLoadingId === deletingInstance.vmId}
+                    onClick={() => confirmDeleteInstance(true)}
+                    className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-all text-center"
+                  >
+                    Force Stop & Destroy
+                  </button>
+                  <button
+                    type="button"
+                    disabled={actionLoadingId === deletingInstance.vmId}
+                    onClick={handleStopThenDestroy}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    {actionLoadingId === deletingInstance.vmId ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Stopping Server...
+                      </>
+                    ) : (
+                      <>
+                        <Power className="w-3.5 h-3.5" /> Power Off Server First
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* STOPPED SERVER DESTROY CONFIRMATION */
+              <>
+                <div className="flex items-center gap-3 text-rose-600 mb-3">
+                  <div className="p-2.5 bg-rose-50 rounded-xl">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 font-poppins">
+                      Destroy Virtual Machine
+                    </h3>
+                    <p className="text-[11px] text-slate-400">Server status: Stopped</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                  Are you sure you want to permanently terminate <strong className="text-slate-900 font-mono">{deletingInstance.name}</strong> ({deletingInstance.ip})?
+                  The Hyper-V VM and all associated VHDX storage will be unlinked and deleted, and its IP will be released.
+                </p>
+
+                <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3 mb-4">
+                  <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs mb-0.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Your Active Subscription Stays Intact</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700 leading-relaxed">
+                    Destroying this instance frees up your server slot. You can deploy a fresh VPS anytime at <strong>$0.00</strong> during your 30-day billing cycle.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setDeletingInstance(null)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={actionLoadingId === deletingInstance.vmId}
+                    onClick={() => confirmDeleteInstance(false)}
+                    className="px-4 py-2 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 shadow-md shadow-rose-500/20 transition-all flex items-center gap-2"
+                  >
+                    {actionLoadingId === deletingInstance.vmId ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Destroying...
+                      </>
+                    ) : (
+                      'Destroy Server'
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
