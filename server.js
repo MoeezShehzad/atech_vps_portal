@@ -80,9 +80,13 @@ const contactLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 300,
+  max: 5000, // High ceiling to support live dashboard telemetry and management
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for high-frequency telemetry polling and console tickets
+    return req.path.includes('/metrics') || req.path.includes('/health') || req.path.includes('/console-session');
+  },
 });
 
 // Apply rate limiting

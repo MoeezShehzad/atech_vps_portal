@@ -6,11 +6,13 @@
 
 import prisma from '../lib/prisma.js';
 
-// Try gateway IPs and Wi-Fi host IP
+// Prioritize local loopback agent, then HYPERV_HOST_URL, then gateway fallback
 const HOST_CANDIDATES = [
+  process.env.HYPERV_HOST_URL,
   process.env.HYPERV_AGENT_URL,
+  'http://127.0.0.1:5050',
+  'http://localhost:5050',
   'http://192.168.0.1:5050',
-  'http://172.25.80.1:5050',
   'http://192.168.100.92:5050',
 ].filter(Boolean);
 
