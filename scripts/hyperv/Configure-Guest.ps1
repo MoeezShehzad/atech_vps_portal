@@ -42,7 +42,7 @@ while ((Get-Date) -lt $Deadline) {
     # Check ARP / Neighbor table by MAC
     if (-not $ResolvedIP -and $MacFormatted) {
         $Neighbor = Get-NetNeighbor -ErrorAction SilentlyContinue | Where-Object {
-            $_.LinkLayerAddress -and ($_.LinkLayerAddress.ToLower() -eq $MacFormatted) -and ($_.State -ne 'Permanent')
+            $_.LinkLayerAddress -and ($_.LinkLayerAddress.ToLower() -eq $MacFormatted)
         } | Select-Object -First 1
 
         if ($Neighbor) {

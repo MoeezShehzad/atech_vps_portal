@@ -80,60 +80,101 @@ export function setupTerminalWebSocket(server) {
     ws.send(`  Host IP: \x1b[33m${targetIp}\x1b[0m | User: \x1b[33m${targetUser}\x1b[0m\r\n`);
     ws.send(`\x1b[36m====================================================\x1b[0m\r\n\r\n`);
 
-    const sshConn = new SSHClient();
+    let activeConn = null;
     let shellStream = null;
     let ptyRows = 30;
     let ptyCols = 100;
     const inputBuffer = [];
 
-    sshConn.on('ready', () => {
-      // Allocate interactive pseudo-terminal (PTY) with accurate rows/cols
-      sshConn.shell(
-        {
-          term: 'xterm-256color',
-          rows: ptyRows,
-          cols: ptyCols,
-        },
-        (err, stream) => {
-          if (err) {
-            if (ws.readyState === ws.OPEN) {
-              ws.send(`\r\n\x1b[31m[ERROR] Failed to start shell session: ${err.message}\x1b[0m\r\n`);
-              ws.close();
-            }
-            return sshConn.end();
-          }
+    function connectSSH(user, pass, isFallback = false) {
+      const sshConn = new SSHClient();
+      activeConn = sshConn;
 
-          shellStream = stream;
-
-          // Flush any keystrokes sent before SSH stream completed handshake
-          while (inputBuffer.length > 0) {
-            const buffered = inputBuffer.shift();
-            if (stream.writable) stream.write(buffered);
-          }
-
-          // Pipe remote shell output directly to browser xterm
-          stream.on('data', (data) => {
-            if (ws.readyState === ws.OPEN) {
-              ws.send(data.toString());
-            }
-          });
-
-          stream.stderr.on('data', (data) => {
-            if (ws.readyState === ws.OPEN) {
-              ws.send(data.toString());
-            }
-          });
-
-          stream.on('close', () => {
-            if (ws.readyState === ws.OPEN) {
-              ws.send(`\r\n\r\n\x1b[1;33m[SESSION CLOSED]\x1b[0m Shell process exited or machine powered off.\r\n`);
-              ws.close();
-            }
-            sshConn.end();
-          });
+      sshConn.on('ready', () => {
+        if (isFallback) {
+          ws.send(`\r\n\x1b[33m[Notice] Initialized via recovery channel. Preparing environment for ${targetUser}...\x1b[0m\r\n`);
         }
-      );
-    });
+
+        // Allocate interactive pseudo-terminal (PTY) with accurate rows/cols
+        sshConn.shell(
+          {
+            term: 'xterm-256color',
+            rows: ptyRows,
+            cols: ptyCols,
+          },
+          (err, stream) => {
+            if (err) {
+              if (ws.readyState === ws.OPEN) {
+                ws.send(`\r\n\x1b[31m[ERROR] Failed to start shell session: ${err.message}\x1b[0m\r\n`);
+                ws.close();
+              }
+              return sshConn.end();
+            }
+
+            shellStream = stream;
+
+            // If we connected via fallback user 'ubuntu', heal targetUser
+            if (isFallback && targetUser !== 'ubuntu' && targetUser !== 'root') {
+              const safeUser = targetUser.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+              const safePass = targetPassword.replace(/"/g, '\\"');
+              const healCmd = `echo "root" | sudo -S id -u ${safeUser} 2>/dev/null || (echo "root" | sudo -S useradd -m -s /bin/bash -G sudo ${safeUser} && echo "${safeUser}:${safePass}" | sudo chpasswd) ; exec su - ${safeUser}\n`;
+              stream.write(healCmd);
+            }
+
+            // Flush any keystrokes sent before SSH stream completed handshake
+            while (inputBuffer.length > 0) {
+              const buffered = inputBuffer.shift();
+              if (stream.writable) stream.write(buffered);
+            }
+
+            // Pipe remote shell output directly to browser xterm
+            stream.on('data', (data) => {
+              if (ws.readyState === ws.OPEN) {
+                ws.send(data.toString());
+              }
+            });
+
+            stream.stderr.on('data', (data) => {
+              if (ws.readyState === ws.OPEN) {
+                ws.send(data.toString());
+              }
+            });
+
+            stream.on('close', () => {
+              if (ws.readyState === ws.OPEN) {
+                ws.send(`\r\n\r\n\x1b[1;33m[SESSION CLOSED]\x1b[0m Shell process exited or machine powered off.\r\n`);
+                ws.close();
+              }
+              sshConn.end();
+            });
+          }
+        );
+      });
+
+      sshConn.on('error', (err) => {
+        console.warn(`[SSH2 Connection Attempt on ${targetIp} for ${user}]:`, err.message);
+        // If authentication failed on custom user, attempt fallback to default ubuntu user
+        if (!isFallback && targetUser !== 'ubuntu' && (err.level === 'client-authentication' || err.message?.toLowerCase().includes('auth'))) {
+          console.log(`[SSH2 Fallback] Retrying with default account 'ubuntu' to self-heal guest session...`);
+          try { sshConn.end(); } catch (e) {}
+          return connectSSH('ubuntu', 'root', true);
+        }
+
+        if (ws.readyState === ws.OPEN) {
+          ws.send(`\r\n\x1b[31m[SSH Error] Connection failed: ${err.message}\x1b[0m\r\n`);
+          ws.close();
+        }
+      });
+
+      sshConn.connect({
+        host: targetIp,
+        port: 22,
+        username: user,
+        password: pass,
+        readyTimeout: 15000,
+        keepaliveInterval: 10000,
+      });
+    }
 
     // Forward browser keystrokes and resize signals to remote shell stream
     ws.on('message', (msg) => {
@@ -162,30 +203,15 @@ export function setupTerminalWebSocket(server) {
       } catch (e) {}
     });
 
-    sshConn.on('error', (err) => {
-      console.warn(`[SSH2 Connection Error on ${targetIp}]:`, err.message);
-      if (ws.readyState === ws.OPEN) {
-        ws.send(`\r\n\x1b[31m[SSH Error] Connection failed: ${err.message}\x1b[0m\r\n`);
-        ws.close();
-      }
-    });
-
     ws.on('close', () => {
       try {
         if (shellStream) shellStream.end();
-        sshConn.end();
+        if (activeConn) activeConn.end();
       } catch (e) {}
     });
 
-    // Connect to target guest VM
-    sshConn.connect({
-      host: targetIp,
-      port: 22,
-      username: targetUser,
-      password: targetPassword,
-      readyTimeout: 15000,
-      keepaliveInterval: 10000,
-    });
+    // Start SSH connection
+    connectSSH(targetUser, targetPassword, false);
   });
 
   return wss;

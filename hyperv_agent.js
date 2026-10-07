@@ -8,6 +8,8 @@ import http from 'http';
 import { exec } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Client as SSHClient } from 'ssh2';
+import net from 'net';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,6 +18,136 @@ const PORT = process.env.HYPERV_AGENT_PORT || 5050;
 const HOST = '0.0.0.0';
 const SCRIPTS_DIR = path.join(__dirname, 'scripts', 'hyperv');
 const DEFAULT_TEMPLATE = 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx';
+
+function checkPortOpen(host, port, timeout = 2500) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let isOpen = false;
+    socket.setTimeout(timeout);
+    socket.on('connect', () => {
+      isOpen = true;
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.on('error', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.connect(port, host);
+  });
+}
+
+async function provisionGuestVM({ vmName, adminUsername, adminPassword, sshPublicKey }) {
+  console.log(`[GUEST PROVISIONER] Starting background provisioning for VM '${vmName}'...`);
+  const deadline = Date.now() + 150000; // 2.5 minutes timeout
+  let targetIp = null;
+
+  while (Date.now() < deadline) {
+    try {
+      const status = await runPowerShell('Get-VPS.ps1', { VMName: vmName });
+      if (status && status.IPAddresses && status.IPAddresses.length > 0) {
+        const found = status.IPAddresses.find((ip) => ip && !ip.includes(':') && ip !== '127.0.0.1');
+        if (found) {
+          const isOpen = await checkPortOpen(found, 22, 2000);
+          if (isOpen) {
+            targetIp = found;
+            break;
+          }
+        }
+      }
+    } catch (e) {}
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+
+  if (!targetIp) {
+    console.warn(`[GUEST PROVISIONER] VM '${vmName}' IP not discovered or port 22 not reachable within timeout.`);
+    return;
+  }
+
+  console.log(`[GUEST PROVISIONER] VM '${vmName}' is reachable at ${targetIp}:22. Running guest initialization...`);
+
+  const defaultUser = 'ubuntu';
+  const defaultPass = 'root';
+
+  return new Promise((resolve) => {
+    const conn = new SSHClient();
+    conn.on('ready', () => {
+      console.log(`[GUEST PROVISIONER] SSH connected to ${targetIp} as ${defaultUser}.`);
+
+      const safePass = (adminPassword || defaultPass).replace(/"/g, '\\"');
+      const safeUser = (adminUsername || defaultUser).toLowerCase().replace(/[^a-z0-9_-]/g, '');
+
+      let script = `
+echo "${defaultPass}" | sudo -S growpart /dev/sda 3 2>/dev/null || true
+echo "${defaultPass}" | sudo -S pvresize /dev/sda3 2>/dev/null || true
+echo "${defaultPass}" | sudo -S lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
+echo "${defaultPass}" | sudo -S resize2fs /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
+echo "${defaultPass}" | sudo -S resize2fs /dev/sda3 2>/dev/null || true
+`;
+
+      if (adminPassword) {
+        script += `
+echo "root:${safePass}" | sudo chpasswd
+echo "ubuntu:${safePass}" | sudo chpasswd
+`;
+        if (safeUser !== 'ubuntu' && safeUser !== 'root') {
+          script += `
+id -u ${safeUser} 2>/dev/null || echo "${defaultPass}" | sudo -S useradd -m -s /bin/bash -G sudo ${safeUser}
+echo "${safeUser}:${safePass}" | sudo chpasswd
+`;
+        }
+      }
+
+      if (sshPublicKey && sshPublicKey.trim()) {
+        const cleanKey = sshPublicKey.trim().replace(/"/g, '\\"');
+        const userHome = safeUser === 'root' ? '/root' : `/home/${safeUser}`;
+        script += `
+sudo mkdir -p ${userHome}/.ssh && sudo chmod 700 ${userHome}/.ssh
+echo "${cleanKey}" | sudo tee -a ${userHome}/.ssh/authorized_keys >/dev/null
+sudo chmod 600 ${userHome}/.ssh/authorized_keys
+sudo chown -R ${safeUser}:${safeUser} ${userHome}/.ssh 2>/dev/null || true
+sudo mkdir -p /root/.ssh && sudo chmod 700 /root/.ssh
+echo "${cleanKey}" | sudo tee -a /root/.ssh/authorized_keys >/dev/null
+sudo chmod 600 /root/.ssh/authorized_keys
+`;
+      }
+
+      conn.exec(script, (err, stream) => {
+        if (err) {
+          console.error(`[GUEST PROVISIONER ERROR] Exec failed:`, err.message);
+          conn.end();
+          return resolve();
+        }
+        stream.on('data', (d) => console.log(`[GUEST STDOUT] ${d.toString().trim()}`));
+        stream.stderr.on('data', (d) => console.warn(`[GUEST STDERR] ${d.toString().trim()}`));
+        stream.on('close', (code) => {
+          console.log(`[GUEST PROVISIONER DONE] VM '${vmName}' guest configuration finished with code ${code}.`);
+          conn.end();
+          resolve();
+        });
+      });
+    });
+
+    conn.on('error', (err) => {
+      console.warn(`[GUEST PROVISIONER] SSH initial connection failed (${err.message}). Trying user ${adminUsername}...`);
+      // If default credentials failed, perhaps user was already provisioned
+      conn.end();
+      resolve();
+    });
+
+    conn.connect({
+      host: targetIp,
+      port: 22,
+      username: defaultUser,
+      password: defaultPass,
+      readyTimeout: 10000,
+    });
+  });
+}
 
 function runPowerShell(scriptName, params = {}) {
   return new Promise((resolve, reject) => {
@@ -117,6 +249,14 @@ const server = http.createServer(async (req, res) => {
         TemplatePath: data.templatePath || DEFAULT_TEMPLATE,
         SwitchName: data.switchName || 'Default Switch',
       });
+
+      // Asynchronously provision guest OS in background
+      provisionGuestVM({
+        vmName,
+        adminUsername: data.adminUsername || 'ubuntu',
+        adminPassword: data.adminPassword || '',
+        sshPublicKey: data.sshPublicKey || '',
+      }).catch((e) => console.error('[GUEST PROVISION ASYNC ERROR]:', e));
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(result));

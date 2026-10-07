@@ -195,8 +195,16 @@ export default function WebConsoleModal({
 
       // 2. Paste: Ctrl+V / Cmd+V
       if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'v' || event.code === 'KeyV')) {
-        // Return true to allow browser native paste event to fire on the helper textarea
-        return true;
+        if (event.type === 'keydown') {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            navigator.clipboard.readText()
+              .then((text) => {
+                if (text) term.paste(text);
+              })
+              .catch(() => {});
+          }
+        }
+        return false;
       }
 
       return true;

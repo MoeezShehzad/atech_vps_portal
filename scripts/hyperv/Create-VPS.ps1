@@ -106,11 +106,9 @@ try {
     # 9. Asynchronously run guest configuration (disk filesystem expansion & credential setup)
     $GuestScript = Join-Path $PSScriptRoot "Configure-Guest.ps1"
     if (Test-Path $GuestScript) {
-        Start-Job -ScriptBlock {
-            param($Script, $Name, $User, $Pass, $Key)
-            & $Script -VMName $Name -AdminUsername $User -AdminPassword $Pass -SSHPublicKey $Key -TimeoutSeconds 120
-        } -ArgumentList $GuestScript, $VMName, $AdminUsername, $AdminPassword, $SSHPublicKey | Out-Null
-        Write-Output "[GUEST] Spawned background job for guest initialization and filesystem expansion."
+        $ProcArgs = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$GuestScript`" -VMName `"$VMName`" -AdminUsername `"$AdminUsername`" -AdminPassword `"$AdminPassword`" -SSHPublicKey `"$SSHPublicKey`" -TimeoutSeconds 120"
+        Start-Process powershell.exe -ArgumentList $ProcArgs -WindowStyle Hidden -ErrorAction SilentlyContinue | Out-Null
+        Write-Output "[GUEST] Spawned independent process for guest initialization and filesystem expansion."
     }
 
     # 10. Audit Logging
