@@ -99,6 +99,9 @@ export default function Footer() {
               <img 
                 src={atcLogo} 
                 alt="Analytical Technical Consulting" 
+                width="160"
+                height="32"
+                loading="lazy"
                 className="h-8 w-auto object-contain brightness-200 opacity-80" 
               />
             </div>

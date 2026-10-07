@@ -34,7 +34,7 @@ export default function Navbar() {
         
         {/* BRAND LOGO */}
         <Link to="/" className="flex items-center gap-3">
-          <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
+          <img src={atcLogo} alt="ATC Logo" width="160" height="40" fetchPriority="high" className="h-10 w-auto object-contain" />
         </Link>
 
         {/* DESKTOP NAVIGATION */}

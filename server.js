@@ -6,6 +6,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 
 import userRoutes from './routes/user.js';
@@ -18,6 +19,12 @@ import { setupTerminalWebSocket } from './services/terminalService.js';
 
 const app = express();
 app.set('trust proxy', 1);
+
+// Gzip/Brotli HTTP payload compression for all API endpoints
+app.use(compression({
+  threshold: 1024, // Only compress responses larger than 1KB
+  level: 6,
+}));
 
 // 1. Security Headers Middleware (Helmet)
 app.use(helmet({

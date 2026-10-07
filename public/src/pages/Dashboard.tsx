@@ -37,8 +37,9 @@ import {
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import AccountSettings from '../components/AccountSettings';
-import WebConsoleModal from '../components/WebConsoleModal';
 import { apiCall } from '../services/api';
+
+const WebConsoleModal = React.lazy(() => import('../components/WebConsoleModal'));
 
 interface Instance {
   id: string;
@@ -2224,15 +2225,17 @@ export default function Dashboard() {
 
       {/* INTERACTIVE WEB TERMINAL CONSOLE MODAL */}
       {consoleVm && (
-        <WebConsoleModal
-          vmId={consoleVm.vmId}
-          vmName={consoleVm.name}
-          vmIp={consoleVm.ip}
-          adminUser={consoleVm.adminUser}
-          adminPassword={consoleVm.adminPassword}
-          onClose={() => setConsoleVm(null)}
-          onSessionEnd={fetchVMs}
-        />
+        <React.Suspense fallback={null}>
+          <WebConsoleModal
+            vmId={consoleVm.vmId}
+            vmName={consoleVm.name}
+            vmIp={consoleVm.ip}
+            adminUser={consoleVm.adminUser}
+            adminPassword={consoleVm.adminPassword}
+            onClose={() => setConsoleVm(null)}
+            onSessionEnd={fetchVMs}
+          />
+        </React.Suspense>
       )}
 
     </div>

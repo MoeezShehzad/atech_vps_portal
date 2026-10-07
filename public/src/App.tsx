@@ -1,21 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import Home from './pages/Home';
-import AboutUs from './pages/AboutUs';
-import Services from './pages/Services';
-import ContactUs from './pages/ContactUs';
-import Pricing from './pages/Pricing';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import ForgotPassword from './pages/ForgotPassword';
-import Dashboard from './pages/Dashboard';
-import AddtoCart from './pages/AddtoCart';
-import Checkout from './pages/Checkout';
 import atcLogo from './assets/ATC_Logo.png';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Footer from './components/Footer';
-import AuthCallback from './pages/AuthCallback';
+
+// Route Code-Splitting with Lazy Loading
+const Home = lazy(() => import('./pages/Home'));
+const AboutUs = lazy(() => import('./pages/AboutUs'));
+const Services = lazy(() => import('./pages/Services'));
+const ContactUs = lazy(() => import('./pages/ContactUs'));
+const Pricing = lazy(() => import('./pages/Pricing'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const AddtoCart = lazy(() => import('./pages/AddtoCart'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const AuthCallback = lazy(() => import('./pages/AuthCallback'));
+
+// Lightweight, seamless route suspense fallback
+function RouteLoadingFallback() {
+  return (
+    <div className="min-h-[50vh] flex flex-col items-center justify-center py-20">
+      <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+    </div>
+  );
+}
 
 // Scroll Reset Component for Route Navigation
 function ScrollToTop() {
@@ -53,7 +64,7 @@ function AppContent() {
       {!isAuthPage && (
         <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 px-10 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 font-bold text-blue-950 font-poppins">
-            <img src={atcLogo} alt="ATC Logo" className="h-8 w-auto object-contain" />
+            <img src={atcLogo} alt="ATC Logo" width="160" height="32" fetchPriority="high" className="h-8 w-auto object-contain" />
             <span className="text-lg">Analytical Technical Consulting</span>
           </Link>
 
@@ -102,29 +113,31 @@ function AppContent() {
 
       {/* DYNAMIC PAGE VIEWS */}
       <main className="flex-1">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/about" element={<AboutUs />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/contact" element={<ContactUs />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
-          <Route path="/configure" element={<AddtoCart />} />
-          <Route path="/checkout" element={<Checkout />} />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/about" element={<AboutUs />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/contact" element={<ContactUs />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/configure" element={<AddtoCart />} />
+            <Route path="/checkout" element={<Checkout />} />
 
-          {/* PROTECTED ROUTE */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
+            {/* PROTECTED ROUTE */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Suspense>
       </main>
 
       {/* FOOTER */}

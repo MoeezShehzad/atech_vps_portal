@@ -2,4 +2,12 @@
 
 body {
   @apply bg-slate-950 text-slate-100 font-sans antialiased;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Modern off-screen rendering optimization */
+.defer-render {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 350px;
 }
