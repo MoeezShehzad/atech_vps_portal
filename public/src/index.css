@@ -1,7 +1,61 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *, .dark, .dark *));
+
+/* iOS-Style Ultra-Smooth Spring Transition */
+html {
+  color-scheme: light dark;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Global smooth transition for surfaces, borders, text, and icons */
+html,
+body,
+div,
+header,
+nav,
+aside,
+main,
+footer,
+section,
+article,
+button,
+input,
+select,
+textarea,
+span,
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+table,
+thead,
+tbody,
+tr,
+th,
+td {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  transition-duration: 380ms;
+}
+
+/* Exempt high-frequency real-time animations from global transition to prevent jitter */
+.animate-spin,
+.animate-pulse,
+.animate-ping,
+.transition-none,
+input[type="range"] {
+  transition-property: none !important;
+}
+
 body {
-  @apply bg-slate-950 text-slate-100 font-sans antialiased;
+  @apply bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 font-sans antialiased;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }

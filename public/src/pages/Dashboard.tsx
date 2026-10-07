@@ -41,6 +41,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import Sidebar from '../components/Sidebar';
 import AccountSettings from '../components/AccountSettings';
+import NotificationBell from '../components/NotificationBell';
+import ThemeToggle from '../components/ThemeToggle';
 import { apiCall } from '../services/api';
 
 const WebConsoleModal = React.lazy(() => import('../components/WebConsoleModal'));
@@ -760,7 +762,7 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-[#0b0f19] font-sans">
       {/* PERSISTENT SIDEBAR */}
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
@@ -819,25 +821,31 @@ export default function Dashboard() {
           <div className="max-w-7xl mx-auto space-y-8">
             
             {/* HEADER */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
               <div>
                 <div className="flex items-center gap-2.5">
-                  <h1 className="text-2xl font-bold text-blue-950 font-poppins">
+                  <h1 className="text-2xl font-bold text-blue-950 dark:text-white font-poppins">
                     Infrastructure Dashboard
                   </h1>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400">
                     Hyper-V Cluster Online
                   </span>
                 </div>
-                <p className="text-sm text-slate-500 mt-1">
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                   Manage your virtual machines, scale RAM & CPU resources, and control power cycles.
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
+                {/* IN-APP REAL-TIME NOTIFICATION BELL */}
+                <NotificationBell />
+
+                {/* IOS-STYLE THEME TOGGLE */}
+                <ThemeToggle />
+
                 <button 
                   onClick={() => fetchVMs()}
                   title="Refresh instances"
-                  className="p-2.5 text-slate-500 bg-white border border-slate-200 hover:bg-slate-100 rounded-xl transition-all"
+                  className="p-2.5 text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all shadow-xs"
                 >
                   <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
                 </button>
@@ -852,45 +860,45 @@ export default function Dashboard() {
 
             {/* OVERVIEW METRICS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-xl">
                   <Server className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Servers</p>
-                  <p className="text-xl font-bold text-slate-900 mt-0.5">{instances.length} Configured</p>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Servers</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">{instances.length} Configured</p>
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-xl">
                   <Activity className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Running Instances</p>
-                  <p className="text-xl font-bold text-emerald-600 mt-0.5">{runningCount} Active</p>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Running Instances</p>
+                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{runningCount} Active</p>
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 rounded-xl">
                   <Cpu className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Allocated vCPUs</p>
-                  <p className="text-xl font-bold text-slate-900 mt-0.5">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Allocated vCPUs</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">
                     {instances.reduce((acc, i) => acc + i.vCPU, 0)} Cores
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-xl">
                   <HardDrive className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Storage Allocated</p>
-                  <p className="text-xl font-bold text-slate-900 mt-0.5">{totalStorage} GB NVMe</p>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Storage Allocated</p>
+                  <p className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">{totalStorage} GB NVMe</p>
                 </div>
               </div>
             </div>
@@ -1062,26 +1070,26 @@ export default function Dashboard() {
               const isVmRunning = activeMonitoringVm?.status === 'running';
 
               return (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-6">
                   {/* MONITORING HEADER WITH VM SELECTOR */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                      <div className="p-2.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-xl">
                         <Activity className="w-5 h-5 animate-pulse" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h2 className="text-base font-bold text-slate-900 font-poppins">
+                          <h2 className="text-base font-bold text-slate-900 dark:text-white font-poppins">
                             Live Hyper-V Telemetry & Resource Load
                           </h2>
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            isVmRunning ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'
+                            isVmRunning ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${isVmRunning ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
                             {isVmRunning ? 'Real-Time Active' : 'Instance Standby'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                           High-resolution telemetry stream directly from Windows Hyper-V Host cluster
                         </p>
                       </div>
@@ -1090,15 +1098,15 @@ export default function Dashboard() {
                     {/* TARGET VM SELECTOR & REFRESH */}
                     <div className="flex items-center gap-3">
                       {instances.length > 1 && (
-                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-                          <Server className="w-3.5 h-3.5 text-slate-500" />
+                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5">
+                          <Server className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                           <select
                             value={activeTelemetryVmId || activeMonitoringVm.vmId}
                             onChange={(e) => setActiveTelemetryVmId(Number(e.target.value))}
-                            className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                            className="bg-transparent text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none cursor-pointer"
                           >
                             {instances.map((inst) => (
-                              <option key={inst.vmId} value={inst.vmId}>
+                              <option key={inst.vmId} value={inst.vmId} className="dark:bg-slate-800 dark:text-white">
                                 {inst.name} ({inst.status.toUpperCase()})
                               </option>
                             ))}
@@ -1106,11 +1114,11 @@ export default function Dashboard() {
                         </div>
                       )}
 
-                      <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                      <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-xl">
                         {metricsLoading ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600 dark:text-blue-400" />
                         ) : (
-                          <span className="text-emerald-600 font-bold">⚡ 3.5s stream</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-bold">⚡ 3.5s stream</span>
                         )}
                       </div>
                     </div>
@@ -1119,24 +1127,24 @@ export default function Dashboard() {
                   {isVmRunning ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                       {/* 1. CPU LOAD & HISTORICAL SPARKLINE */}
-                      <div className="p-4 bg-gradient-to-br from-blue-50/70 to-slate-50 rounded-2xl border border-blue-100/90 shadow-xs flex flex-col justify-between space-y-3">
+                      <div className="p-4 bg-gradient-to-br from-blue-50/70 to-slate-50 dark:from-slate-800/80 dark:to-slate-900/80 rounded-2xl border border-blue-100/90 dark:border-blue-900/30 shadow-xs flex flex-col justify-between space-y-3">
                         <div>
                           <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                              <Cpu className="w-4 h-4 text-blue-600" /> Processor (vCPU)
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                              <Cpu className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Processor (vCPU)
                             </span>
-                            <span className="text-lg font-mono font-extrabold text-blue-600">
+                            <span className="text-lg font-mono font-extrabold text-blue-600 dark:text-blue-400">
                               {liveMetrics ? `${Math.min(100, Math.max(0, liveMetrics.avgCpu !== undefined ? liveMetrics.avgCpu : liveMetrics.cpuUsage))}%` : `${Math.min(100, activeMonitoringVm.cpuUsage)}%`}
                             </span>
                           </div>
-                          <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden mb-3">
+                          <div className="w-full bg-slate-200/80 dark:bg-slate-700/60 h-2 rounded-full overflow-hidden mb-3">
                             <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                              className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-500"
                               style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.avgCpu ?? activeMonitoringVm.cpuUsage))}%` }}
                             />
                           </div>
                           {/* Live 10-sample Sparkline */}
-                          <div className="flex items-end gap-1.5 h-12 pt-2 px-2 bg-white/80 rounded-xl border border-blue-100/70">
+                          <div className="flex items-end gap-1.5 h-12 pt-2 px-2 bg-white/80 dark:bg-slate-950/60 rounded-xl border border-blue-100/70 dark:border-slate-800">
                             {cpuHistory.map((val, idx) => (
                               <div 
                                 key={idx}
@@ -1147,31 +1155,31 @@ export default function Dashboard() {
                             ))}
                           </div>
                         </div>
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1 border-t border-blue-100/60">
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 font-mono pt-1 border-t border-blue-100/60 dark:border-slate-800">
                           <span>{activeMonitoringVm.vCPU} Cores Assigned</span>
-                          <span className="text-blue-600 font-semibold">Live 10-tick trend</span>
+                          <span className="text-blue-600 dark:text-blue-400 font-semibold">Live 10-tick trend</span>
                         </div>
                       </div>
 
                       {/* 2. RAM ALLOCATION & WORKLOAD */}
-                      <div className="p-4 bg-gradient-to-br from-purple-50/70 to-slate-50 rounded-2xl border border-purple-100/90 shadow-xs flex flex-col justify-between space-y-3">
+                      <div className="p-4 bg-gradient-to-br from-purple-50/70 to-slate-50 dark:from-slate-800/80 dark:to-slate-900/80 rounded-2xl border border-purple-100/90 dark:border-purple-900/30 shadow-xs flex flex-col justify-between space-y-3">
                         <div>
                           <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                              <MemoryStick className="w-4 h-4 text-purple-600" /> Memory (RAM)
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                              <MemoryStick className="w-4 h-4 text-purple-600 dark:text-purple-400" /> Memory (RAM)
                             </span>
-                            <span className="text-lg font-mono font-extrabold text-purple-600">
+                            <span className="text-lg font-mono font-extrabold text-purple-600 dark:text-purple-400">
                               {liveMetrics ? `${liveMetrics.ramPercent}%` : `${activeMonitoringVm.ramUsage}`}
                             </span>
                           </div>
-                          <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden mb-3">
+                          <div className="w-full bg-slate-200/80 dark:bg-slate-700/60 h-2 rounded-full overflow-hidden mb-3">
                             <div 
-                              className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                              className="bg-purple-600 dark:bg-purple-500 h-2 rounded-full transition-all duration-500"
                               style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.ramPercent ?? 20))}%` }}
                             />
                           </div>
                           {/* Live 10-sample Sparkline */}
-                          <div className="flex items-end gap-1.5 h-12 pt-2 px-2 bg-white/80 rounded-xl border border-purple-100/70">
+                          <div className="flex items-end gap-1.5 h-12 pt-2 px-2 bg-white/80 dark:bg-slate-950/60 rounded-xl border border-purple-100/70 dark:border-slate-800">
                             {ramHistory.map((val, idx) => (
                               <div 
                                 key={idx}
@@ -1182,48 +1190,48 @@ export default function Dashboard() {
                             ))}
                           </div>
                         </div>
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1 border-t border-purple-100/60">
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 font-mono pt-1 border-t border-purple-100/60 dark:border-slate-800">
                           <span>{liveMetrics?.ramUsedMb ? `${liveMetrics.ramUsedMb} MB` : 'Active'} used</span>
                           <span>{liveMetrics?.ramTotalMb ? `${liveMetrics.ramTotalMb} MB` : `${activeMonitoringVm.ramGB} GB`} Cap</span>
                         </div>
                       </div>
 
                       {/* 3. NVME STORAGE VHDX & DISK THROUGHPUT */}
-                      <div className="p-4 bg-gradient-to-br from-amber-50/50 to-slate-50 rounded-2xl border border-amber-100/90 shadow-xs flex flex-col justify-between space-y-3">
+                      <div className="p-4 bg-gradient-to-br from-amber-50/50 to-slate-50 dark:from-slate-800/80 dark:to-slate-900/80 rounded-2xl border border-amber-100/90 dark:border-amber-900/30 shadow-xs flex flex-col justify-between space-y-3">
                         <div>
                           <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                              <HardDrive className="w-4 h-4 text-amber-600" /> NVMe Virtual Storage
+                            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                              <HardDrive className="w-4 h-4 text-amber-600 dark:text-amber-400" /> NVMe Virtual Storage
                             </span>
-                            <span className="text-lg font-mono font-extrabold text-amber-600">
+                            <span className="text-lg font-mono font-extrabold text-amber-600 dark:text-amber-400">
                               {liveMetrics ? `${liveMetrics.diskPercent}%` : '20%'}
                             </span>
                           </div>
-                          <div className="w-full bg-slate-200/80 h-2 rounded-full overflow-hidden mb-3">
+                          <div className="w-full bg-slate-200/80 dark:bg-slate-700/60 h-2 rounded-full overflow-hidden mb-3">
                             <div 
-                              className="bg-amber-500 h-2 rounded-full transition-all duration-500"
+                              className="bg-amber-500 dark:bg-amber-400 h-2 rounded-full transition-all duration-500"
                               style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.diskPercent ?? 20))}%` }}
                             />
                           </div>
-                          <div className="bg-white/80 p-3 rounded-xl border border-amber-100/70 space-y-2">
+                          <div className="bg-white/80 dark:bg-slate-950/60 p-3 rounded-xl border border-amber-100/70 dark:border-slate-800 space-y-2">
                             <div className="flex items-center justify-between text-xs font-mono">
-                              <span className="text-slate-500">Physical Size:</span>
-                              <strong className="text-slate-800">
+                              <span className="text-slate-500 dark:text-slate-400">Physical Size:</span>
+                              <strong className="text-slate-800 dark:text-slate-200">
                                 {liveMetrics?.diskUsedGb !== undefined ? `${liveMetrics.diskUsedGb} GB` : `${Math.round(activeMonitoringVm.diskGB * 0.2)} GB`}
                               </strong>
                             </div>
                             <div className="flex items-center justify-between text-xs font-mono">
-                              <span className="text-slate-500">Allocated Cap:</span>
-                              <strong className="text-slate-800">{activeMonitoringVm.diskGB} GB NVMe</strong>
+                              <span className="text-slate-500 dark:text-slate-400">Allocated Cap:</span>
+                              <strong className="text-slate-800 dark:text-slate-200">{activeMonitoringVm.diskGB} GB NVMe</strong>
                             </div>
-                            <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100 font-mono">
-                              <span className="text-slate-500">Read: <strong className="text-slate-700">{liveMetrics?.diskReadMb || 0} MB</strong></span>
-                              <span className="text-slate-500">Write: <strong className="text-slate-700">{liveMetrics?.diskWriteMb || 0} MB</strong></span>
+                            <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100 dark:border-slate-800 font-mono">
+                              <span className="text-slate-500 dark:text-slate-400">Read: <strong className="text-slate-700 dark:text-slate-300">{liveMetrics?.diskReadMb || 0} MB</strong></span>
+                              <span className="text-slate-500 dark:text-slate-400">Write: <strong className="text-slate-700 dark:text-slate-300">{liveMetrics?.diskWriteMb || 0} MB</strong></span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1 border-t border-amber-100/60">
-                          <span className="flex items-center gap-1 text-emerald-600 font-semibold">
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 font-mono pt-1 border-t border-amber-100/60 dark:border-slate-800">
+                          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
                             <ShieldCheck className="w-3.5 h-3.5" /> Uptime: {liveMetrics?.uptime || 'Active'}
                           </span>
                           <span>Status: {liveMetrics?.status || 'Normal'}</span>
@@ -1231,12 +1239,12 @@ export default function Dashboard() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-center">
+                    <div className="p-8 bg-slate-50 dark:bg-slate-850 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-center">
                       <Power className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                      <h3 className="text-sm font-bold text-slate-800">
+                      <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
                         {activeMonitoringVm.name} is Powered Off
                       </h3>
-                      <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1">
                         Power on this virtual machine to start streaming real-time Hyper-V CPU usage, memory demand, and NVMe disk throughput directly to this dashboard.
                       </p>
                     </div>
@@ -1247,23 +1255,23 @@ export default function Dashboard() {
 
             {/* INSTANCE TABLE SECTION (When user has active VMs) */}
             {instances.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 
                 {/* TABLE CONTROLS & FILTER TABS */}
-                <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   
                   {/* STATUS FILTER TABS */}
-                  <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl w-fit">
+                  <div className="flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-800 p-1 rounded-xl w-fit">
                     <button
                       onClick={() => setStatusFilter('all')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
                         statusFilter === 'all'
-                          ? 'bg-white text-slate-900 shadow-sm'
-                          : 'text-slate-500 hover:text-slate-800'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                       }`}
                     >
                       All
-                      <span className="bg-slate-200/80 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
+                      <span className="bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-md text-[10px]">
                         {instances.length}
                       </span>
                     </button>
@@ -1272,12 +1280,12 @@ export default function Dashboard() {
                       onClick={() => setStatusFilter('running')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
                         statusFilter === 'running'
-                          ? 'bg-white text-emerald-700 shadow-sm'
-                          : 'text-slate-500 hover:text-slate-800'
+                          ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                       }`}
                     >
                       Running
-                      <span className="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md text-[10px]">
+                      <span className="bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 px-1.5 py-0.5 rounded-md text-[10px]">
                         {runningCount}
                       </span>
                     </button>
@@ -1286,12 +1294,12 @@ export default function Dashboard() {
                       onClick={() => setStatusFilter('stopped')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
                         statusFilter === 'stopped'
-                          ? 'bg-white text-slate-800 shadow-sm'
-                          : 'text-slate-500 hover:text-slate-800'
+                          ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                       }`}
                     >
                       Stopped
-                      <span className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">
+                      <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-md text-[10px]">
                         {stoppedCount}
                       </span>
                     </button>
@@ -1305,15 +1313,15 @@ export default function Dashboard() {
                       placeholder="Search instances or IP..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
                     />
                   </div>
                 </div>
 
                 {/* TABLE */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-slate-600">
-                    <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                  <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
+                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
                       <tr>
                         <th className="px-6 py-3.5">Instance Name</th>
                         <th className="px-6 py-3.5">Status</th>
@@ -1323,7 +1331,7 @@ export default function Dashboard() {
                         <th className="px-6 py-3.5 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {filteredInstances.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-xs">
@@ -1335,9 +1343,9 @@ export default function Dashboard() {
                           <tr 
                             key={inst.id} 
                             onClick={() => setSelectedInstance(inst)}
-                            className="hover:bg-slate-50 cursor-pointer transition-colors"
+                            className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
                           >
-                            <td className="px-6 py-4 font-semibold text-slate-900 flex items-center gap-3">
+                            <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white flex items-center gap-3">
                               <Server className="w-4 h-4 text-slate-400" />
                               <div>
                                 <p>{inst.name}</p>
@@ -1366,15 +1374,15 @@ export default function Dashboard() {
                                 {inst.status}
                               </span>
                             </td>
-                            <td className="px-6 py-4 font-mono text-xs text-slate-600">{inst.ip}</td>
-                            <td className="px-6 py-4 text-xs font-medium text-slate-700">
+                            <td className="px-6 py-4 font-mono text-xs text-slate-600 dark:text-slate-300">{inst.ip}</td>
+                            <td className="px-6 py-4 text-xs font-medium text-slate-700 dark:text-slate-300">
                               <span className="inline-flex items-center gap-1.5">
-                                <Cpu className="w-3.5 h-3.5 text-blue-600" /> {inst.vCPU} vCPU
-                                <span className="text-slate-300">•</span>
-                                <MemoryStick className="w-3.5 h-3.5 text-purple-600" /> {inst.ramGB} GB RAM
+                                <Cpu className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> {inst.vCPU} vCPU
+                                <span className="text-slate-300 dark:text-slate-600">•</span>
+                                <MemoryStick className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> {inst.ramGB} GB RAM
                               </span>
                             </td>
-                            <td className="px-6 py-4 font-bold text-slate-900 font-poppins text-xs">
+                            <td className="px-6 py-4 font-bold text-slate-900 dark:text-white font-poppins text-xs">
                               ${inst.monthlyPrice}/mo
                             </td>
                             <td className="px-6 py-4 text-right">
@@ -1392,8 +1400,8 @@ export default function Dashboard() {
                                   title={inst.status === 'running' ? 'Power Off' : 'Power On'}
                                   className={`p-1.5 rounded-lg border transition-all ${
                                     inst.status === 'running'
-                                      ? 'border-slate-200 text-slate-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200'
-                                      : 'border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200'
+                                      ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 hover:border-rose-200 dark:hover:border-rose-800'
+                                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 hover:border-emerald-200 dark:hover:border-emerald-800'
                                   }`}
                                 >
                                   <Power className={`w-4 h-4 ${actionLoadingId === inst.vmId ? 'animate-spin' : ''}`} />
@@ -1406,7 +1414,7 @@ export default function Dashboard() {
                                     setConnectGuideVm(inst);
                                   }}
                                   title="SSH Connection Guide (Terminal / PuTTY)"
-                                  className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-all"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all"
                                 >
                                   <KeyRound className="w-4 h-4" />
                                 </button>
@@ -1419,7 +1427,7 @@ export default function Dashboard() {
                                       setConsoleVm(inst);
                                     }}
                                     title="Open In-Browser Web Console Terminal"
-                                    className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200 transition-all"
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all"
                                   >
                                     <Terminal className="w-4 h-4" />
                                   </button>
@@ -1429,7 +1437,7 @@ export default function Dashboard() {
                                 <button
                                   onClick={(e) => openResizeModal(inst, e)}
                                   title="Scale CPU & RAM Specs"
-                                  className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-all"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all"
                                 >
                                   <Sliders className="w-4 h-4" />
                                 </button>
@@ -1441,7 +1449,7 @@ export default function Dashboard() {
                                     setDeletingInstance(inst);
                                   }}
                                   title="Terminate / Destroy Server"
-                                  className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-200 dark:hover:border-rose-800 transition-all"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -2111,27 +2119,27 @@ export default function Dashboard() {
           onClick={() => setSelectedInstance(null)}
         >
           <div 
-            className="bg-white w-full max-w-lg h-full border-l border-slate-200 p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200"
+            className="bg-white dark:bg-slate-900 w-full max-w-lg h-full border-l border-slate-200 dark:border-slate-800 p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             
             <div className="space-y-6">
               {/* DRAWER HEADER (Never hidden behind navbar; elevated z-index & prominent close button) */}
-              <div className="sticky -top-6 -mx-6 px-6 py-4 bg-white/95 backdrop-blur-md z-30 border-b border-slate-100 flex items-center justify-between shadow-xs">
+              <div className="sticky -top-6 -mx-6 px-6 py-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md z-30 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <div className="p-2.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-xl">
                     <Server className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-lg font-poppins">
+                    <h3 className="font-bold text-slate-900 dark:text-white text-lg font-poppins">
                       {selectedInstance.name}
                     </h3>
-                    <p className="text-xs font-mono text-slate-500">{selectedInstance.hostname}</p>
+                    <p className="text-xs font-mono text-slate-500 dark:text-slate-400">{selectedInstance.hostname}</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => setSelectedInstance(null)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all border border-slate-200"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all border border-slate-200 dark:border-slate-700"
                   title="Close Details Panel (Esc)"
                 >
                   <X className="w-4 h-4" />

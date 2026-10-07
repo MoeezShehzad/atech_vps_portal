@@ -17,6 +17,7 @@ import vmRoutes from './routes/vmRoutes.js';
 import sshKeyRoutes from './routes/sshKeyRoutes.js';
 import securityRoutes from './routes/securityRoutes.js';
 import billingRoutes from './routes/billingRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import { setupTerminalWebSocket } from './services/terminalService.js';
 
 const app = express();
@@ -115,6 +116,7 @@ app.use('/api/ssh-keys', sshKeyRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/logs', securityRoutes); // Alias for convenience
 app.use('/api/billing', billingRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
