@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Server, 
   Cpu, 
@@ -190,7 +190,7 @@ export default function Dashboard() {
   const [resizeLoading, setResizeLoading] = useState(false);
 
   // 1. Fetch user VMs and catalog from API
-  const fetchVMs = async () => {
+  const fetchVMs = useCallback(async () => {
     try {
       const data = await apiCall('/vms');
       if (data) {
@@ -200,7 +200,7 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Failed to load user VMs:', err);
     }
-  };
+  }, []);
 
   const fetchCatalog = async () => {
     try {
@@ -2227,7 +2227,7 @@ export default function Dashboard() {
           adminUser={consoleVm.adminUser}
           adminPassword={consoleVm.adminPassword}
           onClose={() => setConsoleVm(null)}
-          onSessionEnd={() => fetchVMs()}
+          onSessionEnd={fetchVMs}
         />
       )}
 

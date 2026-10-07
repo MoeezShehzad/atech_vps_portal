@@ -36,16 +36,23 @@ export default function WebConsoleModal({
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
+  const onSessionEndRef = useRef(onSessionEnd);
+  useEffect(() => {
+    onSessionEndRef.current = onSessionEnd;
+  }, [onSessionEnd]);
+
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
 
+  // Stable connect / reconnect function
   const connectSession = useCallback(async () => {
     if (!xtermInstance.current) return;
     const term = xtermInstance.current;
 
-    // Close any previous socket
+    // Close any previous socket cleanly without triggering onclose loop
     if (socketRef.current) {
+      socketRef.current.onclose = null;
       socketRef.current.close();
       socketRef.current = null;
     }
@@ -92,19 +99,19 @@ export default function WebConsoleModal({
 
       ws.onclose = () => {
         setConnectionStatus('disconnected');
-        onSessionEnd?.();
+        onSessionEndRef.current?.();
       };
     } catch (err: any) {
       console.error('[WebConsole] Error acquiring ticket:', err);
       setConnectionStatus('disconnected');
       term.write(`\r\n\x1b[31m[Authentication Error] ${err.message || 'Unauthorized console access'}\x1b[0m\r\n`);
     }
-  }, [vmId, vmIp, onSessionEnd]);
+  }, [vmId, vmIp]);
 
+  // Terminal instance initialization — runs strictly ONCE when modal opens
   useEffect(() => {
     if (!terminalRef.current) return;
 
-    // 1. Initialize xterm
     const term = new XTerm({
       cursorBlink: true,
       cursorStyle: 'block',
@@ -157,11 +164,12 @@ export default function WebConsoleModal({
       window.removeEventListener('resize', handleResize);
       onDataDisposable.dispose();
       if (socketRef.current) {
+        socketRef.current.onclose = null;
         socketRef.current.close();
       }
       term.dispose();
     };
-  }, [connectSession]);
+  }, [vmId]); // Strictly runs once per vmId
 
   const handleReconnect = () => {
     if (xtermInstance.current) {
