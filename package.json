@@ -29,6 +29,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",
+    "ssh2": "^1.16.0",
     "ws": "^8.22.0"
   },
   "devDependencies": {
