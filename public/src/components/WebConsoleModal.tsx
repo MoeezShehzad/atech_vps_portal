@@ -6,14 +6,9 @@ import {
   X,
   Maximize2,
   Minimize2,
+  Minus,
   RefreshCw,
   Terminal as TerminalIcon,
-  ShieldCheck,
-  Eye,
-  EyeOff,
-  Copy,
-  Check,
-  Key,
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 
@@ -43,13 +38,7 @@ export default function WebConsoleModal({
 
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [isFullscreen, setIsFullscreen] = useState(false);
-
-  const [activeIp, setActiveIp] = useState<string>(vmIp || 'DHCP Leasing...');
-  const [activeUser, setActiveUser] = useState<string>(initialUser);
-  const [activePassword, setActivePassword] = useState<string>(initialPassword);
-  const [showPassword, setShowPassword] = useState(false);
-  const [copiedPassword, setCopiedPassword] = useState(false);
-  const [copiedSSH, setCopiedSSH] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   const connectSession = useCallback(async () => {
     if (!xtermInstance.current) return;
@@ -70,10 +59,6 @@ export default function WebConsoleModal({
       if (!session || !session.ticket) {
         throw new Error(session?.error || 'Failed to obtain console session ticket.');
       }
-
-      if (session.ip) setActiveIp(session.ip);
-      if (session.adminUser) setActiveUser(session.adminUser);
-      if (session.adminPassword) setActivePassword(session.adminPassword);
 
       term.write(`\x1b[32m[Console]\x1b[0m Ticket granted. Establishing SSH bridge to ${session.ip || vmIp}...\r\n`);
 
@@ -114,7 +99,7 @@ export default function WebConsoleModal({
       setConnectionStatus('disconnected');
       term.write(`\r\n\x1b[31m[Authentication Error] ${err.message || 'Unauthorized console access'}\x1b[0m\r\n`);
     }
-  }, [vmId, vmIp]);
+  }, [vmId, vmIp, onSessionEnd]);
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -185,157 +170,142 @@ export default function WebConsoleModal({
     connectSession();
   };
 
-  const copyPasswordToClipboard = () => {
-    navigator.clipboard.writeText(activePassword);
-    setCopiedPassword(true);
-    setTimeout(() => setCopiedPassword(false), 2000);
-  };
-
-  const copySSHCommand = () => {
-    navigator.clipboard.writeText(`ssh ${activeUser}@${activeIp}`);
-    setCopiedSSH(true);
-    setTimeout(() => setCopiedSSH(false), 2000);
+  const handleRestore = () => {
+    setIsMinimized(false);
+    setTimeout(() => {
+      fitAddonRef.current?.fit();
+      xtermInstance.current?.focus();
+    }, 100);
   };
 
   return (
-    <div className="fixed inset-0 z-[120] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 md:p-6 animate-in fade-in duration-200">
-      <div 
-        className={`bg-[#090d16] border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
-          isFullscreen ? 'w-full h-full rounded-none' : 'w-full max-w-5xl h-[82vh] min-h-[520px]'
-        }`}
-      >
-        {/* CONSOLE HEADER BAR */}
-        <div className="bg-slate-900/95 border-b border-slate-800 px-4 py-3 flex items-center justify-between select-none">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${
-                connectionStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                connectionStatus === 'connecting' ? 'bg-amber-400 animate-ping' : 'bg-rose-500'
-              }`} />
-              <TerminalIcon className="w-4 h-4 text-blue-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-white font-mono tracking-wide">
-                  {vmName}
-                </span>
-                <span className="text-[11px] text-slate-300 font-mono bg-slate-800/90 px-2 py-0.5 rounded border border-slate-700/60">
-                  {activeIp}
-                </span>
-              </div>
+    <>
+      {/* 1. MINIMIZED FLOATING DOCK BADGE */}
+      {isMinimized && (
+        <div className="fixed bottom-5 right-5 z-[130] bg-[#090d16]/95 border border-slate-700/90 rounded-2xl shadow-2xl p-3 flex items-center gap-3 backdrop-blur-md animate-in slide-in-from-bottom-4 duration-200 select-none">
+          <div 
+            onClick={handleRestore}
+            className="flex items-center gap-2.5 cursor-pointer hover:opacity-80 transition-opacity"
+            title="Click to restore Web Console"
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+              connectionStatus === 'connecting' ? 'bg-amber-400 animate-ping' : 'bg-rose-500'
+            }`} />
+            <TerminalIcon className="w-4 h-4 text-blue-400" />
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-white font-mono">{vmName}</span>
+              <span className="text-[10px] text-emerald-400 font-mono">
+                {connectionStatus === 'connected' ? 'Terminal Active' : connectionStatus.toUpperCase()}
+              </span>
             </div>
           </div>
 
-          {/* CREDENTIALS TOOLBAR IN HEADER */}
-          <div className="hidden lg:flex items-center gap-2 bg-slate-950/60 px-2.5 py-1 rounded-xl border border-slate-800 text-[11px] font-mono">
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Key className="w-3 h-3 text-amber-400" />
-              <span>User:</span>
-              <strong className="text-slate-200">{activeUser}</strong>
-            </div>
-            <span className="text-slate-700">|</span>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <span>Pass:</span>
-              <strong className="text-slate-200">{showPassword ? activePassword : '••••••••'}</strong>
-              <button
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-slate-400 hover:text-white p-0.5"
-                title={showPassword ? 'Hide Password' : 'Show Password'}
-              >
-                {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-              </button>
-              <button
-                onClick={copyPasswordToClipboard}
-                className="text-slate-400 hover:text-white p-0.5 ml-0.5"
-                title="Copy Password"
-              >
-                {copiedPassword ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-              </button>
-            </div>
-            <span className="text-slate-700">|</span>
+          <div className="flex items-center gap-1 border-l border-slate-800 pl-2">
             <button
-              onClick={copySSHCommand}
-              className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-[10px]"
-              title="Copy ssh command"
-            >
-              {copiedSSH ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-              <span>ssh {activeUser}@{activeIp}</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-              <ShieldCheck className="w-3 h-3" /> Secure SSH Shell
-            </span>
-
-            <button
-              onClick={handleReconnect}
-              title="Reconnect Console"
+              onClick={handleRestore}
+              title="Restore Console"
               className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <Maximize2 className="w-3.5 h-3.5" />
             </button>
-
-            <button
-              onClick={() => {
-                setIsFullscreen(!isFullscreen);
-                setTimeout(() => fitAddonRef.current?.fit(), 150);
-              }}
-              title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
-            >
-              {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-            </button>
-
             <button
               onClick={onClose}
-              title="Close Console (Esc)"
-              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all ml-1"
+              title="Close Console"
+              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
+      )}
 
-        {/* MOBILE/TABLET QUICK CREDENTIALS BAR */}
-        <div className="lg:hidden bg-slate-950 border-b border-slate-800/80 px-4 py-1.5 flex items-center justify-between text-[11px] font-mono text-slate-400">
-          <div className="flex items-center gap-2">
-            <span>User: <strong className="text-slate-200">{activeUser}</strong></span>
-            <span>•</span>
-            <span>Pass: <strong className="text-slate-200">{showPassword ? activePassword : '••••••'}</strong></span>
-            <button onClick={() => setShowPassword(!showPassword)} className="p-0.5 hover:text-white">
-              {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-            </button>
-          </div>
-          <button
-            onClick={copyPasswordToClipboard}
-            className="flex items-center gap-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-0.5 rounded transition-all"
-          >
-            {copiedPassword ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-            <span>Copy Password</span>
-          </button>
-        </div>
-
-        {/* TERMINAL CANVAS CONTAINER */}
+      {/* 2. FULL / RESTORED CONSOLE MODAL */}
+      <div 
+        className={`fixed inset-0 z-[120] transition-opacity duration-200 ${
+          isMinimized 
+            ? 'pointer-events-none opacity-0' 
+            : 'bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 md:p-6 opacity-100'
+        }`}
+      >
         <div 
-          ref={terminalRef} 
-          onClick={() => xtermInstance.current?.focus()}
-          className="flex-1 w-full p-3 overflow-hidden font-mono cursor-text"
-          style={{ minHeight: 0 }}
-        />
+          className={`bg-[#090d16] border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
+            isFullscreen ? 'w-full h-full rounded-none' : 'w-full max-w-5xl h-[82vh] min-h-[520px]'
+          }`}
+        >
+          {/* CONSOLE HEADER BAR */}
+          <div className="bg-slate-900/95 border-b border-slate-800 px-4 py-3 flex items-center justify-between select-none">
+            <div className="flex items-center gap-2.5">
+              <span className={`w-2.5 h-2.5 rounded-full ${
+                connectionStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
+                connectionStatus === 'connecting' ? 'bg-amber-400 animate-ping' : 'bg-rose-500'
+              }`} />
+              <TerminalIcon className="w-4 h-4 text-blue-400" />
+              <span className="text-xs font-bold text-white font-mono tracking-wide">
+                {vmName}
+              </span>
+            </div>
 
-        {/* CONSOLE FOOTER STATUS BAR */}
-        <div className="bg-slate-950 border-t border-slate-800/80 px-4 py-1.5 flex items-center justify-between text-[11px] font-mono text-slate-400">
-          <div className="flex items-center gap-3">
-            <span>Status: <strong className={connectionStatus === 'connected' ? 'text-emerald-400' : 'text-amber-400'}>{connectionStatus.toUpperCase()}</strong></span>
-            <span>Port: 22</span>
-            <span>Type: xterm-256color</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleReconnect}
+                title="Reconnect Console"
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                onClick={() => setIsMinimized(true)}
+                title="Minimize Console"
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsFullscreen(!isFullscreen);
+                  setTimeout(() => fitAddonRef.current?.fit(), 150);
+                }}
+                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+              >
+                {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              </button>
+
+              <button
+                onClick={onClose}
+                title="Close Console (Esc)"
+                className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all ml-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-          <div className="text-[10px] text-slate-500">
-            Paste with Ctrl+V / Cmd+V
+
+          {/* TERMINAL CANVAS CONTAINER */}
+          <div 
+            ref={terminalRef} 
+            onClick={() => xtermInstance.current?.focus()}
+            className="flex-1 w-full p-3 overflow-hidden font-mono cursor-text"
+            style={{ minHeight: 0 }}
+          />
+
+          {/* CONSOLE FOOTER STATUS BAR */}
+          <div className="bg-slate-950 border-t border-slate-800/80 px-4 py-2 flex items-center justify-between text-[11px] font-mono text-slate-400 select-none">
+            <div className="flex items-center gap-2">
+              <span>Status:</span>
+              <strong className={
+                connectionStatus === 'connected' ? 'text-emerald-400 font-semibold' :
+                connectionStatus === 'connecting' ? 'text-amber-400 font-semibold' : 'text-rose-400 font-semibold'
+              }>
+                {connectionStatus.toUpperCase()}
+              </strong>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
