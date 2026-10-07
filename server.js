@@ -15,6 +15,7 @@ import contactRoutes from './routes/contact.js';
 import pricingRoutes from './routes/pricing.js';
 import vmRoutes from './routes/vmRoutes.js';
 import sshKeyRoutes from './routes/sshKeyRoutes.js';
+import securityRoutes from './routes/securityRoutes.js';
 import { setupTerminalWebSocket } from './services/terminalService.js';
 
 const app = express();
@@ -110,6 +111,8 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/vms', vmRoutes);
 app.use('/api/ssh-keys', sshKeyRoutes);
+app.use('/api/security', securityRoutes);
+app.use('/api/logs', securityRoutes); // Alias for convenience
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

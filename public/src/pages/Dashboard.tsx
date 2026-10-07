@@ -40,6 +40,7 @@ import AccountSettings from '../components/AccountSettings';
 import { apiCall } from '../services/api';
 
 const WebConsoleModal = React.lazy(() => import('../components/WebConsoleModal'));
+const SecurityAndLogs = React.lazy(() => import('../components/SecurityAndLogs'));
 
 interface Instance {
   id: string;
@@ -602,6 +603,17 @@ export default function Dashboard() {
         
         {/* RENDER ACCOUNT SETTINGS WHEN TAB IS SETTINGS */}
         {activeTab === 'settings' && <AccountSettings />}
+
+        {/* RENDER SECURITY & AUDIT LOGS WHEN TAB IS SECURITY */}
+        {activeTab === 'security' && (
+          <React.Suspense fallback={
+            <div className="py-20 flex justify-center">
+              <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+            </div>
+          }>
+            <SecurityAndLogs />
+          </React.Suspense>
+        )}
 
         {/* RENDER DASHBOARD / VMS VIEWS */}
         {(activeTab === 'dashboard' || activeTab === 'vms') && (

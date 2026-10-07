@@ -920,6 +920,17 @@ export async function getConsoleSession(req, res) {
       { expiresIn: '5m' }
     );
 
+    // Record web console access in audit trail
+    await prisma.securityLog.create({
+      data: {
+        userId,
+        action: 'WEB_CONSOLE_ACCESS',
+        ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+        result: 'SUCCESS',
+        details: `Established SSH Web Console terminal bridge for VM '${vm.vmName}' (${targetIp})`,
+      },
+    }).catch(() => {});
+
     return res.json({
       success: true,
       ticket,

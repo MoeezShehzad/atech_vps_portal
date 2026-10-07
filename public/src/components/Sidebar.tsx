@@ -1,4 +1,6 @@
 import { Server, HardDrive, Cpu, Shield, Settings, LogOut, LayoutDashboard } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   activeTab: string;
@@ -6,6 +8,13 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'vms', label: 'Virtual Machines', icon: Server },
@@ -57,7 +66,10 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
       {/* Logout Footer */}
       <div className="p-4 border-t border-slate-100">
-        <button className="flex items-center space-x-3 w-full px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all">
+        <button
+          onClick={handleLogout}
+          className="flex items-center space-x-3 w-full px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all"
+        >
           <LogOut className="h-5 w-5 text-slate-400 group-hover:text-rose-600" />
           <span>Logout</span>
         </button>

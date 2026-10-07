@@ -439,6 +439,15 @@ export const login = async (req, res) => {
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
+      await prisma.securityLog.create({
+        data: {
+          userId: user.userId,
+          action: 'FAILED_LOGIN_ATTEMPT',
+          ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+          result: 'FAILED',
+          details: `Failed password authentication attempt for user ${user.email}`,
+        },
+      }).catch(() => {});
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
@@ -453,6 +462,17 @@ export const login = async (req, res) => {
       where: { userId: user.userId },
       data: { lastLoginAt: new Date() },
     });
+
+    // Record successful login in security audit trail
+    await prisma.securityLog.create({
+      data: {
+        userId: user.userId,
+        action: 'USER_LOGIN',
+        ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+        result: 'SUCCESS',
+        details: `Successful web authentication session initialized (${req.headers['user-agent'] || 'Modern Web Browser'})`,
+      },
+    }).catch(() => {});
 
     res.json({
       message: 'Login successful',
