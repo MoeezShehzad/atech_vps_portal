@@ -45,9 +45,11 @@ export default function WebConsoleModal({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
 
+  const isMountedRef = useRef(true);
+
   // Stable connect / reconnect function
   const connectSession = useCallback(async () => {
-    if (!xtermInstance.current) return;
+    if (!xtermInstance.current || !isMountedRef.current) return;
     const term = xtermInstance.current;
 
     // Close any previous socket cleanly without triggering onclose loop
@@ -63,6 +65,8 @@ export default function WebConsoleModal({
     try {
       const session = await apiCall(`/vms/${vmId}/console-session`, { method: 'POST' });
 
+      if (!isMountedRef.current) return;
+
       if (!session || !session.ticket) {
         throw new Error(session?.error || 'Failed to obtain console session ticket.');
       }
@@ -77,14 +81,25 @@ export default function WebConsoleModal({
       socketRef.current = ws;
 
       ws.onopen = () => {
+        if (!isMountedRef.current) return;
         setConnectionStatus('connected');
-        term.focus();
-        setTimeout(() => {
+
+        // Immediate fit & focus
+        try {
           fitAddonRef.current?.fit();
-          if (term.cols && term.rows && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-          }
-        }, 150);
+          term.focus();
+        } catch {}
+
+        setTimeout(() => {
+          if (!isMountedRef.current) return;
+          try {
+            fitAddonRef.current?.fit();
+            term.focus();
+            if (term.cols && term.rows && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+            }
+          } catch {}
+        }, 120);
       };
 
       ws.onmessage = (event) => {
@@ -93,16 +108,19 @@ export default function WebConsoleModal({
 
       ws.onerror = (err) => {
         console.warn('[WebConsole] WebSocket error:', err);
+        if (!isMountedRef.current) return;
         setConnectionStatus('disconnected');
         term.write('\r\n\x1b[31m[WebSocket Error] Connection to SSH terminal gateway failed.\x1b[0m\r\n');
       };
 
       ws.onclose = () => {
+        if (!isMountedRef.current) return;
         setConnectionStatus('disconnected');
         onSessionEndRef.current?.();
       };
     } catch (err: any) {
       console.error('[WebConsole] Error acquiring ticket:', err);
+      if (!isMountedRef.current) return;
       setConnectionStatus('disconnected');
       term.write(`\r\n\x1b[31m[Authentication Error] ${err.message || 'Unauthorized console access'}\x1b[0m\r\n`);
     }
@@ -110,7 +128,9 @@ export default function WebConsoleModal({
 
   // Terminal instance initialization — runs strictly ONCE when modal opens
   useEffect(() => {
+    isMountedRef.current = true;
     if (!terminalRef.current) return;
+    const currentContainer = terminalRef.current;
 
     const term = new XTerm({
       cursorBlink: true,
@@ -136,11 +156,19 @@ export default function WebConsoleModal({
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
-    term.open(terminalRef.current);
-    fitAddon.fit();
+    term.open(currentContainer);
 
     xtermInstance.current = term;
     fitAddonRef.current = fitAddon;
+
+    // Helper to reliably fit and focus the terminal helper textarea
+    const triggerFitAndFocus = () => {
+      try {
+        fitAddon.fit();
+        term.focus();
+        currentContainer.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
+      } catch {}
+    };
 
     // Forward keystrokes to remote SSH stdin
     const onDataDisposable = term.onData((data) => {
@@ -149,48 +177,49 @@ export default function WebConsoleModal({
       }
     });
 
-    // Handle Ctrl+C (Copy if selected) and Ctrl+V / Cmd+V (Paste)
+    // Handle Ctrl+C (Copy if selected) and Ctrl+V (allow native paste)
     term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
       // 1. Copy: Ctrl+C / Cmd+C when text is highlighted
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
         if (term.hasSelection()) {
-          navigator.clipboard.writeText(term.getSelection());
+          const selectedText = term.getSelection();
+          if (selectedText) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(selectedText).catch(() => {});
+            }
+          }
           return false; // Handled, do not send interrupt signal
         }
-        return true; // No selection: allow Ctrl+C SIGINT in bash
+        return true; // No selection: allow standard Ctrl+C SIGINT in bash
       }
 
-      // 2. Paste: Ctrl+V, Cmd+V, or Ctrl+Shift+V
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v' && event.type === 'keydown') {
-        navigator.clipboard.readText().then((clipText) => {
-          if (clipText && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-            socketRef.current.send(clipText);
-          }
-        }).catch(() => {});
-        return false; // Handled
+      // 2. Paste: Ctrl+V / Cmd+V
+      if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'v' || event.code === 'KeyV')) {
+        // Return true to allow browser native paste event to fire on the helper textarea
+        return true;
       }
 
       return true;
     });
 
-    // Native browser paste event listener
-    const currentContainer = terminalRef.current;
+    // Native browser paste event listener (listens on both container & window)
     const handleNativePaste = (e: ClipboardEvent) => {
-      const text = e.clipboardData?.getData('text');
-      if (text && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-        socketRef.current.send(text);
+      const text = e.clipboardData?.getData('text/plain') || e.clipboardData?.getData('text');
+      if (text) {
         e.preventDefault();
+        term.paste(text);
       }
     };
     currentContainer.addEventListener('paste', handleNativePaste);
+    window.addEventListener('paste', handleNativePaste);
 
     // Right-click paste (PuTTY / Windows Terminal style)
     const handleContextMenu = async (e: MouseEvent) => {
       if (!term.hasSelection()) {
         try {
           const text = await navigator.clipboard.readText();
-          if (text && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-            socketRef.current.send(text);
+          if (text) {
+            term.paste(text);
             e.preventDefault();
           }
         } catch {}
@@ -198,26 +227,55 @@ export default function WebConsoleModal({
     };
     currentContainer.addEventListener('contextmenu', handleContextMenu);
 
-    const handleResize = () => {
-      fitAddon.fit();
+    // Container interaction focus listeners
+    const handlePointerFocus = () => {
+      triggerFitAndFocus();
+    };
+    currentContainer.addEventListener('mousedown', handlePointerFocus);
+    currentContainer.addEventListener('pointerdown', handlePointerFocus);
+
+    // ResizeObserver watches modal container animations and window changes continuously
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (!entries || entries.length === 0) return;
+      const entry = entries[0];
+      if (entry.contentRect.width > 50 && entry.contentRect.height > 50) {
+        try {
+          fitAddon.fit();
+          if (term.cols && term.rows && socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+          }
+        } catch {}
+      }
+    });
+    resizeObserver.observe(currentContainer);
+
+    const handleWindowResize = () => {
+      triggerFitAndFocus();
       if (term.cols && term.rows && socketRef.current?.readyState === WebSocket.OPEN) {
         socketRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
       }
     };
-    window.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleWindowResize);
 
-    // Ensure focus immediately and after modal animation completes
-    term.focus();
-    setTimeout(() => term.focus(), 150);
-    setTimeout(() => term.focus(), 400);
+    // Focus sequence: immediate, animation frame, and after CSS modal transition completes
+    triggerFitAndFocus();
+    requestAnimationFrame(triggerFitAndFocus);
+    setTimeout(triggerFitAndFocus, 100);
+    setTimeout(triggerFitAndFocus, 250);
+    setTimeout(triggerFitAndFocus, 500);
 
     // Initial connection
     connectSession();
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      isMountedRef.current = false;
+      window.removeEventListener('resize', handleWindowResize);
+      window.removeEventListener('paste', handleNativePaste);
       currentContainer.removeEventListener('paste', handleNativePaste);
       currentContainer.removeEventListener('contextmenu', handleContextMenu);
+      currentContainer.removeEventListener('mousedown', handlePointerFocus);
+      currentContainer.removeEventListener('pointerdown', handlePointerFocus);
+      resizeObserver.disconnect();
       onDataDisposable.dispose();
       if (socketRef.current) {
         socketRef.current.onclose = null;
@@ -351,8 +409,9 @@ export default function WebConsoleModal({
           {/* TERMINAL CANVAS CONTAINER */}
           <div 
             ref={terminalRef} 
+            tabIndex={0}
             onClick={() => xtermInstance.current?.focus()}
-            className="flex-1 w-full p-3 overflow-hidden font-mono cursor-text"
+            className="flex-1 w-full p-3 overflow-hidden font-mono cursor-text outline-none focus:outline-none"
             style={{ minHeight: 0 }}
           />
 

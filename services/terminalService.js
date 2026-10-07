@@ -82,15 +82,17 @@ export function setupTerminalWebSocket(server) {
 
     const sshConn = new SSHClient();
     let shellStream = null;
+    let ptyRows = 30;
+    let ptyCols = 100;
     const inputBuffer = [];
 
     sshConn.on('ready', () => {
-      // Allocate interactive pseudo-terminal (PTY) on remote Linux guest
+      // Allocate interactive pseudo-terminal (PTY) with accurate rows/cols
       sshConn.shell(
         {
           term: 'xterm-256color',
-          rows: 30,
-          cols: 100,
+          rows: ptyRows,
+          cols: ptyCols,
         },
         (err, stream) => {
           if (err) {
@@ -140,8 +142,12 @@ export function setupTerminalWebSocket(server) {
         if (str.startsWith('{') && str.includes('"type":"resize"')) {
           try {
             const parsed = JSON.parse(str);
-            if (shellStream && parsed.cols && parsed.rows) {
-              shellStream.setWindow(parsed.rows, parsed.cols, 0, 0);
+            if (parsed.cols && parsed.rows) {
+              ptyCols = Number(parsed.cols);
+              ptyRows = Number(parsed.rows);
+              if (shellStream && shellStream.writable) {
+                shellStream.setWindow(ptyRows, ptyCols, 0, 0);
+              }
             }
           } catch {}
           return;

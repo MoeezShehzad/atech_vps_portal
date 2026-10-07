@@ -1967,7 +1967,11 @@ export default function Dashboard() {
                 {/* LAUNCH IN-BROWSER WEB CONSOLE */}
                 {selectedInstance.status === 'running' ? (
                   <button
-                    onClick={() => setConsoleVm(selectedInstance)}
+                    onClick={() => {
+                      const target = selectedInstance;
+                      setSelectedInstance(null);
+                      setConsoleVm(target);
+                    }}
                     className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-2"
                   >
                     <Terminal className="w-4 h-4 text-emerald-400" />
