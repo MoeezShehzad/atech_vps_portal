@@ -946,3 +946,306 @@ export async function getConsoleSession(req, res) {
   }
 }
 
+/**
+ * 9. GET /api/vms/:id/snapshots - List checkpoints for VM
+ */
+export async function getVMSnapshots(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const vmId = Number(req.params.id);
+    const vm = await prisma.virtualMachine.findFirst({
+      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    });
+    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+
+    let snapshots = await prisma.vMSnapshot.findMany({
+      where: { vmId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Also attempt live Hyper-V sync
+    try {
+      const hvSnaps = await hypervService.snapshotAction(vm.vmName, 'LIST');
+      if (Array.isArray(hvSnaps) && hvSnaps.length > 0) {
+        for (const hv of hvSnaps) {
+          const exists = snapshots.find((s) => s.name === hv.snapshotName);
+          if (!exists) {
+            const created = await prisma.vMSnapshot.create({
+              data: {
+                vmId,
+                name: hv.snapshotName,
+                description: hv.snapshotType || 'Standard Checkpoint',
+                status: 'ACTIVE',
+                createdAt: hv.createdAt ? new Date(hv.createdAt) : new Date(),
+              },
+            });
+            snapshots.push(created);
+          }
+        }
+      }
+    } catch (e) {
+      // Fall back to database list
+    }
+
+    return res.json({ success: true, snapshots });
+  } catch (err) {
+    console.error('[getVMSnapshots Error]:', err);
+    return res.status(500).json({ error: 'Failed to fetch snapshots' });
+  }
+}
+
+/**
+ * 10. POST /api/vms/:id/snapshots - Create new checkpoint
+ */
+export async function createVMSnapshot(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const vmId = Number(req.params.id);
+    const { name, description } = req.body;
+
+    const vm = await prisma.virtualMachine.findFirst({
+      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    });
+    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+
+    const snapName = (name || `Snapshot_${Date.now()}`).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    // Trigger Hyper-V Checkpoint
+    await hypervService.snapshotAction(vm.vmName, 'CREATE', snapName);
+
+    // Save to DB
+    const newSnapshot = await prisma.vMSnapshot.create({
+      data: {
+        vmId,
+        name: snapName,
+        description: description || 'Manual Portal Snapshot',
+        status: 'ACTIVE',
+      },
+    });
+
+    await prisma.securityLog.create({
+      data: {
+        userId,
+        action: 'VM_SNAPSHOT_CREATE',
+        ipAddress: req.ip || req.headers['x-forwarded-for'],
+        result: 'SUCCESS',
+        details: `Created snapshot '${snapName}' for VM '${vm.vmName}'`,
+      },
+    }).catch(() => {});
+
+    return res.status(201).json({ success: true, snapshot: newSnapshot });
+  } catch (err) {
+    console.error('[createVMSnapshot Error]:', err);
+    return res.status(500).json({ error: err.message || 'Failed to create snapshot' });
+  }
+}
+
+/**
+ * 11. POST /api/vms/:id/snapshots/:snapshotId/restore - Restore/Rollback checkpoint
+ */
+export async function restoreVMSnapshot(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const vmId = Number(req.params.id);
+    const snapshotId = Number(req.params.snapshotId);
+
+    const vm = await prisma.virtualMachine.findFirst({
+      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    });
+    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+
+    const snapshot = await prisma.vMSnapshot.findFirst({
+      where: { snapshotId, vmId, deletedAt: null },
+    });
+    if (!snapshot) return res.status(404).json({ error: 'Snapshot not found' });
+
+    await hypervService.snapshotAction(vm.vmName, 'RESTORE', snapshot.name);
+
+    await prisma.securityLog.create({
+      data: {
+        userId,
+        action: 'VM_SNAPSHOT_RESTORE',
+        ipAddress: req.ip || req.headers['x-forwarded-for'],
+        result: 'SUCCESS',
+        details: `Restored VM '${vm.vmName}' to snapshot '${snapshot.name}'`,
+      },
+    }).catch(() => {});
+
+    return res.json({ success: true, message: `Successfully rolled back to '${snapshot.name}'` });
+  } catch (err) {
+    console.error('[restoreVMSnapshot Error]:', err);
+    return res.status(500).json({ error: err.message || 'Failed to restore snapshot' });
+  }
+}
+
+/**
+ * 12. DELETE /api/vms/:id/snapshots/:snapshotId - Delete checkpoint
+ */
+export async function deleteVMSnapshot(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const vmId = Number(req.params.id);
+    const snapshotId = Number(req.params.snapshotId);
+
+    const vm = await prisma.virtualMachine.findFirst({
+      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    });
+    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+
+    const snapshot = await prisma.vMSnapshot.findFirst({
+      where: { snapshotId, vmId },
+    });
+    if (!snapshot) return res.status(404).json({ error: 'Snapshot not found' });
+
+    try {
+      await hypervService.snapshotAction(vm.vmName, 'DELETE', snapshot.name);
+    } catch (e) {
+      console.warn(`[Snapshot Delete Warning]:`, e.message);
+    }
+
+    await prisma.vMSnapshot.update({
+      where: { snapshotId },
+      data: { deletedAt: new Date(), status: 'DELETED' },
+    });
+
+    await prisma.securityLog.create({
+      data: {
+        userId,
+        action: 'VM_SNAPSHOT_DELETE',
+        ipAddress: req.ip || req.headers['x-forwarded-for'],
+        result: 'SUCCESS',
+        details: `Deleted snapshot '${snapshot.name}' for VM '${vm.vmName}'`,
+      },
+    }).catch(() => {});
+
+    return res.json({ success: true, message: 'Snapshot deleted successfully' });
+  } catch (err) {
+    console.error('[deleteVMSnapshot Error]:', err);
+    return res.status(500).json({ error: err.message || 'Failed to delete snapshot' });
+  }
+}
+
+/**
+ * 13. POST /api/vms/:id/reset-password - Reset guest admin password
+ */
+export async function resetVMPassword(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const vmId = Number(req.params.id);
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    const vm = await prisma.virtualMachine.findFirst({
+      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    });
+    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+
+    // Update in Hyper-V Guest
+    await hypervService.resetPassword({
+      vmName: vm.vmName,
+      adminUsername: vm.adminUser || 'ubuntu',
+      newPassword,
+    });
+
+    // Update in DB
+    await prisma.virtualMachine.update({
+      where: { vmId },
+      data: { adminPassword: newPassword },
+    });
+
+    await prisma.securityLog.create({
+      data: {
+        userId,
+        action: 'VM_PASSWORD_RESET',
+        ipAddress: req.ip || req.headers['x-forwarded-for'],
+        result: 'SUCCESS',
+        details: `Reset root/admin password for VM '${vm.vmName}'`,
+      },
+    }).catch(() => {});
+
+    return res.json({ success: true, message: 'Password has been successfully reset.' });
+  } catch (err) {
+    console.error('[resetVMPassword Error]:', err);
+    return res.status(500).json({ error: err.message || 'Failed to reset password' });
+  }
+}
+
+/**
+ * 14. POST /api/vms/:id/rebuild - Rebuild VM with clean OS
+ */
+export async function rebuildVMInstance(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const vmId = Number(req.params.id);
+    const { imageId, adminPassword, adminUsername, sshPublicKey } = req.body;
+
+    const vm = await prisma.virtualMachine.findFirst({
+      where: { vmId, userId, status: { not: 'TERMINATED' } },
+      include: { image: true },
+    });
+    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+
+    let targetImage = vm.image;
+    if (imageId) {
+      const img = await prisma.oSImage.findUnique({ where: { imageId: Number(imageId) } });
+      if (img) targetImage = img;
+    }
+
+    const newPass = adminPassword || vm.adminPassword || 'root';
+    const newUser = adminUsername || vm.adminUser || 'ubuntu';
+
+    // Update status to PROVISIONING
+    await prisma.virtualMachine.update({
+      where: { vmId },
+      data: {
+        status: 'PROVISIONING',
+        provisioningStatus: 'RUNNING',
+        imageId: targetImage.imageId,
+        adminUser: newUser,
+        adminPassword: newPass,
+      },
+    });
+
+    // Dispatch Rebuild to Hyper-V Host
+    await hypervService.rebuildVM({
+      vmName: vm.vmName,
+      ramMb: vm.ramGb * 1024,
+      cpuCount: vm.cpuCores,
+      diskGb: vm.storageGb,
+      templatePath: targetImage.templatePath,
+      adminUsername: newUser,
+      adminPassword: newPass,
+      sshPublicKey: sshPublicKey || '',
+    });
+
+    // Mark completed
+    await prisma.virtualMachine.update({
+      where: { vmId },
+      data: {
+        status: 'RUNNING',
+        provisioningStatus: 'COMPLETED',
+        startedAt: new Date(),
+      },
+    });
+
+    await prisma.securityLog.create({
+      data: {
+        userId,
+        action: 'VM_REBUILD',
+        ipAddress: req.ip || req.headers['x-forwarded-for'],
+        result: 'SUCCESS',
+        details: `Rebuilt VM '${vm.vmName}' with image '${targetImage.name}'`,
+      },
+    }).catch(() => {});
+
+    return res.json({ success: true, message: 'VM rebuild completed successfully.' });
+  } catch (err) {
+    console.error('[rebuildVMInstance Error]:', err);
+    return res.status(500).json({ error: err.message || 'Failed to rebuild VM' });
+  }
+}
+
+

@@ -1,4 +1,4 @@
-import { Server, HardDrive, Cpu, Shield, Settings, LogOut, LayoutDashboard } from 'lucide-react';
+import { Server, HardDrive, Cpu, Shield, Settings, LogOut, LayoutDashboard, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -20,6 +20,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     { id: 'vms', label: 'Virtual Machines', icon: Server },
     { id: 'storage', label: 'Storage & Disk', icon: HardDrive },
     { id: 'pools', label: 'Resource Pools', icon: Cpu },
+    { id: 'billing', label: 'Billing & Invoices', icon: CreditCard },
     { id: 'security', label: 'Security & Logs', icon: Shield },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];

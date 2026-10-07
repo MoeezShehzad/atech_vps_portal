@@ -337,6 +337,97 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify(result));
     }
 
+    // 8. Snapshots (CREATE, LIST, RESTORE, DELETE)
+    if (pathname === '/api/hyperv/snapshot') {
+      if (req.method === 'GET') {
+        const vmName = url.searchParams.get('vmName');
+        if (!vmName) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: 'vmName is required' }));
+        }
+        const result = await runPowerShell('Snapshot-VPS.ps1', {
+          VMName: vmName,
+          Action: 'LIST',
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(result));
+      }
+
+      if (req.method === 'POST') {
+        const data = await parseJsonBody(req);
+        const { vmName, action, snapshotName } = data;
+        if (!vmName || !action) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: 'vmName and action are required' }));
+        }
+        const result = await runPowerShell('Snapshot-VPS.ps1', {
+          VMName: vmName,
+          Action: action.toUpperCase(),
+          SnapshotName: snapshotName || '',
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(result));
+      }
+    }
+
+    // 9. Reset Guest Admin Password
+    if (req.method === 'POST' && pathname === '/api/hyperv/reset-password') {
+      const data = await parseJsonBody(req);
+      const { vmName, adminUsername, newPassword, currentPassword } = data;
+      if (!vmName || !newPassword) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'vmName and newPassword are required' }));
+      }
+
+      // Provision new password to guest OS
+      await provisionGuestVM({
+        vmName,
+        adminUsername: adminUsername || 'ubuntu',
+        adminPassword: newPassword,
+      });
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ status: 'SUCCESS', message: 'Password updated on guest VM' }));
+    }
+
+    // 10. Rebuild VM (Destroy old disk & recreate from master template)
+    if (req.method === 'POST' && pathname === '/api/hyperv/rebuild') {
+      const data = await parseJsonBody(req);
+      const { vmName, ramMb, cpuCount, diskGb, templatePath, adminUsername, adminPassword, sshPublicKey } = data;
+      if (!vmName) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'vmName is required' }));
+      }
+
+      try {
+        await runPowerShell('Destroy-VPS.ps1', { VMName: vmName });
+      } catch (e) {
+        console.warn(`[REBUILD] VM destroy warning:`, e.message);
+      }
+
+      const result = await runPowerShell('Create-VPS.ps1', {
+        VMName: vmName,
+        RAMMB: ramMb || 2048,
+        CPUCount: cpuCount || 2,
+        DiskGB: diskGb || 40,
+        AdminUsername: adminUsername || 'ubuntu',
+        AdminPassword: adminPassword || '',
+        SSHPublicKey: sshPublicKey || '',
+        TemplatePath: templatePath || DEFAULT_TEMPLATE,
+        SwitchName: data.switchName || 'Default Switch',
+      });
+
+      provisionGuestVM({
+        vmName,
+        adminUsername: adminUsername || 'ubuntu',
+        adminPassword: adminPassword || '',
+        sshPublicKey: sshPublicKey || '',
+      }).catch((e) => console.error('[GUEST REBUILD PROVISION ERROR]:', e));
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(result));
+    }
+
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Endpoint not found' }));
   } catch (error) {

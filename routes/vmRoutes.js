@@ -15,6 +15,12 @@ import {
   destroyVM,
   getVMMetrics,
   getConsoleSession,
+  getVMSnapshots,
+  createVMSnapshot,
+  restoreVMSnapshot,
+  deleteVMSnapshot,
+  resetVMPassword,
+  rebuildVMInstance,
 } from '../controllers/vmController.js';
 
 const router = express.Router();
@@ -49,5 +55,17 @@ router.get('/:id/metrics', getVMMetrics);
 // 8. Dynamic Web Console session ticket
 router.post('/:vmId/console-session', getConsoleSession);
 router.get('/:vmId/console-session', getConsoleSession);
+
+// 9. Checkpoints / Snapshots
+router.get('/:id/snapshots', getVMSnapshots);
+router.post('/:id/snapshots', createVMSnapshot);
+router.post('/:id/snapshots/:snapshotId/restore', restoreVMSnapshot);
+router.delete('/:id/snapshots/:snapshotId', deleteVMSnapshot);
+
+// 10. Reset Guest Admin Password
+router.post('/:id/reset-password', resetVMPassword);
+
+// 11. Rebuild VM instance
+router.post('/:id/rebuild', rebuildVMInstance);
 
 export default router;

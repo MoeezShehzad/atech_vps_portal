@@ -200,6 +200,48 @@ class HyperVService {
     const qs = `?vmName=${encodeURIComponent(vmName)}`;
     return await this.dispatchToHost(`/api/hyperv/metrics${qs}`, 'GET');
   }
+
+  /**
+   * Manage Checkpoints/Snapshots: CREATE, LIST, RESTORE, DELETE
+   */
+  async snapshotAction(vmName, action, snapshotName = '') {
+    if (action.toUpperCase() === 'LIST') {
+      const qs = `?vmName=${encodeURIComponent(vmName)}`;
+      return await this.dispatchToHost(`/api/hyperv/snapshot${qs}`, 'GET');
+    }
+    return await this.dispatchToHost('/api/hyperv/snapshot', 'POST', {
+      vmName,
+      action: action.toUpperCase(),
+      snapshotName,
+    });
+  }
+
+  /**
+   * Reset Guest OS Admin / Root password
+   */
+  async resetPassword({ vmName, adminUsername, newPassword }) {
+    return await this.dispatchToHost('/api/hyperv/reset-password', 'POST', {
+      vmName,
+      adminUsername,
+      newPassword,
+    });
+  }
+
+  /**
+   * Rebuild VM with clean OS image
+   */
+  async rebuildVM({ vmName, ramMb, cpuCount, diskGb, templatePath, adminUsername, adminPassword, sshPublicKey }) {
+    return await this.dispatchToHost('/api/hyperv/rebuild', 'POST', {
+      vmName,
+      ramMb,
+      cpuCount,
+      diskGb,
+      templatePath,
+      adminUsername,
+      adminPassword,
+      sshPublicKey,
+    });
+  }
 }
 
 export default new HyperVService();
