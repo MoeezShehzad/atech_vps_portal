@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import prisma from '../lib/prisma.js';
 
 export const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -18,3 +19,43 @@ export const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+/**
+ * Strict Admin Guard: verifies user's active role directly against database
+ * to prevent token spoofing or revoked privileges.
+ */
+export const requireAdmin = async (req, res, next) => {
+  try {
+    const userId = Number(req.user?.userId || req.user?.id);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { userId },
+      include: {
+        userRoles: {
+          include: { role: true },
+        },
+      },
+    });
+
+    if (!user || !user.isActive) {
+      return res.status(403).json({ error: 'Account inactive or suspended' });
+    }
+
+    const hasAdminRole = user.userRoles?.some(
+      (ur) => ur.role?.roleName?.toLowerCase() === 'admin' || ur.role?.roleName?.toLowerCase() === 'superuser'
+    );
+
+    if (!hasAdminRole) {
+      return res.status(403).json({ error: 'Access denied: Administrator privileges required.' });
+    }
+
+    req.adminUser = user;
+    next();
+  } catch (error) {
+    console.error('requireAdmin error:', error);
+    return res.status(500).json({ error: 'Internal privilege verification error' });
+  }
+};

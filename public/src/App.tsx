@@ -20,6 +20,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const AddtoCart = lazy(() => import('./pages/AddtoCart'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 // Lightweight, seamless route suspense fallback
 function RouteLoadingFallback() {
@@ -83,6 +84,13 @@ function AppContent() {
                 Dashboard
               </Link>
             )}
+
+            {/* Render Admin Console if user is Admin */}
+            {isLoggedIn && (user?.role?.toLowerCase() === 'admin' || user?.roles?.some(r => r.toLowerCase() === 'admin')) && (
+              <Link to="/admin" className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 font-bold text-xs hover:bg-rose-100 transition-all border border-rose-200 dark:border-rose-900">
+                Admin Console
+              </Link>
+            )}
           </div>
 
           <div className="flex gap-3 items-center">
@@ -135,6 +143,16 @@ function AppContent() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* SECURE ADMIN ROUTE (Protected by Role Guard) */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminDashboard />
                 </ProtectedRoute>
               }
             />

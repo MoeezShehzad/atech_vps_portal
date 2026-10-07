@@ -9,7 +9,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -64,6 +64,18 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
               </button>
             );
           })}
+
+          {/* ADMIN CONSOLE LINK (Shown only for Admin users) */}
+          {user?.role?.toLowerCase() === 'admin' && (
+            <button
+              type="button"
+              onClick={() => navigate('/admin')}
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 transition-all mt-3"
+            >
+              <Shield className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+              <span>Admin Console</span>
+            </button>
+          )}
         </nav>
       </div>
 
