@@ -7,6 +7,7 @@
 // ==============================================================================
 
 import os from 'os';
+import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
 
@@ -431,3 +432,384 @@ export async function getAdminAuditLogs(req, res) {
     res.status(500).json({ error: 'Failed to retrieve cluster audit logs' });
   }
 }
+
+/**
+ * ==============================================================================
+ * HOSTINGER ADVANCED SUITE (OPTIONS 1 - 6)
+ * ==============================================================================
+ */
+
+/**
+ * OPTION 1: CUSTOMER IMPERSONATION ("Login as User" / Ghost Mode)
+ * POST /api/admin/impersonate/:userId
+ */
+export async function impersonateUser(req, res) {
+  try {
+    const targetUserId = Number(req.params.userId);
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Valid userId required' });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { userId: targetUserId },
+      include: {
+        userRoles: { include: { role: true } },
+      },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Target user not found' });
+    }
+
+    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
+    const primaryRole = targetUser.userRoles?.[0]?.role?.roleName || 'Customer';
+
+    // Scoped 2-hour impersonation access token
+    const impersonationToken = jwt.sign(
+      {
+        userId: targetUser.userId,
+        email: targetUser.email,
+        role: primaryRole,
+        isImpersonated: true,
+        impersonatedBy: req.adminUser.email,
+      },
+      secret,
+      { expiresIn: '2h' }
+    );
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.adminUser.userId,
+        action: 'ADMIN_IMPERSONATE_USER',
+        status: 'SUCCESS',
+        details: `Administrator ${req.adminUser.email} initiated impersonation session for ${targetUser.email} (ID: ${targetUserId})`,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `Impersonation session created for ${targetUser.email}`,
+      accessToken: impersonationToken,
+      user: {
+        userId: targetUser.userId,
+        fullName: targetUser.fullName,
+        email: targetUser.email,
+        role: primaryRole,
+        isImpersonated: true,
+        impersonatedBy: req.adminUser.email,
+      },
+    });
+  } catch (error) {
+    console.error('impersonateUser error:', error);
+    res.status(500).json({ error: 'Failed to generate impersonation token' });
+  }
+}
+
+/**
+ * OPTION 4: SYSTEM ANNOUNCEMENTS & MAINTENANCE BANNERS
+ * GET /api/admin/announcements
+ * POST /api/admin/announcements
+ * DELETE /api/admin/announcements/:id
+ */
+export async function getAnnouncements(req, res) {
+  try {
+    const list = await prisma.systemAnnouncement.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, announcements: list });
+  } catch (error) {
+    console.error('getAnnouncements error:', error);
+    res.status(500).json({ error: 'Failed to retrieve announcements' });
+  }
+}
+
+export async function createAnnouncement(req, res) {
+  try {
+    const { title, message, type } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message required' });
+    }
+
+    const created = await prisma.systemAnnouncement.create({
+      data: {
+        title,
+        message,
+        type: type || 'info',
+        createdBy: req.adminUser.email,
+        isActive: true,
+      },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.adminUser.userId,
+        action: 'ADMIN_CREATE_ANNOUNCEMENT',
+        status: 'SUCCESS',
+        details: `Administrator broadcast announcement: "${title}" (${type})`,
+      },
+    });
+
+    res.json({ success: true, announcement: created });
+  } catch (error) {
+    console.error('createAnnouncement error:', error);
+    res.status(500).json({ error: 'Failed to broadcast announcement' });
+  }
+}
+
+export async function deleteAnnouncement(req, res) {
+  try {
+    const id = Number(req.params.id);
+    await prisma.systemAnnouncement.delete({ where: { id } });
+    res.json({ success: true, message: 'Announcement removed' });
+  } catch (error) {
+    console.error('deleteAnnouncement error:', error);
+    res.status(500).json({ error: 'Failed to delete announcement' });
+  }
+}
+
+/**
+ * OPTION 2: DYNAMIC VPS PLANS & PROMO CODE ENGINE
+ * GET /api/admin/plans
+ * POST /api/admin/plans
+ * PATCH /api/admin/plans/:planId
+ * GET /api/admin/coupons
+ * POST /api/admin/coupons
+ * DELETE /api/admin/coupons/:id
+ */
+export async function getAdminPlans(req, res) {
+  try {
+    const plans = await prisma.vPSPlan.findMany({
+      orderBy: { planId: 'asc' },
+    });
+    res.json({ success: true, plans });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load plans' });
+  }
+}
+
+export async function updatePlan(req, res) {
+  try {
+    const planId = Number(req.params.planId);
+    const { name, cpuCores, ramGb, storageGb, monthlyPrice, isActive } = req.body;
+
+    const updated = await prisma.vPSPlan.update({
+      where: { planId },
+      data: {
+        ...(name && { name }),
+        ...(cpuCores && { cpuCores: Number(cpuCores) }),
+        ...(ramGb && { ramGb: Number(ramGb) }),
+        ...(storageGb && { storageGb: Number(storageGb) }),
+        ...(monthlyPrice && { monthlyPrice: Number(monthlyPrice) }),
+        ...(isActive !== undefined && { isActive: Boolean(isActive) }),
+      },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.adminUser.userId,
+        action: 'ADMIN_UPDATE_PLAN',
+        status: 'SUCCESS',
+        details: `Administrator updated VPS plan '${updated.name}' (ID: ${planId})`,
+      },
+    });
+
+    res.json({ success: true, plan: updated });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update plan' });
+  }
+}
+
+export async function getAdminCoupons(req, res) {
+  try {
+    const coupons = await prisma.promoCode.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, coupons });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load coupons' });
+  }
+}
+
+export async function createAdminCoupon(req, res) {
+  try {
+    const { code, discountType, discountValue, maxUses } = req.body;
+    if (!code || !discountValue) {
+      return res.status(400).json({ error: 'Code and discount value required' });
+    }
+
+    const created = await prisma.promoCode.create({
+      data: {
+        code: code.toUpperCase().trim(),
+        discountType: discountType || 'PERCENT',
+        discountValue: Number(discountValue),
+        maxUses: Number(maxUses) || 100,
+        isActive: true,
+      },
+    });
+
+    res.json({ success: true, coupon: created });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create promo code' });
+  }
+}
+
+export async function deleteAdminCoupon(req, res) {
+  try {
+    const id = Number(req.params.id);
+    await prisma.promoCode.delete({ where: { id } });
+    res.json({ success: true, message: 'Promo code deleted' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete promo code' });
+  }
+}
+
+/**
+ * OPTION 3: IP ADDRESS POOL & SUBNET MANAGER (IPAM)
+ * GET /api/admin/ipam
+ * POST /api/admin/ipam
+ * PATCH /api/admin/ipam/:ipId/release
+ */
+export async function getIpamPool(req, res) {
+  try {
+    const ips = await prisma.iPPool.findMany({
+      include: {
+        assignedVm: {
+          select: { vmId: true, name: true, user: { select: { email: true } } },
+        },
+      },
+      orderBy: { ipId: 'asc' },
+    });
+    res.json({ success: true, ips });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load IP inventory' });
+  }
+}
+
+export async function addIpToPool(req, res) {
+  try {
+    const { ipAddress, subnetMask, gateway, ipType } = req.body;
+    if (!ipAddress) {
+      return res.status(400).json({ error: 'ipAddress is required' });
+    }
+
+    const created = await prisma.iPPool.create({
+      data: {
+        ipAddress,
+        subnetMask: subnetMask || '255.255.255.0',
+        gateway: gateway || '172.19.124.1',
+        ipType: ipType || 'PUBLIC_IPV4',
+        status: 'AVAILABLE',
+      },
+    });
+
+    res.json({ success: true, ip: created });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to add IP address to pool' });
+  }
+}
+
+export async function releaseIpFromPool(req, res) {
+  try {
+    const ipId = Number(req.params.ipId);
+    const updated = await prisma.iPPool.update({
+      where: { ipId },
+      data: {
+        status: 'AVAILABLE',
+        assignedVmId: null,
+      },
+    });
+    res.json({ success: true, message: `IP ${updated.ipAddress} released back to pool` });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to release IP' });
+  }
+}
+
+/**
+ * OPTION 5: CLUSTER FIREWALL BLACKLIST & ABUSE QUARANTINE
+ * GET /api/admin/security/threats
+ * POST /api/admin/security/ban-ip
+ */
+export async function getSecurityThreats(req, res) {
+  try {
+    const failedLogins = await prisma.securityLog.findMany({
+      where: { result: 'FAILED' },
+      take: 50,
+      orderBy: { timestamp: 'desc' },
+      include: { user: { select: { email: true } } },
+    });
+
+    res.json({
+      success: true,
+      threats: failedLogins.map((f) => ({
+        id: f.logId.toString(),
+        action: f.action,
+        ipAddress: f.ipAddress || 'Unknown',
+        targetUser: f.user?.email || 'N/A',
+        details: f.details || '',
+        timestamp: f.timestamp,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load security threat events' });
+  }
+}
+
+export async function banThreatIp(req, res) {
+  try {
+    const { ipAddress, reason } = req.body;
+    if (!ipAddress) return res.status(400).json({ error: 'IP address required' });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.adminUser.userId,
+        action: 'ADMIN_BAN_IP',
+        status: 'SUCCESS',
+        details: `Administrator banned IP address ${ipAddress} across cluster. Reason: ${reason || 'Suspicious Activity'}`,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `IP ${ipAddress} has been successfully banned cluster-wide.`,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to ban IP address' });
+  }
+}
+
+/**
+ * OPTION 6: SUPPORT TICKET HELPDESK
+ * GET /api/admin/tickets
+ * POST /api/admin/tickets/:ticketId/reply
+ */
+export async function getAdminTickets(req, res) {
+  try {
+    const tickets = await prisma.supportTicket.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, tickets });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load support tickets' });
+  }
+}
+
+export async function replyAdminTicket(req, res) {
+  try {
+    const id = Number(req.params.ticketId);
+    const { response, status } = req.body;
+
+    const updated = await prisma.supportTicket.update({
+      where: { id },
+      data: {
+        ...(response && { response }),
+        ...(status && { status }),
+        assignedTo: req.adminUser.email,
+      },
+    });
+
+    res.json({ success: true, ticket: updated });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update ticket response' });
+  }
+}
+

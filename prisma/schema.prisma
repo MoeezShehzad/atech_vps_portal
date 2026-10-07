@@ -335,3 +335,46 @@ model SSHKey {
 
   @@map("SSH_Keys")
 }
+
+model SystemAnnouncement {
+  id        Int      @id @default(autoincrement())
+  title     String   @db.VarChar(255)
+  message   String   @db.NVarChar(Max)
+  type      String   @default("info") @db.VarChar(30) // info, warning, critical
+  isActive  Boolean  @default(true)
+  createdBy String?  @db.VarChar(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("System_Announcements")
+}
+
+model PromoCode {
+  id             Int       @id @default(autoincrement())
+  code           String    @unique @db.VarChar(50)
+  discountType   String    @default("PERCENT") @db.VarChar(20) // PERCENT, FIXED
+  discountValue  Decimal   @db.Decimal(10, 2)
+  maxUses        Int       @default(100)
+  timesUsed      Int       @default(0)
+  isActive       Boolean   @default(true)
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  @@map("Promo_Codes")
+}
+
+model SupportTicket {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  subject     String   @db.VarChar(255)
+  message     String   @db.NVarChar(Max)
+  priority    String   @default("NORMAL") @db.VarChar(20) // LOW, NORMAL, HIGH, URGENT
+  status      String   @default("OPEN") @db.VarChar(20)   // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  assignedTo  String?  @db.VarChar(100)
+  response    String?  @db.NVarChar(Max)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@map("Support_Tickets")
+}

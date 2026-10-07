@@ -24,6 +24,8 @@ export interface User {
   roles?: string[];
   avatarUrl?: string;
   hasPassword?: boolean;
+  isImpersonated?: boolean;
+  impersonatedBy?: string;
 }
 
 interface AuthContextType {

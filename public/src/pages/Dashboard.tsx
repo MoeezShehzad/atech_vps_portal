@@ -769,6 +769,29 @@ export default function Dashboard() {
       {/* DYNAMIC CONTENT CONTAINER */}
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         
+        {/* HOSTINGER GHOST MODE IMPERSONATION BANNER */}
+        {user?.isImpersonated && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-amber-700 dark:text-amber-300 flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-2.5 text-xs font-semibold">
+              <span className="p-1.5 rounded-lg bg-amber-500 text-slate-950 font-black text-[10px]">GHOST MODE</span>
+              <span>You are viewing this portal as <strong>{user.email}</strong> (Impersonated by {user.impersonatedBy || 'Admin'}).</span>
+            </div>
+            <button
+              onClick={() => {
+                const orig = sessionStorage.getItem('originalAdminToken');
+                if (orig) {
+                  localStorage.setItem('accessToken', orig);
+                  sessionStorage.removeItem('originalAdminToken');
+                }
+                window.location.href = '/admin';
+              }}
+              className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs hover:bg-amber-400 transition-all shadow-xs"
+            >
+              Exit Impersonation
+            </button>
+          </div>
+        )}
+
         {/* RENDER ACCOUNT SETTINGS WHEN TAB IS SETTINGS */}
         {activeTab === 'settings' && <AccountSettings />}
 
