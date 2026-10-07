@@ -51,6 +51,7 @@ const StorageAndDisks = React.lazy(() => import('../components/StorageAndDisks')
 const ResourcePools = React.lazy(() => import('../components/ResourcePools'));
 const BillingAndInvoices = React.lazy(() => import('../components/BillingAndInvoices'));
 const ConnectionGuideModal = React.lazy(() => import('../components/ConnectionGuideModal'));
+const SupportAndTickets = React.lazy(() => import('../components/SupportAndTickets'));
 
 interface Instance {
   id: string;
@@ -192,8 +193,14 @@ export default function Dashboard() {
   const [customCpu, setCustomCpu] = useState<number>(2);
   const [customRam, setCustomRam] = useState<number>(4);
   const [customStorage, setCustomStorage] = useState<number>(50);
-  const [deployUsername, setDeployUsername] = useState('ubuntu');
-  const [deployPassword, setDeployPassword] = useState('root');
+  const [deployUsername, setDeployUsername] = useState(() => {
+    try {
+      return localStorage.getItem('atech_preferred_admin_user') || 'ubuntu';
+    } catch {
+      return 'ubuntu';
+    }
+  });
+  const [deployPassword, setDeployPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [deployLoading, setDeployLoading] = useState(false);
 
@@ -460,10 +467,14 @@ export default function Dashboard() {
         body: JSON.stringify(payload),
       });
       toast.success(`Server '${newHostname}' deployed successfully.`);
+      if (deployUsername.trim()) {
+        try {
+          localStorage.setItem('atech_preferred_admin_user', deployUsername.trim());
+        } catch {}
+      }
       setIsDeployOpen(false);
       setNewHostname('');
-      setDeployUsername('ubuntu');
-      setDeployPassword('root');
+      setDeployPassword('');
       setCustomSSHPublicKey('');
       await fetchVMs();
     } catch (err: any) {
@@ -737,8 +748,15 @@ export default function Dashboard() {
         setNewHostname(`srv-vps-${Math.floor(Math.random() * 899 + 100)}`);
       }
     }
-    setDeployUsername('ubuntu');
-    setDeployPassword('root');
+    let savedUser = '';
+    try {
+      savedUser = localStorage.getItem('atech_preferred_admin_user') || '';
+    } catch {}
+    const autoUser = savedUser || (user?.email ? user.email.split('@')[0].replace(/[^a-z0-9_-]/g, '').toLowerCase() : 'ubuntu');
+    setDeployUsername(autoUser || 'ubuntu');
+    if (!deployPassword) {
+      generateStrongPassword();
+    }
     setIsDeployOpen(true);
   };
 
@@ -836,6 +854,17 @@ export default function Dashboard() {
             </div>
           }>
             <BillingAndInvoices />
+          </React.Suspense>
+        )}
+
+        {/* RENDER SUPPORT & HELPDESK */}
+        {activeTab === 'support' && (
+          <React.Suspense fallback={
+            <div className="py-20 flex justify-center">
+              <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+            </div>
+          }>
+            <SupportAndTickets />
           </React.Suspense>
         )}
 
@@ -1490,7 +1519,7 @@ export default function Dashboard() {
         )}
 
         {/* PLACEHOLDER FOR OTHER TABS */}
-        {!['dashboard', 'vms', 'settings', 'security', 'storage', 'pools', 'billing'].includes(activeTab) && (
+        {!['dashboard', 'vms', 'settings', 'security', 'storage', 'pools', 'billing', 'support'].includes(activeTab) && (
           <div className="max-w-7xl mx-auto bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-500 font-medium">
             Section <strong className="capitalize text-slate-800">{activeTab}</strong> is under construction.
           </div>
@@ -1876,10 +1905,10 @@ export default function Dashboard() {
                       required
                       value={deployUsername}
                       onChange={(e) => setDeployUsername(e.target.value)}
-                      placeholder="ubuntu"
+                      placeholder="e.g. admin or custom user"
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
                     />
-                    <p className="text-[10px] text-slate-400 mt-0.5">Template default: <code className="text-slate-600">ubuntu</code></p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Custom admin account for SSH & sudo access</p>
                   </div>
 
                   {authMethod === 'password' ? (
@@ -1902,7 +1931,7 @@ export default function Dashboard() {
                           required
                           value={deployPassword}
                           onChange={(e) => setDeployPassword(e.target.value)}
-                          placeholder="Default: root"
+                          placeholder="Secure server password"
                           className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 pr-8 transition-all"
                         />
                         <button
@@ -1914,7 +1943,7 @@ export default function Dashboard() {
                           {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Template default: <code className="text-slate-600">root</code></p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Encrypted credentials for initial server login</p>
                     </div>
                   ) : null}
                 </div>

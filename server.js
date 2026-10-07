@@ -19,6 +19,7 @@ import securityRoutes from './routes/securityRoutes.js';
 import billingRoutes from './routes/billingRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import ticketRoutes from './routes/ticketRoutes.js';
 import { setupTerminalWebSocket } from './services/terminalService.js';
 
 const app = express();
@@ -119,6 +120,7 @@ app.use('/api/logs', securityRoutes); // Alias for convenience
 app.use('/api/billing', billingRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/tickets', ticketRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

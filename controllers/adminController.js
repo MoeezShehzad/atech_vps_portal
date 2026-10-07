@@ -282,14 +282,17 @@ export async function getFleetVMs(req, res) {
     } catch (_) {}
 
     const formattedVMs = vms.map((v) => {
-      const hv = hvMap.get(v.name.toLowerCase());
+      const vmDisplayName = v.vmName || v.name || `vm-${v.vmId}`;
+      const hv = hvMap.get(vmDisplayName.toLowerCase());
+      const assignedIp = (v.ipPool && v.ipPool.length > 0) ? v.ipPool[0].ipAddress : (v.ipAddress || '172.19.124.x');
+
       return {
         vmId: v.vmId,
-        name: v.name,
-        hostname: v.hostname,
+        name: vmDisplayName,
+        hostname: v.hostname || `${vmDisplayName}.atech-vps.net`,
         os: v.image?.name || 'Ubuntu 24.04 LTS',
-        status: hv?.State ? (hv.State === 'Running' ? 'running' : 'stopped') : v.status,
-        ip: v.ipPool?.ipAddress || v.ipAddress || '172.19.124.x',
+        status: hv?.State ? (hv.State === 'Running' ? 'running' : 'stopped') : (v.status ? v.status.toLowerCase() : 'stopped'),
+        ip: assignedIp,
         cpuCores: v.cpuCores,
         ramGb: v.ramGb,
         storageGb: v.storageGb,
@@ -335,7 +338,8 @@ export async function adminPowerControl(req, res) {
       return res.status(404).json({ error: 'VM not found' });
     }
 
-    const result = await hypervService.controlPower(vm.name, action);
+    const vmTargetName = vm.vmName || vm.name;
+    const result = await hypervService.controlPower(vmTargetName, action);
 
     // Update DB status
     const newStatus = (action === 'START' || action === 'RESTART') ? 'running' : 'stopped';
@@ -351,13 +355,13 @@ export async function adminPowerControl(req, res) {
         vmId: vm.vmId,
         action: `ADMIN_POWER_${action}`,
         status: 'SUCCESS',
-        details: `Administrator ${req.adminUser.email} executed ${action} on VM '${vm.name}' owned by ${vm.user?.email}`,
+        details: `Administrator ${req.adminUser.email} executed ${action} on VM '${vmTargetName}' owned by ${vm.user?.email || 'N/A'}`,
       },
     });
 
     res.json({
       success: true,
-      message: `Power action '${action}' successfully dispatched to VM ${vm.name}`,
+      message: `Power action '${action}' successfully dispatched to VM ${vmTargetName}`,
       result,
     });
   } catch (error) {
@@ -383,7 +387,7 @@ export async function getAdminAuditLogs(req, res) {
             select: { userId: true, fullName: true, email: true },
           },
           vm: {
-            select: { vmId: true, name: true },
+            select: { vmId: true, vmName: true },
           },
         },
       }),
@@ -407,7 +411,7 @@ export async function getAdminAuditLogs(req, res) {
         status: l.status,
         details: l.details || '',
         actor: l.user ? { userId: l.user.userId, name: l.user.fullName, email: l.user.email } : { email: 'System' },
-        targetVm: l.vm ? l.vm.name : null,
+        targetVm: l.vm ? l.vm.vmName : null,
         timestamp: l.createdAt,
       })),
       ...securityLogs.map((s) => ({
@@ -674,7 +678,7 @@ export async function getIpamPool(req, res) {
     const ips = await prisma.iPPool.findMany({
       include: {
         assignedVm: {
-          select: { vmId: true, name: true, user: { select: { email: true } } },
+          select: { vmId: true, vmName: true, user: { select: { email: true } } },
         },
       },
       orderBy: { ipId: 'asc' },
@@ -787,8 +791,22 @@ export async function getAdminTickets(req, res) {
     const tickets = await prisma.supportTicket.findMany({
       orderBy: { createdAt: 'desc' },
     });
-    res.json({ success: true, tickets });
+
+    const userIds = [...new Set(tickets.map((t) => t.userId))];
+    const users = await prisma.user.findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true, fullName: true, email: true },
+    });
+    const userMap = new Map(users.map((u) => [u.userId, u]));
+
+    const enriched = tickets.map((t) => ({
+      ...t,
+      user: userMap.get(t.userId) || { email: `User #${t.userId}`, fullName: 'Customer' },
+    }));
+
+    res.json({ success: true, tickets: enriched });
   } catch (error) {
+    console.error('getAdminTickets error:', error);
     res.status(500).json({ error: 'Failed to load support tickets' });
   }
 }
@@ -802,13 +820,23 @@ export async function replyAdminTicket(req, res) {
       where: { id },
       data: {
         ...(response && { response }),
-        ...(status && { status }),
+        status: status || 'RESOLVED',
         assignedTo: req.adminUser.email,
+      },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.adminUser.userId,
+        action: 'ADMIN_REPLY_TICKET',
+        status: 'SUCCESS',
+        details: `Administrator ${req.adminUser.email} replied to ticket #${id} and updated status to '${updated.status}'`,
       },
     });
 
     res.json({ success: true, ticket: updated });
   } catch (error) {
+    console.error('replyAdminTicket error:', error);
     res.status(500).json({ error: 'Failed to update ticket response' });
   }
 }

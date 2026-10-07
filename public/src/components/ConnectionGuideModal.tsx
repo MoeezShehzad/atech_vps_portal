@@ -160,7 +160,7 @@ export default function ConnectionGuideModal({
                   <strong className="text-slate-900">SSH</strong>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Default User:</span>
+                  <span className="text-slate-500">Admin User:</span>
                   <strong className="font-mono text-slate-900">{username}</strong>
                 </div>
               </div>
