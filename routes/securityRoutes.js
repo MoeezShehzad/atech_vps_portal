@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../middlewares/authMiddleware.js';
+import authenticateToken from '../middleware/authMiddleware.js';
 import {
   getSecurityOverview,
   getAuditLogs,
@@ -9,7 +9,7 @@ import {
 const router = express.Router();
 
 // All security routes require user authentication
-router.use(authenticate);
+router.use(authenticateToken);
 
 router.get('/overview', getSecurityOverview);
 router.get('/logs', getAuditLogs);
