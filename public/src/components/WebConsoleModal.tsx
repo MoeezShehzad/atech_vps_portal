@@ -149,6 +149,55 @@ export default function WebConsoleModal({
       }
     });
 
+    // Handle Ctrl+C (Copy if selected) and Ctrl+V / Cmd+V (Paste)
+    term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      // 1. Copy: Ctrl+C / Cmd+C when text is highlighted
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
+        if (term.hasSelection()) {
+          navigator.clipboard.writeText(term.getSelection());
+          return false; // Handled, do not send interrupt signal
+        }
+        return true; // No selection: allow Ctrl+C SIGINT in bash
+      }
+
+      // 2. Paste: Ctrl+V, Cmd+V, or Ctrl+Shift+V
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v' && event.type === 'keydown') {
+        navigator.clipboard.readText().then((clipText) => {
+          if (clipText && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            socketRef.current.send(clipText);
+          }
+        }).catch(() => {});
+        return false; // Handled
+      }
+
+      return true;
+    });
+
+    // Native browser paste event listener
+    const currentContainer = terminalRef.current;
+    const handleNativePaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData('text');
+      if (text && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(text);
+        e.preventDefault();
+      }
+    };
+    currentContainer.addEventListener('paste', handleNativePaste);
+
+    // Right-click paste (PuTTY / Windows Terminal style)
+    const handleContextMenu = async (e: MouseEvent) => {
+      if (!term.hasSelection()) {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+            socketRef.current.send(text);
+            e.preventDefault();
+          }
+        } catch {}
+      }
+    };
+    currentContainer.addEventListener('contextmenu', handleContextMenu);
+
     const handleResize = () => {
       fitAddon.fit();
       if (term.cols && term.rows && socketRef.current?.readyState === WebSocket.OPEN) {
@@ -157,11 +206,18 @@ export default function WebConsoleModal({
     };
     window.addEventListener('resize', handleResize);
 
+    // Ensure focus immediately and after modal animation completes
+    term.focus();
+    setTimeout(() => term.focus(), 150);
+    setTimeout(() => term.focus(), 400);
+
     // Initial connection
     connectSession();
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      currentContainer.removeEventListener('paste', handleNativePaste);
+      currentContainer.removeEventListener('contextmenu', handleContextMenu);
       onDataDisposable.dispose();
       if (socketRef.current) {
         socketRef.current.onclose = null;

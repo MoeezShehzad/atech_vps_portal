@@ -82,6 +82,7 @@ export function setupTerminalWebSocket(server) {
 
     const sshConn = new SSHClient();
     let shellStream = null;
+    const inputBuffer = [];
 
     sshConn.on('ready', () => {
       // Allocate interactive pseudo-terminal (PTY) on remote Linux guest
@@ -101,6 +102,12 @@ export function setupTerminalWebSocket(server) {
           }
 
           shellStream = stream;
+
+          // Flush any keystrokes sent before SSH stream completed handshake
+          while (inputBuffer.length > 0) {
+            const buffered = inputBuffer.shift();
+            if (stream.writable) stream.write(buffered);
+          }
 
           // Pipe remote shell output directly to browser xterm
           stream.on('data', (data) => {
@@ -142,6 +149,9 @@ export function setupTerminalWebSocket(server) {
 
         if (shellStream && shellStream.writable) {
           shellStream.write(msg);
+        } else {
+          // Buffer keystrokes while SSH handshake is finishing
+          inputBuffer.push(msg);
         }
       } catch (e) {}
     });
