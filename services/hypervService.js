@@ -66,9 +66,9 @@ class HyperVService {
   /**
    * Provision a new Virtual Machine on Windows Hyper-V.
    */
-  async createVM({ vmId, vmName, cpuCores, ramGb, storageGb, templatePath, switchName = 'Default Switch', adminUsername = 'ubuntu', adminPassword = '' }) {
+  async createVM({ vmId, vmName, cpuCores, ramGb, storageGb, templatePath, switchName = 'Default Switch', adminUsername = 'ubuntu', adminPassword = '', sshPublicKey = '' }) {
     const ramMb = ramGb * 1024;
-    console.log(`[HYPER-V] Provisioning VM: ${vmName} (${cpuCores} vCPU, ${ramGb}GB RAM, ${storageGb}GB Disk, user: ${adminUsername})`);
+    console.log(`[HYPER-V] Provisioning VM: ${vmName} (${cpuCores} vCPU, ${ramGb}GB RAM, ${storageGb}GB Disk, user: ${adminUsername}, sshKey: ${Boolean(sshPublicKey)})`);
 
     // Record Provisioning Job in Database
     const job = await prisma.provisioningJob.create({
@@ -92,6 +92,7 @@ class HyperVService {
         switchName,
         adminUsername,
         adminPassword,
+        sshPublicKey,
       });
 
       // Update Provisioning Job as completed

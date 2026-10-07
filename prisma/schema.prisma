@@ -34,6 +34,7 @@ model User {
   securityLogs    SecurityLog[]
   activityLogs    ActivityLog[]
   refreshTokens   RefreshToken[]
+  sshKeys         SSHKey[]
 
   @@map("Users")
 }
@@ -152,6 +153,8 @@ model VirtualMachine {
   status             String    @db.VarChar(30)
   provisioningStatus String    @map("provisioning_status") @db.VarChar(30)
   provisioningError  String?   @map("provisioning_error") @db.NVarChar(Max)
+  adminUser          String?   @default("ubuntu") @map("admin_user") @db.VarChar(50)
+  adminPassword      String?   @map("admin_password") @db.VarChar(100)
   createdAt          DateTime  @default(now()) @map("created_at")
   startedAt          DateTime? @map("started_at")
   stoppedAt          DateTime? @map("stopped_at")
@@ -317,4 +320,18 @@ model RefreshToken {
 
   @@index([userId], map: "idx_refresh_token_user_id")
   @@map("Refresh_Tokens")
+}
+
+model SSHKey {
+  keyId       Int      @id @default(autoincrement()) @map("key_id")
+  userId      Int      @map("user_id")
+  name        String   @db.VarChar(100)
+  publicKey   String   @map("public_key") @db.NVarChar(Max)
+  fingerprint String   @db.VarChar(100)
+  keyType     String   @default("ED25519") @map("key_type") @db.VarChar(30)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("SSH_Keys")
 }

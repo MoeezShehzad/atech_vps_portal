@@ -10,6 +10,7 @@ param (
     [Parameter(Mandatory=$false)][int]$DiskGB = 40,
     [Parameter(Mandatory=$false)][string]$AdminUsername = "ubuntu",
     [Parameter(Mandatory=$false)][string]$AdminPassword = "",
+    [Parameter(Mandatory=$false)][string]$SSHPublicKey = "",
     [Parameter(Mandatory=$false)][string]$TemplatePath = "D:\00_Master_Template\ubuntu-22.04.5-live-server-amd64.iso",
     [Parameter(Mandatory=$false)][string]$SwitchName = "Default Switch",
     [Parameter(Mandatory=$false)][string]$CustomerVMsRoot = "D:\CUSTOMER-VMS",
@@ -106,9 +107,9 @@ try {
     $GuestScript = Join-Path $PSScriptRoot "Configure-Guest.ps1"
     if (Test-Path $GuestScript) {
         Start-Job -ScriptBlock {
-            param($Script, $Name, $User, $Pass)
-            & $Script -VMName $Name -AdminUsername $User -AdminPassword $Pass -TimeoutSeconds 120
-        } -ArgumentList $GuestScript, $VMName, $AdminUsername, $AdminPassword | Out-Null
+            param($Script, $Name, $User, $Pass, $Key)
+            & $Script -VMName $Name -AdminUsername $User -AdminPassword $Pass -SSHPublicKey $Key -TimeoutSeconds 120
+        } -ArgumentList $GuestScript, $VMName, $AdminUsername, $AdminPassword, $SSHPublicKey | Out-Null
         Write-Output "[GUEST] Spawned background job for guest initialization and filesystem expansion."
     }
 

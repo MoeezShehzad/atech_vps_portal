@@ -37,6 +37,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import AccountSettings from '../components/AccountSettings';
+import WebConsoleModal from '../components/WebConsoleModal';
 import { apiCall } from '../services/api';
 
 interface Instance {
@@ -46,6 +47,7 @@ interface Instance {
   hostname: string;
   ip: string;
   adminUser?: string;
+  adminPassword?: string;
   os: string;
   status: 'running' | 'stopped' | 'provisioning';
   cpuUsage: number;
@@ -137,6 +139,8 @@ export default function Dashboard() {
   // Modals state
   const [isDeployOpen, setIsDeployOpen] = useState(false);
   const [selectedInstance, setSelectedInstance] = useState<Instance | null>(null);
+  const [drawerShowPassword, setDrawerShowPassword] = useState(false);
+  const [copiedDrawerPassword, setCopiedDrawerPassword] = useState(false);
   const [deletingInstance, setDeletingInstance] = useState<Instance | null>(null);
   const [resizingInstance, setResizingInstance] = useState<Instance | null>(null);
   const [copiedSSH, setCopiedSSH] = useState(false);
@@ -158,6 +162,15 @@ export default function Dashboard() {
   const [deployPassword, setDeployPassword] = useState('root');
   const [showPassword, setShowPassword] = useState(false);
   const [deployLoading, setDeployLoading] = useState(false);
+
+  // Web Terminal Console state
+  const [consoleVm, setConsoleVm] = useState<Instance | null>(null);
+
+  // Deploy SSH Key selection state
+  const [authMethod, setAuthMethod] = useState<'password' | 'sshKey'>('password');
+  const [userSSHKeys, setUserSSHKeys] = useState<{ keyId: number; name: string; fingerprint: string; keyType: string }[]>([]);
+  const [selectedSSHKeyId, setSelectedSSHKeyId] = useState<number | 'custom'>('custom');
+  const [customSSHPublicKey, setCustomSSHPublicKey] = useState('');
 
   const generateStrongPassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*';
@@ -230,6 +243,14 @@ export default function Dashboard() {
     return () => clearInterval(timer);
   }, [instances]);
 
+  // Periodic background sync: Keeps VM power states updated (e.g., if user ran 'sudo poweroff' or 'sudo reboot' inside guest OS)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      fetchVMs();
+    }, 8000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Active VM selected for live dashboard telemetry
   const [activeTelemetryVmId, setActiveTelemetryVmId] = useState<number | null>(null);
 
@@ -260,6 +281,15 @@ export default function Dashboard() {
         const ramVal = Math.min(100, Math.max(0, data.ramPercent || 0));
         setCpuHistory((prev) => [...prev.slice(1), cpuVal]);
         setRamHistory((prev) => [...prev.slice(1), ramVal]);
+
+        // If telemetry detects VM state changed to Off, immediately refresh dashboard instances
+        const currentInstance = instances.find((i) => i.vmId === vmId);
+        if (currentInstance && data.state) {
+          const liveState = data.state.toLowerCase();
+          if (liveState !== currentInstance.status) {
+            fetchVMs();
+          }
+        }
       }
     } catch (err) {
       console.warn('Failed to load VM metrics:', err);
@@ -293,11 +323,29 @@ export default function Dashboard() {
         setResizingInstance(null);
         setIsDeployOpen(false);
         setDeletingInstance(null);
+        setConsoleVm(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Fetch saved SSH keys when deploy modal opens
+  useEffect(() => {
+    if (isDeployOpen) {
+      apiCall('/ssh-keys')
+        .then((data) => {
+          if (data && data.keys && data.keys.length > 0) {
+            setUserSSHKeys(data.keys);
+            setSelectedSSHKeyId(data.keys[0].keyId);
+          } else {
+            setUserSSHKeys([]);
+            setSelectedSSHKeyId('custom');
+          }
+        })
+        .catch((err) => console.warn('Could not load SSH keys for deploy:', err));
+    }
+  }, [isDeployOpen]);
 
   // Update plan specs when plan selection changes in Deploy modal
   const handlePlanChange = (planId: number) => {
@@ -346,25 +394,42 @@ export default function Dashboard() {
     e.preventDefault();
     if (!newHostname.trim()) return;
 
+    if (authMethod === 'sshKey' && selectedSSHKeyId === 'custom' && !customSSHPublicKey.trim()) {
+      alert('Please paste a valid OpenSSH public key or select an existing key.');
+      return;
+    }
+
     setDeployLoading(true);
     try {
+      const payload: any = {
+        vmName: newHostname.trim(),
+        planId: selectedPlanId,
+        imageId: selectedImageId,
+        customCpu,
+        customRam,
+        customStorage,
+        username: deployUsername.trim() || 'ubuntu',
+        password: deployPassword.trim() || 'root',
+        authMethod,
+      };
+
+      if (authMethod === 'sshKey') {
+        if (selectedSSHKeyId !== 'custom') {
+          payload.sshKeyId = selectedSSHKeyId;
+        } else {
+          payload.sshPublicKey = customSSHPublicKey.trim();
+        }
+      }
+
       await apiCall('/vms/deploy', {
         method: 'POST',
-        body: JSON.stringify({
-          vmName: newHostname.trim(),
-          planId: selectedPlanId,
-          imageId: selectedImageId,
-          customCpu,
-          customRam,
-          customStorage,
-          username: deployUsername.trim() || 'ubuntu',
-          password: deployPassword.trim() || 'root',
-        }),
+        body: JSON.stringify(payload),
       });
       setIsDeployOpen(false);
       setNewHostname('');
       setDeployUsername('ubuntu');
       setDeployPassword('root');
+      setCustomSSHPublicKey('');
       await fetchVMs();
     } catch (err: any) {
       alert(`Deployment failed: ${err.message || 'Check cluster capacity'}`);
@@ -1122,6 +1187,20 @@ export default function Dashboard() {
                                   <Power className={`w-4 h-4 ${actionLoadingId === inst.vmId ? 'animate-spin' : ''}`} />
                                 </button>
 
+                                {/* WEB TERMINAL CONSOLE BUTTON */}
+                                {inst.status === 'running' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setConsoleVm(inst);
+                                    }}
+                                    title="Open In-Browser Web Console Terminal"
+                                    className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200 transition-all"
+                                  >
+                                    <Terminal className="w-4 h-4" />
+                                  </button>
+                                )}
+
                                 {/* RESIZE SPECS BUTTON */}
                                 <button
                                   onClick={(e) => openResizeModal(inst, e)}
@@ -1496,17 +1575,44 @@ export default function Dashboard() {
                 </>
               )}
 
-              {/* SERVER CREDENTIALS (USERNAME & PASSWORD) */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2.5">
+              {/* SERVER AUTHENTICATION (PASSWORD vs SSH PUBLIC KEY) */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-blue-600" /> Server Login Credentials
+                    <Key className="w-3.5 h-3.5 text-blue-600" /> Authentication Method
                   </span>
                   <span className="text-[10px] text-slate-500 font-mono">SSH & Root Access</span>
                 </div>
 
+                {/* AUTH METHOD SELECTOR TABS */}
+                <div className="grid grid-cols-2 gap-2 bg-slate-200/60 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setAuthMethod('password')}
+                    className={`py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      authMethod === 'password'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>Password Auth</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMethod('sshKey')}
+                    className={`py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                      authMethod === 'sshKey'
+                        ? 'bg-white text-blue-700 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Terminal className="w-3 h-3 text-blue-600" />
+                    <span>SSH Public Key</span>
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
+                  <div className={authMethod === 'sshKey' ? 'sm:col-span-2' : ''}>
                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                       Admin Username
                     </label>
@@ -1521,40 +1627,102 @@ export default function Dashboard() {
                     <p className="text-[10px] text-slate-400 mt-0.5">Template default: <code className="text-slate-600">ubuntu</code></p>
                   </div>
 
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-[11px] font-semibold text-slate-600">
-                        Root / Admin Password
-                      </label>
-                      <button
-                        type="button"
-                        onClick={generateStrongPassword}
-                        className="text-[10px] text-blue-600 hover:underline font-semibold"
-                      >
-                        Generate Strong
-                      </button>
+                  {authMethod === 'password' ? (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-semibold text-slate-600">
+                          Root / Admin Password
+                        </label>
+                        <button
+                          type="button"
+                          onClick={generateStrongPassword}
+                          className="text-[10px] text-blue-600 hover:underline font-semibold"
+                        >
+                          Generate Strong
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          value={deployPassword}
+                          onChange={(e) => setDeployPassword(e.target.value)}
+                          placeholder="Default: root"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 pr-8 transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          title={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Template default: <code className="text-slate-600">root</code></p>
                     </div>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={deployPassword}
-                        onChange={(e) => setDeployPassword(e.target.value)}
-                        placeholder="Default: root"
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 pr-8 transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        title={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Template default: <code className="text-slate-600">root</code></p>
-                  </div>
+                  ) : null}
                 </div>
+
+                {authMethod === 'sshKey' && (
+                  <div className="space-y-2.5 pt-1">
+                    {userSSHKeys.length > 0 && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Select Saved SSH Key
+                        </label>
+                        <select
+                          value={selectedSSHKeyId}
+                          onChange={(e) => setSelectedSSHKeyId(e.target.value === 'custom' ? 'custom' : Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
+                        >
+                          {userSSHKeys.map((k) => (
+                            <option key={k.keyId} value={k.keyId}>
+                              {k.name} ({k.keyType} - {k.fingerprint.slice(0, 20)}...)
+                            </option>
+                          ))}
+                          <option value="custom">+ Paste a new OpenSSH public key</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {(selectedSSHKeyId === 'custom' || userSSHKeys.length === 0) && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          OpenSSH Public Key
+                        </label>
+                        <textarea
+                          rows={3}
+                          required
+                          value={customSSHPublicKey}
+                          onChange={(e) => setCustomSSHPublicKey(e.target.value)}
+                          placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5... user@laptop"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Paste public key from <code className="text-slate-600">~/.ssh/id_ed25519.pub</code> or <code className="text-slate-600">~/.ssh/id_rsa.pub</code>.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-lg text-[11px] text-blue-800 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        Injected directly into guest authorized_keys
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsDeployOpen(false);
+                          setActiveTab('settings');
+                        }}
+                        className="text-[10px] font-bold text-blue-700 hover:underline"
+                      >
+                        Manage Keys →
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
@@ -1766,14 +1934,51 @@ export default function Dashboard() {
                   </button>
                 </div>
                 <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 flex items-center justify-between text-[11px] text-slate-600">
-                  <div className="flex items-center gap-2">
-                    <Key className="w-3.5 h-3.5 text-slate-400" />
+                  <div className="flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-blue-600" />
                     <span>User: <strong className="text-slate-800 font-mono">{selectedInstance.adminUser || 'ubuntu'}</strong></span>
                   </div>
-                  <div className="text-[10px] text-slate-500 font-mono">
-                    Password: <span className="bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-700">Set on deploy (default: root)</span>
+                  <div className="flex items-center gap-1 text-[11px] font-mono">
+                    <span className="text-slate-400">Pass:</span>
+                    <strong className="text-slate-800 bg-slate-200/80 px-1.5 py-0.5 rounded text-[10px]">
+                      {drawerShowPassword ? (selectedInstance.adminPassword || 'root') : '••••••••'}
+                    </strong>
+                    <button
+                      onClick={() => setDrawerShowPassword(!drawerShowPassword)}
+                      className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
+                      title={drawerShowPassword ? 'Hide Password' : 'Show Password'}
+                    >
+                      {drawerShowPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedInstance.adminPassword || 'root');
+                        setCopiedDrawerPassword(true);
+                        setTimeout(() => setCopiedDrawerPassword(false), 2000);
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
+                      title="Copy Password"
+                    >
+                      {copiedDrawerPassword ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
                 </div>
+
+                {/* LAUNCH IN-BROWSER WEB CONSOLE */}
+                {selectedInstance.status === 'running' ? (
+                  <button
+                    onClick={() => setConsoleVm(selectedInstance)}
+                    className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-2"
+                  >
+                    <Terminal className="w-4 h-4 text-emerald-400" />
+                    <span>Launch Web Terminal Console</span>
+                  </button>
+                ) : (
+                  <div className="w-full py-2 px-3 bg-slate-100 text-slate-400 rounded-xl text-xs font-medium flex items-center justify-center gap-2 border border-slate-200">
+                    <Terminal className="w-3.5 h-3.5" />
+                    <span>Web Console Available When Running</span>
+                  </div>
+                )}
               </div>
 
               {/* SPECS GRID */}
@@ -2011,6 +2216,19 @@ export default function Dashboard() {
 
           </div>
         </div>
+      )}
+
+      {/* INTERACTIVE WEB TERMINAL CONSOLE MODAL */}
+      {consoleVm && (
+        <WebConsoleModal
+          vmId={consoleVm.vmId}
+          vmName={consoleVm.name}
+          vmIp={consoleVm.ip}
+          adminUser={consoleVm.adminUser}
+          adminPassword={consoleVm.adminPassword}
+          onClose={() => setConsoleVm(null)}
+          onSessionEnd={() => fetchVMs()}
+        />
       )}
 
     </div>

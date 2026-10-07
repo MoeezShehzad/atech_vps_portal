@@ -10,6 +10,7 @@ param (
     [Parameter(Mandatory=$true)][string]$VMName,
     [Parameter(Mandatory=$false)][string]$AdminUsername = "ubuntu",
     [Parameter(Mandatory=$false)][string]$AdminPassword = "",
+    [Parameter(Mandatory=$false)][string]$SSHPublicKey = "",
     [Parameter(Mandatory=$false)][string]$DefaultPass = "root",
     [Parameter(Mandatory=$false)][int]$TimeoutSeconds = 90
 )
@@ -104,6 +105,13 @@ try {
             $Commands += "id -u $SafeUser 2>/dev/null || sudo useradd -m -s /bin/bash -G sudo $SafeUser"
             $Commands += "echo '$SafeUser:$SafePass' | sudo chpasswd"
         }
+    }
+
+    # Inject SSH Public Key for passwordless authentication
+    if ($SSHPublicKey) {
+        $KeyEscaped = $SSHPublicKey.Trim() -replace '"', '\"'
+        $Commands += "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo `"$KeyEscaped`" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+        $Commands += "echo $DefaultPass | sudo -S mkdir -p /root/.ssh && sudo chmod 700 /root/.ssh && echo `"$KeyEscaped`" | sudo tee -a /root/.ssh/authorized_keys >/dev/null && sudo chmod 600 /root/.ssh/authorized_keys"
     }
 
     $FullCmd = $Commands -join " ; "

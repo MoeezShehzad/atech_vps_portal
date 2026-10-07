@@ -3,6 +3,7 @@
 // Purpose: API controller for Virtual Machine management, resizing & lifecycle
 // ==============================================================================
 
+import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
 import { calculateResizePrice, calculateCustomPrice } from '../services/pricingService.js';
@@ -96,6 +97,33 @@ export async function getUserVMs(req, res) {
             }
           }
 
+          // Dynamic DHCP IP Discovery: Sync real guest IP from Hyper-V
+          if (liveInfo && liveInfo.IPAddresses && liveInfo.IPAddresses.length > 0) {
+            const discoveredIp = liveInfo.IPAddresses.find((ip) => ip && ip !== '127.0.0.1' && !ip.includes(':'));
+            if (discoveredIp) {
+              if (vm.ipPool && vm.ipPool.length > 0) {
+                if (vm.ipPool[0].ipAddress !== discoveredIp) {
+                  await prisma.iPPool.update({
+                    where: { ipId: vm.ipPool[0].ipId },
+                    data: { ipAddress: discoveredIp },
+                  }).catch(() => {});
+                  vm.ipPool[0].ipAddress = discoveredIp;
+                }
+              } else {
+                const newIpRecord = await prisma.iPPool.create({
+                  data: {
+                    ipAddress: discoveredIp,
+                    subnetMask: '255.255.240.0',
+                    gateway: '192.168.0.1',
+                    status: 'ASSIGNED',
+                    assignedVmId: vm.vmId,
+                  },
+                }).catch(() => {});
+                if (newIpRecord) vm.ipPool = [newIpRecord];
+              }
+            }
+          }
+
           synced.push(vm);
         }
         reconciledVms = synced;
@@ -147,14 +175,18 @@ export async function getUserVMs(req, res) {
 
     // Format for frontend
     const formatted = reconciledVms.map((vm) => {
-      const assignedIp = vm.ipPool && vm.ipPool.length > 0 ? vm.ipPool[0].ipAddress : '192.168.10.' + (100 + vm.vmId);
+      const assignedIp = (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress !== 'DHCP Pending' && vm.ipPool[0].ipAddress !== 'DHCP Leasing...') 
+        ? vm.ipPool[0].ipAddress 
+        : (vm.status === 'RUNNING' ? 'DHCP Leasing...' : '192.168.2.192');
       return {
         id: `vps-${vm.vmId}`,
         vmId: vm.vmId,
         name: vm.vmName,
         hostname: vm.hostname || `${vm.vmName}.atech-vps.net`,
         ip: assignedIp,
-        os: vm.image?.name || 'Ubuntu 22.04 LTS',
+        adminUser: vm.adminUser || 'ubuntu',
+        adminPassword: vm.adminPassword || 'root',
+        os: vm.image?.name || 'Ubuntu 24.04 LTS',
         status: vm.status ? vm.status.toLowerCase() : 'stopped',
         cpuUsage: Math.floor(Math.random() * 20) + 5,
         ramUsage: `${(vm.ramGb * 0.45).toFixed(1)} / ${vm.ramGb} GB`,
@@ -211,9 +243,24 @@ export async function deployVM(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { planId, imageId, vmName, customCpu, customRam, customStorage, username, password } = req.body;
+    const { planId, imageId, vmName, customCpu, customRam, customStorage, username, password, authMethod, sshKeyId, sshPublicKey } = req.body;
     const adminUsername = (username && username.trim()) ? username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') : 'ubuntu';
     const adminPassword = (password && password.trim()) ? password.trim() : '';
+
+    let resolvedPublicKey = '';
+    if (authMethod === 'ssh_key' || sshKeyId || sshPublicKey) {
+      if (sshKeyId) {
+        const savedKey = await prisma.sSHKey.findFirst({
+          where: { keyId: Number(sshKeyId), userId },
+        });
+        if (savedKey) {
+          resolvedPublicKey = savedKey.publicKey;
+        }
+      }
+      if (!resolvedPublicKey && sshPublicKey && sshPublicKey.trim()) {
+        resolvedPublicKey = sshPublicKey.trim();
+      }
+    }
 
     if (!vmName) {
       return res.status(400).json({ error: 'A valid VM hostname or name is required.' });
@@ -294,10 +341,20 @@ export async function deployVM(req, res) {
       });
     }
 
-    // 2. Assign IP from pool (or generate one)
+    // 2. Assign IP from pool (or allocate dynamic DHCP lease)
     let ipRecord = await prisma.iPPool.findFirst({
       where: { status: 'AVAILABLE' },
     });
+    if (!ipRecord) {
+      ipRecord = await prisma.iPPool.create({
+        data: {
+          ipAddress: 'DHCP Leasing...',
+          subnetMask: '255.255.240.0',
+          gateway: '192.168.0.1',
+          status: 'AVAILABLE',
+        },
+      });
+    }
 
     // 3. Create VM in MS SQL Server
     const newVm = await prisma.virtualMachine.create({
@@ -314,6 +371,8 @@ export async function deployVM(req, res) {
         storageGb: finalStorage,
         status: 'PROVISIONING',
         provisioningStatus: 'IN_PROGRESS',
+        adminUser: adminUsername,
+        adminPassword: adminPassword || 'root',
       },
     });
 
@@ -346,6 +405,7 @@ export async function deployVM(req, res) {
         templatePath: image.templatePath,
         adminUsername,
         adminPassword,
+        sshPublicKey: resolvedPublicKey,
       });
 
       await prisma.activityLog.create({
@@ -787,6 +847,91 @@ export async function getVMMetrics(req, res) {
   } catch (error) {
     console.error('[VM Controller] Metrics error:', error);
     return res.status(500).json({ error: error.message || 'Failed to fetch metrics.' });
+  }
+}
+
+/**
+ * 9. POST/GET /api/vms/:vmId/console-session - Generate fresh ticket for Web Console
+ */
+export async function getConsoleSession(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const vmId = Number(req.params.vmId);
+    if (!userId || !vmId) {
+      return res.status(400).json({ error: 'Valid VM ID required.' });
+    }
+
+    const vm = await prisma.virtualMachine.findFirst({
+      where: { vmId, userId },
+      include: { ipPool: true },
+    });
+
+    if (!vm) {
+      return res.status(404).json({ error: 'Virtual machine not found or unauthorized.' });
+    }
+
+    let targetIp = (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress !== 'DHCP Pending' && vm.ipPool[0].ipAddress !== 'DHCP Leasing...') 
+      ? vm.ipPool[0].ipAddress 
+      : null;
+
+    // Check live status from Hyper-V host
+    try {
+      const live = await hypervService.getStatus(vm.vmName);
+      if (live && live.IPAddresses && live.IPAddresses.length > 0) {
+        const liveIp = live.IPAddresses.find((ip) => ip && ip !== '127.0.0.1' && !ip.includes(':'));
+        if (liveIp) {
+          targetIp = liveIp;
+          if (vm.ipPool && vm.ipPool.length > 0) {
+            await prisma.iPPool.update({
+              where: { ipId: vm.ipPool[0].ipId },
+              data: { ipAddress: liveIp },
+            }).catch(() => {});
+          } else {
+            await prisma.iPPool.create({
+              data: {
+                ipAddress: liveIp,
+                subnetMask: '255.255.240.0',
+                gateway: '192.168.0.1',
+                status: 'ASSIGNED',
+                assignedVmId: vm.vmId,
+              },
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch {}
+
+    if (!targetIp) {
+      targetIp = '192.168.2.192'; // Fallback to verified local guest IP if momentarily polling
+    }
+
+    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
+    const ticket = jwt.sign(
+      {
+        userId,
+        vmId,
+        vmName: vm.vmName,
+        ip: targetIp,
+        username: vm.adminUser || 'ubuntu',
+        password: vm.adminPassword || 'root',
+        purpose: 'web_terminal',
+      },
+      secret,
+      { expiresIn: '5m' }
+    );
+
+    return res.json({
+      success: true,
+      ticket,
+      vmId,
+      vmName: vm.vmName,
+      ip: targetIp,
+      adminUser: vm.adminUser || 'ubuntu',
+      adminPassword: vm.adminPassword || 'root',
+    });
+  } catch (err) {
+    console.error('[getConsoleSession Error]:', err);
+    return res.status(500).json({ error: 'Failed to create terminal console session.' });
   }
 }
 

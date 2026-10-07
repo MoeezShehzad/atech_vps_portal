@@ -14,6 +14,7 @@ import {
   resizeVM,
   destroyVM,
   getVMMetrics,
+  getConsoleSession,
 } from '../controllers/vmController.js';
 
 const router = express.Router();
@@ -44,5 +45,9 @@ router.delete('/:id', destroyVM);
 
 // 7. Live resource telemetry & metrics
 router.get('/:id/metrics', getVMMetrics);
+
+// 8. Dynamic Web Console session ticket
+router.post('/:vmId/console-session', getConsoleSession);
+router.get('/:vmId/console-session', getConsoleSession);
 
 export default router;

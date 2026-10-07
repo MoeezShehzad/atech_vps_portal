@@ -98,7 +98,7 @@ export const apiCall = async (
    *
    * Don't refresh authentication endpoints themselves.
    */
-  if (response.status === 401 && !isAuthEndpoint) {
+  if ((response.status === 401 || response.status === 403) && !isAuthEndpoint) {
     try {
       const newAccessToken = await refreshAccessToken();
 

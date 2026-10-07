@@ -113,6 +113,7 @@ const server = http.createServer(async (req, res) => {
         DiskGB: data.diskGb || 40,
         AdminUsername: data.adminUsername || 'ubuntu',
         AdminPassword: data.adminPassword || '',
+        SSHPublicKey: data.sshPublicKey || '',
         TemplatePath: data.templatePath || DEFAULT_TEMPLATE,
         SwitchName: data.switchName || 'Default Switch',
       });

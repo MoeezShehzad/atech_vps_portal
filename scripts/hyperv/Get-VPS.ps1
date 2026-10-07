@@ -30,9 +30,9 @@ try {
         }
         if (-not $IPs -and $Net -and $Net.MacAddress) {
             $MacFormatted = [regex]::Replace($Net.MacAddress, '..(?!$)', '$&-').ToLower()
-            $Neighbor = Get-NetNeighbor -ErrorAction SilentlyContinue | Where-Object { $_.LinkLayerAddress -and ($_.LinkLayerAddress.ToLower() -eq $MacFormatted) -and ($_.State -ne 'Permanent') }
+            $Neighbor = Get-NetNeighbor -ErrorAction SilentlyContinue | Where-Object { $_.LinkLayerAddress -and ($_.LinkLayerAddress.ToLower() -eq $MacFormatted) }
             if ($Neighbor) {
-                $IPs = @($Neighbor.IPAddress | Where-Object { $_ -notlike '*:*' })
+                $IPs = @($Neighbor | ForEach-Object { $_.IPAddress } | Where-Object { $_ -notlike '*:*' })
             }
         }
 

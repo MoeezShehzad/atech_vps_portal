@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -12,8 +13,11 @@ import authRoutes from './routes/authRoutes.js';
 import contactRoutes from './routes/contact.js';
 import pricingRoutes from './routes/pricing.js';
 import vmRoutes from './routes/vmRoutes.js';
+import sshKeyRoutes from './routes/sshKeyRoutes.js';
+import { setupTerminalWebSocket } from './services/terminalService.js';
 
 const app = express();
+app.set('trust proxy', 1);
 
 // 1. Security Headers Middleware (Helmet)
 app.use(helmet({
@@ -94,6 +98,7 @@ app.use('/api/user', userRoutes); // Alias for compatibility
 app.use('/api/contact', contactRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/vms', vmRoutes);
+app.use('/api/ssh-keys', sshKeyRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -101,6 +106,12 @@ app.get('/api/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+// Attach in-browser Web Terminal WebSocket server
+setupTerminalWebSocket(server);
+
+server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
+  console.log(`Web Terminal WebSocket server attached to /ws/terminal`);
 });
