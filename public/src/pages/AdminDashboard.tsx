@@ -1,6 +1,6 @@
 // ==============================================================================
 // Page: AdminDashboard.tsx
-// Purpose: Enterprise Administrator Control Center (Hostinger-Grade Suite)
+// Purpose: Enterprise Administrator Control Center (Cloud Infrastructure Suite)
 //          1. Physical Host & Hyper-V Fleet Telemetry
 //          2. Directory of Users & Role/Status Management + Ghost Mode Impersonation
 //          3. Global Fleet VM Oversight & Emergency Power Controls
@@ -33,6 +33,11 @@ import {
   ArrowUpRight,
   Clock,
   ChevronRight,
+  ChevronLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  LayoutDashboard,
+  Menu,
   Filter,
   BadgeAlert,
   UserCheck,
@@ -63,6 +68,26 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<
     'overview' | 'users' | 'fleet' | 'plans' | 'ipam' | 'announcements' | 'threats' | 'tickets' | 'audit'
   >('overview');
+
+  // Sidebar compression & expansion states
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('atech_admin_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('atech_admin_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Loading & states
   const [overviewLoading, setOverviewLoading] = useState(true);
@@ -369,29 +394,215 @@ export default function AdminDashboard() {
     if (activeTab === 'audit') fetchAudit();
   }, [activeTab]);
 
+  const navItems = [
+    { id: 'overview', label: 'Host Telemetry', icon: Activity, badge: null, alert: false },
+    { id: 'users', label: 'Users & Impersonation', icon: Users, badge: users.length || null, alert: false },
+    { id: 'fleet', label: 'Global Fleet', icon: Server, badge: fleetVMs.length || null, alert: false },
+    { id: 'plans', label: 'Plans & Coupons', icon: Tag, badge: null, alert: false },
+    { id: 'ipam', label: 'IPAM Pool', icon: Network, badge: null, alert: false },
+    { id: 'announcements', label: 'Announcements', icon: Megaphone, badge: announcements.length || null, alert: false },
+    { id: 'threats', label: 'Security & IP Bans', icon: ShieldAlert, badge: threats.length ? threats.length : null, alert: true },
+    { id: 'tickets', label: 'Support Tickets', icon: LifeBuoy, badge: tickets.filter((t) => t.status === 'OPEN').length || null, alert: true },
+    { id: 'audit', label: 'Audit Trail', icon: ShieldCheck, badge: null, alert: false },
+  ] as const;
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        {/* Top Header Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
-                HOSTINGER CLUSTER CORE
-              </span>
-              <h1 className="text-2xl md:text-3xl font-bold font-poppins text-slate-900 dark:text-white">
-                Global Operations & Infrastructure
-              </h1>
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 flex">
+      {/* Mobile Backdrop */}
+      {mobileSidebarOpen && (
+        <div
+          onClick={() => setMobileSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-40 md:hidden"
+        />
+      )}
+
+      {/* COLLAPSIBLE & EXPANDABLE ADMIN SIDEBAR */}
+      <aside
+        className={`fixed md:sticky top-0 h-screen z-50 flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out shrink-0 select-none ${
+          sidebarCollapsed ? 'w-20' : 'w-64'
+        } ${
+          mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        {/* Top: Branding & Collapse Toggle */}
+        <div className="border-b border-slate-100 dark:border-slate-800 p-4">
+          <div className="flex items-center justify-between">
+            <div className={`flex items-center gap-3 overflow-hidden ${sidebarCollapsed ? 'mx-auto' : ''}`}>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-md shadow-blue-500/20 shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              {!sidebarCollapsed && (
+                <div className="min-w-0">
+                  <span className="font-bold text-sm text-slate-900 dark:text-white font-poppins block truncate">
+                    ATEC CLOUD
+                  </span>
+                  <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded tracking-wide">
+                    SUPER ADMIN
+                  </span>
+                </div>
+              )}
             </div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Multi-tenant Hyper-V hypervisor controls, IPAM, revenue promotions, and security governance.
-            </p>
+
+            {/* Collapse/Expand Toggle on Desktop */}
+            {!sidebarCollapsed && (
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title="Compress sidebar"
+                className="hidden md:flex p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <NotificationBell />
+          {/* Expand Button When Collapsed */}
+          {sidebarCollapsed && (
+            <div className="hidden md:flex justify-center mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title="Expand sidebar"
+                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Navigation Items */}
+        <nav className="p-3 space-y-1.5 overflow-y-auto flex-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(item.id as any);
+                  setMobileSidebarOpen(false);
+                }}
+                title={sidebarCollapsed ? item.label : undefined}
+                className={`w-full flex items-center rounded-xl transition-all relative group ${
+                  sidebarCollapsed
+                    ? 'justify-center p-3'
+                    : 'justify-between px-3.5 py-2.5 text-xs font-semibold'
+                } ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 font-bold'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-100'
+                }`}
+              >
+                <div className={`flex items-center gap-3 ${sidebarCollapsed ? 'justify-center' : ''}`}>
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'}`} />
+                  {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
+                </div>
+
+                {/* Badge Count */}
+                {item.badge ? (
+                  sidebarCollapsed ? (
+                    <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  ) : (
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                        isActive
+                          ? 'bg-white/20 text-white'
+                          : item.alert
+                          ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {item.badge}
+                    </span>
+                  )
+                ) : null}
+
+                {/* Tooltip on Collapsed hover */}
+                {sidebarCollapsed && (
+                  <div className="absolute left-full ml-2 px-2.5 py-1 bg-slate-900 text-white text-[11px] font-semibold rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                    {item.label}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom Actions */}
+        <div className="p-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          {/* Back to Client Portal */}
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            title={sidebarCollapsed ? 'Return to Client Portal' : undefined}
+            className={`w-full flex items-center rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${
+              sidebarCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5 gap-2.5'
+            }`}
+          >
+            <LayoutDashboard className="w-4 h-4 text-slate-400" />
+            {!sidebarCollapsed && <span>Client Portal</span>}
+          </button>
+
+          {/* Theme Switcher */}
+          <div className={`flex items-center rounded-xl bg-slate-50 dark:bg-slate-800/60 p-2 ${
+            sidebarCollapsed ? 'justify-center' : 'justify-between px-3'
+          }`}>
+            {!sidebarCollapsed && (
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Theme</span>
+            )}
             <ThemeToggle />
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT AREA */}
+      <div className="flex-1 min-w-0 flex flex-col h-screen overflow-y-auto">
+        {/* Top Header Bar */}
+        <header className="sticky top-0 z-20 bg-white/80 dark:bg-[#0b0f19]/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 md:px-8 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Mobile Hamburger Button */}
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen(true)}
+              className="md:hidden p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl border border-slate-200 dark:border-slate-800"
+            >
+              <Menu className="w-4 h-4" />
+            </button>
+
+            {/* Quick Compress/Expand on Desktop Topbar */}
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Compress sidebar'}
+              className="hidden md:flex p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+            </button>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 tracking-wide uppercase">
+                  ATEC CLUSTER CORE
+                </span>
+                <h1 className="text-lg md:text-xl font-bold font-poppins text-slate-900 dark:text-white truncate">
+                  {activeTab === 'overview' && 'Host Telemetry & Cluster Oversight'}
+                  {activeTab === 'users' && 'Directory of Users & Ghost Mode'}
+                  {activeTab === 'fleet' && 'Global Virtual Machine Fleet'}
+                  {activeTab === 'plans' && 'Cloud Plans & Promo Engine'}
+                  {activeTab === 'ipam' && 'IP Address Pool & Subnet Management'}
+                  {activeTab === 'announcements' && 'Broadcast Maintenance & Notices'}
+                  {activeTab === 'threats' && 'Security Threat Intel & IP Blacklist'}
+                  {activeTab === 'tickets' && 'Customer Support Ticket Helpdesk'}
+                  {activeTab === 'audit' && 'Cluster Audit Trail & Event Stream'}
+                </h1>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <NotificationBell />
             <button
               onClick={() => {
                 fetchOverview();
@@ -404,45 +615,16 @@ export default function AdminDashboard() {
                 if (activeTab === 'tickets') fetchTickets();
                 if (activeTab === 'audit') fetchAudit();
               }}
-              title="Refresh"
+              title="Refresh Current View"
               className="p-2.5 text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all shadow-xs"
             >
               <RefreshCw className={`w-4 h-4 ${overviewLoading ? 'animate-spin text-blue-600' : ''}`} />
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* Tab Navigation (Hostinger Operations Suite) */}
-        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto">
-          {[
-            { id: 'overview', label: 'Host Telemetry', icon: Activity },
-            { id: 'users', label: 'Users & Impersonation', icon: Users },
-            { id: 'fleet', label: 'Global Fleet', icon: Server },
-            { id: 'plans', label: 'Plans & Coupons', icon: Tag },
-            { id: 'ipam', label: 'IPAM Pool', icon: Network },
-            { id: 'announcements', label: 'Announcements', icon: Megaphone },
-            { id: 'threats', label: 'Security & IP Bans', icon: ShieldAlert },
-            { id: 'tickets', label: 'Support Tickets', icon: LifeBuoy },
-            { id: 'audit', label: 'Audit Trail', icon: ShieldCheck },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        {/* Main Content Area */}
+        <main className="p-4 md:p-8 space-y-6 max-w-7xl w-full">
 
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
@@ -1061,6 +1243,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        </main>
       </div>
     </div>
   );

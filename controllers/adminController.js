@@ -439,7 +439,7 @@ export async function getAdminAuditLogs(req, res) {
 
 /**
  * ==============================================================================
- * HOSTINGER ADVANCED SUITE (OPTIONS 1 - 6)
+ * ENTERPRISE INFRASTRUCTURE SUITE (OPTIONS 1 - 6)
  * ==============================================================================
  */
 

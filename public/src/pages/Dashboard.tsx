@@ -543,7 +543,7 @@ export default function Dashboard() {
     }
   };
 
-  // Terminate/Delete instance handler (Hostinger standard with optional force flag)
+  // Terminate/Delete instance handler (with optional force flag)
   const confirmDeleteInstance = async (force: boolean = false) => {
     if (!deletingInstance) return;
     const targetId = deletingInstance.vmId;
@@ -787,7 +787,7 @@ export default function Dashboard() {
       {/* DYNAMIC CONTENT CONTAINER */}
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         
-        {/* HOSTINGER GHOST MODE IMPERSONATION BANNER */}
+        {/* GHOST MODE IMPERSONATION BANNER */}
         {user?.isImpersonated && (
           <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-amber-700 dark:text-amber-300 flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2.5 text-xs font-semibold">
@@ -955,7 +955,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* ACTIVE SUBSCRIPTION AVAILABLE SLOT BANNER (Hostinger Model) */}
+            {/* ACTIVE SUBSCRIPTION AVAILABLE SLOT BANNER */}
             {activeSlot && (
               <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white border border-emerald-500/40 shadow-xl relative overflow-hidden mb-6">
                 <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">

@@ -132,7 +132,7 @@ export async function getUserVMs(req, res) {
       // Hyper-V Host Agent temporarily busy or offline; fallback to DB
     }
 
-    // Query active subscriptions and slot availability (Hostinger model)
+    // Query active subscriptions and slot availability (Standard cloud slot model)
     const now = new Date();
     const activeSubscriptions = await prisma.subscription.findMany({
       where: {
@@ -307,7 +307,7 @@ export async function deployVM(req, res) {
       storageGb: finalStorage,
     });
 
-    // Check if user has an existing active subscription with an available server slot (Hostinger model)
+    // Check if user has an existing active subscription with an available server slot (Multi-tenant cloud model)
     const now = new Date();
     let subscription = await prisma.subscription.findFirst({
       where: {
@@ -634,7 +634,7 @@ export async function resizeVM(req, res) {
 }
 
 /**
- * 7. DELETE /api/vms/:id - Destroy VM, free IP & retain active subscription slot (Hostinger model)
+ * 7. DELETE /api/vms/:id - Destroy VM, free IP & retain active subscription slot (Dedicated slot model)
  */
 export async function destroyVM(req, res) {
   try {
@@ -710,7 +710,7 @@ export async function destroyVM(req, res) {
       where: { vmId },
     });
 
-    // 7. Industry Standard Lifecycle (Hostinger): DO NOT CANCEL ACTIVE SUBSCRIPTION!
+    // 7. Industry Standard Lifecycle: DO NOT CANCEL ACTIVE SUBSCRIPTION!
     // The user paid for a 30-day billing cycle. Destroying the VM frees up the slot for fresh re-deployment.
     let isSubscriptionActive = false;
     let subscriptionEndDate = null;
