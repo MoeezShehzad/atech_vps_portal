@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Tag, Check, X } from 'lucide-react';
 
 // Data Structures for IONOS-Style Options
 const OS_OPTIONS = [
@@ -52,6 +53,12 @@ export default function ServerConfigure() {
   const [selectedTerm, setSelectedTerm] = useState('12m');
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
 
+  // Coupon States
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
+
   // Toggle Addon
   const toggleAddon = (addonId: string) => {
     setSelectedAddons((prev) =>
@@ -77,20 +84,70 @@ export default function ServerConfigure() {
     return sum + (item ? item.price : 0);
   }, 0);
 
-  const monthlyTotal = basePrice + osPrice + addonsPriceTotal;
+  const subtotalMonthly = basePrice + osPrice + addonsPriceTotal;
+
+  // Calculate discount if coupon is applied
+  let discountAmount = 0;
+  if (appliedCoupon) {
+    if (appliedCoupon.discountType === 'PERCENT') {
+      discountAmount = Number(((subtotalMonthly * appliedCoupon.discountValue) / 100).toFixed(2));
+    } else {
+      discountAmount = Number(appliedCoupon.discountValue);
+    }
+    if (discountAmount > subtotalMonthly) discountAmount = subtotalMonthly;
+  }
+
+  const monthlyTotal = Math.max(0, Number((subtotalMonthly - discountAmount).toFixed(2)));
+
+  const handleApplyCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!couponCode.trim()) return;
+    setCouponLoading(true);
+    setCouponError('');
+    try {
+      const res = await fetch('/api/pricing/validate-coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: couponCode.trim(),
+          planId: selectedPlan.planId,
+          amount: subtotalMonthly,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data?.success) {
+        setAppliedCoupon(data);
+      } else {
+        setAppliedCoupon(null);
+        setCouponError(data?.error || 'Invalid or expired promo code');
+      }
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      setCouponError(err.message || 'Failed to validate promo code');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError('');
+  };
 
   const handleCheckout = () => {
-  const configurationOrder = {
-    plan: selectedPlan,
-    os: activeOsObj,
-    location: DATACENTER_LOCATIONS.find((l) => l.id === selectedLocation),
-    term: activeTermObj,
-    addons: selectedAddons.map((id) => ADDONS.find((a) => a.id === id)),
-    monthlyTotal,
-  };
-    console.log('Final Order Configuration:', configurationOrder);
-    // Navigating with state attached
-  navigate('/checkout', { state: { configurationOrder } });
+    const configurationOrder = {
+      plan: selectedPlan,
+      os: activeOsObj,
+      location: DATACENTER_LOCATIONS.find((l) => l.id === selectedLocation),
+      term: activeTermObj,
+      addons: selectedAddons.map((id) => ADDONS.find((a) => a.id === id)),
+      appliedCoupon,
+      discountAmount,
+      monthlyTotal,
+    };
+    navigate('/checkout', { state: { configurationOrder } });
   };
 
   return (
@@ -313,13 +370,75 @@ export default function ServerConfigure() {
                     })}
                   </div>
                 )}
+
+                {/* Promo Code Discount if Applied */}
+                {appliedCoupon && (
+                  <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs text-emerald-600 font-bold">
+                    <div className="flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5" />
+                      <span>Coupon: {appliedCoupon.code} ({appliedCoupon.discountType === 'PERCENT' ? `${appliedCoupon.discountValue}%` : `$${appliedCoupon.discountValue}`} off)</span>
+                    </div>
+                    <span>-${discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Promo Code Input Box */}
+              <div className="pt-3 border-t border-slate-100">
+                {appliedCoupon ? (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-600" />
+                      <span className="font-bold text-emerald-800">{appliedCoupon.code} applied!</span>
+                    </div>
+                    <button
+                      onClick={handleRemoveCoupon}
+                      className="text-slate-400 hover:text-rose-600 p-1 rounded-md"
+                      title="Remove coupon"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleApplyCoupon} className="space-y-1.5">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Promo or coupon code"
+                        value={couponCode}
+                        onChange={(e) => {
+                          setCouponCode(e.target.value.toUpperCase());
+                          setCouponError('');
+                        }}
+                        className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono uppercase focus:outline-none focus:border-blue-600"
+                      />
+                      <button
+                        type="submit"
+                        disabled={couponLoading || !couponCode.trim()}
+                        className="px-3.5 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold disabled:opacity-50 transition-colors"
+                      >
+                        {couponLoading ? '...' : 'Apply'}
+                      </button>
+                    </div>
+                    {couponError && (
+                      <p className="text-[11px] text-rose-600 font-semibold">{couponError}</p>
+                    )}
+                  </form>
+                )}
               </div>
 
               {/* Total Calculation */}
               <div className="pt-4 border-t border-slate-200 space-y-1">
                 <div className="flex justify-between items-baseline">
                   <span className="text-xs font-bold text-slate-500">Total Due Monthly</span>
-                  <span className="text-3xl font-black text-slate-950">${monthlyTotal.toFixed(2)}</span>
+                  <div className="text-right">
+                    {discountAmount > 0 && (
+                      <span className="text-xs line-through text-slate-400 font-semibold mr-2 block">
+                        ${subtotalMonthly.toFixed(2)}
+                      </span>
+                    )}
+                    <span className="text-3xl font-black text-slate-950">${monthlyTotal.toFixed(2)}</span>
+                  </div>
                 </div>
                 <p className="text-[10px] text-slate-400">Excl. applicable local taxes</p>
               </div>

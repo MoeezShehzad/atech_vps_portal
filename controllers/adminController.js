@@ -591,6 +591,40 @@ export async function getAdminPlans(req, res) {
   }
 }
 
+export async function createAdminPlan(req, res) {
+  try {
+    const { name, cpuCores, ramGb, storageGb, monthlyPrice } = req.body;
+    if (!name || !monthlyPrice) {
+      return res.status(400).json({ error: 'Plan name and monthly price are required' });
+    }
+
+    const created = await prisma.vPSPlan.create({
+      data: {
+        name,
+        cpuCores: Number(cpuCores) || 2,
+        ramGb: Number(ramGb) || 4,
+        storageGb: Number(storageGb) || 50,
+        monthlyPrice: Number(monthlyPrice),
+        isActive: true,
+      },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.adminUser.userId,
+        action: 'ADMIN_CREATE_PLAN',
+        status: 'SUCCESS',
+        details: `Administrator created new VPS plan '${created.name}' at $${created.monthlyPrice}/mo`,
+      },
+    });
+
+    res.json({ success: true, plan: created });
+  } catch (error) {
+    console.error('createAdminPlan error:', error);
+    res.status(500).json({ error: 'Failed to create plan' });
+  }
+}
+
 export async function updatePlan(req, res) {
   try {
     const planId = Number(req.params.planId);
@@ -636,7 +670,7 @@ export async function getAdminCoupons(req, res) {
 
 export async function createAdminCoupon(req, res) {
   try {
-    const { code, discountType, discountValue, maxUses } = req.body;
+    const { code, discountType, discountValue, maxUses, applicablePlanId } = req.body;
     if (!code || !discountValue) {
       return res.status(400).json({ error: 'Code and discount value required' });
     }
@@ -647,6 +681,7 @@ export async function createAdminCoupon(req, res) {
         discountType: discountType || 'PERCENT',
         discountValue: Number(discountValue),
         maxUses: Number(maxUses) || 100,
+        applicablePlanId: applicablePlanId ? Number(applicablePlanId) : null,
         isActive: true,
       },
     });
@@ -799,10 +834,40 @@ export async function getAdminTickets(req, res) {
     });
     const userMap = new Map(users.map((u) => [u.userId, u]));
 
-    const enriched = tickets.map((t) => ({
-      ...t,
-      user: userMap.get(t.userId) || { email: `User #${t.userId}`, fullName: 'Customer' },
-    }));
+    const enriched = tickets.map((t) => {
+      const user = userMap.get(t.userId) || { email: `User #${t.userId}`, fullName: 'Customer' };
+      let chatHistory = [];
+      if (t.chatHistory) {
+        try {
+          chatHistory = JSON.parse(t.chatHistory);
+        } catch (_) {}
+      }
+      if (!Array.isArray(chatHistory) || chatHistory.length === 0) {
+        if (t.message) {
+          chatHistory.push({
+            id: 'msg-init',
+            sender: 'CUSTOMER',
+            senderName: user.fullName || 'Customer',
+            message: t.message,
+            timestamp: t.createdAt,
+          });
+        }
+        if (t.response) {
+          chatHistory.push({
+            id: 'msg-resp',
+            sender: 'SUPPORT',
+            senderName: t.assignedTo || 'Support Engineer',
+            message: t.response,
+            timestamp: t.updatedAt || t.createdAt,
+          });
+        }
+      }
+      return {
+        ...t,
+        user,
+        chatHistory,
+      };
+    });
 
     res.json({ success: true, tickets: enriched });
   } catch (error) {
@@ -816,11 +881,48 @@ export async function replyAdminTicket(req, res) {
     const id = Number(req.params.ticketId);
     const { response, status } = req.body;
 
+    const existing = await prisma.supportTicket.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    let chatHistory = [];
+    if (existing.chatHistory) {
+      try {
+        chatHistory = JSON.parse(existing.chatHistory);
+      } catch (_) {}
+    }
+    if (!Array.isArray(chatHistory) || chatHistory.length === 0) {
+      if (existing.message) {
+        chatHistory.push({
+          id: 'msg-init',
+          sender: 'CUSTOMER',
+          senderName: 'Customer',
+          message: existing.message,
+          timestamp: existing.createdAt,
+        });
+      }
+    }
+
+    if (response) {
+      chatHistory.push({
+        id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        sender: 'SUPPORT',
+        senderName: req.adminUser.fullName || req.adminUser.email || 'Support Engineer',
+        message: response.trim(),
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     const updated = await prisma.supportTicket.update({
       where: { id },
       data: {
         ...(response && { response }),
-        status: status || 'RESOLVED',
+        chatHistory: JSON.stringify(chatHistory),
+        status: status || (existing.status === 'CLOSED' ? 'CLOSED' : 'RESOLVED'),
         assignedTo: req.adminUser.email,
       },
     });
@@ -834,7 +936,13 @@ export async function replyAdminTicket(req, res) {
       },
     });
 
-    res.json({ success: true, ticket: updated });
+    res.json({
+      success: true,
+      ticket: {
+        ...updated,
+        chatHistory,
+      },
+    });
   } catch (error) {
     console.error('replyAdminTicket error:', error);
     res.status(500).json({ error: 'Failed to update ticket response' });

@@ -70,4 +70,68 @@ router.get('/plans', async (req, res) => {
   }
 });
 
+// POST /api/pricing/validate-coupon
+router.post('/validate-coupon', async (req, res) => {
+  try {
+    const { code, planId, amount } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'Promo code is required' });
+    }
+
+    const promo = await prisma.promoCode.findUnique({
+      where: { code: String(code).trim().toUpperCase() },
+    });
+
+    if (!promo || !promo.isActive) {
+      return res.status(404).json({ error: 'Invalid or inactive promo code' });
+    }
+
+    if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {
+      return res.status(400).json({ error: 'This promo code has expired' });
+    }
+
+    if (promo.usedCount >= promo.maxUses) {
+      return res.status(400).json({ error: 'This promo code has reached its maximum usage limit' });
+    }
+
+    // Check plan restriction if applicable
+    if (promo.applicablePlanId && planId && Number(promo.applicablePlanId) !== Number(planId)) {
+      return res.status(400).json({
+        error: `This coupon is only valid for plan #${promo.applicablePlanId}`,
+      });
+    }
+
+    const originalPrice = Number(amount) || 0;
+    let discountAmount = 0;
+
+    if (promo.discountType === 'PERCENT') {
+      discountAmount = Number(((originalPrice * promo.discountValue) / 100).toFixed(2));
+    } else {
+      // FIXED discount in USD
+      discountAmount = Number(promo.discountValue);
+    }
+
+    if (discountAmount > originalPrice) {
+      discountAmount = originalPrice;
+    }
+
+    const finalPrice = Math.max(0, Number((originalPrice - discountAmount).toFixed(2)));
+
+    return res.json({
+      success: true,
+      code: promo.code,
+      discountType: promo.discountType,
+      discountValue: promo.discountValue,
+      applicablePlanId: promo.applicablePlanId,
+      originalPrice,
+      discountAmount,
+      finalPrice,
+      message: `Promo code ${promo.code} applied successfully!`,
+    });
+  } catch (error) {
+    console.error('Validate coupon error:', error);
+    return res.status(500).json({ error: 'Failed to validate promo code' });
+  }
+});
+
 export default router;

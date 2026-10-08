@@ -753,15 +753,29 @@ export default function Checkout() {
                     ))}
                   </div>
                 )}
+
+                {orderData.appliedCoupon && (
+                  <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs text-emerald-600 font-bold">
+                    <span>Coupon ({orderData.appliedCoupon.code}):</span>
+                    <span>-${Number(orderData.discountAmount || 0).toFixed(2)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Total Calculation */}
               <div className="pt-4 border-t border-slate-200 space-y-1">
                 <div className="flex justify-between items-baseline">
                   <span className="text-xs font-bold text-slate-500">Total Due Monthly</span>
-                  <span className="text-3xl font-black text-slate-950 tracking-tight">
-                    ${orderData.monthlyTotal.toFixed(2)}
-                  </span>
+                  <div className="text-right">
+                    {orderData.discountAmount > 0 && (
+                      <span className="text-xs line-through text-slate-400 font-semibold mr-2 block">
+                        ${(Number(orderData.monthlyTotal) + Number(orderData.discountAmount)).toFixed(2)}
+                      </span>
+                    )}
+                    <span className="text-3xl font-black text-slate-950 tracking-tight">
+                      ${Number(orderData.monthlyTotal).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
                 <p className="text-[10px] text-slate-400">Includes full root access & automated provisioning</p>
               </div>

@@ -33,11 +33,18 @@ export async function getNotifications(req, res) {
       take: 5,
     });
 
-    // 3. Fetch user VMs
-    const vms = await prisma.virtualMachine.findMany({
-      where: { userId, status: { not: 'TERMINATED' } },
-      orderBy: { updatedAt: 'desc' },
+    // 3. Fetch active system announcements
+    const announcements = await prisma.systemAnnouncement.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'desc' },
       take: 5,
+    });
+
+    // 4. Fetch recent support ticket updates for user
+    const tickets = await prisma.supportTicket.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
     });
 
     const items = [];
@@ -92,6 +99,34 @@ export async function getNotifications(req, res) {
         timestamp: inv.issueDate,
         isRead: new Date(inv.issueDate) <= lastReadAt,
       });
+    });
+
+    // Map System Announcements
+    announcements.forEach((ann) => {
+      items.push({
+        id: `ann-${ann.id}`,
+        title: `Announcement: ${ann.title}`,
+        message: ann.message,
+        type: ann.type === 'danger' ? 'danger' : ann.type === 'warning' ? 'warning' : 'info',
+        category: 'system',
+        timestamp: ann.createdAt,
+        isRead: new Date(ann.createdAt) <= lastReadAt,
+      });
+    });
+
+    // Map Tickets Updates
+    tickets.forEach((t) => {
+      if (t.response || t.status === 'RESOLVED' || t.status === 'IN_PROGRESS') {
+        items.push({
+          id: `tkt-${t.id}-${new Date(t.updatedAt).getTime()}`,
+          title: `Ticket #${t.id}: ${t.status}`,
+          message: t.response ? `Admin replied: "${t.response.slice(0, 80)}..."` : `Ticket "${t.subject}" status updated to ${t.status}`,
+          type: t.status === 'RESOLVED' ? 'success' : 'info',
+          category: 'support',
+          timestamp: t.updatedAt,
+          isRead: new Date(t.updatedAt) <= lastReadAt,
+        });
+      }
     });
 
     // Sort all chronologically descending

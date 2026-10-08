@@ -18,6 +18,7 @@ import {
   createAnnouncement,
   deleteAnnouncement,
   getAdminPlans,
+  createAdminPlan,
   updatePlan,
   getAdminCoupons,
   createAdminCoupon,
@@ -62,6 +63,7 @@ router.delete('/announcements/:id', deleteAnnouncement);
 
 // Option 2: Dynamic VPS Plans & Coupons
 router.get('/plans', getAdminPlans);
+router.post('/plans', createAdminPlan);
 router.patch('/plans/:planId', updatePlan);
 router.get('/coupons', getAdminCoupons);
 router.post('/coupons', createAdminCoupon);

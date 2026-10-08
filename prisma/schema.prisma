@@ -350,16 +350,17 @@ model SystemAnnouncement {
 }
 
 model PromoCode {
-  id             Int       @id @default(autoincrement())
-  code           String    @unique @db.VarChar(50)
-  discountType   String    @default("PERCENT") @db.VarChar(20) // PERCENT, FIXED
-  discountValue  Decimal   @db.Decimal(10, 2)
-  maxUses        Int       @default(100)
-  timesUsed      Int       @default(0)
-  isActive       Boolean   @default(true)
-  expiresAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @default(now()) @updatedAt
+  id               Int       @id @default(autoincrement())
+  code             String    @unique @db.VarChar(50)
+  discountType     String    @default("PERCENT") @db.VarChar(20) // PERCENT, FIXED
+  discountValue    Decimal   @db.Decimal(10, 2)
+  applicablePlanId Int?      @map("applicable_plan_id")
+  maxUses          Int       @default(100)
+  timesUsed        Int       @default(0)
+  isActive         Boolean   @default(true)
+  expiresAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
 
   @@map("Promo_Codes")
 }
@@ -373,6 +374,7 @@ model SupportTicket {
   status      String   @default("OPEN") @db.VarChar(20)   // OPEN, IN_PROGRESS, RESOLVED, CLOSED
   assignedTo  String?  @db.VarChar(100)
   response    String?  @db.NVarChar(Max)
+  chatHistory String?  @map("chat_history") @db.NVarChar(Max) // JSON thread messages
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 

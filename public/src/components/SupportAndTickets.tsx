@@ -1,12 +1,14 @@
 // ==============================================================================
 // Component: SupportAndTickets.tsx
-// Purpose: Customer Support Ticket & Helpdesk Portal
-//          - View open, pending, and resolved tickets
+// Purpose: Customer Support Ticket & Multi-Turn Chat Helpdesk Portal
+//          - Multi-Turn Real-Time Chat Conversation History
+//          - Customer can send follow-up replies directly into the ongoing thread
+//          - View status, priority, and assigned engineer
 //          - Raise new support tickets with priorities and target VM tagging
-//          - Read official support engineer responses and close resolved tickets
+//          - Close resolved tickets
 // ==============================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LifeBuoy,
   Plus,
@@ -24,11 +26,21 @@ import {
   Check,
   UserCheck,
   HelpCircle,
+  User,
+  Headphones,
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
 
-interface Ticket {
+export interface ChatMessage {
+  id: string;
+  sender: 'CUSTOMER' | 'SUPPORT';
+  senderName: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface Ticket {
   id: number;
   userId: number;
   subject: string;
@@ -37,6 +49,7 @@ interface Ticket {
   status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
   assignedTo?: string | null;
   response?: string | null;
+  chatHistory?: ChatMessage[];
   createdAt: string;
   updatedAt: string;
 }
@@ -65,6 +78,12 @@ export default function SupportAndTickets() {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Active Selected Ticket for Full Thread Chat
+  const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+
   // New Ticket Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newSubject, setNewSubject] = useState('');
@@ -74,7 +93,7 @@ export default function SupportAndTickets() {
   const [userVms, setUserVms] = useState<{ vmId: number; name: string; ip: string }[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Selected detail ticket for viewing / closing
+  // Selected detail ticket for closing
   const [closingId, setClosingId] = useState<number | null>(null);
 
   const fetchTickets = async (isManual = false) => {
@@ -84,6 +103,12 @@ export default function SupportAndTickets() {
       if (res && res.success) {
         setTickets(res.tickets || []);
         if (res.stats) setStats(res.stats);
+
+        // Update activeTicket if currently selected
+        if (activeTicket) {
+          const fresh = (res.tickets || []).find((t: Ticket) => t.id === activeTicket.id);
+          if (fresh) setActiveTicket(fresh);
+        }
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to load support tickets');
@@ -112,6 +137,12 @@ export default function SupportAndTickets() {
     fetchTickets();
     fetchUserVms();
   }, []);
+
+  useEffect(() => {
+    if (activeTicket) {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeTicket, activeTicket?.chatHistory]);
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +179,35 @@ export default function SupportAndTickets() {
     }
   };
 
+  const handleSendCustomerReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeTicket || !replyText.trim()) return;
+
+    setSendingReply(true);
+    try {
+      const res = await apiCall(`/tickets/${activeTicket.id}/message`, {
+        method: 'POST',
+        body: JSON.stringify({ message: replyText.trim() }),
+      });
+
+      if (res && res.success) {
+        setReplyText('');
+        if (res.ticket) {
+          setActiveTicket(res.ticket);
+          setTickets((prev) =>
+            prev.map((t) => (t.id === res.ticket.id ? res.ticket : t))
+          );
+        } else {
+          fetchTickets();
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send message');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
   const handleCloseTicket = async (ticketId: number) => {
     setClosingId(ticketId);
     try {
@@ -157,6 +217,9 @@ export default function SupportAndTickets() {
       if (res && res.success) {
         toast.success('Ticket marked as resolved and closed.');
         fetchTickets();
+        if (activeTicket && activeTicket.id === ticketId) {
+          setActiveTicket((prev) => (prev ? { ...prev, status: 'CLOSED' } : null));
+        }
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to close ticket');
@@ -248,22 +311,20 @@ export default function SupportAndTickets() {
             <span className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1 block font-poppins">
               {stats.total}
             </span>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">Lifetime support history</span>
           </div>
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl">
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/50 rounded-xl text-blue-600 dark:text-blue-400">
             <LifeBuoy className="w-5 h-5" />
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Awaiting Engineer</span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Open & Queue</span>
             <span className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1 block font-poppins">
               {stats.open}
             </span>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">Queued in dispatch system</span>
           </div>
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 rounded-xl">
+          <div className="p-3 bg-amber-50 dark:bg-amber-950/50 rounded-xl text-amber-600 dark:text-amber-400">
             <Clock className="w-5 h-5" />
           </div>
         </div>
@@ -274,24 +335,20 @@ export default function SupportAndTickets() {
             <span className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mt-1 block font-poppins">
               {stats.inProgress}
             </span>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">Under technical investigation</span>
           </div>
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl">
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/50 rounded-xl text-blue-600 dark:text-blue-400">
             <MessageSquare className="w-5 h-5" />
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Resolved & Closed</span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Resolved</span>
             <span className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1 block font-poppins">
-              {stats.resolved + stats.closed}
-            </span>
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5 block">
-              100% SLA Guarantee Met
+              {stats.resolved}
             </span>
           </div>
-          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl">
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 rounded-xl text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="w-5 h-5" />
           </div>
         </div>
@@ -354,84 +411,226 @@ export default function SupportAndTickets() {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredTickets.map((t) => (
-            <div
-              key={t.id}
-              className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4 hover:border-slate-300 dark:hover:border-slate-700 transition-all"
-            >
-              {/* Ticket Top Meta */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="font-mono text-xs font-bold text-slate-400">#{t.id}</span>
-                  <h3 className="font-bold text-slate-900 dark:text-white text-sm">{t.subject}</h3>
+          {filteredTickets.map((t) => {
+            const history = t.chatHistory && t.chatHistory.length > 0 ? t.chatHistory : [
+              { id: '1', sender: 'CUSTOMER' as const, senderName: 'You', message: t.message, timestamp: t.createdAt },
+              ...(t.response ? [{ id: '2', sender: 'SUPPORT' as const, senderName: t.assignedTo || 'Engineer', message: t.response, timestamp: t.updatedAt }] : []),
+            ];
+
+            return (
+              <div
+                key={t.id}
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4 hover:border-slate-300 dark:hover:border-slate-700 transition-all"
+              >
+                {/* Ticket Top Meta */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono text-xs font-bold text-slate-400">#{t.id}</span>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">{t.subject}</h3>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getPriorityBadge(t.priority)}`}>
+                      {t.priority} PRIORITY
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusBadge(t.status)}`}>
+                      {t.status.replace('_', ' ')}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {new Date(t.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getPriorityBadge(t.priority)}`}>
-                    {t.priority} PRIORITY
-                  </span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusBadge(t.status)}`}>
-                    {t.status.replace('_', ' ')}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {new Date(t.createdAt).toLocaleDateString()} at {new Date(t.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                {/* Chat Preview / Latest Messages */}
+                <div className="space-y-2.5 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800/80 max-h-56 overflow-y-auto">
+                  {history.slice(-3).map((msg, idx) => {
+                    const isUser = msg.sender === 'CUSTOMER';
+                    return (
+                      <div
+                        key={msg.id || idx}
+                        className={`flex gap-3 text-xs ${isUser ? 'justify-end' : 'justify-start'}`}
+                      >
+                        {!isUser && (
+                          <div className="w-6 h-6 rounded-full bg-emerald-600/20 text-emerald-500 flex items-center justify-center shrink-0">
+                            <Headphones className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed ${
+                            isUser
+                              ? 'bg-blue-600 text-white rounded-tr-xs'
+                              : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-tl-xs'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-4 mb-0.5 text-[10px] opacity-75">
+                            <span className="font-bold">{isUser ? 'You' : msg.senderName || 'Support Engineer'}</span>
+                            <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <p className="whitespace-pre-wrap">{msg.message}</p>
+                        </div>
+                        {isUser && (
+                          <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-500 flex items-center justify-center shrink-0">
+                            <User className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
 
-              {/* Customer Inquiry Body */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center gap-2 mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <span>Your Request:</span>
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                  {t.message}
-                </p>
-              </div>
+                {/* Bottom Actions */}
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-slate-500">
+                    {history.length} message{history.length === 1 ? '' : 's'} in discussion
+                  </span>
 
-              {/* Official Engineering Response if available */}
-              {t.response ? (
-                <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-xl border border-emerald-200/80 dark:border-emerald-800/50 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300">
-                        Official Engineering Resolution:
-                      </span>
-                      {t.assignedTo && (
-                        <span className="text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-900/40 px-2 py-0.5 rounded-full font-mono">
-                          By {t.assignedTo}
-                        </span>
-                      )}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setActiveTicket(t)}
+                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition-all"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Open Live Chat ({history.length})</span>
+                    </button>
 
                     {t.status !== 'CLOSED' && (
                       <button
                         onClick={() => handleCloseTicket(t.id)}
                         disabled={closingId === t.id}
-                        className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                        className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition-all"
                       >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Accept & Close Ticket</span>
+                        <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>Close</span>
                       </button>
                     )}
                   </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-                  <p className="text-xs text-emerald-800 dark:text-emerald-200 whitespace-pre-wrap leading-relaxed">
-                    {t.response}
-                  </p>
+      {/* MODAL: FULL MULTI-TURN CHAT DIALOG */}
+      {activeTicket && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col h-[650px] max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-600/30 border border-blue-500/40 rounded-xl text-blue-400">
+                  <LifeBuoy className="w-5 h-5" />
                 </div>
-              ) : (
-                <div className="p-3 bg-amber-50/50 dark:bg-amber-950/10 rounded-xl border border-amber-200/50 dark:border-amber-800/30 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-                  <Clock className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                  <span>
-                    Your ticket is currently assigned in the technical queue. An engineer is actively evaluating host diagnostics and will reply directly here.
-                  </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-blue-400 font-bold">#{activeTicket.id}</span>
+                    <h3 className="text-sm font-bold truncate max-w-sm font-poppins">{activeTicket.subject}</h3>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                    <span>Priority: {activeTicket.priority}</span>
+                    <span>•</span>
+                    <span>Status: {activeTicket.status}</span>
+                    {activeTicket.assignedTo && (
+                      <>
+                        <span>•</span>
+                        <span>Engineer: {activeTicket.assignedTo}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {activeTicket.status !== 'CLOSED' && (
+                  <button
+                    onClick={() => handleCloseTicket(activeTicket.id)}
+                    className="px-2.5 py-1 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Resolve</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setActiveTicket(null)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-          ))}
+
+            {/* Conversation Bubbles Scroll Area */}
+            <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50 dark:bg-slate-950/50">
+              {(() => {
+                const thread = activeTicket.chatHistory && activeTicket.chatHistory.length > 0
+                  ? activeTicket.chatHistory
+                  : [
+                      { id: '1', sender: 'CUSTOMER' as const, senderName: 'You', message: activeTicket.message, timestamp: activeTicket.createdAt },
+                      ...(activeTicket.response ? [{ id: '2', sender: 'SUPPORT' as const, senderName: activeTicket.assignedTo || 'Engineer', message: activeTicket.response, timestamp: activeTicket.updatedAt }] : []),
+                    ];
+
+                return thread.map((msg, idx) => {
+                  const isUser = msg.sender === 'CUSTOMER';
+                  return (
+                    <div
+                      key={msg.id || idx}
+                      className={`flex gap-3 text-xs ${isUser ? 'justify-end' : 'justify-start'}`}
+                    >
+                      {!isUser && (
+                        <div className="w-7 h-7 rounded-full bg-emerald-600/20 text-emerald-500 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                          <Headphones className="w-4 h-4" />
+                        </div>
+                      )}
+
+                      <div
+                        className={`max-w-[80%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-xs ${
+                          isUser
+                            ? 'bg-blue-600 text-white rounded-tr-xs'
+                            : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-tl-xs'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-4 mb-1 text-[10px] opacity-75 font-semibold">
+                          <span>{isUser ? 'You' : msg.senderName || 'Technical Support'}</span>
+                          <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        <p className="whitespace-pre-wrap">{msg.message}</p>
+                      </div>
+
+                      {isUser && (
+                        <div className="w-7 h-7 rounded-full bg-blue-600/20 text-blue-500 border border-blue-500/30 flex items-center justify-center shrink-0">
+                          <User className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+              <div ref={chatBottomRef} />
+            </div>
+
+            {/* Follow-up Reply Input */}
+            <form
+              onSubmit={handleSendCustomerReply}
+              className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 shrink-0"
+            >
+              <input
+                type="text"
+                placeholder={activeTicket.status === 'CLOSED' ? 'This ticket is closed. Re-opening on message...' : 'Write your reply or question...'}
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+              />
+              <button
+                type="submit"
+                disabled={sendingReply || !replyText.trim()}
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition-all shrink-0"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{sendingReply ? 'Sending...' : 'Send'}</span>
+              </button>
+            </form>
+          </div>
         </div>
       )}
 

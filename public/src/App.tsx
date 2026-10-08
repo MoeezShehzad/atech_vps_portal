@@ -6,6 +6,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import Footer from './components/Footer';
+import AnnouncementTicker from './components/AnnouncementTicker';
 
 // Route Code-Splitting with Lazy Loading
 const Home = lazy(() => import('./pages/Home'));
@@ -62,6 +63,9 @@ function AppContent() {
     <div className="min-h-screen bg-white text-slate-900 flex flex-col justify-between font-sans">
       {/* Resets scroll position on every page navigation */}
       <ScrollToTop />
+
+      {/* GLOBAL ANNOUNCEMENTS TICKER (Above Navbar) */}
+      {!isAuthPage && <AnnouncementTicker />}
 
       {/* NAVBAR (Hidden on Auth Pages & Callback) */}
       {!isAuthPage && (

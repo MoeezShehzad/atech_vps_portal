@@ -122,6 +122,22 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/tickets', ticketRoutes);
 
+// Public announcements route for website navbar ticker
+app.get('/api/announcements', async (req, res) => {
+  try {
+    const prismaModule = (await import('./lib/prisma.js')).default;
+    const announcements = await prismaModule.systemAnnouncement.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+    res.json({ success: true, announcements });
+  } catch (error) {
+    console.error('Fetch public announcements error:', error);
+    res.json({ success: true, announcements: [] });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

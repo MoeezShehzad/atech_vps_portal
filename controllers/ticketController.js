@@ -1,13 +1,43 @@
 // ==============================================================================
 // Controller: ticketController.js
 // Purpose: Customer Support Ticket & Helpdesk System
-//          - Retrieve User Support Tickets
+//          - Real-Time Multi-Turn Chat & Conversation History
 //          - Open New Support Ticket (with priority & optional VM tagging)
-//          - View Ticket Discussion & Admin Resolution
+//          - Post Follow-up Messages to Ongoing Thread
 //          - Close/Resolve Ticket from Customer Portal
 // ==============================================================================
 
 import prisma from '../lib/prisma.js';
+
+export function parseChatHistory(ticket, user = null) {
+  let list = [];
+  if (ticket.chatHistory) {
+    try {
+      list = JSON.parse(ticket.chatHistory);
+    } catch (_) {}
+  }
+  if (!Array.isArray(list) || list.length === 0) {
+    if (ticket.message) {
+      list.push({
+        id: 'msg-init',
+        sender: 'CUSTOMER',
+        senderName: user?.fullName || 'Customer',
+        message: ticket.message,
+        timestamp: ticket.createdAt,
+      });
+    }
+    if (ticket.response) {
+      list.push({
+        id: 'msg-resp',
+        sender: 'SUPPORT',
+        senderName: ticket.assignedTo || 'Support Engineer',
+        message: ticket.response,
+        timestamp: ticket.updatedAt || ticket.createdAt,
+      });
+    }
+  }
+  return list;
+}
 
 /**
  * 1. GET /api/tickets
@@ -25,6 +55,11 @@ export async function getUserTickets(req, res) {
       orderBy: { createdAt: 'desc' },
     });
 
+    const parsedTickets = tickets.map((t) => ({
+      ...t,
+      chatHistory: parseChatHistory(t, req.user),
+    }));
+
     const stats = {
       total: tickets.length,
       open: tickets.filter((t) => t.status === 'OPEN').length,
@@ -36,7 +71,7 @@ export async function getUserTickets(req, res) {
     res.json({
       success: true,
       stats,
-      tickets,
+      tickets: parsedTickets,
     });
   } catch (error) {
     console.error('getUserTickets error:', error);
@@ -80,6 +115,16 @@ export async function createTicket(req, res) {
       ? priority.toUpperCase()
       : 'NORMAL';
 
+    const initialThread = [
+      {
+        id: `msg-${Date.now()}`,
+        sender: 'CUSTOMER',
+        senderName: req.user?.fullName || req.user?.email || 'Customer',
+        message: message.trim(),
+        timestamp: new Date().toISOString(),
+      },
+    ];
+
     const ticket = await prisma.supportTicket.create({
       data: {
         userId,
@@ -87,6 +132,7 @@ export async function createTicket(req, res) {
         message: message.trim(),
         priority: assignedPriority,
         status: 'OPEN',
+        chatHistory: JSON.stringify(initialThread),
       },
     });
 
@@ -103,7 +149,10 @@ export async function createTicket(req, res) {
     res.status(201).json({
       success: true,
       message: 'Support ticket submitted successfully. An engineer will inspect your request shortly.',
-      ticket,
+      ticket: {
+        ...ticket,
+        chatHistory: initialThread,
+      },
     });
   } catch (error) {
     console.error('createTicket error:', error);
@@ -112,7 +161,68 @@ export async function createTicket(req, res) {
 }
 
 /**
- * 3. GET /api/tickets/:id
+ * 3. POST /api/tickets/:id/message
+ * Adds a new message from the customer into the ticket discussion thread.
+ */
+export async function addCustomerMessage(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const ticketId = Number(req.params.id);
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Message cannot be empty.' });
+    }
+
+    const ticket = await prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Support ticket not found.' });
+    }
+
+    const isOwner = ticket.userId === userId;
+    const isAdmin = req.user?.role?.toUpperCase() === 'ADMIN';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Access denied to this ticket.' });
+    }
+
+    const thread = parseChatHistory(ticket, req.user);
+    const newMsg = {
+      id: `msg-${Date.now()}`,
+      sender: 'CUSTOMER',
+      senderName: req.user?.fullName || req.user?.email || 'Customer',
+      message: message.trim(),
+      timestamp: new Date().toISOString(),
+    };
+    thread.push(newMsg);
+
+    const updated = await prisma.supportTicket.update({
+      where: { id: ticketId },
+      data: {
+        chatHistory: JSON.stringify(thread),
+        status: ticket.status === 'RESOLVED' || ticket.status === 'CLOSED' ? 'OPEN' : ticket.status,
+      },
+    });
+
+    res.json({
+      success: true,
+      ticket: {
+        ...updated,
+        chatHistory: thread,
+      },
+      newMessage: newMsg,
+    });
+  } catch (error) {
+    console.error('addCustomerMessage error:', error);
+    res.status(500).json({ error: 'Failed to add message to ticket thread.' });
+  }
+}
+
+/**
+ * 4. GET /api/tickets/:id
  * Fetches single ticket details and resolution status.
  */
 export async function getTicketDetails(req, res) {
@@ -132,7 +242,6 @@ export async function getTicketDetails(req, res) {
       return res.status(404).json({ error: 'Support ticket not found.' });
     }
 
-    // Security check: only ticket owner or admin may view
     const isOwner = ticket.userId === userId;
     const isAdmin = req.user?.role?.toUpperCase() === 'ADMIN';
 
@@ -142,7 +251,10 @@ export async function getTicketDetails(req, res) {
 
     res.json({
       success: true,
-      ticket,
+      ticket: {
+        ...ticket,
+        chatHistory: parseChatHistory(ticket, req.user),
+      },
     });
   } catch (error) {
     console.error('getTicketDetails error:', error);
@@ -151,7 +263,7 @@ export async function getTicketDetails(req, res) {
 }
 
 /**
- * 4. PATCH /api/tickets/:id/close
+ * 5. PATCH /api/tickets/:id/close
  * Customer closes their resolved ticket.
  */
 export async function closeUserTicket(req, res) {
@@ -188,7 +300,10 @@ export async function closeUserTicket(req, res) {
     res.json({
       success: true,
       message: 'Ticket closed successfully.',
-      ticket: updated,
+      ticket: {
+        ...updated,
+        chatHistory: parseChatHistory(updated, req.user),
+      },
     });
   } catch (error) {
     console.error('closeUserTicket error:', error);
