@@ -36,7 +36,7 @@ function createMailTransporter(user, pass) {
 // 1. Dedicated Transporters
 export const transporterSupport = createMailTransporter(
   process.env.SMTP_SUPPORT_USER || 'customer-support@atechconsult.com',
-  process.env.SMTP_SUPPORT_PASS || 'Admin@123'
+  process.env.SMTP_SUPPORT_PASS || 'uTJ5+5CbUG'
 );
 
 export const transporterNoReply = createMailTransporter(
@@ -74,9 +74,11 @@ export function escapeHtml(text) {
 }
 
 /**
- * Universal ATC Branded Email Template Wrapper
+ * Clean, Spacious, Modern ATC Email Template Wrapper
+ * Avoids claustrophobic narrow cards / compressed invoice look.
+ * Natural white background, elegant fluid container, clean typography.
  */
-function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl, categoryBadge = 'PORTAL', footerNote }) {
+function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl, categoryBadge, footerNote }) {
   return `
   <!DOCTYPE html>
   <html>
@@ -85,69 +87,66 @@ function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl, cate
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapeHtml(title)}</title>
   </head>
-  <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
-    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:30px 10px;">
-      <tr>
-        <td align="center">
-          <table width="600" border="0" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,0.05);border:1px solid #e2e8f0;">
-            <!-- Header -->
-            <tr>
-              <td style="background:#0f172a;padding:26px 36px;text-align:left;">
-                <table width="100%" border="0" cellspacing="0" cellpadding="0">
-                  <tr>
-                    <td>
-                      <span style="font-size:22px;font-weight:800;letter-spacing:1px;color:#ffffff;text-transform:uppercase;">
-                        ATC <span style="color:#38bdf8;">Cloud</span>
-                      </span>
-                      <div style="font-size:12px;color:#94a3b8;margin-top:3px;">Next-Gen VPS Infrastructure & Data Services</div>
-                    </td>
-                    <td align="right" style="vertical-align:middle;">
-                      <span style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:11px;font-weight:700;letter-spacing:0.5px;padding:4px 10px;border-radius:999px;border:1px solid rgba(56,189,248,0.3);text-transform:uppercase;">
-                        ${escapeHtml(categoryBadge)}
-                      </span>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
+  <body style="margin:0;padding:0;background-color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#1e293b;">
+    <div style="background-color:#ffffff;width:100%;padding:32px 16px;">
+      <div style="max-width:620px;margin:0 auto;">
+        
+        <!-- Minimal Brand Header -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="padding-bottom:20px;border-bottom:1px solid #e2e8f0;">
+          <tr>
+            <td align="left" style="vertical-align:middle;">
+              <span style="font-size:20px;font-weight:800;letter-spacing:0.5px;color:#0f172a;text-transform:uppercase;">
+                ATC <span style="color:#2563eb;">Cloud</span>
+              </span>
+            </td>
+            ${categoryBadge ? `
+            <td align="right" style="vertical-align:middle;">
+              <span style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:0.5px;text-transform:uppercase;">
+                ${escapeHtml(categoryBadge)}
+              </span>
+            </td>` : ''}
+          </tr>
+        </table>
 
-            <!-- Title & Subtitle Banner -->
-            <tr>
-              <td style="padding:28px 36px 12px 36px;border-bottom:1px solid #f1f5f9;">
-                <h1 style="margin:0;font-size:20px;font-weight:700;color:#0f172a;">${escapeHtml(title)}</h1>
-                ${subtitle ? `<p style="margin:6px 0 0 0;font-size:14px;color:#64748b;">${escapeHtml(subtitle)}</p>` : ''}
-              </td>
-            </tr>
+        <!-- Header Title & Subtitle -->
+        <div style="padding-top:28px;padding-bottom:12px;">
+          <h1 style="margin:0;font-size:22px;font-weight:700;color:#0f172a;line-height:1.3;">
+            ${escapeHtml(title)}
+          </h1>
+          ${subtitle ? `
+          <p style="margin:8px 0 0 0;font-size:15px;color:#64748b;line-height:1.5;">
+            ${escapeHtml(subtitle)}
+          </p>` : ''}
+        </div>
 
-            <!-- Main Body Content -->
-            <tr>
-              <td style="padding:24px 36px;font-size:14px;line-height:1.6;color:#334155;">
-                ${contentHtml}
+        <!-- Main Body Content -->
+        <div style="font-size:15px;line-height:1.65;color:#334155;padding-top:8px;">
+          ${contentHtml}
 
-                ${ctaText && ctaUrl ? `
-                <div style="margin:30px 0 20px 0;text-align:center;">
-                  <a href="${ctaUrl}" style="background:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 28px;border-radius:10px;display:inline-block;box-shadow:0 4px 10px rgba(37,99,235,0.25);">
-                    ${escapeHtml(ctaText)} &rarr;
-                  </a>
-                  <p style="margin-top:12px;font-size:11px;color:#94a3b8;">
-                    If the button does not work, copy and paste this link in your browser:<br/>
-                    <a href="${ctaUrl}" style="color:#2563eb;word-break:break-all;">${ctaUrl}</a>
-                  </p>
-                </div>` : ''}
-              </td>
-            </tr>
+          ${ctaText && ctaUrl ? `
+          <div style="margin:32px 0 24px 0;">
+            <a href="${ctaUrl}" style="background-color:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 26px;border-radius:8px;display:inline-block;">
+              ${escapeHtml(ctaText)} &rarr;
+            </a>
+            <p style="margin-top:14px;font-size:12px;color:#94a3b8;line-height:1.5;">
+              If the button doesn't work, visit:<br/>
+              <a href="${ctaUrl}" style="color:#2563eb;word-break:break-all;">${ctaUrl}</a>
+            </p>
+          </div>` : ''}
+        </div>
 
-            <!-- Footer -->
-            <tr>
-              <td style="background:#f8fafc;padding:20px 36px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;text-align:center;">
-                <p style="margin:0 0 6px 0;">ATC Consulting & Data Center Portal • <a href="mailto:${SUPPORT_EMAIL}" style="color:#2563eb;text-decoration:none;">${SUPPORT_EMAIL}</a></p>
-                <p style="margin:0;font-size:11px;color:#94a3b8;">${footerNote || 'This is an automated message from ATC Cloud Platform.'}</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
+        <!-- Clean, Lightweight Footer -->
+        <div style="margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;line-height:1.6;">
+          <p style="margin:0 0 4px 0;">
+            ATC Cloud & Infrastructure Services • <a href="mailto:${SUPPORT_EMAIL}" style="color:#64748b;text-decoration:none;">${SUPPORT_EMAIL}</a>
+          </p>
+          <p style="margin:0;">
+            ${footerNote || 'This is an automated notification regarding your account.'}
+          </p>
+        </div>
+
+      </div>
+    </div>
   </body>
   </html>
   `;
@@ -163,16 +162,14 @@ function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl, cate
 export async function sendVerificationEmail(email, fullName, token) {
   const verifyUrl = `${APP_URL}/api/auth/verify-email?token=${token}`;
   const html = wrapEmailTemplate({
-    title: 'Verify Your Email Address',
+    title: 'Verify your email address',
     subtitle: `Welcome to ATC Cloud, ${fullName}!`,
-    categoryBadge: 'SECURITY',
+    categoryBadge: 'Verification',
     contentHtml: `
-      <p>Thank you for signing up for an ATC Cloud account. Please confirm your email address to activate your dashboard and deploy virtual machines.</p>
-      <div style="background:#eff6ff;border-left:4px solid #2563eb;padding:14px;margin:20px 0;border-radius:4px;">
-        <strong style="color:#1e40af;">Security Notice:</strong> This activation link will expire in 24 hours.
-      </div>
+      <p style="margin-top:0;">Thanks for signing up for an ATC Cloud account. Please confirm your email address to activate your portal and deploy your virtual machines.</p>
+      <p style="font-size:13px;color:#64748b;margin-bottom:0;">This verification link will remain active for 24 hours.</p>
     `,
-    ctaText: 'Activate My Account',
+    ctaText: 'Verify Email Address',
     ctaUrl: verifyUrl,
   });
 
@@ -180,7 +177,7 @@ export async function sendVerificationEmail(email, fullName, token) {
     const info = await transporterNoReply.sendMail({
       from: `"ATC Cloud" <${NOREPLY_EMAIL}>`,
       to: email,
-      subject: 'Activate Your ATC Cloud Account - Verify Email',
+      subject: 'Verify your ATC Cloud account',
       html,
     });
     console.log(`[No-Reply] Verification email sent to ${email} (ID: ${info.messageId})`);
@@ -197,15 +194,13 @@ export async function sendVerificationEmail(email, fullName, token) {
 export async function sendPasswordResetEmail(email, fullName, token) {
   const resetUrl = `${APP_URL}/reset-password?token=${token}`;
   const html = wrapEmailTemplate({
-    title: 'Password Reset Request',
-    subtitle: `Hi ${fullName || 'Customer'},`,
-    categoryBadge: 'SECURITY',
+    title: 'Reset your password',
+    subtitle: `Hi ${fullName || 'there'},`,
+    categoryBadge: 'Security',
     contentHtml: `
-      <p>We received a request to reset the password for your ATC Cloud Portal account.</p>
-      <p>Click the button below to set a new password. If you did not make this request, you can safely ignore this email; your account remains secure.</p>
-      <div style="background:#fffbeb;border-left:4px solid #f59e0b;padding:14px;margin:20px 0;border-radius:4px;">
-        <strong style="color:#b45309;">Expires Soon:</strong> For your security, this password reset link will expire in 1 hour.
-      </div>
+      <p style="margin-top:0;">We received a request to reset your password for your ATC Cloud account.</p>
+      <p>Click the button below to choose a new password. If you didn't request a password reset, you can safely ignore this email.</p>
+      <p style="font-size:13px;color:#64748b;margin-bottom:0;">For your security, this link is valid for 1 hour.</p>
     `,
     ctaText: 'Reset Password',
     ctaUrl: resetUrl,
@@ -213,9 +208,9 @@ export async function sendPasswordResetEmail(email, fullName, token) {
 
   try {
     const info = await transporterNoReply.sendMail({
-      from: `"ATC Cloud Security" <${NOREPLY_EMAIL}>`,
+      from: `"ATC Cloud" <${NOREPLY_EMAIL}>`,
       to: email,
-      subject: 'Reset Your ATC Cloud Password',
+      subject: 'Reset your ATC Cloud password',
       html,
     });
     console.log(`[No-Reply] Password reset email sent to ${email} (ID: ${info.messageId})`);
@@ -232,32 +227,36 @@ export async function sendPasswordResetEmail(email, fullName, token) {
 export async function sendVmProvisionedEmail({ email, fullName, vmName, ipAddress, username, password, os }) {
   const portalUrl = `${APP_URL}/dashboard`;
   const html = wrapEmailTemplate({
-    title: 'Your Virtual Machine is Online!',
-    subtitle: `Server "${escapeHtml(vmName)}" is provisioned and ready`,
-    categoryBadge: 'CLOUD DEPLOY',
+    title: `Your server "${escapeHtml(vmName)}" is ready`,
+    subtitle: `Hi ${escapeHtml(fullName || 'Customer')}, your virtual machine is deployed and online.`,
+    categoryBadge: 'Cloud Compute',
     contentHtml: `
-      <p>Hi ${escapeHtml(fullName || 'Customer')},</p>
-      <p>Your cloud instance has been successfully deployed on the ATC Data Center Windows Hyper-V cluster with assigned IP connectivity.</p>
-      <div style="background:#0f172a;color:#f8fafc;padding:18px;border-radius:10px;margin:20px 0;font-family:monospace;font-size:13px;">
-        <div style="color:#38bdf8;font-weight:bold;margin-bottom:8px;font-family:sans-serif;">SERVER CONNECTION CREDENTIALS:</div>
+      <p style="margin-top:0;">Your new cloud instance has been successfully allocated on the ATC infrastructure with dedicated resources.</p>
+      
+      <div style="background-color:#0f172a;color:#f8fafc;padding:18px 22px;border-radius:10px;margin:22px 0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.7;">
+        <div style="color:#38bdf8;font-weight:700;font-family:-apple-system,sans-serif;font-size:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Access Credentials</div>
         <div>Hostname: <span style="color:#ffffff;">${escapeHtml(vmName)}</span></div>
-        <div>IP Address: <span style="color:#4ade80;">${escapeHtml(ipAddress)}</span></div>
-        <div>Operating System: <span style="color:#ffffff;">${escapeHtml(os || 'Linux')}</span></div>
-        <div>SSH Username: <span style="color:#ffffff;">${escapeHtml(username || 'root')}</span></div>
+        <div>Public IP: <span style="color:#4ade80;font-weight:600;">${escapeHtml(ipAddress)}</span></div>
+        <div>OS: <span style="color:#ffffff;">${escapeHtml(os || 'Linux')}</span></div>
+        <div>Username: <span style="color:#ffffff;">${escapeHtml(username || 'root')}</span></div>
         <div>Initial Password: <span style="color:#facc15;">${escapeHtml(password)}</span></div>
-        <div style="margin-top:10px;color:#94a3b8;font-size:12px;">Quick SSH Command:<br/><code style="color:#e2e8f0;background:#1e293b;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px;">ssh ${escapeHtml(username || 'root')}@${escapeHtml(ipAddress)}</code></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b;color:#94a3b8;font-size:12px;">
+          Quick Connect:<br/>
+          <code style="color:#38bdf8;">ssh ${escapeHtml(username || 'root')}@${escapeHtml(ipAddress)}</code>
+        </div>
       </div>
-      <p style="font-size:12px;color:#dc2626;"><strong>Security Tip:</strong> We recommend changing your root password immediately upon your initial login.</p>
+
+      <p style="font-size:13px;color:#64748b;margin-bottom:0;">You can manage power, snapshots, and web console directly from your dashboard.</p>
     `,
-    ctaText: 'Access Server in Dashboard',
+    ctaText: 'Open Cloud Console',
     ctaUrl: portalUrl,
   });
 
   try {
     const info = await transporterNoReply.sendMail({
-      from: `"ATC Cloud Provisioning" <${NOREPLY_EMAIL}>`,
+      from: `"ATC Cloud" <${NOREPLY_EMAIL}>`,
       to: email,
-      subject: `[Ready] Your Server "${vmName}" is Provisioned and Online`,
+      subject: `Your server "${vmName}" is ready to connect`,
       html,
     });
     console.log(`[No-Reply] VM provision email sent to ${email} (ID: ${info.messageId})`);
@@ -282,20 +281,16 @@ export async function sendContactFormNotification({ fullName, email, message }) 
 
   // A. Alert Support Desk
   const teamHtml = wrapEmailTemplate({
-    title: 'New Public Contact Inquiry',
-    subtitle: `Inquiry submitted via Landing Page Contact Form`,
-    categoryBadge: 'INQUIRY',
+    title: `Inquiry from ${safeName}`,
+    subtitle: `Submitted via website contact form`,
+    categoryBadge: 'New Lead',
     contentHtml: `
-      <table width="100%" cellpadding="6" style="border-collapse:collapse;margin-bottom:16px;">
-        <tr><td width="120" style="color:#64748b;font-weight:600;">Full Name:</td><td><strong>${safeName}</strong></td></tr>
-        <tr><td style="color:#64748b;font-weight:600;">Email:</td><td><a href="mailto:${safeEmail}">${safeEmail}</a></td></tr>
-      </table>
-      <div style="background:#f8fafc;padding:16px;border-radius:8px;border:1px solid #e2e8f0;margin-top:12px;">
-        <strong style="color:#0f172a;display:block;margin-bottom:8px;">Customer Inquiry Message:</strong>
-        <p style="margin:0;font-size:14px;line-height:1.6;color:#334155;">${safeMsg}</p>
+      <p style="margin-top:0;"><strong>Sender:</strong> ${safeName} (<a href="mailto:${safeEmail}" style="color:#2563eb;">${safeEmail}</a>)</p>
+      <div style="background-color:#f8fafc;padding:16px 20px;border-radius:8px;border-left:3px solid #2563eb;margin:18px 0;font-size:14px;color:#1e293b;line-height:1.6;">
+        ${safeMsg}
       </div>
     `,
-    ctaText: 'Reply Directly to Visitor',
+    ctaText: 'Reply via Email',
     ctaUrl: `mailto:${safeEmail}?subject=Re:%20Inquiry%20from%20ATC%20Contact%20Form`,
   });
 
@@ -303,24 +298,23 @@ export async function sendContactFormNotification({ fullName, email, message }) 
     from: `"ATC Customer Support" <${SUPPORT_EMAIL}>`,
     to: SUPPORT_EMAIL,
     replyTo: email,
-    subject: `[Contact Form] Inquiry from ${safeName} (${safeEmail})`,
+    subject: `[Contact Form] Inquiry from ${safeName}`,
     html: teamHtml,
   });
 
   // B. Auto-acknowledgement to visitor
   const visitorHtml = wrapEmailTemplate({
-    title: 'We Received Your Message',
-    subtitle: `Hi ${safeName}, thanks for contacting ATC Cloud Support!`,
-    categoryBadge: 'SUPPORT',
+    title: 'We received your message',
+    subtitle: `Hi ${safeName}, thanks for reaching out.`,
+    categoryBadge: 'Customer Support',
     contentHtml: `
-      <p>This is to confirm that our customer support engineers have received your inquiry. A representative will review your message and respond directly to this email shortly.</p>
-      <div style="background:#f8fafc;padding:14px;border-radius:8px;border:1px solid #e2e8f0;margin:16px 0;">
-        <strong style="color:#475569;font-size:12px;text-transform:uppercase;">Summary of your request:</strong>
-        <p style="margin:6px 0 0 0;font-size:13px;color:#64748b;">${safeMsg}</p>
+      <p style="margin-top:0;">Our support team has received your inquiry and is reviewing your message. One of our engineers will follow up with you directly shortly.</p>
+      <div style="background-color:#f8fafc;padding:14px 18px;border-radius:8px;margin:18px 0;font-size:13px;color:#475569;line-height:1.6;">
+        <strong style="color:#0f172a;">Your Message:</strong><br/>
+        ${safeMsg}
       </div>
-      <p>If your inquiry is urgent, you may also log in to your portal and submit a high-priority ticket in the Ticket Center.</p>
     `,
-    ctaText: 'Visit ATC Portal',
+    ctaText: 'Visit ATC Cloud',
     ctaUrl: APP_URL,
   });
 
@@ -328,7 +322,7 @@ export async function sendContactFormNotification({ fullName, email, message }) 
     const info = await transporterSupport.sendMail({
       from: `"ATC Customer Support" <${SUPPORT_EMAIL}>`,
       to: email,
-      subject: 'We Received Your Inquiry - ATC Customer Support',
+      subject: 'We received your message - ATC Customer Support',
       html: visitorHtml,
     });
     return { success: true, messageId: info.messageId };
@@ -348,22 +342,16 @@ export async function sendTicketCreatedNotification({ ticket, customerEmail, cus
 
   // A. Notify Support Desk
   const adminHtml = wrapEmailTemplate({
-    title: `New Ticket #${ticket.id}: ${safeSubject}`,
-    subtitle: `Priority: ${ticket.priority} | Customer: ${escapeHtml(customerName || customerEmail)}`,
-    categoryBadge: 'TICKET OPEN',
+    title: `Ticket #${ticket.id}: ${safeSubject}`,
+    subtitle: `From: ${escapeHtml(customerName || customerEmail)} • Priority: ${ticket.priority}`,
+    categoryBadge: 'Support Desk',
     contentHtml: `
-      <table width="100%" cellpadding="6" style="border-collapse:collapse;margin-bottom:14px;">
-        <tr><td width="120" style="color:#64748b;font-weight:600;">Ticket ID:</td><td>#${ticket.id}</td></tr>
-        <tr><td style="color:#64748b;font-weight:600;">Customer:</td><td>${escapeHtml(customerName)} (${escapeHtml(customerEmail)})</td></tr>
-        <tr><td style="color:#64748b;font-weight:600;">Priority:</td><td><strong style="color:${ticket.priority === 'URGENT' || ticket.priority === 'HIGH' ? '#dc2626' : '#2563eb'};">${ticket.priority}</strong></td></tr>
-        <tr><td style="color:#64748b;font-weight:600;">Status:</td><td>${ticket.status}</td></tr>
-      </table>
-      <div style="background:#f8fafc;padding:16px;border-radius:8px;border:1px solid #e2e8f0;">
-        <strong style="color:#0f172a;display:block;margin-bottom:6px;">Initial Issue Description:</strong>
-        <p style="margin:0;font-size:14px;color:#334155;">${safeMsg}</p>
+      <p style="margin-top:0;">A customer has submitted a new support request.</p>
+      <div style="background-color:#f8fafc;padding:16px 20px;border-radius:8px;border-left:3px solid #2563eb;margin:18px 0;font-size:14px;color:#1e293b;line-height:1.6;">
+        ${safeMsg}
       </div>
     `,
-    ctaText: 'Open in Admin Ticket Center',
+    ctaText: 'View in Admin Helpdesk',
     ctaUrl: `${APP_URL}/admin?tab=tickets&ticketId=${ticket.id}`,
   });
 
@@ -377,25 +365,21 @@ export async function sendTicketCreatedNotification({ ticket, customerEmail, cus
 
   // B. Customer Confirmation Receipt
   const customerHtml = wrapEmailTemplate({
-    title: `Support Ticket Received [#${ticket.id}]`,
-    subtitle: `Subject: ${safeSubject}`,
-    categoryBadge: 'HELP DESK',
+    title: `Support Request Received [#${ticket.id}]`,
+    subtitle: `Hi ${escapeHtml(customerName || 'Customer')}, we're on it.`,
+    categoryBadge: 'Helpdesk',
     contentHtml: `
-      <p>Hi ${escapeHtml(customerName || 'Customer')},</p>
-      <p>Your support ticket has been received by our engineering desk. An engineer has been assigned and is reviewing your issue.</p>
-      <div style="background:#f8fafc;padding:16px;border-radius:8px;border:1px solid #e2e8f0;margin:16px 0;">
-        <p style="margin:0 0 6px 0;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Ticket Details:</p>
-        <p style="margin:0 0 4px 0;font-size:14px;"><strong>Ticket Number:</strong> #${ticket.id}</p>
-        <p style="margin:0 0 4px 0;font-size:14px;"><strong>Priority:</strong> ${ticket.priority}</p>
-        <p style="margin:0 0 8px 0;font-size:14px;"><strong>Status:</strong> ${ticket.status}</p>
-        <div style="border-top:1px dashed #cbd5e1;padding-top:8px;margin-top:8px;">
-          <strong style="font-size:13px;color:#475569;">Description:</strong>
-          <p style="margin:4px 0 0 0;font-size:13px;color:#64748b;">${safeMsg}</p>
-        </div>
+      <p style="margin-top:0;">Your support ticket <strong>#${ticket.id}</strong> has been logged into our queue. A member of our technical team will review it and reply as soon as possible.</p>
+      
+      <div style="background-color:#f8fafc;padding:14px 18px;border-radius:8px;margin:18px 0;font-size:13px;line-height:1.6;">
+        <div><strong>Subject:</strong> ${safeSubject}</div>
+        <div><strong>Priority:</strong> ${ticket.priority}</div>
+        <div style="margin-top:8px;color:#475569;">${safeMsg}</div>
       </div>
-      <p>You can track updates or reply directly at any time by clicking the button below.</p>
+
+      <p style="font-size:13px;color:#64748b;margin-bottom:0;">You can check status or reply anytime in the Ticket Center.</p>
     `,
-    ctaText: 'View Ticket in Customer Portal',
+    ctaText: 'View Ticket Thread',
     ctaUrl: ticketUrl,
   });
 
@@ -403,7 +387,7 @@ export async function sendTicketCreatedNotification({ ticket, customerEmail, cus
     const info = await transporterSupport.sendMail({
       from: `"ATC Customer Support" <${SUPPORT_EMAIL}>`,
       to: customerEmail,
-      subject: `[Ticket #${ticket.id}] We have received your support request: ${ticket.subject}`,
+      subject: `[Ticket #${ticket.id}] We received your support request: ${ticket.subject}`,
       html: customerHtml,
     });
     return { success: true, messageId: info.messageId };
@@ -429,17 +413,16 @@ export async function sendTicketReplyNotification({
     : `${APP_URL}/admin?tab=tickets&ticketId=${ticket.id}`;
 
   const html = wrapEmailTemplate({
-    title: `New Reply on Ticket #${ticket.id}`,
-    subtitle: `Subject: ${escapeHtml(ticket.subject)}`,
-    categoryBadge: 'SUPPORT REPLY',
+    title: `New update on Ticket #${ticket.id}`,
+    subtitle: `${escapeHtml(senderName)} posted a response`,
+    categoryBadge: 'Ticket Reply',
     contentHtml: `
-      <p><strong>${escapeHtml(senderName)}</strong> posted a new update to this ticket thread:</p>
-      <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;margin:16px 0;border-radius:4px;">
-        <p style="margin:0;font-size:14px;color:#166534;line-height:1.6;">${safeMsg}</p>
+      <div style="background-color:#f8fafc;padding:16px 20px;border-radius:8px;border-left:3px solid #16a34a;margin:16px 0;font-size:14px;color:#1e293b;line-height:1.65;">
+        ${safeMsg}
       </div>
-      <p style="font-size:13px;color:#64748b;">To continue this conversation or view the full thread history, click below to open the ticket console.</p>
+      <p style="font-size:13px;color:#64748b;margin-bottom:0;">Click the button below to view the conversation or reply directly.</p>
     `,
-    ctaText: isCustomerRecipient ? 'View Ticket & Reply' : 'Open Ticket in Admin Desk',
+    ctaText: isCustomerRecipient ? 'Reply to Ticket' : 'Open in Admin Desk',
     ctaUrl: targetUrl,
   });
 
@@ -467,43 +450,42 @@ export async function sendTicketReplyNotification({
 export async function sendInvoiceReceiptEmail({ email, fullName, invoiceNumber, amount, planName, currency = 'USD' }) {
   const invoiceUrl = `${APP_URL}/dashboard?tab=billing`;
   const html = wrapEmailTemplate({
-    title: 'Payment Receipt & Invoice Confirmation',
-    subtitle: `Thank you for your business with ATC Cloud, ${fullName || 'Customer'}`,
-    categoryBadge: 'BILLING',
+    title: `Payment Receipt: ${escapeHtml(invoiceNumber)}`,
+    subtitle: `Hi ${escapeHtml(fullName || 'Customer')}, here is your payment receipt.`,
+    categoryBadge: 'Billing',
     contentHtml: `
-      <p>This email confirms that your subscription invoice has been processed successfully.</p>
-      <div style="background:#f8fafc;padding:18px;border-radius:10px;border:1px solid #e2e8f0;margin:18px 0;">
-        <table width="100%" cellpadding="6" style="border-collapse:collapse;font-size:14px;">
-          <tr>
-            <td style="color:#64748b;">Invoice Number:</td>
-            <td align="right"><strong>${escapeHtml(invoiceNumber)}</strong></td>
+      <p style="margin-top:0;">Thank you for your payment. Your cloud service has been activated.</p>
+      
+      <div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin:20px 0;">
+        <table width="100%" cellpadding="12" cellspacing="0" style="font-size:14px;border-collapse:collapse;">
+          <tr style="background-color:#f8fafc;border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;font-size:13px;font-weight:600;">Description</td>
+            <td align="right" style="color:#64748b;font-size:13px;font-weight:600;">Amount</td>
           </tr>
           <tr>
-            <td style="color:#64748b;">Plan / Service:</td>
-            <td align="right">${escapeHtml(planName || 'Cloud VPS Subscription')}</td>
-          </tr>
-          <tr>
-            <td style="color:#64748b;">Amount Paid:</td>
-            <td align="right" style="color:#16a34a;font-weight:bold;font-size:16px;">$${Number(amount).toFixed(2)} ${escapeHtml(currency)}</td>
-          </tr>
-          <tr>
-            <td style="color:#64748b;">Status:</td>
-            <td align="right"><span style="background:#dcfce7;color:#166534;font-size:11px;font-weight:bold;padding:2px 8px;border-radius:999px;">PAID</span></td>
+            <td>
+              <strong>${escapeHtml(planName || 'Cloud VPS Compute Plan')}</strong><br/>
+              <span style="font-size:12px;color:#64748b;">Invoice ${escapeHtml(invoiceNumber)} • Paid</span>
+            </td>
+            <td align="right" style="font-size:16px;font-weight:700;color:#0f172a;">
+              $${Number(amount).toFixed(2)} ${escapeHtml(currency)}
+            </td>
           </tr>
         </table>
       </div>
-      <p style="font-size:13px;color:#64748b;">You can view and download your full itemized PDF invoice anytime from the Billing & Invoices section of your customer portal.</p>
+
+      <p style="font-size:13px;color:#64748b;margin-bottom:0;">You can view and download your full printable PDF invoice anytime from the Billing & Invoices section.</p>
     `,
     ctaText: 'View Invoices in Portal',
     ctaUrl: invoiceUrl,
-    footerNote: 'ATC Cloud Billing Department • For billing questions, reply to this email or contact billing@atechconsult.com',
+    footerNote: 'ATC Cloud Billing • For billing inquiries, reply to this email or contact billing@atechconsult.com',
   });
 
   try {
     const info = await transporterBilling.sendMail({
-      from: `"ATC Billing & Invoicing" <${BILLING_EMAIL}>`,
+      from: `"ATC Billing" <${BILLING_EMAIL}>`,
       to: email,
-      subject: `[Receipt] Invoice ${invoiceNumber} - $${Number(amount).toFixed(2)} ${currency}`,
+      subject: `[Receipt] Invoice ${invoiceNumber} ($${Number(amount).toFixed(2)} ${currency})`,
       html,
     });
     console.log(`[Billing] Receipt sent to ${email} (ID: ${info.messageId})`);
@@ -524,27 +506,25 @@ export async function sendInvoiceReceiptEmail({ email, fullName, invoiceNumber, 
 export async function sendSystemAlertEmail({ subject, alertLevel = 'WARNING', details, targetEmail }) {
   const destEmail = targetEmail || ALERTS_EMAIL;
   const isCritical = alertLevel === 'CRITICAL' || alertLevel === 'DANGER';
-  const badgeColor = isCritical ? '#dc2626' : '#f59e0b';
 
   const html = wrapEmailTemplate({
-    title: `Infrastructure Alert: ${escapeHtml(subject)}`,
+    title: subject,
     subtitle: `Alert Level: ${alertLevel}`,
     categoryBadge: alertLevel,
     contentHtml: `
-      <div style="background:${isCritical ? '#fef2f2' : '#fffbeb'};border-left:4px solid ${badgeColor};padding:16px;border-radius:4px;margin-bottom:16px;">
-        <strong style="color:${badgeColor};font-size:14px;">Cluster Telemetry Event Triggered</strong>
-        <p style="margin:8px 0 0 0;font-size:13px;color:#334155;line-height:1.6;">${escapeHtml(details)}</p>
+      <div style="background-color:#f8fafc;padding:16px 20px;border-radius:8px;border-left:3px solid ${isCritical ? '#dc2626' : '#f59e0b'};margin:16px 0;font-size:14px;color:#1e293b;line-height:1.6;">
+        ${escapeHtml(details)}
       </div>
-      <p style="font-size:12px;color:#64748b;">Timestamp: ${new Date().toUTCString()} | Node: Windows Hyper-V Cluster Primary</p>
+      <p style="font-size:12px;color:#94a3b8;margin-bottom:0;">Timestamp: ${new Date().toUTCString()} • Source: Hyper-V Cluster Node</p>
     `,
-    ctaText: 'Open Admin Telemetry',
+    ctaText: 'Open System Telemetry',
     ctaUrl: `${APP_URL}/admin?tab=overview`,
-    footerNote: 'ATC Cloud Automated Monitoring System • alerts@atechconsult.com',
+    footerNote: 'ATC Cloud Automated Monitoring System',
   });
 
   try {
     const info = await transporterAlerts.sendMail({
-      from: `"ATC Infrastructure Alerts" <${ALERTS_EMAIL}>`,
+      from: `"ATC Alerts" <${ALERTS_EMAIL}>`,
       to: destEmail,
       subject: `[${alertLevel}] ${subject}`,
       html,
