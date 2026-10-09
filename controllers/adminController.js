@@ -593,17 +593,20 @@ export async function getAdminPlans(req, res) {
 
 export async function createAdminPlan(req, res) {
   try {
-    const { name, cpuCores, ramGb, storageGb, monthlyPrice } = req.body;
+    const { name, description, cpuCores, ramGb, storageGb, storageType, bandwidthMbps, monthlyPrice } = req.body;
     if (!name || !monthlyPrice) {
       return res.status(400).json({ error: 'Plan name and monthly price are required' });
     }
 
     const created = await prisma.vPSPlan.create({
       data: {
-        name,
+        name: name.trim(),
+        description: description || `Standard VPS hosting instance with ${cpuCores || 2} vCPUs and ${ramGb || 4} GB RAM`,
         cpuCores: Number(cpuCores) || 2,
         ramGb: Number(ramGb) || 4,
         storageGb: Number(storageGb) || 50,
+        storageType: storageType || 'NVMe',
+        bandwidthMbps: Number(bandwidthMbps) || 1000,
         monthlyPrice: Number(monthlyPrice),
         isActive: true,
       },
@@ -621,22 +624,25 @@ export async function createAdminPlan(req, res) {
     res.json({ success: true, plan: created });
   } catch (error) {
     console.error('createAdminPlan error:', error);
-    res.status(500).json({ error: 'Failed to create plan' });
+    res.status(500).json({ error: error.message || 'Failed to create plan' });
   }
 }
 
 export async function updatePlan(req, res) {
   try {
     const planId = Number(req.params.planId);
-    const { name, cpuCores, ramGb, storageGb, monthlyPrice, isActive } = req.body;
+    const { name, description, cpuCores, ramGb, storageGb, storageType, bandwidthMbps, monthlyPrice, isActive } = req.body;
 
     const updated = await prisma.vPSPlan.update({
       where: { planId },
       data: {
-        ...(name && { name }),
+        ...(name && { name: name.trim() }),
+        ...(description !== undefined && { description }),
         ...(cpuCores && { cpuCores: Number(cpuCores) }),
         ...(ramGb && { ramGb: Number(ramGb) }),
         ...(storageGb && { storageGb: Number(storageGb) }),
+        ...(storageType && { storageType }),
+        ...(bandwidthMbps && { bandwidthMbps: Number(bandwidthMbps) }),
         ...(monthlyPrice && { monthlyPrice: Number(monthlyPrice) }),
         ...(isActive !== undefined && { isActive: Boolean(isActive) }),
       },
@@ -653,7 +659,50 @@ export async function updatePlan(req, res) {
 
     res.json({ success: true, plan: updated });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to update plan' });
+    console.error('updatePlan error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update plan' });
+  }
+}
+
+export async function deletePlan(req, res) {
+  try {
+    const planId = Number(req.params.planId);
+    if (!planId) return res.status(400).json({ error: 'Valid plan ID is required' });
+
+    // Check if any subscriptions or VMs currently use this plan
+    const [subCount, vmCount] = await Promise.all([
+      prisma.subscription.count({ where: { planId } }),
+      prisma.virtualMachine.count({ where: { planId } }),
+    ]);
+
+    if (subCount > 0 || vmCount > 0) {
+      // Soft-delete / deactivate plan instead of breaking database constraints
+      const deactivated = await prisma.vPSPlan.update({
+        where: { planId },
+        data: { isActive: false },
+      });
+      return res.json({
+        success: true,
+        message: `Plan has ${subCount + vmCount} active references. It has been deactivated so new users cannot purchase it.`,
+        plan: deactivated,
+      });
+    }
+
+    await prisma.vPSPlan.delete({ where: { planId } });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.adminUser.userId,
+        action: 'ADMIN_DELETE_PLAN',
+        status: 'SUCCESS',
+        details: `Administrator deleted VPS plan ID: ${planId}`,
+      },
+    });
+
+    res.json({ success: true, message: 'Plan permanently removed from database' });
+  } catch (error) {
+    console.error('deletePlan error:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete plan' });
   }
 }
 

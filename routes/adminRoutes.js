@@ -20,6 +20,7 @@ import {
   getAdminPlans,
   createAdminPlan,
   updatePlan,
+  deletePlan,
   getAdminCoupons,
   createAdminCoupon,
   deleteAdminCoupon,
@@ -65,6 +66,7 @@ router.delete('/announcements/:id', deleteAnnouncement);
 router.get('/plans', getAdminPlans);
 router.post('/plans', createAdminPlan);
 router.patch('/plans/:planId', updatePlan);
+router.delete('/plans/:planId', deletePlan);
 router.get('/coupons', getAdminCoupons);
 router.post('/coupons', createAdminCoupon);
 router.delete('/coupons/:id', deleteAdminCoupon);
