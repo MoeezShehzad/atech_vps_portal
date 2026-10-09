@@ -75,9 +75,9 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
       </button>
 
-      <div>
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Brand Header */}
-        <div className={`border-b border-slate-100 dark:border-slate-800 flex items-center ${collapsed ? 'p-4 justify-center' : 'p-6 space-x-3'}`}>
+        <div className={`shrink-0 border-b border-slate-100 dark:border-slate-800 flex items-center ${collapsed ? 'p-4 justify-center' : 'p-6 space-x-3'}`}>
           <div className="bg-blue-600 p-2.5 rounded-xl text-white shadow-sm shadow-blue-500/20 shrink-0">
             <Server className="h-6 w-6" />
           </div>
@@ -92,7 +92,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         </div>
 
         {/* Navigation */}
-        <nav className="p-3 space-y-1.5 overflow-y-auto">
+        <nav className="p-3 space-y-1.5 overflow-y-auto flex-1 min-h-0">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -136,7 +136,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       </div>
 
       {/* Footer Controls: Theme Toggle & Logout */}
-      <div className={`border-t border-slate-100 dark:border-slate-800 space-y-2 ${collapsed ? 'p-3' : 'p-4'}`}>
+      <div className={`shrink-0 border-t border-slate-100 dark:border-slate-800 space-y-2 ${collapsed ? 'p-3' : 'p-4'}`}>
         {/* iOS-Style Theme Switcher in Sidebar */}
         <div className={`rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/80 flex items-center ${
           collapsed ? 'justify-center p-2' : 'px-4 py-2.5 justify-between'

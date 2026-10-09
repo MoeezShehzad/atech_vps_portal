@@ -62,34 +62,34 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="bg-slate-950 text-slate-300 font-sans border-t border-slate-800">
+    <footer className="bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-300 font-sans border-t border-slate-200 dark:border-slate-800 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8 items-start">
           
           {/* COLUMN 1: CONTACT */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white font-poppins">Contact</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Contact</h3>
             
             <div className="space-y-1 text-sm">
               <a 
                 href="mailto:info@atechconsult.com" 
-                className="block text-slate-200 font-semibold hover:text-blue-400 transition-colors"
+                className="block text-slate-700 dark:text-slate-200 font-semibold hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
                 info@atechconsult.com
               </a>
               <a 
                 href="tel:+16306967721" 
-                className="block text-slate-200 font-semibold hover:text-blue-400 transition-colors"
+                className="block text-slate-700 dark:text-slate-200 font-semibold hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               >
                 +1 630-696-7721
               </a>
             </div>
 
             <div className="pt-2">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+              <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                 Address
               </h4>
-              <p className="text-xs text-slate-400 leading-relaxed">
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                 1360 Brentwood Trl,<br />
                 Bolingbrook, IL 60490, United States
               </p>
@@ -102,37 +102,37 @@ export default function Footer() {
                 width="160"
                 height="32"
                 loading="lazy"
-                className="h-8 w-auto object-contain brightness-200 opacity-80" 
+                className="h-8 w-auto object-contain dark:brightness-200 opacity-90" 
               />
             </div>
           </div>
 
           {/* COLUMN 2: COMPANY LINKS */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white font-poppins">Company</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Company</h3>
             <ul className="space-y-3 text-sm">
               <li>
-                <Link to="/" className="text-slate-300 hover:text-white transition-colors">
+                <Link to="/" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white transition-colors">
                   Home
                 </Link>
               </li>
               <li>
-                <Link to="/services" className="text-slate-300 hover:text-white transition-colors">
+                <Link to="/services" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white transition-colors">
                   Services
                 </Link>
               </li>
               <li>
-                <Link to="/about" className="text-slate-300 hover:text-white transition-colors">
+                <Link to="/about" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white transition-colors">
                   About me
                 </Link>
               </li>
               <li>
-                <Link to="/pricing" className="text-slate-300 hover:text-white transition-colors">
+                <Link to="/pricing" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white transition-colors">
                   Reviews
                 </Link>
               </li>
               <li>
-                <Link to="/contact" className="text-slate-300 hover:text-white transition-colors">
+                <Link to="/contact" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white transition-colors">
                   Contact
                 </Link>
               </li>
@@ -141,17 +141,17 @@ export default function Footer() {
 
           {/* COLUMN 3: LOCATION MAP CARD */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white font-poppins">Location</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Location</h3>
             
-            <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 group shadow-lg">
-              <div className="h-48 w-full bg-slate-800 relative flex items-center justify-center overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
+            <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 group shadow-md">
+              <div className="h-48 w-full bg-slate-100 dark:bg-slate-800 relative flex items-center justify-center overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
 
                 <a
                   href="https://maps.google.com/?q=1360+Brentwood+Trl,+Bolingbrook,+IL+60490"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="absolute top-3 left-3 z-10 bg-white/90 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-white transition-all flex items-center gap-1.5 shadow-md"
+                  className="absolute top-3 left-3 z-10 bg-white/95 dark:bg-slate-900/90 text-slate-900 dark:text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-white transition-all flex items-center gap-1.5 shadow-md border border-slate-200 dark:border-slate-700"
                 >
                   Open in Maps <ExternalLink className="w-3 h-3 text-blue-600" />
                 </a>
@@ -163,23 +163,23 @@ export default function Footer() {
                 </div>
               </div>
 
-              <div className="p-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+              <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
                 <span>Bolingbrook, IL Center</span>
-                <span className="text-emerald-400 font-medium">Data Center Hub</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Data Center Hub</span>
               </div>
             </div>
           </div>
 
           {/* COLUMN 4: SOCIAL ACCOUNTS */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white font-poppins">Social Accounts</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Social Accounts</h3>
             
             <div className="flex flex-col gap-2.5">
               {socialLinks.map((social) => (
                 <a
                   key={social.name}
                   href={social.href}
-                  className="w-10 h-10 rounded-full border border-slate-800 bg-slate-900 hover:bg-blue-600 hover:border-blue-500 hover:text-white text-slate-400 transition-all flex items-center justify-center shadow-sm"
+                  className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-blue-600 hover:border-blue-500 hover:text-white text-slate-600 dark:text-slate-400 transition-all flex items-center justify-center shadow-xs"
                   title={social.name}
                 >
                   {social.icon}
@@ -191,11 +191,11 @@ export default function Footer() {
         </div>
 
         {/* BOTTOM COPYRIGHT */}
-        <div className="mt-12 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>© {new Date().getFullYear()} Analytical Technical Consulting. All rights reserved.</p>
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-slate-300 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-slate-300 transition-colors">Terms of Service</a>
+            <a href="#" className="hover:text-slate-800 dark:hover:text-slate-300 transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-slate-800 dark:hover:text-slate-300 transition-colors">Terms of Service</a>
           </div>
         </div>
 

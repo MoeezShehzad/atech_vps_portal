@@ -168,17 +168,17 @@ export default function StorageAndDisks() {
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold text-blue-950 font-poppins">
+            <h1 className="text-2xl font-bold text-blue-950 dark:text-white font-poppins">
               Storage & Virtual Disks
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400">
               NVMe Tier-1 Cluster
             </span>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Manage attached VHDX virtual hard disks, perform on-the-fly disk expansions, and attach secondary block storage.
           </p>
         </div>
@@ -187,7 +187,7 @@ export default function StorageAndDisks() {
           <button
             onClick={fetchStorageData}
             disabled={loading}
-            className="p-2.5 text-slate-500 hover:text-slate-800 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-xs"
+            className="p-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-xs"
             title="Refresh storage"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -206,67 +206,67 @@ export default function StorageAndDisks() {
 
       {/* Top Storage Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>Total Storage Allocated</span>
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+            <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl">
               <HardDrive className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
-            {totalAllocatedGb} <span className="text-sm font-sans font-medium text-slate-500">GB NVMe</span>
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+            {totalAllocatedGb} <span className="text-sm font-sans font-medium text-slate-500 dark:text-slate-400">GB NVMe</span>
           </div>
-          <p className="text-[11px] text-slate-400">High-speed PCIe 4.0 storage</p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">High-speed PCIe 4.0 storage</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>Active Virtual Disks</span>
-            <div className="p-2 bg-purple-50 text-purple-600 rounded-xl">
+            <div className="p-2 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 rounded-xl">
               <Database className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
-            {disks.length} <span className="text-sm font-sans font-medium text-slate-500">Disks</span>
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+            {disks.length} <span className="text-sm font-sans font-medium text-slate-500 dark:text-slate-400">Disks</span>
           </div>
-          <p className="text-[11px] text-slate-400">Mounted SCSI controllers</p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">Mounted SCSI controllers</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>IOPS Performance</span>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+            <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl">
               <Zap className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
-            Up to 80,000 <span className="text-sm font-sans font-medium text-slate-500">IOPS</span>
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+            Up to 80,000 <span className="text-sm font-sans font-medium text-slate-500 dark:text-slate-400">IOPS</span>
           </div>
-          <p className="text-[11px] text-emerald-600 font-medium">Sub-millisecond latency</p>
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Sub-millisecond latency</p>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>Redundancy Tier</span>
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+            <div className="p-2 bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 rounded-xl">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
             RAID-10
           </div>
-          <p className="text-[11px] text-slate-400">Automated fault-tolerant array</p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">Automated fault-tolerant array</p>
         </div>
       </div>
 
       {/* Disks Table Section */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div>
-            <h2 className="font-bold text-slate-900 font-poppins">Attached Virtual Hard Disks</h2>
-            <p className="text-xs text-slate-500">All provisioned VHDX files and dynamically expanding volumes</p>
+            <h2 className="font-bold text-slate-900 dark:text-white font-poppins">Attached Virtual Hard Disks</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">All provisioned VHDX files and dynamically expanding volumes</p>
           </div>
-          <span className="text-xs text-slate-500 font-mono bg-slate-100 px-3 py-1 rounded-lg">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg">
             {disks.length} Volume{disks.length === 1 ? '' : 's'}
           </span>
         </div>
@@ -276,16 +276,16 @@ export default function StorageAndDisks() {
             <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
           </div>
         ) : disks.length === 0 ? (
-          <div className="py-16 text-center text-slate-500">
-            <HardDrive className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-            <p className="font-semibold text-slate-700">No active storage volumes detected</p>
-            <p className="text-xs text-slate-400 mt-1">Deploy a virtual machine to allocate NVMe storage.</p>
+          <div className="py-16 text-center text-slate-500 dark:text-slate-400">
+            <HardDrive className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+            <p className="font-semibold text-slate-700 dark:text-slate-300">No active storage volumes detected</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Deploy a virtual machine to allocate NVMe storage.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                <tr className="bg-slate-50 dark:bg-slate-800/60 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
                   <th className="py-3.5 px-6">Disk Volume</th>
                   <th className="py-3.5 px-6">Attached VM</th>
                   <th className="py-3.5 px-6">Capacity</th>
@@ -294,39 +294,39 @@ export default function StorageAndDisks() {
                   <th className="py-3.5 px-6 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
                 {disks.map((disk) => (
-                  <tr key={disk.id} className="hover:bg-slate-50/80 transition-colors">
+                  <tr key={disk.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                        <div className="p-2 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl">
                           <HardDrive className="w-4 h-4" />
                         </div>
                         <div>
-                          <div className="font-bold text-slate-900 font-mono">{disk.diskName}</div>
-                          <div className="text-[11px] text-slate-400">{disk.type}</div>
+                          <div className="font-bold text-slate-900 dark:text-white font-mono">{disk.diskName}</div>
+                          <div className="text-[11px] text-slate-400 dark:text-slate-500">{disk.type}</div>
                         </div>
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <div className="flex items-center gap-2 font-semibold text-slate-800">
+                      <div className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200">
                         <Server className="w-3.5 h-3.5 text-slate-400" />
                         {disk.vmName}
                       </div>
                     </td>
                     <td className="py-4 px-6">
                       <div className="space-y-1">
-                        <div className="font-mono font-bold text-slate-900">{disk.capacityGb} GB</div>
-                        <div className="w-24 bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                        <div className="font-mono font-bold text-slate-900 dark:text-white">{disk.capacityGb} GB</div>
+                        <div className="w-24 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
                           <div className="bg-blue-600 h-full w-2/5 rounded-full"></div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6 font-mono text-[11px] text-slate-500">
+                    <td className="py-4 px-6 font-mono text-[11px] text-slate-500 dark:text-slate-400">
                       {disk.bus}
                     </td>
                     <td className="py-4 px-6">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                         {disk.status}
                       </span>
@@ -334,7 +334,7 @@ export default function StorageAndDisks() {
                     <td className="py-4 px-6 text-right">
                       <button
                         onClick={() => handleOpenExpand(disk)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-semibold transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
                       >
                         <Sliders className="w-3.5 h-3.5" /> Expand
                       </button>
@@ -350,29 +350,29 @@ export default function StorageAndDisks() {
       {/* EXPAND DISK MODAL */}
       {isExpandOpen && selectedDisk && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsExpandOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600"
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-3 text-blue-600 mb-4">
-              <div className="p-2.5 bg-blue-50 rounded-xl">
+            <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400 mb-4">
+              <div className="p-2.5 bg-blue-50 dark:bg-blue-950/60 rounded-xl">
                 <HardDrive className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 font-poppins">Expand Virtual Disk</h3>
-                <p className="text-xs text-slate-500">Target: <strong className="font-mono text-slate-800">{selectedDisk.diskName}</strong></p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Expand Virtual Disk</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Target: <strong className="font-mono text-slate-800 dark:text-slate-200">{selectedDisk.diskName}</strong></p>
               </div>
             </div>
 
             <form onSubmit={handleExpandSubmit} className="space-y-5">
               <div>
                 <div className="flex justify-between text-xs font-semibold mb-2">
-                  <span className="text-slate-700">New Disk Capacity (GB)</span>
-                  <span className="text-blue-600 font-bold font-mono text-sm">{newCapacity} GB NVMe</span>
+                  <span className="text-slate-700 dark:text-slate-300">New Disk Capacity (GB)</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-bold font-mono text-sm">{newCapacity} GB NVMe</span>
                 </div>
                 <input
                   type="range"
@@ -381,15 +381,15 @@ export default function StorageAndDisks() {
                   step="5"
                   value={newCapacity}
                   onChange={(e) => setNewCapacity(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
-                <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                   <span>Current: {selectedDisk.capacityGb} GB</span>
                   <span>Max: {selectedDisk.capacityGb + 200} GB</span>
                 </div>
               </div>
 
-              <div className="p-3 bg-amber-50 border border-amber-200/60 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/60 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <span>
                   Disks can only be expanded, not shrunk. After expanding, your guest OS partition is automatically resized by the agent.
@@ -400,14 +400,14 @@ export default function StorageAndDisks() {
                 <button
                   type="button"
                   onClick={() => setIsExpandOpen(false)}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+                  className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={expandLoading || newCapacity <= selectedDisk.capacityGb}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
                 >
                   {expandLoading ? 'Expanding...' : 'Confirm Expansion'}
                 </button>
@@ -420,46 +420,46 @@ export default function StorageAndDisks() {
       {/* ATTACH SECONDARY VOLUME MODAL */}
       {isAttachOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsAttachOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600"
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-3 text-blue-600 mb-4">
-              <div className="p-2.5 bg-blue-50 rounded-xl">
+            <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400 mb-4">
+              <div className="p-2.5 bg-blue-50 dark:bg-blue-950/60 rounded-xl">
                 <Plus className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 font-poppins">Attach Secondary Volume</h3>
-                <p className="text-xs text-slate-500">Create dedicated block storage for your VM</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Attach Secondary Volume</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Create dedicated block storage for your VM</p>
               </div>
             </div>
 
             <form onSubmit={handleAttachVolume} className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Volume Name</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Volume Name</label>
                 <input
                   type="text"
                   value={attachVolumeName}
                   onChange={(e) => setAttachVolumeName(e.target.value)}
                   placeholder="data-volume-01"
                   required
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:outline-hidden focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs font-mono focus:outline-hidden focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Attach to Virtual Machine</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Attach to Virtual Machine</label>
                 <select
                   value={attachTargetVmId || ''}
                   onChange={(e) => setAttachTargetVmId(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-hidden focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs focus:outline-hidden focus:border-blue-500"
                 >
                   {instances.map((v) => (
-                    <option key={v.vmId} value={v.vmId}>
+                    <option key={v.vmId} value={v.vmId} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
                       {v.name} ({v.ip || 'Provisioning'})
                     </option>
                   ))}
@@ -468,8 +468,8 @@ export default function StorageAndDisks() {
 
               <div>
                 <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-slate-700">Volume Size</span>
-                  <span className="text-blue-600 font-bold font-mono">{attachVolumeSize} GB</span>
+                  <span className="text-slate-700 dark:text-slate-300">Volume Size</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-bold font-mono">{attachVolumeSize} GB</span>
                 </div>
                 <input
                   type="range"
@@ -478,7 +478,7 @@ export default function StorageAndDisks() {
                   step="5"
                   value={attachVolumeSize}
                   onChange={(e) => setAttachVolumeSize(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
               </div>
 
@@ -486,14 +486,14 @@ export default function StorageAndDisks() {
                 <button
                   type="button"
                   onClick={() => setIsAttachOpen(false)}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+                  className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={attachLoading || instances.length === 0}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
                 >
                   {attachLoading ? 'Attaching...' : 'Attach Volume'}
                 </button>

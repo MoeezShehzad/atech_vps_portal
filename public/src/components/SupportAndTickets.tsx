@@ -146,6 +146,29 @@ export default function SupportAndTickets() {
     }
   }, [activeTicket, activeTicket?.chatHistory]);
 
+  // Polling for active ticket thread updates in real-time every 4s
+  useEffect(() => {
+    if (!activeTicket) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await apiCall(`/tickets/${activeTicket.id}`);
+        if (res && res.success && res.ticket) {
+          const fresh = res.ticket;
+          setActiveTicket((prev) => {
+            if (!prev || prev.id !== fresh.id) return prev;
+            const prevLen = prev.chatHistory?.length || 0;
+            const freshLen = fresh.chatHistory?.length || 0;
+            if (prevLen !== freshLen || prev.status !== fresh.status || prev.response !== fresh.response) {
+              return fresh;
+            }
+            return prev;
+          });
+        }
+      } catch (_) {}
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [activeTicket?.id]);
+
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubject.trim() || !newMessage.trim()) {

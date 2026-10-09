@@ -103,6 +103,7 @@ export default function AdminDashboard() {
   // Fleet
   const [fleetVMs, setFleetVMs] = useState<any[]>([]);
   const [powerActionLoadingId, setPowerActionLoadingId] = useState<number | null>(null);
+  const [adminPowerConfirmVm, setAdminPowerConfirmVm] = useState<{ vmId: number; name: string } | null>(null);
 
   // Plans & Coupons
   const [plans, setPlans] = useState<any[]>([]);
@@ -206,8 +207,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleFleetPower = async (vmId: number, currentStatus: string) => {
-    const action = currentStatus === 'running' ? 'STOP' : 'START';
+  const executeFleetPower = async (vmId: number, action: 'START' | 'STOP') => {
     try {
       setPowerActionLoadingId(vmId);
       const res = await apiCall(`/admin/fleet/vms/${vmId}/power`, {
@@ -225,6 +225,15 @@ export default function AdminDashboard() {
     } finally {
       setPowerActionLoadingId(null);
     }
+  };
+
+  const handleFleetPower = async (vmId: number, currentStatus: string) => {
+    if (currentStatus === 'running') {
+      const target = fleetVMs.find((v) => v.vmId === vmId);
+      setAdminPowerConfirmVm({ vmId, name: target ? target.name : `Virtual Machine #${vmId}` });
+      return;
+    }
+    await executeFleetPower(vmId, 'START');
   };
 
   // 4. Plans & Coupons
@@ -1594,6 +1603,48 @@ export default function AdminDashboard() {
 
         </main>
       </div>
+
+      {/* ADMIN POWER OFF CONFIRMATION MODAL */}
+      {adminPowerConfirmVm && (
+        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <Power className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Power Off Fleet Instance?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Emergency power off command will be issued to Hyper-V host</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+              Are you sure you want to shut down <strong className="text-slate-900 dark:text-white font-bold">{adminPowerConfirmVm.name}</strong>? Guest processes and customer services will be immediately interrupted.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setAdminPowerConfirmVm(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = adminPowerConfirmVm.vmId;
+                  setAdminPowerConfirmVm(null);
+                  executeFleetPower(id, 'STOP');
+                }}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Power className="w-3.5 h-3.5" /> Confirm Power Off
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

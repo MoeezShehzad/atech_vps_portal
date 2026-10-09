@@ -141,6 +141,7 @@ export default function Dashboard() {
 
   // Real-time server state from API
   const [instances, setInstances] = useState<Instance[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Advanced VM features state
   const [connectGuideVm, setConnectGuideVm] = useState<Instance | null>(null);
@@ -165,8 +166,8 @@ export default function Dashboard() {
   const [activeSubscriptions, setActiveSubscriptions] = useState<ActiveSubscription[]>([]);
   const [catalogPlans, setCatalogPlans] = useState<PlanOption[]>([]);
   const [catalogImages, setCatalogImages] = useState<ImageOption[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [powerConfirmVm, setPowerConfirmVm] = useState<{ vmId: number; name: string } | null>(null);
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -416,8 +417,7 @@ export default function Dashboard() {
   };
 
   // Power action (START / STOP / RESTART)
-  const handlePowerAction = async (vmId: number, action: 'START' | 'STOP' | 'RESTART', e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+  const executePowerAction = async (vmId: number, action: 'START' | 'STOP' | 'RESTART') => {
     setActionLoadingId(vmId);
     try {
       await apiCall(`/vms/${vmId}/power`, {
@@ -434,6 +434,16 @@ export default function Dashboard() {
     } finally {
       setActionLoadingId(null);
     }
+  };
+
+  const handlePowerAction = async (vmId: number, action: 'START' | 'STOP' | 'RESTART', e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (action === 'STOP') {
+      const target = instances.find((i) => i.vmId === vmId);
+      setPowerConfirmVm({ vmId, name: target ? target.name : `Virtual Machine #${vmId}` });
+      return;
+    }
+    await executePowerAction(vmId, action);
   };
 
   // Deploy submit handler
@@ -1660,25 +1670,25 @@ export default function Dashboard() {
 
       {/* DEPLOY NEW INSTANCE MODAL */}
       {isDeployOpen && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <button 
               onClick={() => setIsDeployOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600"
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-xl font-bold text-slate-900 font-poppins mb-1">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white font-poppins mb-1">
               Deploy New Virtual Machine
             </h3>
-            <p className="text-xs text-slate-500 mb-6">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
               Instant Generation 2 Hyper-V provisioning from enterprise image templates.
             </p>
 
             <form onSubmit={handleDeploySubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Server Hostname / Tag
                 </label>
                 <input
@@ -1687,18 +1697,18 @@ export default function Dashboard() {
                   placeholder="e.g. app-prod-01"
                   value={newHostname}
                   onChange={(e) => setNewHostname(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Operating System / Master Image
                 </label>
                 <select
                   value={selectedImageId}
                   onChange={(e) => setSelectedImageId(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
                 >
                   {catalogImages.map((img) => (
                     <option key={img.imageId} value={img.imageId}>
@@ -1710,13 +1720,13 @@ export default function Dashboard() {
 
               {/* PLAN SELECTION */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Base Plan Tier
                 </label>
                 <select
                   value={selectedPlanId}
                   onChange={(e) => handlePlanChange(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
                 >
                   {catalogPlans.map((p) => (
                     <option key={p.planId} value={p.planId}>
@@ -1728,7 +1738,7 @@ export default function Dashboard() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     vCPU Cores
                   </label>
                   <input
@@ -1737,11 +1747,11 @@ export default function Dashboard() {
                     max="16"
                     value={customCpu}
                     onChange={(e) => setCustomCpu(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     RAM (GB)
                   </label>
                   <input
@@ -1750,11 +1760,11 @@ export default function Dashboard() {
                     max="64"
                     value={customRam}
                     onChange={(e) => setCustomRam(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                     NVMe Disk (GB)
                   </label>
                   <input
@@ -1764,7 +1774,7 @@ export default function Dashboard() {
                     step="10"
                     value={customStorage}
                     onChange={(e) => setCustomStorage(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
                   />
                 </div>
               </div>
@@ -1780,27 +1790,27 @@ export default function Dashboard() {
                 const isCoveredBySlot = Boolean(activeSlot && activeSlot.planId === plan.planId && delta === 0);
 
                 return (
-                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs text-slate-500">
+                  <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                       <span>Base Plan ({plan.name})</span>
-                      <span className="font-semibold text-slate-700">${plan.monthlyPrice}/mo</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">${plan.monthlyPrice}/mo</span>
                     </div>
                     {delta > 0 && (
-                      <div className="flex items-center justify-between text-[11px] text-blue-600 font-medium">
+                      <div className="flex items-center justify-between text-[11px] text-blue-600 dark:text-blue-400 font-medium">
                         <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM{extraStorage > 0 ? `, +${extraStorage}GB NVMe` : ''})</span>
                         <span>+${delta.toFixed(2)}/mo</span>
                       </div>
                     )}
-                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700">Estimated Monthly Rate</span>
+                    <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Estimated Monthly Rate</span>
                       <div className="text-right">
                         {isCoveredBySlot ? (
                           <div>
-                            <span className="text-sm font-extrabold text-emerald-600 font-poppins">$0.00 /mo</span>
-                            <span className="block text-[10px] text-emerald-600 font-medium">Covered by Active Prepaid Slot</span>
+                            <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-poppins">$0.00 /mo</span>
+                            <span className="block text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Covered by Active Prepaid Slot</span>
                           </div>
                         ) : (
-                          <span className="text-sm font-extrabold text-blue-600 font-poppins">
+                          <span className="text-sm font-extrabold text-blue-600 dark:text-blue-400 font-poppins">
                             ${total.toFixed(2)}/mo
                           </span>
                         )}
@@ -1811,23 +1821,23 @@ export default function Dashboard() {
               })()}
 
               {/* SERVER AUTHENTICATION (PASSWORD vs SSH PUBLIC KEY) */}
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-blue-600" /> Authentication Method
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Authentication Method
                   </span>
-                  <span className="text-[10px] text-slate-500 font-mono">SSH & Root Access</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">SSH & Root Access</span>
                 </div>
 
                 {/* AUTH METHOD SELECTOR TABS */}
-                <div className="grid grid-cols-2 gap-2 bg-slate-200/60 p-1 rounded-xl">
+                <div className="grid grid-cols-2 gap-2 bg-slate-200/60 dark:bg-slate-900/60 p-1 rounded-xl">
                   <button
                     type="button"
                     onClick={() => setAuthMethod('password')}
                     className={`py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                       authMethod === 'password'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
                     <span>Password Auth</span>
@@ -1837,18 +1847,18 @@ export default function Dashboard() {
                     onClick={() => setAuthMethod('sshKey')}
                     className={`py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
                       authMethod === 'sshKey'
-                        ? 'bg-white text-blue-700 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                     }`}
                   >
-                    <Terminal className="w-3 h-3 text-blue-600" />
+                    <Terminal className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                     <span>SSH Public Key</span>
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className={authMethod === 'sshKey' ? 'sm:col-span-2' : ''}>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
                       Admin Username
                     </label>
                     <input
@@ -1857,7 +1867,7 @@ export default function Dashboard() {
                       value={deployUsername}
                       onChange={(e) => setDeployUsername(e.target.value)}
                       placeholder="e.g. admin or custom user"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
                     />
                     <p className="text-[10px] text-slate-400 mt-0.5">Custom admin account for SSH & sudo access</p>
                   </div>
@@ -1865,13 +1875,13 @@ export default function Dashboard() {
                   {authMethod === 'password' ? (
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[11px] font-semibold text-slate-600">
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                           Root / Admin Password
                         </label>
                         <button
                           type="button"
                           onClick={generateStrongPassword}
-                          className="text-[10px] text-blue-600 hover:underline font-semibold"
+                          className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-semibold"
                         >
                           Generate Strong
                         </button>
@@ -1883,12 +1893,12 @@ export default function Dashboard() {
                           value={deployPassword}
                           onChange={(e) => setDeployPassword(e.target.value)}
                           placeholder="Secure server password"
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 pr-8 transition-all"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 pr-8 transition-all"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                           title={showPassword ? 'Hide password' : 'Show password'}
                         >
                           {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1903,13 +1913,13 @@ export default function Dashboard() {
                   <div className="space-y-2.5 pt-1">
                     {userSSHKeys.length > 0 && (
                       <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
                           Select Saved SSH Key
                         </label>
                         <select
                           value={selectedSSHKeyId}
                           onChange={(e) => setSelectedSSHKeyId(e.target.value === 'custom' ? 'custom' : Number(e.target.value))}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
                         >
                           {userSSHKeys.map((k) => (
                             <option key={k.keyId} value={k.keyId}>
@@ -1923,7 +1933,7 @@ export default function Dashboard() {
 
                     {(selectedSSHKeyId === 'custom' || userSSHKeys.length === 0) && (
                       <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
                           OpenSSH Public Key
                         </label>
                         <textarea
@@ -1932,17 +1942,17 @@ export default function Dashboard() {
                           value={customSSHPublicKey}
                           onChange={(e) => setCustomSSHPublicKey(e.target.value)}
                           placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5... user@laptop"
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
                         />
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          Paste public key from <code className="text-slate-600">~/.ssh/id_ed25519.pub</code> or <code className="text-slate-600">~/.ssh/id_rsa.pub</code>.
+                          Paste public key from <code className="text-slate-600 dark:text-slate-400">~/.ssh/id_ed25519.pub</code> or <code className="text-slate-600 dark:text-slate-400">~/.ssh/id_rsa.pub</code>.
                         </p>
                       </div>
                     )}
 
-                    <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-lg text-[11px] text-blue-800 flex items-center justify-between">
+                    <div className="p-2.5 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 rounded-lg text-[11px] text-blue-800 dark:text-blue-300 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                         Injected directly into guest authorized_keys
                       </span>
                       <button
@@ -1951,7 +1961,7 @@ export default function Dashboard() {
                           setIsDeployOpen(false);
                           setActiveTab('settings');
                         }}
-                        className="text-[10px] font-bold text-blue-700 hover:underline"
+                        className="text-[10px] font-bold text-blue-700 dark:text-blue-400 hover:underline"
                       >
                         Manage Keys →
                       </button>
@@ -1960,11 +1970,11 @@ export default function Dashboard() {
                 )}
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsDeployOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
                 >
                   Cancel
                 </button>
@@ -1983,6 +1993,48 @@ export default function Dashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION POPUP FOR POWER OFF (STOP) */}
+      {powerConfirmVm && (
+        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-900/60 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
+                <Power className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Power Off Machine?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Graceful shutdown command will be issued to Hyper-V</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+              Are you sure you want to stop <strong className="text-slate-900 dark:text-white font-bold">{powerConfirmVm.name}</strong>? Any unsaved processes or temporary memory cache inside the virtual machine will be halted.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setPowerConfirmVm(null)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = powerConfirmVm.vmId;
+                  setPowerConfirmVm(null);
+                  executePowerAction(id, 'STOP');
+                }}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Power className="w-3.5 h-3.5" /> Confirm Power Off
+              </button>
+            </div>
           </div>
         </div>
       )}

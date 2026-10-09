@@ -82,10 +82,19 @@ html.dark select option {
   color: #f8fafc !important;
 }
 
-/* Text Selection Contrast */
-::selection {
-  background-color: #2563eb;
-  color: #ffffff;
+select option:checked,
+select option:hover {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+/* Universal Text Selection Contrast */
+::selection,
+*::selection,
+input::selection,
+textarea::selection {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
 }
 
 /* Modern off-screen rendering optimization */

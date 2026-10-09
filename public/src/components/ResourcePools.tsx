@@ -65,30 +65,41 @@ export default function ResourcePools() {
   const diskPercent = Math.min(100, Math.round((totalDiskAllocated / DISK_LIMIT) * 100));
   const bandwidthPercent = Math.min(100, Math.round((estimatedBandwidthTb / BANDWIDTH_LIMIT_TB) * 100));
 
-  const handleRequestUpgrade = (e: React.FormEvent) => {
+  const handleRequestUpgrade = async (e: React.FormEvent) => {
     e.preventDefault();
     setUpgradeSubmitted(true);
-    setTimeout(() => {
+    try {
+      await apiCall('/tickets', {
+        method: 'POST',
+        body: JSON.stringify({
+          subject: 'Resource Pool Hardware Quota Expansion Request',
+          message: `Customer submitted a hardware expansion request:\n- Requested vCPU Cap: ${requestedCpu} Cores\n- Requested RAM Cap: ${requestedRam} GB\n- Requested NVMe Storage Cap: ${requestedDisk} GB\nPlease review infrastructure capacity and approve quota increase.`,
+          priority: 'HIGH',
+        }),
+      });
       toast.success('Resource Pool upgrade ticket submitted to infrastructure engineers.');
       setIsUpgradeModalOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to submit upgrade request');
+    } finally {
       setUpgradeSubmitted(false);
-    }, 1000);
+    }
   };
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold text-blue-950 font-poppins">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-poppins">
               Resource Pools & Quotas
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
               Dedicated Compute Tier
             </span>
           </div>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Monitor real-time infrastructure pool consumption across all virtual instances and manage account hardware quotas.
           </p>
         </div>
@@ -97,14 +108,14 @@ export default function ResourcePools() {
           <button
             onClick={fetchPoolData}
             disabled={loading}
-            className="p-2.5 text-slate-500 hover:text-slate-800 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-xs"
+            className="p-2.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-xs"
             title="Refresh Pool Status"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={() => setIsUpgradeModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-blue-500/20"
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-blue-500/20 cursor-pointer"
           >
             <Sparkles className="w-4 h-4" /> Request Pool Expansion
           </button>
@@ -114,17 +125,17 @@ export default function ResourcePools() {
       {/* Quota Gauge Meters */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* CPU POOL */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <div className="flex items-center justify-between text-slate-600 text-xs font-semibold">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 text-xs font-semibold">
             <span className="flex items-center gap-1.5">
-              <Cpu className="w-4 h-4 text-blue-600" /> vCPU Compute Pool
+              <Cpu className="w-4 h-4 text-blue-600 dark:text-blue-400" /> vCPU Compute Pool
             </span>
-            <span className="font-mono text-blue-600 font-bold">{cpuPercent}%</span>
+            <span className="font-mono text-blue-600 dark:text-blue-400 font-bold">{cpuPercent}%</span>
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
             {totalCpuAllocated} <span className="text-xs font-sans text-slate-400">/ {CPU_LIMIT} Cores</span>
           </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
             <div 
               className="bg-blue-600 h-full rounded-full transition-all duration-500" 
               style={{ width: `${cpuPercent}%` }}
@@ -132,22 +143,22 @@ export default function ResourcePools() {
           </div>
           <div className="flex justify-between text-[11px] text-slate-400 font-medium pt-1">
             <span>Available: {CPU_LIMIT - totalCpuAllocated} Cores</span>
-            <span className="text-emerald-600">Optimal</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Optimal</span>
           </div>
         </div>
 
         {/* RAM POOL */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <div className="flex items-center justify-between text-slate-600 text-xs font-semibold">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 text-xs font-semibold">
             <span className="flex items-center gap-1.5">
-              <MemoryStick className="w-4 h-4 text-purple-600" /> RAM Memory Pool
+              <MemoryStick className="w-4 h-4 text-purple-600 dark:text-purple-400" /> RAM Memory Pool
             </span>
-            <span className="font-mono text-purple-600 font-bold">{ramPercent}%</span>
+            <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{ramPercent}%</span>
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
             {totalRamAllocated} <span className="text-xs font-sans text-slate-400">/ {RAM_LIMIT} GB</span>
           </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
             <div 
               className="bg-purple-600 h-full rounded-full transition-all duration-500" 
               style={{ width: `${ramPercent}%` }}
@@ -155,22 +166,22 @@ export default function ResourcePools() {
           </div>
           <div className="flex justify-between text-[11px] text-slate-400 font-medium pt-1">
             <span>Available: {RAM_LIMIT - totalRamAllocated} GB</span>
-            <span className="text-emerald-600">Optimal</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Optimal</span>
           </div>
         </div>
 
         {/* STORAGE POOL */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <div className="flex items-center justify-between text-slate-600 text-xs font-semibold">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 text-xs font-semibold">
             <span className="flex items-center gap-1.5">
-              <HardDrive className="w-4 h-4 text-amber-600" /> NVMe Storage Pool
+              <HardDrive className="w-4 h-4 text-amber-600 dark:text-amber-400" /> NVMe Storage Pool
             </span>
-            <span className="font-mono text-amber-600 font-bold">{diskPercent}%</span>
+            <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">{diskPercent}%</span>
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
             {totalDiskAllocated} <span className="text-xs font-sans text-slate-400">/ {DISK_LIMIT} GB</span>
           </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
             <div 
               className="bg-amber-500 h-full rounded-full transition-all duration-500" 
               style={{ width: `${diskPercent}%` }}
@@ -178,22 +189,22 @@ export default function ResourcePools() {
           </div>
           <div className="flex justify-between text-[11px] text-slate-400 font-medium pt-1">
             <span>Available: {DISK_LIMIT - totalDiskAllocated} GB</span>
-            <span className="text-emerald-600">Optimal</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Optimal</span>
           </div>
         </div>
 
         {/* BANDWIDTH POOL */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-3">
-          <div className="flex items-center justify-between text-slate-600 text-xs font-semibold">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
+          <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 text-xs font-semibold">
             <span className="flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-emerald-600" /> Egress Bandwidth
+              <Activity className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Egress Bandwidth
             </span>
-            <span className="font-mono text-emerald-600 font-bold">{bandwidthPercent}%</span>
+            <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{bandwidthPercent}%</span>
           </div>
-          <div className="text-2xl font-bold text-slate-900 font-mono">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
             {estimatedBandwidthTb} <span className="text-xs font-sans text-slate-400">/ {BANDWIDTH_LIMIT_TB} TB</span>
           </div>
-          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
             <div 
               className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
               style={{ width: `${bandwidthPercent}%` }}
@@ -201,19 +212,19 @@ export default function ResourcePools() {
           </div>
           <div className="flex justify-between text-[11px] text-slate-400 font-medium pt-1">
             <span>Reset in 22 days</span>
-            <span className="text-emerald-600">Unthrottled</span>
+            <span className="text-emerald-600 dark:text-emerald-400">Unthrottled</span>
           </div>
         </div>
       </div>
 
       {/* VM Resource Allocation Breakdown Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div>
-            <h2 className="font-bold text-slate-900 font-poppins">Instance Consumption Breakdown</h2>
-            <p className="text-xs text-slate-500">Resource dedication per running virtual machine</p>
+            <h2 className="font-bold text-slate-900 dark:text-white font-poppins">Instance Consumption Breakdown</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Resource dedication per running virtual machine</p>
           </div>
-          <span className="text-xs text-slate-500 font-mono bg-slate-100 px-3 py-1 rounded-lg">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg">
             {instances.length} Managed VM{instances.length === 1 ? '' : 's'}
           </span>
         </div>
@@ -223,15 +234,15 @@ export default function ResourcePools() {
             <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
           </div>
         ) : instances.length === 0 ? (
-          <div className="py-16 text-center text-slate-500">
-            <Server className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-            <p className="font-semibold text-slate-700">No active instances using pool resources</p>
+          <div className="py-16 text-center text-slate-500 dark:text-slate-400">
+            <Server className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+            <p className="font-semibold text-slate-700 dark:text-slate-300">No active instances using pool resources</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                <tr className="bg-slate-50 dark:bg-slate-800/60 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
                   <th className="py-3.5 px-6">Virtual Machine</th>
                   <th className="py-3.5 px-6">Status</th>
                   <th className="py-3.5 px-6">vCPU Allocation</th>
@@ -240,7 +251,7 @@ export default function ResourcePools() {
                   <th className="py-3.5 px-6">Total Pool Share</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
                 {instances.map((vm) => {
                   const cpu = vm.cpuCores || vm.vCPU || 2;
                   const ram = vm.ramGb || vm.ramGB || 2;
@@ -248,43 +259,43 @@ export default function ResourcePools() {
                   const share = Math.round(((cpu / CPU_LIMIT + ram / RAM_LIMIT + disk / DISK_LIMIT) / 3) * 100);
 
                   return (
-                    <tr key={vm.vmId} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={vm.vmId} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                          <div className="p-2 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-xl">
                             <Server className="w-4 h-4" />
                           </div>
                           <div>
-                            <strong className="text-slate-900 font-poppins">{vm.name}</strong>
+                            <strong className="text-slate-900 dark:text-white font-poppins">{vm.name}</strong>
                             <div className="text-[11px] font-mono text-slate-400">{vm.ip || 'Provisioning'}</div>
                           </div>
                         </div>
                       </td>
                       <td className="py-4 px-6">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-                          vm.status === 'RUNNING'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                            : 'bg-slate-100 text-slate-600'
+                          vm.status === 'RUNNING' || vm.status === 'running'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                         }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${vm.status === 'RUNNING' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${vm.status === 'RUNNING' || vm.status === 'running' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`}></span>
                           {vm.status}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-mono font-bold text-slate-800">
+                      <td className="py-4 px-6 font-mono font-bold text-slate-800 dark:text-slate-200">
                         {cpu} Cores <span className="text-[10px] text-slate-400 font-normal">({Math.round((cpu / CPU_LIMIT) * 100)}%)</span>
                       </td>
-                      <td className="py-4 px-6 font-mono font-bold text-slate-800">
+                      <td className="py-4 px-6 font-mono font-bold text-slate-800 dark:text-slate-200">
                         {ram} GB <span className="text-[10px] text-slate-400 font-normal">({Math.round((ram / RAM_LIMIT) * 100)}%)</span>
                       </td>
-                      <td className="py-4 px-6 font-mono font-bold text-slate-800">
+                      <td className="py-4 px-6 font-mono font-bold text-slate-800 dark:text-slate-200">
                         {disk} GB <span className="text-[10px] text-slate-400 font-normal">({Math.round((disk / DISK_LIMIT) * 100)}%)</span>
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-2">
-                          <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                          <div className="w-16 bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
                             <div className="bg-blue-600 h-full rounded-full" style={{ width: `${share}%` }}></div>
                           </div>
-                          <span className="text-[11px] font-mono font-bold text-slate-600">{share}%</span>
+                          <span className="text-[11px] font-mono font-bold text-slate-600 dark:text-slate-400">{share}%</span>
                         </div>
                       </td>
                     </tr>
@@ -299,62 +310,62 @@ export default function ResourcePools() {
       {/* UPGRADE MODAL */}
       {isUpgradeModalOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={() => setIsUpgradeModalOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600"
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-3 text-blue-600 mb-4">
-              <div className="p-2.5 bg-blue-50 rounded-xl">
+            <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400 mb-4">
+              <div className="p-2.5 bg-blue-50 dark:bg-blue-950/60 rounded-xl">
                 <Sparkles className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 font-poppins">Request Pool Expansion</h3>
-                <p className="text-xs text-slate-500">Scale up your account hardware quotas</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Request Pool Expansion</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Scale up your account hardware quotas</p>
               </div>
             </div>
 
             <form onSubmit={handleRequestUpgrade} className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Requested vCPU Cores Cap</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Requested vCPU Cores Cap</label>
                 <input
                   type="number"
                   min="16"
                   max="128"
                   value={requestedCpu}
                   onChange={(e) => setRequestedCpu(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:border-blue-500 focus:outline-hidden"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs font-mono focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-hidden"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Requested RAM Memory (GB)</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Requested RAM Memory (GB)</label>
                 <input
                   type="number"
                   min="64"
                   max="512"
                   value={requestedRam}
                   onChange={(e) => setRequestedRam(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:border-blue-500 focus:outline-hidden"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs font-mono focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-hidden"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Requested NVMe Storage (GB)</label>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Requested NVMe Storage (GB)</label>
                 <input
                   type="number"
                   min="500"
                   max="4000"
                   value={requestedDisk}
                   onChange={(e) => setRequestedDisk(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:border-blue-500 focus:outline-hidden"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs font-mono focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-hidden"
                 />
               </div>
 
-              <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-900">
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl text-xs text-blue-900 dark:text-blue-300">
                 <p className="text-[11px] leading-relaxed">
                   Pool expansions are evaluated based on account tier and usually provisioned within 10 minutes by the Hyper-V hypervisor scheduler.
                 </p>
@@ -364,14 +375,14 @@ export default function ResourcePools() {
                 <button
                   type="button"
                   onClick={() => setIsUpgradeModalOpen(false)}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
+                  className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={upgradeSubmitted}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50"
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
                 >
                   {upgradeSubmitted ? 'Submitting...' : 'Submit Request'}
                 </button>
