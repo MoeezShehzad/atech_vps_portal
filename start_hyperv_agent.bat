@@ -23,6 +23,10 @@ net localgroup "Hyper-V Administrators" "%USERNAME%" /add >nul 2>&1
 :: Free port 5050 if occupied
 powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 5050 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" >nul 2>&1
 
+:: Configure localhost port forwarders to Ubuntu VM for Google OAuth & Portal access
+netsh interface portproxy add v4tov4 listenport=5000 listenaddress=127.0.0.1 connectport=5000 connectaddress=172.19.124.110 >nul 2>&1
+netsh interface portproxy add v4tov4 listenport=5174 listenaddress=127.0.0.1 connectport=5174 connectaddress=172.19.124.110 >nul 2>&1
+
 cls
 color 0A
 echo ======================================================================

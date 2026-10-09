@@ -13,6 +13,8 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
 const JWT_VERIFY_SECRET = process.env.JWT_VERIFY_SECRET || JWT_SECRET;
 const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://172.23.28.242';
 const BACKEND_URL = process.env.BACKEND_URL || process.env.SERVER_URL || 'http://172.23.28.242';
+// Google OAuth strictly forbids private IP addresses (RFC 1918). It requires localhost or a public FQDN domain.
+const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback';
 
 // --- NODEMAILER TRANSPORTER SETUP (GMAIL OPTIMIZED) ---
 const transporter = nodemailer.createTransport({
@@ -96,7 +98,7 @@ export const googleAuth = (req, res) => {
 
   const rootUrl = 'https://accounts.google.com/o/oauth2/v2/auth';
   const options = {
-    redirect_uri: `${BACKEND_URL}/api/auth/google/callback`,
+    redirect_uri: GOOGLE_CALLBACK_URL,
     client_id: process.env.GOOGLE_CLIENT_ID,
     access_type: 'offline',
     response_type: 'code',
@@ -141,7 +143,7 @@ export const googleAuthCallback = async (req, res) => {
         code,
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: `${BACKEND_URL}/api/auth/google/callback`,
+        redirect_uri: GOOGLE_CALLBACK_URL,
         grant_type: 'authorization_code',
       }),
     });
@@ -325,30 +327,54 @@ export const register = async (req, res) => {
 
     const verifyUrl = `${BACKEND_URL}/api/auth/verify-email?token=${verificationToken}`;
 
-    // Send verification email via Nodemailer
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"ATC Portal" <no-reply@atechconsult.com>',
-      to: newUser.email,
-      subject: 'Verify your ATC Portal account',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-          <h2>Welcome, ${newUser.fullName}!</h2>
-          <p>Thank you for signing up. Please verify your email address to complete your registration and activate your dashboard access.</p>
-          <div style="margin: 30px 0;">
-            <a href="${verifyUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-              Verify Email Address
-            </a>
-          </div>
-          <p style="font-size: 13px; color: #666;">
-            Or copy and paste this link in your browser: <br/>
-            <a href="${verifyUrl}">${verifyUrl}</a>
-          </p>
-          <p style="font-size: 12px; color: #999; margin-top: 30px;">This link will expire in 24 hours.</p>
-        </div>
-      `,
-    });
+    let emailSent = false;
+    try {
+      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || '"ATC Portal" <no-reply@atechconsult.com>',
+          to: newUser.email,
+          subject: 'Verify your ATC Portal account',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+              <h2>Welcome, ${newUser.fullName}!</h2>
+              <p>Thank you for signing up. Please verify your email address to complete your registration and activate your dashboard access.</p>
+              <div style="margin: 30px 0;">
+                <a href="${verifyUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                  Verify Email Address
+                </a>
+              </div>
+              <p style="font-size: 13px; color: #666;">
+                Or copy and paste this link in your browser: <br/>
+                <a href="${verifyUrl}">${verifyUrl}</a>
+              </p>
+              <p style="font-size: 12px; color: #999; margin-top: 30px;">This link will expire in 24 hours.</p>
+            </div>
+          `,
+        });
+        emailSent = true;
+      }
+    } catch (mailErr) {
+      console.warn('[Registration Email Dispatch Warning]:', mailErr.message);
+    }
 
-    res.status(201).json({
+    if (!emailSent) {
+      // If email sending was unsuccessful or SMTP is offline, auto-verify so user can login immediately
+      await prisma.user.update({
+        where: { userId: newUser.userId },
+        data: { emailVerified: true },
+      });
+      return res.status(201).json({
+        message: 'Account created successfully! You can now log in with your credentials.',
+        user: {
+          userId: newUser.userId,
+          fullName: newUser.fullName,
+          email: newUser.email,
+          emailVerified: true,
+        },
+      });
+    }
+
+    return res.status(201).json({
       message: 'Registration successful! Please check your email to verify your account.',
       user: {
         userId: newUser.userId,

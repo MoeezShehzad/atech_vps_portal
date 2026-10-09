@@ -443,4 +443,22 @@ server.listen(PORT, HOST, () => {
   console.log(`[HYPER-V AGENT] Ready to receive commands from Ubuntu Portal`);
   console.log(`[HYPER-V AGENT] Master Template Path: ${DEFAULT_TEMPLATE}`);
   console.log(`================================================================`);
+
+  // Forward localhost:5000 and localhost:5174 to Ubuntu VM for Google OAuth & local portal access
+  const VM_IP = process.env.UBUNTU_VM_IP || '172.19.124.110';
+  [5000, 5174].forEach((fwdPort) => {
+    try {
+      const bridge = net.createServer((socket) => {
+        const target = net.connect(fwdPort, VM_IP);
+        socket.pipe(target);
+        target.pipe(socket);
+        socket.on('error', () => {});
+        target.on('error', () => {});
+      });
+      bridge.on('error', () => {}); // Port already forwarded or in use
+      bridge.listen(fwdPort, '127.0.0.1', () => {
+        console.log(`[PORT BRIDGE] Forwarding localhost:${fwdPort} -> ${VM_IP}:${fwdPort}`);
+      });
+    } catch (_) {}
+  });
 });
