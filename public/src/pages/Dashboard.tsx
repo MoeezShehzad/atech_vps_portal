@@ -44,6 +44,7 @@ import AccountSettings from '../components/AccountSettings';
 import NotificationBell from '../components/NotificationBell';
 import ThemeToggle from '../components/ThemeToggle';
 import { apiCall } from '../services/api';
+import WindowsResourceGraph from '../components/WindowsResourceGraph';
 
 const WebConsoleModal = React.lazy(() => import('../components/WebConsoleModal'));
 const SecurityAndLogs = React.lazy(() => import('../components/SecurityAndLogs'));
@@ -183,8 +184,9 @@ export default function Dashboard() {
   // Real-time telemetry monitoring for selected instance
   const [liveMetrics, setLiveMetrics] = useState<VMMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
-  const [cpuHistory, setCpuHistory] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-  const [ramHistory, setRamHistory] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+  const [cpuHistory, setCpuHistory] = useState<number[]>(() => Array(20).fill(0));
+  const [ramHistory, setRamHistory] = useState<number[]>(() => Array(20).fill(0));
+  const [diskHistory, setDiskHistory] = useState<number[]>(() => Array(20).fill(0));
 
   // Deploy form state
   const [newHostname, setNewHostname] = useState('');
@@ -321,8 +323,10 @@ export default function Dashboard() {
         setLiveMetrics(data);
         const cpuVal = Math.min(100, Math.max(0, data.avgCpu !== undefined ? data.avgCpu : (data.cpuUsage || 0)));
         const ramVal = Math.min(100, Math.max(0, data.ramPercent || 0));
+        const diskVal = Math.min(100, Math.max(0, data.diskPercent || 0));
         setCpuHistory((prev) => [...prev.slice(1), cpuVal]);
         setRamHistory((prev) => [...prev.slice(1), ramVal]);
+        setDiskHistory((prev) => [...prev.slice(1), diskVal]);
 
         // If telemetry detects VM state changed to Off, immediately refresh dashboard instances
         const currentInstance = instances.find((i) => i.vmId === vmId);
@@ -341,8 +345,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (!activeTelemetryVmId || Boolean(consoleVm)) {
       setLiveMetrics(null);
-      setCpuHistory([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-      setRamHistory([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+      setCpuHistory(Array(20).fill(0));
+      setRamHistory(Array(20).fill(0));
+      setDiskHistory(Array(20).fill(0));
       return;
     }
 
@@ -1165,10 +1170,10 @@ export default function Dashboard() {
 
                   {isVmRunning ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                      {/* 1. CPU LOAD & HISTORICAL SPARKLINE */}
+                      {/* 1. CPU LOAD & WINDOWS TASK MANAGER GRAPH */}
                       <div className="p-4 bg-gradient-to-br from-blue-50/70 to-slate-50 dark:from-slate-800/80 dark:to-slate-900/80 rounded-2xl border border-blue-100/90 dark:border-blue-900/30 shadow-xs flex flex-col justify-between space-y-3">
                         <div>
-                          <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                               <Cpu className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Processor (vCPU)
                             </span>
@@ -1176,34 +1181,27 @@ export default function Dashboard() {
                               {liveMetrics ? `${Math.min(100, Math.max(0, liveMetrics.avgCpu !== undefined ? liveMetrics.avgCpu : liveMetrics.cpuUsage))}%` : `${Math.min(100, activeMonitoringVm.cpuUsage)}%`}
                             </span>
                           </div>
-                          <div className="w-full bg-slate-200/80 dark:bg-slate-700/60 h-2 rounded-full overflow-hidden mb-3">
-                            <div 
-                              className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.avgCpu ?? activeMonitoringVm.cpuUsage))}%` }}
-                            />
-                          </div>
-                          {/* Live 10-sample Sparkline */}
-                          <div className="flex items-end gap-1.5 h-12 pt-2 px-2 bg-white/80 dark:bg-slate-950/60 rounded-xl border border-blue-100/70 dark:border-slate-800">
-                            {cpuHistory.map((val, idx) => (
-                              <div 
-                                key={idx}
-                                title={`Sample ${idx + 1}: ${val}%`}
-                                className="flex-1 bg-blue-500 hover:bg-blue-600 rounded-xs transition-all duration-300"
-                                style={{ height: `${Math.max(10, Math.min(100, val))}%` }}
-                              />
-                            ))}
-                          </div>
+
+                          {/* Windows Task Manager Performance Graph */}
+                          <WindowsResourceGraph
+                            data={cpuHistory}
+                            color="blue"
+                            unit="%"
+                            timeLabel="60 seconds"
+                            maxLabel="100%"
+                            minLabel="0%"
+                          />
                         </div>
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 font-mono pt-1 border-t border-blue-100/60 dark:border-slate-800">
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 font-mono pt-2 border-t border-blue-100/60 dark:border-slate-800">
                           <span>{activeMonitoringVm.vCPU} Cores Assigned</span>
-                          <span className="text-blue-600 dark:text-blue-400 font-semibold">Live 10-tick trend</span>
+                          <span className="text-blue-600 dark:text-blue-400 font-semibold">% Utilization</span>
                         </div>
                       </div>
 
-                      {/* 2. RAM ALLOCATION & WORKLOAD */}
+                      {/* 2. RAM ALLOCATION & WINDOWS TASK MANAGER GRAPH */}
                       <div className="p-4 bg-gradient-to-br from-purple-50/70 to-slate-50 dark:from-slate-800/80 dark:to-slate-900/80 rounded-2xl border border-purple-100/90 dark:border-purple-900/30 shadow-xs flex flex-col justify-between space-y-3">
                         <div>
-                          <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                               <MemoryStick className="w-4 h-4 text-purple-600 dark:text-purple-400" /> Memory (RAM)
                             </span>
@@ -1211,34 +1209,27 @@ export default function Dashboard() {
                               {liveMetrics ? `${liveMetrics.ramPercent}%` : `${activeMonitoringVm.ramUsage}`}
                             </span>
                           </div>
-                          <div className="w-full bg-slate-200/80 dark:bg-slate-700/60 h-2 rounded-full overflow-hidden mb-3">
-                            <div 
-                              className="bg-purple-600 dark:bg-purple-500 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.ramPercent ?? 20))}%` }}
-                            />
-                          </div>
-                          {/* Live 10-sample Sparkline */}
-                          <div className="flex items-end gap-1.5 h-12 pt-2 px-2 bg-white/80 dark:bg-slate-950/60 rounded-xl border border-purple-100/70 dark:border-slate-800">
-                            {ramHistory.map((val, idx) => (
-                              <div 
-                                key={idx}
-                                title={`Sample ${idx + 1}: ${val}%`}
-                                className="flex-1 bg-purple-500 hover:bg-purple-600 rounded-xs transition-all duration-300"
-                                style={{ height: `${Math.max(10, Math.min(100, val))}%` }}
-                              />
-                            ))}
-                          </div>
+
+                          {/* Windows Task Manager Performance Graph */}
+                          <WindowsResourceGraph
+                            data={ramHistory}
+                            color="purple"
+                            unit="%"
+                            timeLabel="60 seconds"
+                            maxLabel="100%"
+                            minLabel="0%"
+                          />
                         </div>
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 font-mono pt-1 border-t border-purple-100/60 dark:border-slate-800">
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 font-mono pt-2 border-t border-purple-100/60 dark:border-slate-800">
                           <span>{liveMetrics?.ramUsedMb ? `${liveMetrics.ramUsedMb} MB` : 'Active'} used</span>
                           <span>{liveMetrics?.ramTotalMb ? `${liveMetrics.ramTotalMb} MB` : `${activeMonitoringVm.ramGB} GB`} Cap</span>
                         </div>
                       </div>
 
-                      {/* 3. NVME STORAGE VHDX & DISK THROUGHPUT */}
+                      {/* 3. NVME STORAGE VHDX & WINDOWS TASK MANAGER GRAPH */}
                       <div className="p-4 bg-gradient-to-br from-amber-50/50 to-slate-50 dark:from-slate-800/80 dark:to-slate-900/80 rounded-2xl border border-amber-100/90 dark:border-amber-900/30 shadow-xs flex flex-col justify-between space-y-3">
                         <div>
-                          <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                               <HardDrive className="w-4 h-4 text-amber-600 dark:text-amber-400" /> NVMe Virtual Storage
                             </span>
@@ -1246,30 +1237,31 @@ export default function Dashboard() {
                               {liveMetrics ? `${liveMetrics.diskPercent}%` : '20%'}
                             </span>
                           </div>
-                          <div className="w-full bg-slate-200/80 dark:bg-slate-700/60 h-2 rounded-full overflow-hidden mb-3">
-                            <div 
-                              className="bg-amber-500 dark:bg-amber-400 h-2 rounded-full transition-all duration-500"
-                              style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.diskPercent ?? 20))}%` }}
-                            />
-                          </div>
-                          <div className="bg-white/80 dark:bg-slate-950/60 p-3 rounded-xl border border-amber-100/70 dark:border-slate-800 space-y-2">
-                            <div className="flex items-center justify-between text-xs font-mono">
+
+                          {/* Windows Task Manager Performance Graph */}
+                          <WindowsResourceGraph
+                            data={diskHistory}
+                            color="amber"
+                            unit="%"
+                            timeLabel="60 seconds"
+                            maxLabel="100%"
+                            minLabel="0%"
+                          />
+
+                          <div className="mt-2.5 bg-white/80 dark:bg-slate-950/60 p-2.5 rounded-xl border border-amber-100/70 dark:border-slate-800 space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px] font-mono">
                               <span className="text-slate-500 dark:text-slate-400">Physical Size:</span>
                               <strong className="text-slate-800 dark:text-slate-200">
-                                {liveMetrics?.diskUsedGb !== undefined ? `${liveMetrics.diskUsedGb} GB` : `${Math.round(activeMonitoringVm.diskGB * 0.2)} GB`}
+                                {liveMetrics?.diskUsedGb !== undefined ? `${liveMetrics.diskUsedGb} GB` : `${Math.round(activeMonitoringVm.diskGB * 0.2)} GB`} / {activeMonitoringVm.diskGB} GB
                               </strong>
                             </div>
-                            <div className="flex items-center justify-between text-xs font-mono">
-                              <span className="text-slate-500 dark:text-slate-400">Allocated Cap:</span>
-                              <strong className="text-slate-800 dark:text-slate-200">{activeMonitoringVm.diskGB} GB NVMe</strong>
-                            </div>
-                            <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100 dark:border-slate-800 font-mono">
+                            <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100 dark:border-slate-800/80 font-mono">
                               <span className="text-slate-500 dark:text-slate-400">Read: <strong className="text-slate-700 dark:text-slate-300">{liveMetrics?.diskReadMb || 0} MB</strong></span>
                               <span className="text-slate-500 dark:text-slate-400">Write: <strong className="text-slate-700 dark:text-slate-300">{liveMetrics?.diskWriteMb || 0} MB</strong></span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 font-mono pt-1 border-t border-amber-100/60 dark:border-slate-800">
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 font-mono pt-2 border-t border-amber-100/60 dark:border-slate-800">
                           <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
                             <ShieldCheck className="w-3.5 h-3.5" /> Uptime: {liveMetrics?.uptime || 'Active'}
                           </span>
