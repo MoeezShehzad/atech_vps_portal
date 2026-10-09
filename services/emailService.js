@@ -2,41 +2,65 @@ import nodemailer from 'nodemailer';
 
 // ==============================================================================
 // Service: emailService.js
-// Purpose: Enterprise Email Dispatcher for ATC Cloud & VPS Portal
-//          Supports:
-//          - SMTP over SSL (Port 465) / STARTTLS (Port 587)
-//          - Account Email Verification
-//          - Password Reset Links
-//          - Contact Form Inquiries & Auto-Responders
-//          - Support Ticket Open & Reply Notifications
-//          - VPS Provisioning & Credentials
+// Purpose: Enterprise Corporate Multi-Mailbox Dispatcher for ATC Cloud
+//          Dedicated Transporters:
+//          1. no-reply@atechconsult.com       -> Verification, Password Reset, VM Credentials
+//          2. customer-support@atechconsult.com -> Ticket Desk, Contact Form, Support Chat
+//          3. billing@atechconsult.com        -> Invoices, Receipts, Subscriptions
+//          4. alerts@atechconsult.com         -> Infrastructure Alerts, System Monitoring
 // ==============================================================================
 
 const SMTP_HOST = process.env.SMTP_HOST || 'mail.atechconsult.com';
 const SMTP_PORT = Number(process.env.SMTP_PORT) || 465;
-const SMTP_SECURE = process.env.SMTP_SECURE === 'true' || SMTP_PORT === 465;
-const SMTP_USER = process.env.SMTP_USER || 'customer-support@atechconsult.com';
-const SMTP_PASS = process.env.SMTP_PASS || 'Admin@123';
-const SMTP_FROM = process.env.SMTP_FROM || `"ATC Customer Support" <${SMTP_USER}>`;
-const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'customer-support@atechconsult.com';
-const APP_URL = process.env.FRONTEND_URL || process.env.BACKEND_URL || 'https://vps.atechconsult.com';
+const SMTP_SECURE = process.env.SMTP_SECURE === 'false' ? false : true;
 
-// Configure Transporter with connection pooling
-export const transporter = nodemailer.createTransport({
-  host: SMTP_HOST,
-  port: SMTP_PORT,
-  secure: SMTP_SECURE,
-  auth: {
-    user: SMTP_USER,
-    pass: SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false, // Prevents failure on corporate internal or self-signed certificates
-  },
-  pool: true,
-  maxConnections: 5,
-  maxMessages: 100,
-});
+// Helper to create hardened pooled transporter
+function createMailTransporter(user, pass) {
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: {
+      user: user,
+      pass: pass,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
+  });
+}
+
+// 1. Dedicated Transporters
+export const transporterSupport = createMailTransporter(
+  process.env.SMTP_SUPPORT_USER || 'customer-support@atechconsult.com',
+  process.env.SMTP_SUPPORT_PASS || 'Admin@123'
+);
+
+export const transporterNoReply = createMailTransporter(
+  process.env.SMTP_NOREPLY_USER || 'no-reply@atechconsult.com',
+  process.env.SMTP_NOREPLY_PASS || 'Q)9zVhm9BQ'
+);
+
+export const transporterBilling = createMailTransporter(
+  process.env.SMTP_BILLING_USER || 'billing@atechconsult.com',
+  process.env.SMTP_BILLING_PASS || '{tSvuZA9Wj'
+);
+
+export const transporterAlerts = createMailTransporter(
+  process.env.SMTP_ALERTS_USER || 'alerts@atechconsult.com',
+  process.env.SMTP_ALERTS_PASS || 'yykFkq[55g'
+);
+
+// Mail addresses
+const NOREPLY_EMAIL = process.env.SMTP_NOREPLY_USER || 'no-reply@atechconsult.com';
+const SUPPORT_EMAIL = process.env.SMTP_SUPPORT_USER || 'customer-support@atechconsult.com';
+const BILLING_EMAIL = process.env.SMTP_BILLING_USER || 'billing@atechconsult.com';
+const ALERTS_EMAIL = process.env.SMTP_ALERTS_USER || 'alerts@atechconsult.com';
+
+const APP_URL = process.env.FRONTEND_URL || process.env.BACKEND_URL || 'https://vps.atechconsult.com';
 
 // Helper for HTML escaping
 export function escapeHtml(text) {
@@ -50,34 +74,9 @@ export function escapeHtml(text) {
 }
 
 /**
- * Universal Email Sender wrapper with fallback logging
+ * Universal ATC Branded Email Template Wrapper
  */
-export async function sendEmail({ to, subject, html, text, replyTo, cc, bcc }) {
-  try {
-    const mailOptions = {
-      from: SMTP_FROM,
-      to,
-      subject,
-      text: text || html?.replace(/<[^>]+>/g, ' '),
-      html,
-      replyTo: replyTo || SUPPORT_EMAIL,
-    };
-    if (cc) mailOptions.cc = cc;
-    if (bcc) mailOptions.bcc = bcc;
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[Email Dispatched] To: ${to} | Subject: "${subject}" | ID: ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
-  } catch (error) {
-    console.error(`[Email Dispatch Failed] To: ${to} | Subject: "${subject}":`, error.message);
-    return { success: false, error: error.message };
-  }
-}
-
-/**
- * Modern ATC Email Wrapper Template
- */
-function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl }) {
+function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl, categoryBadge = 'PORTAL', footerNote }) {
   return `
   <!DOCTYPE html>
   <html>
@@ -93,18 +92,18 @@ function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl }) {
           <table width="600" border="0" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,0.05);border:1px solid #e2e8f0;">
             <!-- Header -->
             <tr>
-              <td style="background:#0f172a;padding:28px 36px;text-align:left;">
+              <td style="background:#0f172a;padding:26px 36px;text-align:left;">
                 <table width="100%" border="0" cellspacing="0" cellpadding="0">
                   <tr>
                     <td>
                       <span style="font-size:22px;font-weight:800;letter-spacing:1px;color:#ffffff;text-transform:uppercase;">
                         ATC <span style="color:#38bdf8;">Cloud</span>
                       </span>
-                      <div style="font-size:12px;color:#94a3b8;margin-top:4px;">Next-Gen VPS Infrastructure & Data Services</div>
+                      <div style="font-size:12px;color:#94a3b8;margin-top:3px;">Next-Gen VPS Infrastructure & Data Services</div>
                     </td>
                     <td align="right" style="vertical-align:middle;">
-                      <span style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;border:1px solid rgba(56,189,248,0.3);">
-                        PORTAL
+                      <span style="background:rgba(56,189,248,0.15);color:#38bdf8;font-size:11px;font-weight:700;letter-spacing:0.5px;padding:4px 10px;border-radius:999px;border:1px solid rgba(56,189,248,0.3);text-transform:uppercase;">
+                        ${escapeHtml(categoryBadge)}
                       </span>
                     </td>
                   </tr>
@@ -142,7 +141,7 @@ function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl }) {
             <tr>
               <td style="background:#f8fafc;padding:20px 36px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;text-align:center;">
                 <p style="margin:0 0 6px 0;">ATC Consulting & Data Center Portal • <a href="mailto:${SUPPORT_EMAIL}" style="color:#2563eb;text-decoration:none;">${SUPPORT_EMAIL}</a></p>
-                <p style="margin:0;font-size:11px;color:#94a3b8;">This is an automated notification. For assistance, reach out to our 24/7 Support Desk.</p>
+                <p style="margin:0;font-size:11px;color:#94a3b8;">${footerNote || 'This is an automated message from ATC Cloud Platform.'}</p>
               </td>
             </tr>
           </table>
@@ -154,16 +153,21 @@ function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl }) {
   `;
 }
 
+// ==============================================================================
+// 1. NO-REPLY TRANSMISSIONS (no-reply@atechconsult.com)
+// ==============================================================================
+
 /**
- * 1. Account Email Verification
+ * Account Email Verification Link
  */
 export async function sendVerificationEmail(email, fullName, token) {
   const verifyUrl = `${APP_URL}/api/auth/verify-email?token=${token}`;
   const html = wrapEmailTemplate({
     title: 'Verify Your Email Address',
     subtitle: `Welcome to ATC Cloud, ${fullName}!`,
+    categoryBadge: 'SECURITY',
     contentHtml: `
-      <p>Thank you for signing up for an ATC Cloud account. Please confirm your email address to activate your dashboard and deploy your first virtual machine.</p>
+      <p>Thank you for signing up for an ATC Cloud account. Please confirm your email address to activate your dashboard and deploy virtual machines.</p>
       <div style="background:#eff6ff;border-left:4px solid #2563eb;padding:14px;margin:20px 0;border-radius:4px;">
         <strong style="color:#1e40af;">Security Notice:</strong> This activation link will expire in 24 hours.
       </div>
@@ -172,21 +176,30 @@ export async function sendVerificationEmail(email, fullName, token) {
     ctaUrl: verifyUrl,
   });
 
-  return sendEmail({
-    to: email,
-    subject: 'Activate Your ATC Cloud Account - Verify Email',
-    html,
-  });
+  try {
+    const info = await transporterNoReply.sendMail({
+      from: `"ATC Cloud" <${NOREPLY_EMAIL}>`,
+      to: email,
+      subject: 'Activate Your ATC Cloud Account - Verify Email',
+      html,
+    });
+    console.log(`[No-Reply] Verification email sent to ${email} (ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[No-Reply Error] Verification failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
 }
 
 /**
- * 2. Password Reset Request
+ * Password Reset Link
  */
 export async function sendPasswordResetEmail(email, fullName, token) {
   const resetUrl = `${APP_URL}/reset-password?token=${token}`;
   const html = wrapEmailTemplate({
     title: 'Password Reset Request',
     subtitle: `Hi ${fullName || 'Customer'},`,
+    categoryBadge: 'SECURITY',
     contentHtml: `
       <p>We received a request to reset the password for your ATC Cloud Portal account.</p>
       <p>Click the button below to set a new password. If you did not make this request, you can safely ignore this email; your account remains secure.</p>
@@ -198,25 +211,80 @@ export async function sendPasswordResetEmail(email, fullName, token) {
     ctaUrl: resetUrl,
   });
 
-  return sendEmail({
-    to: email,
-    subject: 'Reset Your ATC Cloud Password',
-    html,
-  });
+  try {
+    const info = await transporterNoReply.sendMail({
+      from: `"ATC Cloud Security" <${NOREPLY_EMAIL}>`,
+      to: email,
+      subject: 'Reset Your ATC Cloud Password',
+      html,
+    });
+    console.log(`[No-Reply] Password reset email sent to ${email} (ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[No-Reply Error] Password reset failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
 }
 
 /**
- * 3. Contact Form Submission Notification (Sent to Customer Support & Auto-Ack to User)
+ * VM Provisioned & Credentials Ready Notification
+ */
+export async function sendVmProvisionedEmail({ email, fullName, vmName, ipAddress, username, password, os }) {
+  const portalUrl = `${APP_URL}/dashboard`;
+  const html = wrapEmailTemplate({
+    title: 'Your Virtual Machine is Online!',
+    subtitle: `Server "${escapeHtml(vmName)}" is provisioned and ready`,
+    categoryBadge: 'CLOUD DEPLOY',
+    contentHtml: `
+      <p>Hi ${escapeHtml(fullName || 'Customer')},</p>
+      <p>Your cloud instance has been successfully deployed on the ATC Data Center Windows Hyper-V cluster with assigned IP connectivity.</p>
+      <div style="background:#0f172a;color:#f8fafc;padding:18px;border-radius:10px;margin:20px 0;font-family:monospace;font-size:13px;">
+        <div style="color:#38bdf8;font-weight:bold;margin-bottom:8px;font-family:sans-serif;">SERVER CONNECTION CREDENTIALS:</div>
+        <div>Hostname: <span style="color:#ffffff;">${escapeHtml(vmName)}</span></div>
+        <div>IP Address: <span style="color:#4ade80;">${escapeHtml(ipAddress)}</span></div>
+        <div>Operating System: <span style="color:#ffffff;">${escapeHtml(os || 'Linux')}</span></div>
+        <div>SSH Username: <span style="color:#ffffff;">${escapeHtml(username || 'root')}</span></div>
+        <div>Initial Password: <span style="color:#facc15;">${escapeHtml(password)}</span></div>
+        <div style="margin-top:10px;color:#94a3b8;font-size:12px;">Quick SSH Command:<br/><code style="color:#e2e8f0;background:#1e293b;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px;">ssh ${escapeHtml(username || 'root')}@${escapeHtml(ipAddress)}</code></div>
+      </div>
+      <p style="font-size:12px;color:#dc2626;"><strong>Security Tip:</strong> We recommend changing your root password immediately upon your initial login.</p>
+    `,
+    ctaText: 'Access Server in Dashboard',
+    ctaUrl: portalUrl,
+  });
+
+  try {
+    const info = await transporterNoReply.sendMail({
+      from: `"ATC Cloud Provisioning" <${NOREPLY_EMAIL}>`,
+      to: email,
+      subject: `[Ready] Your Server "${vmName}" is Provisioned and Online`,
+      html,
+    });
+    console.log(`[No-Reply] VM provision email sent to ${email} (ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[No-Reply Error] VM provision email failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// ==============================================================================
+// 2. CUSTOMER SUPPORT TRANSMISSIONS (customer-support@atechconsult.com)
+// ==============================================================================
+
+/**
+ * Public Contact Form Submission (Support Team Alert + Auto-Ack to Visitor)
  */
 export async function sendContactFormNotification({ fullName, email, message }) {
   const safeName = escapeHtml(fullName);
   const safeEmail = escapeHtml(email);
   const safeMsg = escapeHtml(message).replace(/\n/g, '<br/>');
 
-  // A. Notification to Support Team
+  // A. Alert Support Desk
   const teamHtml = wrapEmailTemplate({
     title: 'New Public Contact Inquiry',
     subtitle: `Inquiry submitted via Landing Page Contact Form`,
+    categoryBadge: 'INQUIRY',
     contentHtml: `
       <table width="100%" cellpadding="6" style="border-collapse:collapse;margin-bottom:16px;">
         <tr><td width="120" style="color:#64748b;font-weight:600;">Full Name:</td><td><strong>${safeName}</strong></td></tr>
@@ -231,7 +299,8 @@ export async function sendContactFormNotification({ fullName, email, message }) 
     ctaUrl: `mailto:${safeEmail}?subject=Re:%20Inquiry%20from%20ATC%20Contact%20Form`,
   });
 
-  await sendEmail({
+  await transporterSupport.sendMail({
+    from: `"ATC Customer Support" <${SUPPORT_EMAIL}>`,
     to: SUPPORT_EMAIL,
     replyTo: email,
     subject: `[Contact Form] Inquiry from ${safeName} (${safeEmail})`,
@@ -242,6 +311,7 @@ export async function sendContactFormNotification({ fullName, email, message }) 
   const visitorHtml = wrapEmailTemplate({
     title: 'We Received Your Message',
     subtitle: `Hi ${safeName}, thanks for contacting ATC Cloud Support!`,
+    categoryBadge: 'SUPPORT',
     contentHtml: `
       <p>This is to confirm that our customer support engineers have received your inquiry. A representative will review your message and respond directly to this email shortly.</p>
       <div style="background:#f8fafc;padding:14px;border-radius:8px;border:1px solid #e2e8f0;margin:16px 0;">
@@ -254,15 +324,22 @@ export async function sendContactFormNotification({ fullName, email, message }) 
     ctaUrl: APP_URL,
   });
 
-  return sendEmail({
-    to: email,
-    subject: 'We Received Your Inquiry - ATC Customer Support',
-    html: visitorHtml,
-  });
+  try {
+    const info = await transporterSupport.sendMail({
+      from: `"ATC Customer Support" <${SUPPORT_EMAIL}>`,
+      to: email,
+      subject: 'We Received Your Inquiry - ATC Customer Support',
+      html: visitorHtml,
+    });
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Support Error] Contact ack failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
 }
 
 /**
- * 4. Support Ticket Created Notification
+ * Support Ticket Created (Alerts Support + Receipts Customer)
  */
 export async function sendTicketCreatedNotification({ ticket, customerEmail, customerName }) {
   const safeSubject = escapeHtml(ticket.subject);
@@ -273,6 +350,7 @@ export async function sendTicketCreatedNotification({ ticket, customerEmail, cus
   const adminHtml = wrapEmailTemplate({
     title: `New Ticket #${ticket.id}: ${safeSubject}`,
     subtitle: `Priority: ${ticket.priority} | Customer: ${escapeHtml(customerName || customerEmail)}`,
+    categoryBadge: 'TICKET OPEN',
     contentHtml: `
       <table width="100%" cellpadding="6" style="border-collapse:collapse;margin-bottom:14px;">
         <tr><td width="120" style="color:#64748b;font-weight:600;">Ticket ID:</td><td>#${ticket.id}</td></tr>
@@ -289,7 +367,8 @@ export async function sendTicketCreatedNotification({ ticket, customerEmail, cus
     ctaUrl: `${APP_URL}/admin?tab=tickets&ticketId=${ticket.id}`,
   });
 
-  await sendEmail({
+  await transporterSupport.sendMail({
+    from: `"ATC Customer Support" <${SUPPORT_EMAIL}>`,
     to: SUPPORT_EMAIL,
     replyTo: customerEmail,
     subject: `[Ticket #${ticket.id}] [${ticket.priority}] ${ticket.subject}`,
@@ -300,6 +379,7 @@ export async function sendTicketCreatedNotification({ ticket, customerEmail, cus
   const customerHtml = wrapEmailTemplate({
     title: `Support Ticket Received [#${ticket.id}]`,
     subtitle: `Subject: ${safeSubject}`,
+    categoryBadge: 'HELP DESK',
     contentHtml: `
       <p>Hi ${escapeHtml(customerName || 'Customer')},</p>
       <p>Your support ticket has been received by our engineering desk. An engineer has been assigned and is reviewing your issue.</p>
@@ -319,15 +399,22 @@ export async function sendTicketCreatedNotification({ ticket, customerEmail, cus
     ctaUrl: ticketUrl,
   });
 
-  return sendEmail({
-    to: customerEmail,
-    subject: `[Ticket #${ticket.id}] We have received your support request: ${ticket.subject}`,
-    html: customerHtml,
-  });
+  try {
+    const info = await transporterSupport.sendMail({
+      from: `"ATC Customer Support" <${SUPPORT_EMAIL}>`,
+      to: customerEmail,
+      subject: `[Ticket #${ticket.id}] We have received your support request: ${ticket.subject}`,
+      html: customerHtml,
+    });
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Support Error] Ticket confirmation failed for ${customerEmail}:`, err.message);
+    return { success: false, error: err.message };
+  }
 }
 
 /**
- * 5. Support Ticket Response Notification
+ * Support Ticket Reply (Dispatches to Customer or Support Team)
  */
 export async function sendTicketReplyNotification({
   ticket,
@@ -344,63 +431,143 @@ export async function sendTicketReplyNotification({
   const html = wrapEmailTemplate({
     title: `New Reply on Ticket #${ticket.id}`,
     subtitle: `Subject: ${escapeHtml(ticket.subject)}`,
+    categoryBadge: 'SUPPORT REPLY',
     contentHtml: `
       <p><strong>${escapeHtml(senderName)}</strong> posted a new update to this ticket thread:</p>
       <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;margin:16px 0;border-radius:4px;">
         <p style="margin:0;font-size:14px;color:#166534;line-height:1.6;">${safeMsg}</p>
       </div>
-      <p style="font-size:13px;color:#64748b;">To continue this conversation or attach further details, please click the button below to view the live ticket console.</p>
+      <p style="font-size:13px;color:#64748b;">To continue this conversation or view the full thread history, click below to open the ticket console.</p>
     `,
     ctaText: isCustomerRecipient ? 'View Ticket & Reply' : 'Open Ticket in Admin Desk',
     ctaUrl: targetUrl,
   });
 
-  return sendEmail({
-    to: recipientEmail,
-    subject: `[Update] Ticket #${ticket.id}: ${ticket.subject}`,
-    html,
-  });
+  try {
+    const info = await transporterSupport.sendMail({
+      from: `"ATC Customer Support" <${SUPPORT_EMAIL}>`,
+      to: recipientEmail,
+      subject: `[Update] Ticket #${ticket.id}: ${ticket.subject}`,
+      html,
+    });
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Support Error] Ticket reply notification failed for ${recipientEmail}:`, err.message);
+    return { success: false, error: err.message };
+  }
 }
 
+// ==============================================================================
+// 3. BILLING & INVOICING TRANSMISSIONS (billing@atechconsult.com)
+// ==============================================================================
+
 /**
- * 6. VM Provisioned & Credentials Ready Notification
+ * Invoice Generated & Payment Receipt
  */
-export async function sendVmProvisionedEmail({ email, fullName, vmName, ipAddress, username, password, os }) {
-  const portalUrl = `${APP_URL}/dashboard`;
+export async function sendInvoiceReceiptEmail({ email, fullName, invoiceNumber, amount, planName, currency = 'USD' }) {
+  const invoiceUrl = `${APP_URL}/dashboard?tab=billing`;
   const html = wrapEmailTemplate({
-    title: 'Your Virtual Machine is Ready!',
-    subtitle: `Server "${escapeHtml(vmName)}" is online and running`,
+    title: 'Payment Receipt & Invoice Confirmation',
+    subtitle: `Thank you for your business with ATC Cloud, ${fullName || 'Customer'}`,
+    categoryBadge: 'BILLING',
     contentHtml: `
-      <p>Hi ${escapeHtml(fullName || 'Customer')},</p>
-      <p>Your cloud instance has been successfully deployed and allocated IP connectivity on the ATC Data Center network.</p>
-      <div style="background:#0f172a;color:#f8fafc;padding:18px;border-radius:10px;margin:20px 0;font-family:monospace;font-size:13px;">
-        <div style="color:#38bdf8;font-weight:bold;margin-bottom:8px;font-family:sans-serif;">SERVER CONNECTION CREDENTIALS:</div>
-        <div>Hostname: <span style="color:#ffffff;">${escapeHtml(vmName)}</span></div>
-        <div>IP Address: <span style="color:#4ade80;">${escapeHtml(ipAddress)}</span></div>
-        <div>Operating System: <span style="color:#ffffff;">${escapeHtml(os || 'Linux')}</span></div>
-        <div>SSH Username: <span style="color:#ffffff;">${escapeHtml(username || 'root')}</span></div>
-        <div>Initial Password: <span style="color:#facc15;">${escapeHtml(password)}</span></div>
-        <div style="margin-top:10px;color:#94a3b8;font-size:12px;">Quick SSH Command:<br/><code style="color:#e2e8f0;background:#1e293b;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px;">ssh ${escapeHtml(username || 'root')}@${escapeHtml(ipAddress)}</code></div>
+      <p>This email confirms that your subscription invoice has been processed successfully.</p>
+      <div style="background:#f8fafc;padding:18px;border-radius:10px;border:1px solid #e2e8f0;margin:18px 0;">
+        <table width="100%" cellpadding="6" style="border-collapse:collapse;font-size:14px;">
+          <tr>
+            <td style="color:#64748b;">Invoice Number:</td>
+            <td align="right"><strong>${escapeHtml(invoiceNumber)}</strong></td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Plan / Service:</td>
+            <td align="right">${escapeHtml(planName || 'Cloud VPS Subscription')}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Amount Paid:</td>
+            <td align="right" style="color:#16a34a;font-weight:bold;font-size:16px;">$${Number(amount).toFixed(2)} ${escapeHtml(currency)}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Status:</td>
+            <td align="right"><span style="background:#dcfce7;color:#166534;font-size:11px;font-weight:bold;padding:2px 8px;border-radius:999px;">PAID</span></td>
+          </tr>
+        </table>
       </div>
-      <p style="font-size:12px;color:#dc2626;"><strong>Security Tip:</strong> We recommend changing your root password immediately upon your initial login.</p>
+      <p style="font-size:13px;color:#64748b;">You can view and download your full itemized PDF invoice anytime from the Billing & Invoices section of your customer portal.</p>
     `,
-    ctaText: 'Access Server in Dashboard',
-    ctaUrl: portalUrl,
+    ctaText: 'View Invoices in Portal',
+    ctaUrl: invoiceUrl,
+    footerNote: 'ATC Cloud Billing Department • For billing questions, reply to this email or contact billing@atechconsult.com',
   });
 
-  return sendEmail({
-    to: email,
-    subject: `[Ready] Your Server "${vmName}" is Provisioned and Online`,
-    html,
+  try {
+    const info = await transporterBilling.sendMail({
+      from: `"ATC Billing & Invoicing" <${BILLING_EMAIL}>`,
+      to: email,
+      subject: `[Receipt] Invoice ${invoiceNumber} - $${Number(amount).toFixed(2)} ${currency}`,
+      html,
+    });
+    console.log(`[Billing] Receipt sent to ${email} (ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Billing Error] Invoice receipt failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// ==============================================================================
+// 4. INFRASTRUCTURE & SECURITY ALERTS (alerts@atechconsult.com)
+// ==============================================================================
+
+/**
+ * Infrastructure & Security Alert Dispatcher
+ */
+export async function sendSystemAlertEmail({ subject, alertLevel = 'WARNING', details, targetEmail }) {
+  const destEmail = targetEmail || ALERTS_EMAIL;
+  const isCritical = alertLevel === 'CRITICAL' || alertLevel === 'DANGER';
+  const badgeColor = isCritical ? '#dc2626' : '#f59e0b';
+
+  const html = wrapEmailTemplate({
+    title: `Infrastructure Alert: ${escapeHtml(subject)}`,
+    subtitle: `Alert Level: ${alertLevel}`,
+    categoryBadge: alertLevel,
+    contentHtml: `
+      <div style="background:${isCritical ? '#fef2f2' : '#fffbeb'};border-left:4px solid ${badgeColor};padding:16px;border-radius:4px;margin-bottom:16px;">
+        <strong style="color:${badgeColor};font-size:14px;">Cluster Telemetry Event Triggered</strong>
+        <p style="margin:8px 0 0 0;font-size:13px;color:#334155;line-height:1.6;">${escapeHtml(details)}</p>
+      </div>
+      <p style="font-size:12px;color:#64748b;">Timestamp: ${new Date().toUTCString()} | Node: Windows Hyper-V Cluster Primary</p>
+    `,
+    ctaText: 'Open Admin Telemetry',
+    ctaUrl: `${APP_URL}/admin?tab=overview`,
+    footerNote: 'ATC Cloud Automated Monitoring System • alerts@atechconsult.com',
   });
+
+  try {
+    const info = await transporterAlerts.sendMail({
+      from: `"ATC Infrastructure Alerts" <${ALERTS_EMAIL}>`,
+      to: destEmail,
+      subject: `[${alertLevel}] ${subject}`,
+      html,
+    });
+    console.log(`[Alerts] Alert sent to ${destEmail} (ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Alerts Error] Alert dispatch failed:`, err.message);
+    return { success: false, error: err.message };
+  }
 }
 
 export default {
-  sendEmail,
+  transporterSupport,
+  transporterNoReply,
+  transporterBilling,
+  transporterAlerts,
   sendVerificationEmail,
   sendPasswordResetEmail,
+  sendVmProvisionedEmail,
   sendContactFormNotification,
   sendTicketCreatedNotification,
   sendTicketReplyNotification,
-  sendVmProvisionedEmail,
+  sendInvoiceReceiptEmail,
+  sendSystemAlertEmail,
 };

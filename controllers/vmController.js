@@ -7,7 +7,7 @@ import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
 import { calculateResizePrice, calculateCustomPrice } from '../services/pricingService.js';
-import { sendVmProvisionedEmail } from '../services/emailService.js';
+import { sendVmProvisionedEmail, sendInvoiceReceiptEmail } from '../services/emailService.js';
 
 /**
  * 1. GET /api/vms - Get all VMs for current user
@@ -353,6 +353,50 @@ export async function deployVM(req, res) {
           currency: 'USD',
         },
       });
+
+      // Auto-generate invoice & dispatch payment receipt via billing@atechconsult.com
+      try {
+        const invNum = `INV-${new Date().getFullYear()}-${String(subscription.subscriptionId).padStart(4, '0')}`;
+        const inv = await prisma.invoice.create({
+          data: {
+            userId,
+            subscriptionId: subscription.subscriptionId,
+            invoiceNumber: invNum,
+            subtotal: pricing.totalMonthlyPrice,
+            tax: 0.00,
+            discount: 0.00,
+            total: pricing.totalMonthlyPrice,
+            currency: 'USD',
+            status: 'PAID',
+            issueDate: now,
+            dueDate: now,
+            paidDate: now,
+          },
+        });
+
+        await prisma.payment.create({
+          data: {
+            userId,
+            invoiceId: inv.invoiceId,
+            paymentGateway: 'STRIPE_CARD',
+            transactionId: `txn_${Date.now()}_${subscription.subscriptionId}`,
+            amount: pricing.totalMonthlyPrice,
+            currency: 'USD',
+            status: 'COMPLETED',
+            paymentDate: now,
+          },
+        });
+
+        sendInvoiceReceiptEmail({
+          email: req.user?.email,
+          fullName: req.user?.fullName,
+          invoiceNumber: invNum,
+          amount: pricing.totalMonthlyPrice,
+          planName: plan.name,
+        }).catch((err) => console.warn('[Billing Receipt Email Warning]:', err.message));
+      } catch (invErr) {
+        console.warn('[Auto Invoice Generation Notice]:', invErr.message);
+      }
     }
 
     // 2. Assign IP from pool (or allocate dynamic DHCP lease)
