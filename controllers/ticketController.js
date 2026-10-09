@@ -8,6 +8,7 @@
 // ==============================================================================
 
 import prisma from '../lib/prisma.js';
+import { sendTicketCreatedNotification, sendTicketReplyNotification } from '../services/emailService.js';
 
 export function parseChatHistory(ticket, user = null) {
   let list = [];
@@ -132,7 +133,7 @@ export async function createTicket(req, res) {
         message: message.trim(),
         priority: assignedPriority,
         status: 'OPEN',
-        assignedTo: 'moeezshahzad26@gmail.com',
+        assignedTo: process.env.SUPPORT_EMAIL || 'customer-support@atechconsult.com',
         chatHistory: JSON.stringify(initialThread),
       },
     });
@@ -146,6 +147,13 @@ export async function createTicket(req, res) {
         details: `Submitted support ticket #${ticket.id}: "${ticket.subject}" [Priority: ${ticket.priority}]`,
       },
     });
+
+    // Asynchronously dispatch email notification to support team and confirmation receipt to customer
+    sendTicketCreatedNotification({
+      ticket,
+      customerEmail: req.user?.email,
+      customerName: req.user?.fullName,
+    }).catch((err) => console.warn('[Ticket Creation Email Warning]:', err.message));
 
     res.status(201).json({
       success: true,
@@ -207,6 +215,15 @@ export async function addCustomerMessage(req, res) {
         status: ticket.status === 'RESOLVED' || ticket.status === 'CLOSED' ? 'OPEN' : ticket.status,
       },
     });
+
+    // Notify customer support team of customer's follow-up message
+    sendTicketReplyNotification({
+      ticket: updated,
+      senderName: req.user?.fullName || req.user?.email || 'Customer',
+      message: message.trim(),
+      recipientEmail: process.env.SUPPORT_EMAIL || 'customer-support@atechconsult.com',
+      isCustomerRecipient: false,
+    }).catch((err) => console.warn('[Customer Ticket Reply Email Warning]:', err.message));
 
     res.json({
       success: true,

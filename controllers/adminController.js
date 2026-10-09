@@ -10,6 +10,7 @@ import os from 'os';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
+import { sendTicketReplyNotification } from '../services/emailService.js';
 
 /**
  * 1. GET /api/admin/overview
@@ -1037,6 +1038,26 @@ export async function replyAdminTicket(req, res) {
         details: `Administrator ${req.adminUser.email} replied to ticket #${id} and updated status to '${updated.status}'`,
       },
     });
+
+    // Notify customer by email of the support team's reply
+    if (response) {
+      prisma.user.findUnique({
+        where: { userId: existing.userId },
+        select: { email: true, fullName: true },
+      }).then((customer) => {
+        if (customer && customer.email) {
+          return sendTicketReplyNotification({
+            ticket: updated,
+            senderName: req.adminUser.fullName || req.adminUser.email || 'ATC Support Engineer',
+            message: response.trim(),
+            recipientEmail: customer.email,
+            isCustomerRecipient: true,
+          });
+        }
+      }).catch((mailErr) => {
+        console.warn('[Admin Ticket Reply Email Warning]:', mailErr.message);
+      });
+    }
 
     res.json({
       success: true,

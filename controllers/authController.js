@@ -3,8 +3,8 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import nodemailer from 'nodemailer';
 import prisma from '../lib/prisma.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 
 // --- CENTRALIZED AUTH CONFIGURATION ---
 const JWT_SECRET = process.env.JWT_SECRET || 'atech_vps_default_jwt_secret_must_change';
@@ -15,15 +15,6 @@ const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http
 const BACKEND_URL = process.env.BACKEND_URL || process.env.SERVER_URL || 'http://172.23.28.242';
 // Google OAuth strictly forbids private IP addresses (RFC 1918). It requires localhost or a public FQDN domain.
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback';
-
-// --- NODEMAILER TRANSPORTER SETUP (GMAIL OPTIMIZED) ---
-const transporter = nodemailer.createTransport({
-  service: 'gmail', // Automatically configures smtp.gmail.com & SSL port 465
-  auth: {
-    user: process.env.SMTP_USER, // moeezshehzad26@gmail.com
-    pass: process.env.SMTP_PASS, // 16-character Google App Password
-  },
-});
 
 // --- HELPER FUNCTIONS ---
 
@@ -329,28 +320,8 @@ export const register = async (req, res) => {
 
     let emailSent = false;
     try {
-      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-        await transporter.sendMail({
-          from: process.env.SMTP_FROM || '"ATC Portal" <no-reply@atechconsult.com>',
-          to: newUser.email,
-          subject: 'Verify your ATC Portal account',
-          html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-              <h2>Welcome, ${newUser.fullName}!</h2>
-              <p>Thank you for signing up. Please verify your email address to complete your registration and activate your dashboard access.</p>
-              <div style="margin: 30px 0;">
-                <a href="${verifyUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-                  Verify Email Address
-                </a>
-              </div>
-              <p style="font-size: 13px; color: #666;">
-                Or copy and paste this link in your browser: <br/>
-                <a href="${verifyUrl}">${verifyUrl}</a>
-              </p>
-              <p style="font-size: 12px; color: #999; margin-top: 30px;">This link will expire in 24 hours.</p>
-            </div>
-          `,
-        });
+      const mailResult = await sendVerificationEmail(newUser.email, newUser.fullName, verificationToken);
+      if (mailResult && mailResult.success) {
         emailSent = true;
       }
     } catch (mailErr) {
@@ -657,3 +628,92 @@ export const getProfile = async (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve profile', details: error.message });
   }
 };
+
+// --- FORGOT PASSWORD HANDLER ---
+export const forgotPasswordHandler = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required.' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    // Return generic success to prevent email enumeration
+    if (!user) {
+      return res.json({
+        success: true,
+        message: 'If an account exists with this email address, password reset instructions have been sent.',
+      });
+    }
+
+    // Generate short-lived reset token (1 hour)
+    const resetToken = jwt.sign(
+      { userId: user.userId, email: user.email, purpose: 'pwd_reset' },
+      JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    await sendPasswordResetEmail(user.email, user.fullName, resetToken);
+
+    return res.json({
+      success: true,
+      message: 'If an account exists with this email address, password reset instructions have been sent.',
+    });
+  } catch (error) {
+    console.error('forgotPasswordHandler error:', error);
+    return res.status(500).json({ error: 'Failed to process password reset request.' });
+  }
+};
+
+// --- RESET PASSWORD HANDLER ---
+export const resetPasswordHandler = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token and new password are required.' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+      return res.status(400).json({ error: 'Invalid or expired password reset link. Please request a new one.' });
+    }
+
+    if (decoded.purpose !== 'pwd_reset') {
+      return res.status(400).json({ error: 'Invalid reset token purpose.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { userId: decoded.userId },
+      data: {
+        passwordHash,
+        emailVerified: true,
+      },
+    });
+
+    // Revoke old refresh tokens for security
+    await prisma.refreshToken.deleteMany({
+      where: { userId: decoded.userId },
+    });
+
+    return res.json({
+      success: true,
+      message: 'Your password has been successfully reset. You may now log in.',
+    });
+  } catch (error) {
+    console.error('resetPasswordHandler error:', error);
+    return res.status(500).json({ error: 'Failed to reset password.' });
+  }
+};

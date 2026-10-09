@@ -7,7 +7,9 @@ import {
   logoutHandler,
   googleAuth,
   googleAuthCallback,
-  verifyEmailHandler
+  verifyEmailHandler,
+  forgotPasswordHandler,
+  resetPasswordHandler,
 } from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
@@ -16,6 +18,8 @@ const router = express.Router();
 // --- PUBLIC AUTHENTICATION ROUTES ---
 router.post('/register', register);
 router.post('/login', login);
+router.post('/forgot-password', forgotPasswordHandler);
+router.post('/reset-password', resetPasswordHandler);
 
 // --- SESSION MANAGEMENT ROUTES ---
 router.post('/refresh', refreshTokenHandler);
@@ -31,5 +35,3 @@ router.get('/me', authenticateToken, getProfile);
 router.get('/verify-email', verifyEmailHandler);
 
 export default router;
-
-

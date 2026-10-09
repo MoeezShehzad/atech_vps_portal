@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
 import { calculateResizePrice, calculateCustomPrice } from '../services/pricingService.js';
+import { sendVmProvisionedEmail } from '../services/emailService.js';
 
 /**
  * 1. GET /api/vms - Get all VMs for current user
@@ -434,6 +435,19 @@ export async function deployVM(req, res) {
       const readyVm = await prisma.virtualMachine.findUnique({
         where: { vmId: newVm.vmId },
         include: { plan: true, image: true, ipPool: true, subscription: true },
+      });
+
+      // Send credentials and quick-connect email to the customer
+      sendVmProvisionedEmail({
+        email: req.user?.email,
+        fullName: req.user?.fullName,
+        vmName: cleanVmName,
+        ipAddress: readyVm?.ipAddress || ipRecord?.ipAddress || 'Allocated via DHCP',
+        username: adminUsername,
+        password: adminPassword,
+        os: image?.imageName || 'Linux',
+      }).catch((mailErr) => {
+        console.warn('[VM Provision Email Warning]:', mailErr.message);
       });
 
       return res.status(201).json({
