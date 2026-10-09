@@ -2179,31 +2179,46 @@ export default function Dashboard() {
       {/* SERVER DETAIL SIDEBAR DRAWER */}
       {selectedInstance && (
         <div 
-          className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-xs flex justify-end transition-all"
+          className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex justify-end transition-all"
           onClick={() => setSelectedInstance(null)}
         >
           <div 
-            className="bg-white dark:bg-slate-900 w-full max-w-lg h-full border-l border-slate-200 dark:border-slate-800 p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200"
+            className="bg-white dark:bg-slate-900 w-full max-w-xl h-full border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             
-            <div className="space-y-6">
-              {/* DRAWER HEADER (Never hidden behind navbar; elevated z-index & prominent close button) */}
-              <div className="sticky -top-6 -mx-6 px-6 py-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md z-30 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-xl">
-                    <Server className="w-5 h-5" />
+            <div className="p-6 md:p-7 space-y-6">
+              {/* DRAWER HEADER */}
+              <div className="sticky -top-6 -mx-6 md:-mx-7 -mt-6 px-6 md:px-7 py-4.5 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md z-30 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-2xl shrink-0">
+                    <Server className="w-6 h-6" />
                   </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white text-lg font-poppins">
-                      {selectedInstance.name}
-                    </h3>
-                    <p className="text-xs font-mono text-slate-500 dark:text-slate-400">{selectedInstance.hostname}</p>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-slate-900 dark:text-white text-lg font-poppins truncate">
+                        {selectedInstance.name}
+                      </h3>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        selectedInstance.status === 'running'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          selectedInstance.status === 'running' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                        }`} />
+                        {selectedInstance.status === 'running' ? 'RUNNING' : 'STOPPED'}
+                      </span>
+                    </div>
+                    <p className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                      {selectedInstance.hostname} • <span className="text-blue-600 dark:text-blue-400 font-semibold">{selectedInstance.ip}</span>
+                    </p>
                   </div>
                 </div>
+
                 <button 
                   onClick={() => setSelectedInstance(null)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all border border-slate-200 dark:border-slate-700"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer"
                   title="Close Details Panel (Esc)"
                 >
                   <X className="w-4 h-4" />
@@ -2211,56 +2226,70 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              {/* SSH CONNECTION STRING & SERVER CREDENTIALS */}
-              <div className="space-y-2">
-                <label className="block text-xs font-semibold text-slate-700 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Terminal className="w-3.5 h-3.5 text-blue-600" /> Terminal SSH Access
+              {/* SECTION 1: ACCESS & CREDENTIALS CARD */}
+              <div className="bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800 p-4.5 space-y-4">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Terminal SSH Access
                   </span>
-                  <span className="text-[10px] text-slate-400 font-mono">Port 22</span>
-                </label>
-                <div className="bg-slate-900 text-slate-200 p-3 rounded-xl text-xs font-mono flex items-center justify-between gap-2 border border-slate-800 shadow-inner">
-                  <span>ssh {selectedInstance.adminUser || 'ubuntu'}@{selectedInstance.ip}</span>
+                  <span className="text-[11px] font-mono text-slate-400 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+                    Port 22
+                  </span>
+                </div>
+
+                {/* SSH Command Box */}
+                <div className="bg-slate-950 text-slate-200 p-3.5 rounded-xl text-xs font-mono flex items-center justify-between gap-3 border border-slate-800 shadow-inner">
+                  <span className="truncate select-all text-emerald-400">
+                    ssh {selectedInstance.adminUser || 'ubuntu'}@{selectedInstance.ip}
+                  </span>
                   <button
                     onClick={() => handleCopySSH(`ssh ${selectedInstance.adminUser || 'ubuntu'}@${selectedInstance.ip}`)}
-                    className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all flex items-center gap-1"
+                    className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all shrink-0 cursor-pointer"
                     title="Copy SSH Command"
                   >
                     {copiedSSH ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
-                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 flex items-center justify-between text-[11px] text-slate-600">
-                  <div className="flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-blue-600" />
-                    <span>User: <strong className="text-slate-800 font-mono">{selectedInstance.adminUser || 'ubuntu'}</strong></span>
+
+                {/* Credentials Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                      <Key className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>User:</span>
+                    </div>
+                    <strong className="text-slate-900 dark:text-white font-mono">{selectedInstance.adminUser || 'ubuntu'}</strong>
                   </div>
-                  <div className="flex items-center gap-1 text-[11px] font-mono">
-                    <span className="text-slate-400">Pass:</span>
-                    <strong className="text-slate-800 bg-slate-200/80 px-1.5 py-0.5 rounded text-[10px]">
-                      {drawerShowPassword ? (selectedInstance.adminPassword || 'root') : '••••••••'}
-                    </strong>
-                    <button
-                      onClick={() => setDrawerShowPassword(!drawerShowPassword)}
-                      className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
-                      title={drawerShowPassword ? 'Hide Password' : 'Show Password'}
-                    >
-                      {drawerShowPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(selectedInstance.adminPassword || 'root');
-                        setCopiedDrawerPassword(true);
-                        setTimeout(() => setCopiedDrawerPassword(false), 2000);
-                      }}
-                      className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
-                      title="Copy Password"
-                    >
-                      {copiedDrawerPassword ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
+
+                  <div className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl flex items-center justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Pass:</span>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <strong className="text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[11px]">
+                        {drawerShowPassword ? (selectedInstance.adminPassword || 'root') : '••••••••'}
+                      </strong>
+                      <button
+                        onClick={() => setDrawerShowPassword(!drawerShowPassword)}
+                        className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                        title={drawerShowPassword ? 'Hide Password' : 'Show Password'}
+                      >
+                        {drawerShowPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedInstance.adminPassword || 'root');
+                          setCopiedDrawerPassword(true);
+                          setTimeout(() => setCopiedDrawerPassword(false), 2000);
+                        }}
+                        className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                        title="Copy Password"
+                      >
+                        {copiedDrawerPassword ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* LAUNCH IN-BROWSER WEB CONSOLE */}
+                {/* Primary Web Console Button */}
                 {selectedInstance.status === 'running' ? (
                   <button
                     onClick={() => {
@@ -2268,28 +2297,33 @@ export default function Dashboard() {
                       setSelectedInstance(null);
                       setConsoleVm(target);
                     }}
-                    className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-2"
+                    className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Terminal className="w-4 h-4 text-emerald-400" />
+                    <Terminal className="w-4 h-4 text-emerald-300" />
                     <span>Launch Web Terminal Console</span>
                   </button>
                 ) : (
-                  <div className="w-full py-2 px-3 bg-slate-100 text-slate-400 rounded-xl text-xs font-medium flex items-center justify-center gap-2 border border-slate-200">
-                    <Terminal className="w-3.5 h-3.5" />
+                  <div className="w-full py-2.5 px-4 bg-slate-200/60 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border border-slate-300/60 dark:border-slate-700/60">
+                    <Terminal className="w-4 h-4 opacity-50" />
                     <span>Web Console Available When Running</span>
                   </div>
                 )}
+              </div>
 
-                {/* ADVANCED VM ACTIONS ROW (CONNECT, RESET PASS, REBUILD) */}
-                <div className="grid grid-cols-3 gap-2 pt-1">
+              {/* SECTION 2: QUICK VM OPERATIONS */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Management Actions
+                </h4>
+                <div className="grid grid-cols-3 gap-2.5">
                   <button
                     type="button"
                     onClick={() => setConnectGuideVm(selectedInstance)}
-                    className="py-2 px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors border border-blue-200/60"
+                    className="py-2.5 px-3 bg-white dark:bg-slate-800/80 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-all border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer group"
                     title="SSH / PuTTY connection commands"
                   >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    <span>Connect</span>
+                    <KeyRound className="w-4 h-4 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
+                    <span>Connect Guide</span>
                   </button>
 
                   <button
@@ -2299,11 +2333,11 @@ export default function Dashboard() {
                       setNewResetPassword('');
                       setIsResetPasswordOpen(true);
                     }}
-                    className="py-2 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-200/80"
+                    className="py-2.5 px-3 bg-white dark:bg-slate-800/80 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-200 hover:text-amber-600 dark:hover:text-amber-400 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-all border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer group"
                     title="Reset guest root/admin password"
                   >
-                    <Key className="w-3.5 h-3.5" />
-                    <span>Password</span>
+                    <Key className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
+                    <span>Reset Pass</span>
                   </button>
 
                   <button
@@ -2314,130 +2348,137 @@ export default function Dashboard() {
                       setRebuildConfirmHostname('');
                       setIsRebuildOpen(true);
                     }}
-                    className="py-2 px-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-colors border border-rose-200/60"
+                    className="py-2.5 px-3 bg-white dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-200 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-all border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer group"
                     title="Rebuild VM with clean OS"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
                     <span>Rebuild OS</span>
                   </button>
                 </div>
-
-                {/* CHECKPOINTS & SNAPSHOTS */}
-                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Camera className="w-3.5 h-3.5 text-blue-600" /> Checkpoints & Snapshots
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-400">
-                      {vmSnapshots.length} snapshot{vmSnapshots.length === 1 ? '' : 's'}
-                    </span>
-                  </div>
-
-                  <form onSubmit={handleCreateSnapshot} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Snapshot name (e.g. pre-update)"
-                      value={newSnapshotName}
-                      onChange={(e) => setNewSnapshotName(e.target.value)}
-                      className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:border-blue-500 focus:outline-hidden"
-                    />
-                    <button
-                      type="submit"
-                      disabled={snapshotActionLoading}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shrink-0 transition-colors disabled:opacity-50"
-                    >
-                      {snapshotActionLoading ? 'Saving...' : 'Snapshot'}
-                    </button>
-                  </form>
-
-                  {snapshotsLoading ? (
-                    <div className="py-2 text-center text-xs text-slate-400">Loading checkpoints...</div>
-                  ) : vmSnapshots.length === 0 ? (
-                    <p className="text-[11px] text-slate-400 italic">No snapshots created yet. Take a snapshot to save state.</p>
-                  ) : (
-                    <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                      {vmSnapshots.map((snap: any) => (
-                        <div key={snap.snapshotId || snap.id} className="p-2 bg-white rounded-lg border border-slate-200/70 flex items-center justify-between text-xs">
-                          <div>
-                            <strong className="text-slate-800 font-mono text-[11px]">{snap.name || snap.snapshotName}</strong>
-                            <div className="text-[10px] text-slate-400">{new Date(snap.createdAt).toLocaleString()}</div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleRestoreSnapshot(snap.snapshotId, snap.name || snap.snapshotName)}
-                              disabled={snapshotActionLoading}
-                              className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-[10px] font-bold transition-colors"
-                              title="Roll back to this checkpoint"
-                            >
-                              Rollback
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteSnapshot(snap.snapshotId, snap.name || snap.snapshotName)}
-                              disabled={snapshotActionLoading}
-                              className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                              title="Delete snapshot"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
 
-              {/* SPECS GRID */}
+              {/* SECTION 3: HARDWARE SPECIFICATIONS */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                     Hardware Specifications
                   </h4>
                   <button
                     onClick={(e) => openResizeModal(selectedInstance, e)}
-                    className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                    className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
                   >
-                    <Sliders className="w-3 h-3" /> Resize Specs
+                    <Sliders className="w-3.5 h-3.5" /> Resize Specs
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
-                      <Cpu className="w-3.5 h-3.5" /> vCPU Cores
+                  <div className="p-3.5 bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                      <Cpu className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>vCPU Cores</span>
                     </div>
-                    <p className="font-semibold text-slate-900 text-sm">{selectedInstance.vCPU} Cores</p>
+                    <p className="font-bold text-slate-900 dark:text-white text-sm font-mono">{selectedInstance.vCPU} Cores</p>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
-                      <MemoryStick className="w-3.5 h-3.5" /> Memory
+
+                  <div className="p-3.5 bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                      <MemoryStick className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>Memory</span>
                     </div>
-                    <p className="font-semibold text-slate-900 text-sm">{selectedInstance.ramGB} GB RAM</p>
+                    <p className="font-bold text-slate-900 dark:text-white text-sm font-mono">{selectedInstance.ramGB} GB RAM</p>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
-                      <HardDrive className="w-3.5 h-3.5" /> NVMe Storage
+
+                  <div className="p-3.5 bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                      <HardDrive className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>NVMe Storage</span>
                     </div>
-                    <p className="font-semibold text-slate-900 text-sm">{selectedInstance.diskGB} GB</p>
+                    <p className="font-bold text-slate-900 dark:text-white text-sm font-mono">{selectedInstance.diskGB} GB</p>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="flex items-center gap-2 text-slate-500 text-xs mb-1">
-                      <DollarSign className="w-3.5 h-3.5" /> Monthly Rate
+
+                  <div className="p-3.5 bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
+                      <DollarSign className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Monthly Rate</span>
                     </div>
-                    <p className="font-semibold text-slate-900 text-sm">${selectedInstance.monthlyPrice}/mo</p>
+                    <p className="font-bold text-slate-900 dark:text-white text-sm font-mono">${selectedInstance.monthlyPrice}/mo</p>
                   </div>
                 </div>
               </div>
 
+              {/* SECTION 4: CHECKPOINTS & SNAPSHOTS */}
+              <div className="bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Checkpoints & Snapshots
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                    {vmSnapshots.length} snapshot{vmSnapshots.length === 1 ? '' : 's'}
+                  </span>
+                </div>
 
+                <form onSubmit={handleCreateSnapshot} className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Snapshot name (e.g. pre-update)"
+                    value={newSnapshotName}
+                    onChange={(e) => setNewSnapshotName(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs font-mono focus:border-blue-500 focus:outline-hidden"
+                  />
+                  <button
+                    type="submit"
+                    disabled={snapshotActionLoading || !newSnapshotName.trim()}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {snapshotActionLoading ? 'Saving...' : 'Take Snapshot'}
+                  </button>
+                </form>
+
+                {snapshotsLoading ? (
+                  <div className="py-3 text-center text-xs text-slate-400">Loading checkpoints...</div>
+                ) : vmSnapshots.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 italic py-1">
+                    No snapshots created yet. Take a snapshot to preserve system state.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-36 overflow-y-auto pt-1">
+                    {vmSnapshots.map((snap: any) => (
+                      <div key={snap.snapshotId || snap.id} className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between text-xs">
+                        <div>
+                          <strong className="text-slate-800 dark:text-slate-200 font-mono text-[11px]">{snap.name || snap.snapshotName}</strong>
+                          <div className="text-[10px] text-slate-400">{new Date(snap.createdAt).toLocaleString()}</div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleRestoreSnapshot(snap.snapshotId, snap.name || snap.snapshotName)}
+                            disabled={snapshotActionLoading}
+                            className="px-2.5 py-1 bg-amber-50 dark:bg-amber-950/50 hover:bg-amber-100 text-amber-700 dark:text-amber-400 rounded-lg text-[10px] font-bold transition-colors cursor-pointer border border-amber-200/60 dark:border-amber-800/60"
+                            title="Roll back to this checkpoint"
+                          >
+                            Rollback
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSnapshot(snap.snapshotId, snap.name || snap.snapshotName)}
+                            disabled={snapshotActionLoading}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Delete snapshot"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* DRAWER FOOTER ACTIONS */}
-            <div className="pt-6 border-t border-slate-100 flex items-center gap-2.5">
+            {/* STICKY DRAWER FOOTER ACTIONS */}
+            <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 p-4 md:p-5 flex items-center gap-3">
               <button
                 onClick={() => setSelectedInstance(null)}
-                className="py-2.5 px-4 rounded-xl font-semibold text-xs transition-all border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                className="py-2.5 px-4 rounded-xl font-semibold text-xs transition-all border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 Close
               </button>
@@ -2451,10 +2492,10 @@ export default function Dashboard() {
                   )
                 }
                 disabled={actionLoadingId === selectedInstance.vmId}
-                className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 border ${
+                className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer border shadow-xs ${
                   selectedInstance.status === 'running'
-                    ? 'border-slate-200 text-slate-700 hover:bg-slate-100'
-                    : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+                    ? 'border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-400 bg-amber-50/60 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+                    : 'border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
                 }`}
               >
                 <Power className={`w-4 h-4 ${actionLoadingId === selectedInstance.vmId ? 'animate-spin' : ''}`} />
@@ -2463,9 +2504,9 @@ export default function Dashboard() {
 
               <button
                 onClick={() => setDeletingInstance(selectedInstance)}
-                className="py-2.5 px-4 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 border border-rose-200 text-rose-600 hover:bg-rose-50"
+                className="py-2.5 px-4 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 bg-rose-50/60 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 cursor-pointer"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
                 Destroy
               </button>
             </div>
