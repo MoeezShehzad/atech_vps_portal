@@ -78,6 +78,7 @@ export default function WebConsoleModal({
       const wsUrl = `${protocol}//${host}/api/ws/terminal?ticket=${encodeURIComponent(session.ticket)}&vmId=${vmId}`;
 
       const ws = new WebSocket(wsUrl);
+      ws.binaryType = 'arraybuffer';
       socketRef.current = ws;
 
       ws.onopen = () => {
@@ -103,7 +104,11 @@ export default function WebConsoleModal({
       };
 
       ws.onmessage = (event) => {
-        term.write(event.data);
+        if (event.data instanceof ArrayBuffer) {
+          term.write(new Uint8Array(event.data));
+        } else {
+          term.write(event.data);
+        }
       };
 
       ws.onerror = (err) => {

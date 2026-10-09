@@ -1,3 +1,4 @@
+import net from 'net';
 import { WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
 import { Client as SSHClient } from 'ssh2';
@@ -8,9 +9,14 @@ export function setupTerminalWebSocket(server) {
 
   server.on('upgrade', (request, socket, head) => {
     try {
+      socket.setNoDelay(true);
+      socket.setKeepAlive(true, 10000);
       const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
       if (url.pathname === '/ws/terminal' || url.pathname === '/api/ws/terminal') {
         wss.handleUpgrade(request, socket, head, (ws) => {
+          if (ws._socket) {
+            ws._socket.setNoDelay(true);
+          }
           wss.emit('connection', ws, request, url);
         });
       }
@@ -101,6 +107,14 @@ export function setupTerminalWebSocket(server) {
       const sshConn = new SSHClient();
       activeConn = sshConn;
 
+      // Create dedicated TCP socket with setNoDelay to eliminate Nagle packet buffering
+      const directSock = net.connect({ host: targetIp, port: 22 });
+      directSock.setNoDelay(true);
+      directSock.setKeepAlive(true, 10000);
+      directSock.on('error', () => {
+        // Handled via sshConn error event
+      });
+
       sshConn.on('ready', () => {
         retryCount = 0;
         if (isFallback) {
@@ -139,16 +153,16 @@ export function setupTerminalWebSocket(server) {
               if (stream.writable) stream.write(buffered);
             }
 
-            // Pipe remote shell output directly to browser xterm
+            // Pipe remote shell output directly to browser xterm (Buffer passed directly, 0 string transcoding)
             stream.on('data', (data) => {
               if (ws.readyState === ws.OPEN) {
-                ws.send(data.toString());
+                ws.send(data);
               }
             });
 
             stream.stderr.on('data', (data) => {
               if (ws.readyState === ws.OPEN) {
-                ws.send(data.toString());
+                ws.send(data);
               }
             });
 
@@ -168,7 +182,7 @@ export function setupTerminalWebSocket(server) {
         // If authentication failed on custom user, attempt fallback to default ubuntu user
         if (!isFallback && targetUser !== 'ubuntu' && (err.level === 'client-authentication' || err.message?.toLowerCase().includes('auth'))) {
           console.log(`[SSH2 Fallback] Retrying with default account 'ubuntu' to self-heal guest session...`);
-          try { sshConn.end(); } catch (e) {}
+          try { directSock.destroy(); sshConn.end(); } catch (e) {}
           return connectSSH('ubuntu', 'root', true);
         }
 
@@ -178,7 +192,7 @@ export function setupTerminalWebSocket(server) {
           if (ws.readyState === ws.OPEN) {
             ws.send(`\r\n\x1b[33m[Console]\x1b[0m Waiting for guest operating system SSH service to become ready (attempt ${retryCount}/${maxRetries})...\r\n`);
           }
-          try { sshConn.end(); } catch (e) {}
+          try { directSock.destroy(); sshConn.end(); } catch (e) {}
           setTimeout(() => {
             if (ws.readyState === ws.OPEN) {
               connectSSH(user, pass, isFallback);
@@ -194,21 +208,20 @@ export function setupTerminalWebSocket(server) {
       });
 
       sshConn.connect({
-        host: targetIp,
-        port: 22,
+        sock: directSock,
         username: user,
         password: pass,
         readyTimeout: 15000,
-        keepaliveInterval: 10000,
       });
     }
 
     // Forward browser keystrokes and resize signals to remote shell stream
     ws.on('message', (msg) => {
-      try {
-        const str = msg.toString();
-        if (str.startsWith('{') && str.includes('"type":"resize"')) {
-          try {
+      // Check for JSON resize signal (starts with '{' -> 123)
+      if (typeof msg === 'string' ? msg.charCodeAt(0) === 123 : (msg && msg[0] === 123)) {
+        try {
+          const str = msg.toString();
+          if (str.startsWith('{"type":"resize"')) {
             const parsed = JSON.parse(str);
             if (parsed.cols && parsed.rows) {
               ptyCols = Number(parsed.cols);
@@ -217,17 +230,17 @@ export function setupTerminalWebSocket(server) {
                 shellStream.setWindow(ptyRows, ptyCols, 0, 0);
               }
             }
-          } catch {}
-          return;
-        }
+            return;
+          }
+        } catch {}
+      }
 
-        if (shellStream && shellStream.writable) {
-          shellStream.write(msg);
-        } else {
-          // Buffer keystrokes while SSH handshake is finishing
-          inputBuffer.push(msg);
-        }
-      } catch (e) {}
+      // Fast-path: keystroke input (zero overhead, direct write)
+      if (shellStream && shellStream.writable) {
+        shellStream.write(msg);
+      } else {
+        inputBuffer.push(msg);
+      }
     });
 
     ws.on('close', () => {

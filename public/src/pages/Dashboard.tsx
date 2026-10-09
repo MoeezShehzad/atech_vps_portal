@@ -286,11 +286,12 @@ export default function Dashboard() {
 
   // Periodic background sync: Keeps VM power states updated (e.g., if user ran 'sudo poweroff' or 'sudo reboot' inside guest OS)
   useEffect(() => {
+    if (Boolean(consoleVm)) return;
     const timer = setInterval(() => {
       fetchVMs();
     }, 12000);
     return () => clearInterval(timer);
-  }, []);
+  }, [Boolean(consoleVm)]);
 
   // Active VM selected for live dashboard telemetry
   const [activeTelemetryVmId, setActiveTelemetryVmId] = useState<number | null>(null);
@@ -338,7 +339,7 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (!activeTelemetryVmId) {
+    if (!activeTelemetryVmId || Boolean(consoleVm)) {
       setLiveMetrics(null);
       setCpuHistory([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       setRamHistory([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -354,7 +355,7 @@ export default function Dashboard() {
     }, 5000);
 
     return () => clearInterval(metricsTimer);
-  }, [activeTelemetryVmId]);
+  }, [activeTelemetryVmId, Boolean(consoleVm)]);
 
   // Handle Escape key to close any active drawer or modal
   useEffect(() => {
