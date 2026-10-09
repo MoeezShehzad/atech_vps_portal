@@ -107,12 +107,13 @@ export function setupTerminalWebSocket(server) {
       const sshConn = new SSHClient();
       activeConn = sshConn;
 
-      // Create dedicated TCP socket with setNoDelay to eliminate Nagle packet buffering
-      const directSock = net.connect({ host: targetIp, port: 22 });
-      directSock.setNoDelay(true);
-      directSock.setKeepAlive(true, 10000);
-      directSock.on('error', () => {
-        // Handled via sshConn error event
+      sshConn.on('connect', () => {
+        if (sshConn._sock) {
+          try {
+            sshConn._sock.setNoDelay(true);
+            sshConn._sock.setKeepAlive(true, 10000);
+          } catch (e) {}
+        }
       });
 
       sshConn.on('ready', () => {
@@ -153,16 +154,16 @@ export function setupTerminalWebSocket(server) {
               if (stream.writable) stream.write(buffered);
             }
 
-            // Pipe remote shell output directly to browser xterm (Buffer passed directly, 0 string transcoding)
+            // Pipe remote shell output directly to browser xterm as UTF-8 strings
             stream.on('data', (data) => {
               if (ws.readyState === ws.OPEN) {
-                ws.send(data);
+                ws.send(data.toString('utf-8'));
               }
             });
 
             stream.stderr.on('data', (data) => {
               if (ws.readyState === ws.OPEN) {
-                ws.send(data);
+                ws.send(data.toString('utf-8'));
               }
             });
 
@@ -182,7 +183,7 @@ export function setupTerminalWebSocket(server) {
         // If authentication failed on custom user, attempt fallback to default ubuntu user
         if (!isFallback && targetUser !== 'ubuntu' && (err.level === 'client-authentication' || err.message?.toLowerCase().includes('auth'))) {
           console.log(`[SSH2 Fallback] Retrying with default account 'ubuntu' to self-heal guest session...`);
-          try { directSock.destroy(); sshConn.end(); } catch (e) {}
+          try { sshConn.end(); } catch (e) {}
           return connectSSH('ubuntu', 'root', true);
         }
 
@@ -192,7 +193,7 @@ export function setupTerminalWebSocket(server) {
           if (ws.readyState === ws.OPEN) {
             ws.send(`\r\n\x1b[33m[Console]\x1b[0m Waiting for guest operating system SSH service to become ready (attempt ${retryCount}/${maxRetries})...\r\n`);
           }
-          try { directSock.destroy(); sshConn.end(); } catch (e) {}
+          try { sshConn.end(); } catch (e) {}
           setTimeout(() => {
             if (ws.readyState === ws.OPEN) {
               connectSSH(user, pass, isFallback);
@@ -208,10 +209,12 @@ export function setupTerminalWebSocket(server) {
       });
 
       sshConn.connect({
-        sock: directSock,
+        host: targetIp,
+        port: 22,
         username: user,
         password: pass,
         readyTimeout: 15000,
+        keepaliveInterval: 10000,
       });
     }
 

@@ -45,13 +45,22 @@ td {
   transition-duration: 380ms;
 }
 
-/* Exempt high-frequency real-time animations from global transition to prevent jitter */
+/* Exempt high-frequency real-time animations, range inputs, and terminal canvas from global transition */
 .animate-spin,
 .animate-pulse,
 .animate-ping,
 .transition-none,
-input[type="range"] {
+input[type="range"],
+.xterm,
+.xterm *,
+.xterm-viewport,
+.xterm-screen,
+.xterm-rows,
+.xterm-cursor,
+.xterm-helper-textarea {
+  transition: none !important;
   transition-property: none !important;
+  transition-duration: 0s !important;
 }
 
 body {

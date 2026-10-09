@@ -78,7 +78,6 @@ export default function WebConsoleModal({
       const wsUrl = `${protocol}//${host}/api/ws/terminal?ticket=${encodeURIComponent(session.ticket)}&vmId=${vmId}`;
 
       const ws = new WebSocket(wsUrl);
-      ws.binaryType = 'arraybuffer';
       socketRef.current = ws;
 
       ws.onopen = () => {
@@ -100,15 +99,11 @@ export default function WebConsoleModal({
               ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
             }
           } catch {}
-        }, 120);
+        }, 80);
       };
 
       ws.onmessage = (event) => {
-        if (event.data instanceof ArrayBuffer) {
-          term.write(new Uint8Array(event.data));
-        } else {
-          term.write(event.data);
-        }
+        term.write(event.data);
       };
 
       ws.onerror = (err) => {
@@ -146,6 +141,7 @@ export default function WebConsoleModal({
       cursorStyle: 'block',
       fontSize: 13,
       lineHeight: 1.25,
+      scrollback: 2000,
       fontFamily: '"Fira Code", Menlo, Monaco, "Courier New", monospace',
       theme: {
         background: '#090d16',
@@ -251,26 +247,34 @@ export default function WebConsoleModal({
     currentContainer.addEventListener('mousedown', handlePointerFocus);
     currentContainer.addEventListener('pointerdown', handlePointerFocus);
 
+    let lastCols = 0;
+    let lastRows = 0;
+    const sendResize = () => {
+      try {
+        fitAddon.fit();
+        if (term.cols && term.rows && (term.cols !== lastCols || term.rows !== lastRows)) {
+          lastCols = term.cols;
+          lastRows = term.rows;
+          if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+          }
+        }
+      } catch {}
+    };
+
     // ResizeObserver watches modal container animations and window changes continuously
     const resizeObserver = new ResizeObserver((entries) => {
       if (!entries || entries.length === 0) return;
       const entry = entries[0];
       if (entry.contentRect.width > 50 && entry.contentRect.height > 50) {
-        try {
-          fitAddon.fit();
-          if (term.cols && term.rows && socketRef.current?.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-          }
-        } catch {}
+        sendResize();
       }
     });
     resizeObserver.observe(currentContainer);
 
     const handleWindowResize = () => {
+      sendResize();
       triggerFitAndFocus();
-      if (term.cols && term.rows && socketRef.current?.readyState === WebSocket.OPEN) {
-        socketRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-      }
     };
     window.addEventListener('resize', handleWindowResize);
 
