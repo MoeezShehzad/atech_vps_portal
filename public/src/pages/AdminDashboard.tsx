@@ -34,8 +34,6 @@ import {
   Clock,
   ChevronRight,
   ChevronLeft,
-  PanelLeftClose,
-  PanelLeftOpen,
   LayoutDashboard,
   Menu,
   Filter,
@@ -517,13 +515,23 @@ export default function AdminDashboard() {
 
       {/* COLLAPSIBLE & EXPANDABLE ADMIN SIDEBAR */}
       <aside
-        className={`fixed md:sticky top-0 h-screen z-50 flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out shrink-0 select-none ${
+        className={`relative fixed md:sticky top-0 h-screen z-50 flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out shrink-0 select-none ${
           sidebarCollapsed ? 'w-20' : 'w-64'
         } ${
           mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        {/* Top: Branding & Collapse Toggle */}
+        {/* Single Middle Collapse/Expand Toggle on Sidebar Rail (NOT in options) */}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Compress sidebar'}
+          className="hidden md:flex absolute top-1/2 -right-3.5 -translate-y-1/2 z-40 w-7 h-7 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full shadow-md items-center justify-center text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-600 transition-all cursor-pointer"
+        >
+          {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+
+        {/* Top: Branding */}
         <div className="border-b border-slate-100 dark:border-slate-800 p-4">
           <div className="flex items-center justify-between">
             <div className={`flex items-center gap-3 overflow-hidden ${sidebarCollapsed ? 'mx-auto' : ''}`}>
@@ -541,33 +549,7 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
-
-            {/* Collapse/Expand Toggle on Desktop */}
-            {!sidebarCollapsed && (
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                title="Compress sidebar"
-                className="hidden md:flex p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            )}
           </div>
-
-          {/* Expand Button When Collapsed */}
-          {sidebarCollapsed && (
-            <div className="hidden md:flex justify-center mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                title="Expand sidebar"
-                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Navigation Items */}
@@ -668,16 +650,6 @@ export default function AdminDashboard() {
               className="md:hidden p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl border border-slate-200 dark:border-slate-800"
             >
               <Menu className="w-4 h-4" />
-            </button>
-
-            {/* Quick Compress/Expand on Desktop Topbar */}
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              title={sidebarCollapsed ? 'Expand sidebar' : 'Compress sidebar'}
-              className="hidden md:flex p-2 text-slate-500 hover:text-slate-900 dark:hover:text-white rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
             </button>
 
             <div className="min-w-0">

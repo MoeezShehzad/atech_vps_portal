@@ -1,4 +1,17 @@
-import { Server, HardDrive, Cpu, Shield, Settings, LogOut, LayoutDashboard, CreditCard, LifeBuoy } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  Server, 
+  HardDrive, 
+  Cpu, 
+  Shield, 
+  Settings, 
+  LogOut, 
+  LayoutDashboard, 
+  CreditCard, 
+  LifeBuoy,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
@@ -11,6 +24,24 @@ interface SidebarProps {
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('atech_customer_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('atech_customer_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const handleLogout = () => {
     logout();
@@ -29,23 +60,39 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   ];
 
   return (
-    <aside className="w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between h-screen sticky top-0 shrink-0">
+    <aside
+      className={`relative bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between h-screen sticky top-0 shrink-0 select-none transition-all duration-300 ease-in-out ${
+        collapsed ? 'w-20' : 'w-64'
+      }`}
+    >
+      {/* Single Middle Collapse/Expand Toggle on Sidebar Rail (NOT in options) */}
+      <button
+        type="button"
+        onClick={toggleSidebar}
+        title={collapsed ? 'Expand sidebar' : 'Compress sidebar'}
+        className="hidden md:flex absolute top-1/2 -right-3.5 -translate-y-1/2 z-40 w-7 h-7 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full shadow-md items-center justify-center text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-600 transition-all cursor-pointer"
+      >
+        {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
+
       <div>
         {/* Brand Header */}
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center space-x-3">
-          <div className="bg-blue-600 p-2.5 rounded-xl text-white shadow-sm shadow-blue-500/20">
+        <div className={`border-b border-slate-100 dark:border-slate-800 flex items-center ${collapsed ? 'p-4 justify-center' : 'p-6 space-x-3'}`}>
+          <div className="bg-blue-600 p-2.5 rounded-xl text-white shadow-sm shadow-blue-500/20 shrink-0">
             <Server className="h-6 w-6" />
           </div>
-          <div>
-            <h1 className="font-bold text-lg text-slate-900 dark:text-white leading-tight font-poppins">
-              ATEC VPS
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Portal Console</p>
-          </div>
+          {!collapsed && (
+            <div className="overflow-hidden">
+              <h1 className="font-bold text-lg text-slate-900 dark:text-white leading-tight font-poppins truncate">
+                ATEC VPS
+              </h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">Portal Console</p>
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1.5">
+        <nav className="p-3 space-y-1.5 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -54,14 +101,19 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                title={collapsed ? item.label : undefined}
+                className={`w-full flex items-center rounded-xl text-sm font-semibold transition-all group ${
+                  collapsed
+                    ? 'justify-center p-3'
+                    : 'space-x-3 px-4 py-3'
+                } ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/60'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/60 font-bold'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
-                <Icon className={`h-5 w-5 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
+                <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'}`} />
+                {!collapsed && <span className="truncate">{item.label}</span>}
               </button>
             );
           })}
@@ -71,30 +123,38 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <button
               type="button"
               onClick={() => navigate('/admin')}
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 transition-all mt-3"
+              title={collapsed ? 'Admin Console' : undefined}
+              className={`w-full flex items-center rounded-xl text-sm font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 transition-all mt-3 ${
+                collapsed ? 'justify-center p-3' : 'space-x-3 px-4 py-3'
+              }`}
             >
-              <Shield className="h-5 w-5 text-rose-600 dark:text-rose-400" />
-              <span>Admin Console</span>
+              <Shield className="h-5 w-5 shrink-0 text-rose-600 dark:text-rose-400" />
+              {!collapsed && <span>Admin Console</span>}
             </button>
           )}
         </nav>
       </div>
 
       {/* Footer Controls: Theme Toggle & Logout */}
-      <div className="p-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+      <div className={`border-t border-slate-100 dark:border-slate-800 space-y-2 ${collapsed ? 'p-3' : 'p-4'}`}>
         {/* iOS-Style Theme Switcher in Sidebar */}
-        <div className="px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Appearance</span>
+        <div className={`rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/60 dark:border-slate-800/80 flex items-center ${
+          collapsed ? 'justify-center p-2' : 'px-4 py-2.5 justify-between'
+        }`}>
+          {!collapsed && <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Appearance</span>}
           <ThemeToggle />
         </div>
 
         {/* Logout Button */}
         <button
           onClick={handleLogout}
-          className="flex items-center space-x-3 w-full px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl transition-all"
+          title={collapsed ? 'Logout' : undefined}
+          className={`flex items-center w-full text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl transition-all group ${
+            collapsed ? 'justify-center p-3' : 'space-x-3 px-4 py-3'
+          }`}
         >
-          <LogOut className="h-5 w-5 text-slate-400 group-hover:text-rose-600" />
-          <span>Logout</span>
+          <LogOut className="h-5 w-5 shrink-0 text-slate-400 group-hover:text-rose-600" />
+          {!collapsed && <span>Logout</span>}
         </button>
       </div>
     </aside>

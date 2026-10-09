@@ -28,6 +28,8 @@ import {
   HelpCircle,
   User,
   Headphones,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
@@ -386,184 +388,74 @@ export default function SupportAndTickets() {
         </div>
       </div>
 
-      {/* Tickets List */}
+      {/* Tickets List or Active Ticket View */}
       {loading ? (
         <div className="py-20 flex justify-center">
           <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
         </div>
-      ) : filteredTickets.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center space-y-3">
-          <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto">
-            <HelpCircle className="w-6 h-6" />
-          </div>
-          <h3 className="font-bold text-slate-900 dark:text-white text-base">No support tickets found</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-            {tickets.length === 0
-              ? 'You have not submitted any technical requests yet. If you have questions about your server or configuration, open a ticket anytime.'
-              : 'No tickets matched your filter criteria.'}
-          </p>
-          {tickets.length === 0 && (
-            <button
-              onClick={() => setIsCreateOpen(true)}
-              className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" /> Open Your First Ticket
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredTickets.map((t) => {
-            const history = t.chatHistory && t.chatHistory.length > 0 ? t.chatHistory : [
-              { id: '1', sender: 'CUSTOMER' as const, senderName: 'You', message: t.message, timestamp: t.createdAt },
-              ...(t.response ? [{ id: '2', sender: 'SUPPORT' as const, senderName: t.assignedTo || 'Engineer', message: t.response, timestamp: t.updatedAt }] : []),
-            ];
-
-            return (
-              <div
-                key={t.id}
-                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4 hover:border-slate-300 dark:hover:border-slate-700 transition-all"
-              >
-                {/* Ticket Top Meta */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-xs font-bold text-slate-400">#{t.id}</span>
-                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">{t.subject}</h3>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getPriorityBadge(t.priority)}`}>
-                      {t.priority} PRIORITY
-                    </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusBadge(t.status)}`}>
-                      {t.status.replace('_', ' ')}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {new Date(t.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Chat Preview / Latest Messages */}
-                <div className="space-y-2.5 bg-slate-50 dark:bg-slate-950/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800/80 max-h-56 overflow-y-auto">
-                  {history.slice(-3).map((msg, idx) => {
-                    const isUser = msg.sender === 'CUSTOMER';
-                    return (
-                      <div
-                        key={msg.id || idx}
-                        className={`flex gap-3 text-xs ${isUser ? 'justify-end' : 'justify-start'}`}
-                      >
-                        {!isUser && (
-                          <div className="w-6 h-6 rounded-full bg-emerald-600/20 text-emerald-500 flex items-center justify-center shrink-0">
-                            <Headphones className="w-3.5 h-3.5" />
-                          </div>
-                        )}
-                        <div
-                          className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed ${
-                            isUser
-                              ? 'bg-blue-600 text-white rounded-tr-xs'
-                              : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-tl-xs'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-4 mb-0.5 text-[10px] opacity-75">
-                            <span className="font-bold">{isUser ? 'You' : msg.senderName || 'Support Engineer'}</span>
-                            <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                          <p className="whitespace-pre-wrap">{msg.message}</p>
-                        </div>
-                        {isUser && (
-                          <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-500 flex items-center justify-center shrink-0">
-                            <User className="w-3.5 h-3.5" />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Bottom Actions */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[11px] text-slate-500">
-                    {history.length} message{history.length === 1 ? '' : 's'} in discussion
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setActiveTicket(t)}
-                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition-all"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      <span>Open Live Chat ({history.length})</span>
-                    </button>
-
-                    {t.status !== 'CLOSED' && (
-                      <button
-                        onClick={() => handleCloseTicket(t.id)}
-                        disabled={closingId === t.id}
-                        className="px-3 py-1.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold inline-flex items-center gap-1 transition-all"
-                      >
-                        <Check className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>Close</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
+      ) : activeTicket ? (
+        /* DEDICATED ACTIVE TICKET CONVERSATION VIEW (Matching Admin section layout) */
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
+          {/* Header & Back Button */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
+                  Ticket #{activeTicket.id}
+                </span>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins">{activeTicket.subject}</h3>
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* MODAL: FULL MULTI-TURN CHAT DIALOG */}
-      {activeTicket && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col h-[650px] max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="p-4 bg-white dark:bg-slate-900 text-slate-900 dark:text-white flex items-center justify-between border-b border-slate-200 dark:border-slate-800 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-50 dark:bg-blue-600/20 border border-blue-200 dark:border-blue-500/40 rounded-xl text-blue-600 dark:text-blue-400">
-                  <LifeBuoy className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-blue-600 dark:text-blue-400 font-bold">#{activeTicket.id}</span>
-                    <h3 className="text-sm font-bold truncate max-w-sm font-poppins">{activeTicket.subject}</h3>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    <span>Priority: {activeTicket.priority}</span>
-                    <span>•</span>
-                    <span>Status: {activeTicket.status}</span>
-                    {activeTicket.assignedTo && (
-                      <>
-                        <span>•</span>
-                        <span>Engineer: {activeTicket.assignedTo}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {activeTicket.status !== 'CLOSED' && (
-                  <button
-                    onClick={() => handleCloseTicket(activeTicket.id)}
-                    className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-600/30 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Resolve</span>
-                  </button>
+              <p className="text-xs text-slate-500 mt-1">
+                Submitted on {new Date(activeTicket.createdAt).toLocaleString()}
+                {activeTicket.assignedTo && (
+                  <> • Assigned Engineer: <strong className="text-slate-700 dark:text-slate-300">{activeTicket.assignedTo}</strong></>
                 )}
-                <button
-                  onClick={() => setActiveTicket(null)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              </p>
             </div>
 
-            {/* Conversation Bubbles Scroll Area */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50 dark:bg-slate-950/50">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getPriorityBadge(activeTicket.priority)}`}>
+                {activeTicket.priority} PRIORITY
+              </span>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getStatusBadge(activeTicket.status)}`}>
+                {activeTicket.status.replace('_', ' ')}
+              </span>
+
+              {activeTicket.status !== 'CLOSED' && (
+                <button
+                  type="button"
+                  onClick={() => handleCloseTicket(activeTicket.id)}
+                  disabled={closingId === activeTicket.id}
+                  className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 hover:bg-emerald-100 dark:hover:bg-emerald-600/30 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{closingId === activeTicket.id ? 'Resolving...' : 'Resolve & Close'}</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setActiveTicket(null)}
+                className="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 inline-flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Back to All Tickets</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Conversation History Thread */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Customer Conversation History:
+              </label>
+              <span className="text-[11px] text-slate-400 font-mono">
+                {activeTicket.chatHistory?.length || (activeTicket.response ? 2 : 1)} message(s)
+              </span>
+            </div>
+
+            <div className="space-y-3 bg-slate-50 dark:bg-slate-950/50 p-4 md:p-6 rounded-2xl border border-slate-100 dark:border-slate-800/80 max-h-[460px] overflow-y-auto">
               {(() => {
                 const thread = activeTicket.chatHistory && activeTicket.chatHistory.length > 0
                   ? activeTicket.chatHistory
@@ -580,7 +472,7 @@ export default function SupportAndTickets() {
                       className={`flex gap-3 text-xs ${isUser ? 'justify-end' : 'justify-start'}`}
                     >
                       {!isUser && (
-                        <div className="w-7 h-7 rounded-full bg-emerald-600/20 text-emerald-500 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                        <div className="w-7 h-7 rounded-full bg-emerald-600/20 text-emerald-500 border border-emerald-500/30 flex items-center justify-center shrink-0 mt-0.5">
                           <Headphones className="w-4 h-4" />
                         </div>
                       )}
@@ -600,7 +492,7 @@ export default function SupportAndTickets() {
                       </div>
 
                       {isUser && (
-                        <div className="w-7 h-7 rounded-full bg-blue-600/20 text-blue-500 border border-blue-500/30 flex items-center justify-center shrink-0">
+                        <div className="w-7 h-7 rounded-full bg-blue-600/20 text-blue-500 border border-blue-500/30 flex items-center justify-center shrink-0 mt-0.5">
                           <User className="w-4 h-4" />
                         </div>
                       )}
@@ -610,29 +502,95 @@ export default function SupportAndTickets() {
               })()}
               <div ref={chatBottomRef} />
             </div>
+          </div>
 
-            {/* Follow-up Reply Input */}
-            <form
-              onSubmit={handleSendCustomerReply}
-              className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 shrink-0"
-            >
+          {/* Follow-up Reply Input */}
+          <form
+            onSubmit={handleSendCustomerReply}
+            className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3"
+          >
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+              {activeTicket.status === 'CLOSED' ? 'Ticket Closed (Sending a message will reopen it):' : 'Write a Follow-Up Reply:'}
+            </label>
+            <div className="flex items-center gap-3">
               <input
                 type="text"
-                placeholder={activeTicket.status === 'CLOSED' ? 'This ticket is closed. Re-opening on message...' : 'Write your reply or question...'}
+                placeholder={activeTicket.status === 'CLOSED' ? 'This ticket is closed. Type here to reopen and ask a follow-up...' : 'Write your follow-up reply or question...'}
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
               />
               <button
                 type="submit"
                 disabled={sendingReply || !replyText.trim()}
-                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition-all shrink-0"
+                className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm disabled:opacity-50 transition-all shrink-0 cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>{sendingReply ? 'Sending...' : 'Send'}</span>
+                <span>{sendingReply ? 'Sending...' : 'Send Reply'}</span>
               </button>
-            </form>
+            </div>
+          </form>
+        </div>
+      ) : filteredTickets.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-12 text-center space-y-3">
+          <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto">
+            <HelpCircle className="w-6 h-6" />
           </div>
+          <h3 className="font-bold text-slate-900 dark:text-white text-base">No support tickets found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            {tickets.length === 0
+              ? 'You have not submitted any technical requests yet. If you have questions about your server or configuration, open a ticket anytime.'
+              : 'No tickets matched your filter criteria.'}
+          </p>
+          {tickets.length === 0 && (
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Open Your First Ticket
+            </button>
+          )}
+        </div>
+      ) : (
+        /* CLEAN COMPACT TICKET LIST (Ticket 1, Ticket 2, Ticket 3... like Admin Section) */
+        <div className="space-y-3">
+          {filteredTickets.map((t) => {
+            const msgCount = t.chatHistory?.length || (t.response ? 2 : 1);
+            return (
+              <div
+                key={t.id}
+                onClick={() => {
+                  setActiveTicket(t);
+                  setReplyText('');
+                }}
+                className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all bg-white dark:bg-slate-900 shadow-xs group"
+              >
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-slate-400">#{t.id}</span>
+                    <span className="font-bold text-slate-900 dark:text-white text-xs group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      {t.subject}
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${getPriorityBadge(t.priority)}`}>
+                      {t.priority}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 line-clamp-1">{t.message}</p>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    Submitted on {new Date(t.createdAt).toLocaleDateString()} • {msgCount} message{msgCount === 1 ? '' : 's'}
+                    {t.assignedTo && ` • Engineer: ${t.assignedTo}`}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5 self-start sm:self-center shrink-0">
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${getStatusBadge(t.status)}`}>
+                    {t.status.replace('_', ' ')}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
