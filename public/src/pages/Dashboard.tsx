@@ -288,7 +288,7 @@ export default function Dashboard() {
   useEffect(() => {
     const timer = setInterval(() => {
       fetchVMs();
-    }, 8000);
+    }, 12000);
     return () => clearInterval(timer);
   }, []);
 
@@ -312,7 +312,7 @@ export default function Dashboard() {
     }
   }, [instances]);
 
-  // Real-time telemetry monitoring (polls every 3 seconds for active dashboard VM)
+  // Real-time telemetry monitoring (polls every 5 seconds for active dashboard VM)
   const fetchTelemetryMetrics = async (vmId: number) => {
     try {
       const data: VMMetrics = await apiCall(`/vms/${vmId}/metrics`);
@@ -348,10 +348,10 @@ export default function Dashboard() {
     setMetricsLoading(true);
     fetchTelemetryMetrics(activeTelemetryVmId).finally(() => setMetricsLoading(false));
 
-    // Telemetry polling interval (3.5 seconds)
+    // Telemetry polling interval (5 seconds)
     const metricsTimer = setInterval(() => {
       fetchTelemetryMetrics(activeTelemetryVmId);
-    }, 3500);
+    }, 5000);
 
     return () => clearInterval(metricsTimer);
   }, [activeTelemetryVmId]);

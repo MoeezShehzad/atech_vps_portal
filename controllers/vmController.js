@@ -61,15 +61,7 @@ export async function getUserVMs(req, res) {
         for (const vm of vms) {
           let liveInfo = hostVmMap.get(vm.vmName.toLowerCase());
 
-          // If not in the bulk list, perform a targeted check specifically for this VM
-          if (!liveInfo && vm.status !== 'PROVISIONING') {
-            try {
-              const specificCheck = await hypervService.getStatus(vm.vmName);
-              if (specificCheck && specificCheck.Found) {
-                liveInfo = specificCheck;
-              }
-            } catch {}
-          }
+          // If liveList was fetched, liveInfo already reflects whether VM exists on host
 
           // If not found in Hyper-V, mark as STOPPED rather than abruptly deleting user DB record
           if (!liveInfo && vm.status === 'RUNNING') {

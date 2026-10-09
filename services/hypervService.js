@@ -29,10 +29,10 @@ class HyperVService {
   async dispatchToHost(endpoint, method = 'POST', body = null) {
     let lastError = null;
 
-    // Fast timeout for quick operations, extended timeout for disk creation/rebuilding
+    // Generous timeouts: 3min for disk provisioning, 60s for power/destroy/resize, 25s for status
     const isLongOp = endpoint.includes('/create') || endpoint.includes('/rebuild');
-    const isMediumOp = endpoint.includes('/destroy');
-    const timeoutMs = isLongOp ? 180000 : (isMediumOp ? 30000 : 10000);
+    const isMediumOp = endpoint.includes('/destroy') || endpoint.includes('/power') || endpoint.includes('/resize');
+    const timeoutMs = isLongOp ? 180000 : (isMediumOp ? 60000 : 25000);
 
     // Try current active host first
     const candidates = [this.activeHost, ...HOST_CANDIDATES.filter((h) => h !== this.activeHost)];
@@ -72,7 +72,8 @@ class HyperVService {
     }
 
     console.error(`[HYPER-V HOST UNREACHABLE] Could not connect to Windows Host Agent on ${PRIMARY_HOST}`);
-    throw new Error(`Windows Hyper-V Host Agent is not responding. Please make sure hyperv_agent.js is running on Windows.`);
+    const details = lastError ? ` (${lastError.message})` : '';
+    throw new Error(`Windows Hyper-V Host Agent is not responding${details}. Please make sure hyperv_agent.js is running on Windows.`);
   }
 
   /**

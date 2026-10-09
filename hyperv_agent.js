@@ -198,6 +198,60 @@ function parseJsonBody(req) {
   });
 }
 
+let bulkStatusCache = { data: null, timestamp: 0 };
+let bulkStatusPromise = null;
+const metricsCache = new Map();
+
+function invalidateAgentCaches() {
+  bulkStatusCache = { data: null, timestamp: 0 };
+  bulkStatusPromise = null;
+  metricsCache.clear();
+}
+
+async function getCachedStatus(vmName) {
+  const now = Date.now();
+  if (vmName) {
+    if (bulkStatusCache.data && now - bulkStatusCache.timestamp < 3500) {
+      let list = Array.isArray(bulkStatusCache.data) ? bulkStatusCache.data : [bulkStatusCache.data];
+      const match = list.find((v) => v && v.VMName && v.VMName.toLowerCase() === vmName.toLowerCase());
+      if (match) return match;
+    }
+    return await runPowerShell('Get-VPS.ps1', { VMName: vmName });
+  }
+
+  // Bulk query (all VMs)
+  if (bulkStatusCache.data && now - bulkStatusCache.timestamp < 3500) {
+    return bulkStatusCache.data;
+  }
+
+  if (bulkStatusPromise) {
+    return await bulkStatusPromise;
+  }
+
+  bulkStatusPromise = (async () => {
+    try {
+      const result = await runPowerShell('Get-VPS.ps1', { VMName: '' });
+      bulkStatusCache = { data: result, timestamp: Date.now() };
+      return result;
+    } finally {
+      bulkStatusPromise = null;
+    }
+  })();
+
+  return await bulkStatusPromise;
+}
+
+async function getCachedMetrics(vmName) {
+  const now = Date.now();
+  const cached = metricsCache.get(vmName.toLowerCase());
+  if (cached && now - cached.timestamp < 3000) {
+    return cached.data;
+  }
+  const result = await runPowerShell('Get-Metrics.ps1', { VMName: vmName });
+  metricsCache.set(vmName.toLowerCase(), { data: result, timestamp: Date.now() });
+  return result;
+}
+
 const server = http.createServer(async (req, res) => {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -271,10 +325,12 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'vmName and action are required' }));
       }
 
+      invalidateAgentCaches();
       const result = await runPowerShell('Power-VPS.ps1', {
         VMName: vmName,
         Action: action.toUpperCase(),
       });
+      invalidateAgentCaches();
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(result));
@@ -289,12 +345,14 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'vmName is required' }));
       }
 
+      invalidateAgentCaches();
       const result = await runPowerShell('Resize-VPS.ps1', {
         VMName: vmName,
         RAMMB: ramMb || 0,
         CPUCount: cpuCount || 0,
         DiskGB: diskGb || 0,
       });
+      invalidateAgentCaches();
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(result));
@@ -309,9 +367,11 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'vmName is required' }));
       }
 
+      invalidateAgentCaches();
       const result = await runPowerShell('Destroy-VPS.ps1', {
         VMName: vmName,
       });
+      invalidateAgentCaches();
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(result));
@@ -320,7 +380,7 @@ const server = http.createServer(async (req, res) => {
     // 6. Live Status
     if (req.method === 'GET' && pathname === '/api/hyperv/status') {
       const vmName = url.searchParams.get('vmName') || '';
-      const result = await runPowerShell('Get-VPS.ps1', { VMName: vmName });
+      const result = await getCachedStatus(vmName);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(result));
     }
@@ -332,7 +392,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ error: 'vmName query param is required' }));
       }
-      const result = await runPowerShell('Get-Metrics.ps1', { VMName: vmName });
+      const result = await getCachedMetrics(vmName);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(result));
     }
