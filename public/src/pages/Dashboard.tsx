@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Server, 
   Cpu, 
@@ -138,6 +138,15 @@ export default function Dashboard() {
   
   // Navigation active tab state
   const [activeTab, setActiveTab] = useState('dashboard');
+  const mainContentRef = useRef<HTMLElement>(null);
+
+  // Reset scroll to top immediately when user changes tabs from the sidebar
+  useEffect(() => {
+    if (mainContentRef.current) {
+      mainContentRef.current.scrollTop = 0;
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [activeTab]);
 
   // Real-time server state from API
   const [instances, setInstances] = useState<Instance[]>([]);
@@ -794,7 +803,7 @@ export default function Dashboard() {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {/* DYNAMIC CONTENT CONTAINER */}
-      <main className="flex-1 p-6 md:p-10 overflow-y-auto">
+      <main ref={mainContentRef} className="flex-1 p-6 md:p-10 overflow-y-auto">
         
         {/* GHOST MODE IMPERSONATION BANNER */}
         {user?.isImpersonated && (

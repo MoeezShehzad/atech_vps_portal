@@ -502,12 +502,7 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, [activeTab, selectedTicket?.id]);
 
-  // Auto-scroll admin chat to bottom when messages update
-  useEffect(() => {
-    if (selectedTicket) {
-      adminChatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [selectedTicket?.id, selectedTicket?.chatHistory?.length]);
+
 
   const handleReplyTicket = async () => {
     const msgToSend = replyText.trim();
@@ -546,6 +541,7 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     if (activeTab === 'users') fetchUsers();
     if (activeTab === 'fleet') fetchFleet();
     if (activeTab === 'plans') fetchPlansAndCoupons();

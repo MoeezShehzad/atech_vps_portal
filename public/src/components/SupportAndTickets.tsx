@@ -140,11 +140,7 @@ export default function SupportAndTickets() {
     fetchUserVms();
   }, []);
 
-  useEffect(() => {
-    if (activeTicket) {
-      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [activeTicket, activeTicket?.chatHistory]);
+
 
   // Polling for active ticket thread updates in real-time every 4s
   useEffect(() => {
