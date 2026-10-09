@@ -6,36 +6,47 @@
 
 import prisma from '../lib/prisma.js';
 
-// Prioritize local loopback agent, then HYPERV_HOST_URL, then gateway fallback
+// Host agent candidates (prioritize direct host gateway)
+const PRIMARY_HOST = process.env.HYPERV_HOST_URL || process.env.HYPERV_AGENT_URL || 'http://172.19.112.1:5050';
 const HOST_CANDIDATES = [
-  process.env.HYPERV_HOST_URL,
-  process.env.HYPERV_AGENT_URL,
+  PRIMARY_HOST,
+  'http://172.19.112.1:5050',
   'http://127.0.0.1:5050',
   'http://localhost:5050',
-  'http://192.168.0.1:5050',
-  'http://192.168.100.92:5050',
-].filter(Boolean);
+].filter((v, i, a) => v && a.indexOf(v) === i);
 
 const DEFAULT_TEMPLATE = 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx';
 
 class HyperVService {
+  constructor() {
+    this.activeHost = PRIMARY_HOST;
+  }
+
   /**
    * Helper to dispatch commands to the Windows Host Hyper-V Agent via HTTP.
-   * Tries candidate IPs and returns real Hyper-V execution result.
+   * Uses cached active host for fast execution and dynamic timeouts.
    */
   async dispatchToHost(endpoint, method = 'POST', body = null) {
     let lastError = null;
 
-    for (const baseUrl of HOST_CANDIDATES) {
+    // Fast timeout for quick operations, extended timeout for disk creation/rebuilding
+    const isLongOp = endpoint.includes('/create') || endpoint.includes('/rebuild');
+    const isMediumOp = endpoint.includes('/destroy');
+    const timeoutMs = isLongOp ? 180000 : (isMediumOp ? 30000 : 10000);
+
+    // Try current active host first
+    const candidates = [this.activeHost, ...HOST_CANDIDATES.filter((h) => h !== this.activeHost)];
+
+    for (const baseUrl of candidates) {
       const url = `${baseUrl}${endpoint}`;
       try {
-        console.log(`[HYPER-V DISPATCH] -> ${method} ${url}`, body || '');
+        console.log(`[HYPER-V DISPATCH] -> ${method} ${url}`);
 
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
           body: body ? JSON.stringify(body) : undefined,
-          signal: AbortSignal.timeout(180000), // 3 min timeout for VM provisioning
+          signal: AbortSignal.timeout(timeoutMs),
         });
 
         const data = await response.json().catch(() => ({}));
@@ -43,26 +54,25 @@ class HyperVService {
         if (!response.ok) {
           const errMsg = data.error || data.stderr || `Host Agent returned HTTP ${response.status}`;
           if (errMsg.includes('permission') || errMsg.includes('authorization policy') || errMsg.includes('Access is denied')) {
-            throw new Error(`Hyper-V Permission Denied on Windows: The Host Agent must be running as Administrator. Please right-click start_hyperv_agent.bat on Windows and choose 'Run as administrator'.`);
+            throw new Error(`Hyper-V Permission Denied on Windows: Host Agent requires Administrator privileges.`);
           }
           throw new Error(errMsg);
         }
 
-        console.log(`[HYPER-V HOST SUCCESS] Response from ${baseUrl}:`, data);
+        // Cache working host
+        this.activeHost = baseUrl;
         return data;
       } catch (err) {
         lastError = err;
-        console.warn(`[HYPER-V DISPATCH FAILED on ${baseUrl}]:`, err.message);
-        // If it's a permission denied error, stop trying other IPs - it's a Windows privilege issue
+        console.warn(`[HYPER-V DISPATCH NOTICE] ${baseUrl}${endpoint}: ${err.message}`);
         if (err.message.includes('Hyper-V Permission Denied')) {
           throw err;
         }
       }
     }
 
-    // If all hosts were unreachable
-    console.error(`[HYPER-V HOST UNREACHABLE] Could not connect to Windows Host Agent on any candidate URL.`);
-    throw new Error(`Windows Hyper-V Host Agent is not reachable at 172.25.80.1:5050 or 192.168.100.92:5050. Please double-click start_hyperv_agent.bat on Windows to start it.`);
+    console.error(`[HYPER-V HOST UNREACHABLE] Could not connect to Windows Host Agent on ${PRIMARY_HOST}`);
+    throw new Error(`Windows Hyper-V Host Agent is not responding. Please make sure hyperv_agent.js is running on Windows.`);
   }
 
   /**

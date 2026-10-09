@@ -71,18 +71,13 @@ export async function getUserVMs(req, res) {
             } catch {}
           }
 
-          // Only purge if confirmed non-existent by specific check
-          if (!liveInfo && vm.status !== 'PROVISIONING') {
-            console.log(`[RECONCILE] VM '${vm.vmName}' confirmed NOT in Hyper-V. Purging orphaned DB record and freeing IP.`);
-            await prisma.iPPool.updateMany({
-              where: { assignedVmId: vm.vmId },
-              data: { status: 'AVAILABLE', assignedVmId: null },
+          // If not found in Hyper-V, mark as STOPPED rather than abruptly deleting user DB record
+          if (!liveInfo && vm.status === 'RUNNING') {
+            await prisma.virtualMachine.update({
+              where: { vmId: vm.vmId },
+              data: { status: 'STOPPED' },
             }).catch(() => {});
-            await prisma.provisioningJob.deleteMany({ where: { vmId: vm.vmId } }).catch(() => {});
-            await prisma.backup.deleteMany({ where: { vmId: vm.vmId } }).catch(() => {});
-            await prisma.activityLog.updateMany({ where: { vmId: vm.vmId }, data: { vmId: null } }).catch(() => {});
-            await prisma.virtualMachine.delete({ where: { vmId: vm.vmId } }).catch(() => {});
-            continue;
+            vm.status = 'STOPPED';
           }
 
           // If state changed in Hyper-V (e.g. stopped/started outside portal)
@@ -657,26 +652,7 @@ export async function destroyVM(req, res) {
 
     const force = req.query.force === 'true' || req.body?.force === true;
 
-    // Check if VM is physically active in Hyper-V
-    let isPhysicallyRunning = false;
-    try {
-      const hvStatus = await hypervService.getStatus(vm.vmName);
-      if (hvStatus && hvStatus.Found && hvStatus.State && hvStatus.State.toUpperCase() === 'RUNNING') {
-        isPhysicallyRunning = true;
-      }
-    } catch (e) {
-      isPhysicallyRunning = vm.status === 'RUNNING';
-    }
-
-    // Enterprise safety guard: Active running VMs must be stopped or forcefully confirmed
-    if (isPhysicallyRunning && !force) {
-      return res.status(400).json({
-        error: `Virtual machine '${vm.vmName}' is currently running. For safety and data integrity, please power off the server first, or select 'Force Stop & Destroy'.`,
-        requiresStop: true,
-      });
-    }
-
-    // 1. Call Hyper-V destroy service (gracefully handles if already deleted on host)
+    // 1. Call Hyper-V destroy service (gracefully powers off and removes VM & storage)
     try {
       await hypervService.destroyVM(vm.vmName);
     } catch (hvErr) {

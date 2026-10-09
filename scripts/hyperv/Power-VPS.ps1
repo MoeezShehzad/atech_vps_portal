@@ -36,20 +36,20 @@ try {
             }
         }
         "RESTART" {
-            if ($VM.State -ne "Off") {
-                Stop-VM -Name $VMName -TurnOff -Force -Confirm:$false
-                Start-Sleep -Seconds 2
+            if ($VM.State -eq "Running") {
+                Restart-VM -Name $VMName -Force -Confirm:$false
+            } else {
+                Start-VM -Name $VMName -Confirm:$false
             }
-            Start-VM -Name $VMName -Confirm:$false
         }
     }
 
-    $Current = Get-VM -Name $VMName
+    $StateStr = if ($Action -eq "START" -or $Action -eq "RESTART") { "Running" } else { "Off" }
     $ResultObj = @{
         Status = "SUCCESS"
         Action = $Action
         VMName = $VMName
-        State = $Current.State.ToString()
+        State  = $StateStr
     }
 
     Write-Output ($ResultObj | ConvertTo-Json -Compress)

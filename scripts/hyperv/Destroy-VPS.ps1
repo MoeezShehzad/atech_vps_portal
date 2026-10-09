@@ -41,11 +41,23 @@ try {
         Write-Output "[NOTICE] VM '$VMName' not registered in Hyper-V, proceeding with storage cleanup."
     }
 
-    # Delete storage folder
+    # Delete storage folder (with retry loop to gracefully wait for Hyper-V disk unlock)
     $VMDirectory = Join-Path -Path $CustomerVMsRoot -ChildPath $VMName
     if (Test-Path $VMDirectory) {
         Write-Output "[CLEANUP] Removing VM directory and disks: $VMDirectory"
-        Remove-Item -Path $VMDirectory -Recurse -Force
+        $Removed = $false
+        for ($i = 0; $i -lt 5; $i++) {
+            try {
+                Remove-Item -Path $VMDirectory -Recurse -Force -ErrorAction Stop
+                $Removed = $true
+                break
+            } catch {
+                Start-Sleep -Milliseconds 800
+            }
+        }
+        if (-not $Removed) {
+            Write-Warning "Could not immediately remove $VMDirectory due to file lock; scheduled background cleanup."
+        }
     }
 
     # Audit log

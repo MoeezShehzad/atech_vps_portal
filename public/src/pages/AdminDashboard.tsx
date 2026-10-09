@@ -447,19 +447,25 @@ export default function AdminDashboard() {
   };
 
   const handleReplyTicket = async () => {
-    if (!selectedTicket || !replyText) return;
+    const msgToSend = replyText.trim();
+    if (!selectedTicket || !msgToSend) return;
+    setReplyText(''); // Immediately clear input on dispatch
     try {
       const res = await apiCall(`/admin/tickets/${selectedTicket.id}/reply`, {
         method: 'POST',
-        body: JSON.stringify({ response: replyText, status: replyStatus }),
+        body: JSON.stringify({ response: msgToSend, status: replyStatus }),
       });
-      if (res?.success) {
+      if (res && (res.success || res.ticket)) {
         toast.success(`Response dispatched to customer (Status: ${replyStatus}).`);
-        setSelectedTicket(null);
-        setReplyText('');
+        const updatedTicket = res.ticket || res;
+        setSelectedTicket(updatedTicket);
+        setTickets((prev) =>
+          prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
+        );
         fetchTickets();
       }
     } catch (err: any) {
+      setReplyText(msgToSend); // Restore on error
       toast.error(err.message || 'Failed to update ticket');
     }
   };
@@ -1535,7 +1541,7 @@ export default function AdminDashboard() {
                       key={t.id}
                       onClick={() => {
                         setSelectedTicket(t);
-                        setReplyText(t.response || '');
+                        setReplyText('');
                         setReplyStatus(t.status === 'OPEN' ? 'RESOLVED' : t.status);
                       }}
                       className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all"

@@ -181,27 +181,29 @@ export default function SupportAndTickets() {
 
   const handleSendCustomerReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeTicket || !replyText.trim()) return;
+    const msgToSend = replyText.trim();
+    if (!activeTicket || !msgToSend) return;
 
     setSendingReply(true);
+    setReplyText(''); // Clear input immediately for responsive chat UX
+
     try {
       const res = await apiCall(`/tickets/${activeTicket.id}/message`, {
         method: 'POST',
-        body: JSON.stringify({ message: replyText.trim() }),
+        body: JSON.stringify({ message: msgToSend }),
       });
 
-      if (res && res.success) {
-        setReplyText('');
-        if (res.ticket) {
-          setActiveTicket(res.ticket);
-          setTickets((prev) =>
-            prev.map((t) => (t.id === res.ticket.id ? res.ticket : t))
-          );
-        } else {
-          fetchTickets();
-        }
+      if (res && (res.success || res.ticket)) {
+        const updatedTicket = res.ticket || res;
+        setActiveTicket(updatedTicket);
+        setTickets((prev) =>
+          prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
+        );
+      } else {
+        fetchTickets();
       }
     } catch (err: any) {
+      setReplyText(msgToSend); // Restore if error
       toast.error(err.message || 'Failed to send message');
     } finally {
       setSendingReply(false);
@@ -683,10 +685,10 @@ export default function SupportAndTickets() {
                     onChange={(e) => setNewPriority(e.target.value as any)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
                   >
-                    <option value="LOW">Low (General Inquiries)</option>
-                    <option value="NORMAL">Normal (Configuration)</option>
-                    <option value="HIGH">High (Performance Degraded)</option>
-                    <option value="URGENT">Urgent (VM Offline / Outage)</option>
+                    <option value="LOW" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Low (General Inquiries)</option>
+                    <option value="NORMAL" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Normal (Configuration)</option>
+                    <option value="HIGH" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">High (Performance Degraded)</option>
+                    <option value="URGENT" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Urgent (VM Offline / Outage)</option>
                   </select>
                 </div>
 
@@ -699,9 +701,9 @@ export default function SupportAndTickets() {
                     onChange={(e) => setSelectedVmId(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
                   >
-                    <option value="">General Account / Platform</option>
+                    <option value="" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">General Account / Platform</option>
                     {userVms.map((v) => (
-                      <option key={v.vmId} value={v.vmId}>
+                      <option key={v.vmId} value={v.vmId} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
                         {v.name} ({v.ip})
                       </option>
                     ))}

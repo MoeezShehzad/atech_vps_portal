@@ -60,6 +60,25 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Explicit Select Option Contrast across all browsers & OS themes */
+select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.dark select option,
+[data-theme="dark"] select option,
+html.dark select option {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+/* Text Selection Contrast */
+::selection {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
 /* Modern off-screen rendering optimization */
 .defer-render {
   content-visibility: auto;
