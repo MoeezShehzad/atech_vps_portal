@@ -263,6 +263,32 @@ export async function deployVM(req, res) {
 
     // Clean VM slug
     const cleanVmName = vmName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '');
+    if (!cleanVmName) {
+      return res.status(400).json({ error: 'Please enter a valid hostname using letters, numbers, or hyphens.' });
+    }
+
+    // Guard against duplicate hostname in database
+    const existingDbVm = await prisma.virtualMachine.findFirst({
+      where: {
+        vmName: cleanVmName,
+        status: { not: 'TERMINATED' },
+      },
+    });
+    if (existingDbVm) {
+      return res.status(400).json({
+        error: `A virtual machine with hostname '${cleanVmName}' already exists. Please choose a different hostname.`,
+      });
+    }
+
+    // Guard against duplicate VM name on Hyper-V host
+    try {
+      const hvCheck = await hypervService.getStatus(cleanVmName);
+      if (hvCheck && (hvCheck.Found || hvCheck.VMId)) {
+        return res.status(400).json({
+          error: `A virtual machine named '${cleanVmName}' already exists on the hypervisor. Please choose a unique hostname.`,
+        });
+      }
+    } catch (e) {}
 
     // Fetch Plan & OS Image
     const plan = await prisma.vPSPlan.findFirst({
@@ -481,7 +507,21 @@ export async function powerAction(req, res) {
     }
 
     const normAction = action.toUpperCase();
-    await hypervService.executePowerAction(vm.vmName, normAction);
+    let powerResult;
+    try {
+      powerResult = await hypervService.executePowerAction(vm.vmName, normAction);
+    } catch (hvErr) {
+      console.warn(`[Hyper-V Power Notice] ${vm.vmName} ${normAction}:`, hvErr.message);
+      const msg = (hvErr.message || '').toLowerCase();
+      // If action is STOP/FORCE_STOP and machine is already off or stopped, treat as success
+      if ((normAction === 'STOP' || normAction === 'FORCE_STOP') && (msg.includes('off') || msg.includes('not running') || msg.includes('stopped'))) {
+        powerResult = { Status: 'SUCCESS', State: 'Off' };
+      } else if (normAction === 'START' && (msg.includes('already running') || msg.includes('running'))) {
+        powerResult = { Status: 'SUCCESS', State: 'Running' };
+      } else {
+        return res.status(500).json({ error: hvErr.message || 'Failed to execute power command on Hyper-V host.' });
+      }
+    }
 
     const newStatus = normAction === 'START' || normAction === 'RESTART' ? 'RUNNING' : 'STOPPED';
 
@@ -511,7 +551,7 @@ export async function powerAction(req, res) {
     });
   } catch (error) {
     console.error('[VM Controller] Power action error:', error);
-    return res.status(500).json({ error: 'Failed to execute power command.' });
+    return res.status(500).json({ error: error.message || 'Failed to execute power command.' });
   }
 }
 
@@ -844,6 +884,12 @@ export async function getConsoleSession(req, res) {
 
     if (!vm) {
       return res.status(404).json({ error: 'Virtual machine not found or unauthorized.' });
+    }
+
+    if (vm.status === 'STOPPED') {
+      return res.status(400).json({
+        error: `Server '${vm.vmName}' is currently powered off. Please start the server from your dashboard before accessing Web Console.`,
+      });
     }
 
     let targetIp = (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress !== 'DHCP Pending' && vm.ipPool[0].ipAddress !== 'DHCP Leasing...') 

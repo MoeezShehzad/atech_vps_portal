@@ -22,24 +22,29 @@ try {
     switch ($Action) {
         "START" {
             if ($VM.State -ne "Running") {
-                Start-VM -Name $VMName -Confirm:$false
+                Start-VM -Name $VMName -Confirm:$false -ErrorAction Stop
             }
         }
         "STOP" {
             if ($VM.State -ne "Off") {
-                Stop-VM -Name $VMName -TurnOff -Force -Confirm:$false
+                try {
+                    Stop-VM -Name $VMName -TurnOff -Force -Confirm:$false -ErrorAction Stop
+                } catch {
+                    Start-Sleep -Milliseconds 500
+                    Stop-VM -Name $VMName -TurnOff -Force -Confirm:$false -ErrorAction SilentlyContinue
+                }
             }
         }
         "FORCE_STOP" {
             if ($VM.State -ne "Off") {
-                Stop-VM -Name $VMName -TurnOff -Force -Confirm:$false
+                Stop-VM -Name $VMName -TurnOff -Force -Confirm:$false -ErrorAction SilentlyContinue
             }
         }
         "RESTART" {
             if ($VM.State -eq "Running") {
-                Restart-VM -Name $VMName -Force -Confirm:$false
+                Restart-VM -Name $VMName -Force -Confirm:$false -ErrorAction Stop
             } else {
-                Start-VM -Name $VMName -Confirm:$false
+                Start-VM -Name $VMName -Confirm:$false -ErrorAction Stop
             }
         }
     }

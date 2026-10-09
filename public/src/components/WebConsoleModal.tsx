@@ -122,7 +122,11 @@ export default function WebConsoleModal({
       console.error('[WebConsole] Error acquiring ticket:', err);
       if (!isMountedRef.current) return;
       setConnectionStatus('disconnected');
-      term.write(`\r\n\x1b[31m[Authentication Error] ${err.message || 'Unauthorized console access'}\x1b[0m\r\n`);
+      if (err.message?.toLowerCase().includes('powered off') || err.message?.toLowerCase().includes('stopped')) {
+        term.write(`\r\n\x1b[1;33m[Notice]\x1b[0m ${err.message}\r\n`);
+      } else {
+        term.write(`\r\n\x1b[31m[Console Error]\x1b[0m ${err.message || 'Unable to establish console session'}\x1b[0m\r\n`);
+      }
     }
   }, [vmId, vmIp]);
 

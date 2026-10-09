@@ -732,22 +732,15 @@ export default function Dashboard() {
   const activeSlot = activeSubscriptions.find((s) => s.hasAvailableSlot);
 
   const handleOpenDeployModal = () => {
-    if (activeSlot) {
-      setSelectedPlanId(activeSlot.planId);
-      setCustomCpu(activeSlot.specs?.cpuCores || 2);
-      setCustomRam(activeSlot.specs?.ramGb || 4);
-      setCustomStorage(activeSlot.specs?.storageGb || 50);
-      setNewHostname(`srv-${activeSlot.planName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(Math.random() * 899 + 100)}`);
-    } else {
-      const defaultPlan = catalogPlans[0];
-      if (defaultPlan) {
-        setSelectedPlanId(defaultPlan.planId);
-        setCustomCpu(defaultPlan.cpuCores);
-        setCustomRam(defaultPlan.ramGb);
-        setCustomStorage(defaultPlan.storageGb);
-        setNewHostname(`srv-vps-${Math.floor(Math.random() * 899 + 100)}`);
-      }
+    const targetPlan = (activeSlot ? catalogPlans.find((p) => p.planId === activeSlot.planId) : null) || catalogPlans[0];
+    if (targetPlan) {
+      setSelectedPlanId(targetPlan.planId);
+      setCustomCpu(targetPlan.cpuCores);
+      setCustomRam(targetPlan.ramGb);
+      setCustomStorage(targetPlan.storageGb);
     }
+    const randId = Math.floor(1000 + Math.random() * 9000);
+    setNewHostname(`srv-vps-${randId}`);
     let savedUser = '';
     try {
       savedUser = localStorage.getItem('atech_preferred_admin_user') || '';
@@ -981,14 +974,7 @@ export default function Dashboard() {
                   </div>
                   <div className="shrink-0">
                     <button
-                      onClick={() => {
-                        setSelectedPlanId(activeSlot.planId);
-                        setCustomCpu(activeSlot.specs?.cpuCores || 2);
-                        setCustomRam(activeSlot.specs?.ramGb || 4);
-                        setCustomStorage(activeSlot.specs?.storageGb || 50);
-                        setNewHostname(`srv-${activeSlot.planName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.floor(Math.random() * 899 + 100)}`);
-                        setIsDeployOpen(true);
-                      }}
+                      onClick={handleOpenDeployModal}
                       className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2"
                     >
                       <Zap className="w-4 h-4" /> Set Up VPS ($0.00)
@@ -1015,7 +1001,7 @@ export default function Dashboard() {
                     </p>
                     <div className="pt-2 flex flex-wrap gap-4">
                       <button
-                        onClick={() => setIsDeployOpen(true)}
+                        onClick={handleOpenDeployModal}
                         className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
                       >
                         <Zap className="w-4 h-4" /> Quick Deploy Server
@@ -1729,135 +1715,107 @@ export default function Dashboard() {
                 </select>
               </div>
 
-              {/* PLAN SELECTION OR ACTIVE PREPAID SLOT */}
-              {activeSlot ? (
-                <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white rounded-2xl p-4 border border-emerald-500/40 shadow-md space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" /> Active Prepaid Package
-                    </span>
-                    <span className="text-xs font-mono font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-400/30">
-                      $0.00 / Free Slot
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                      <span>{activeSlot.planName} Plan</span>
-                      <span className="text-xs font-normal text-slate-300 font-mono">({activeSlot.daysRemaining} days remaining)</span>
-                    </h4>
-                    <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
-                      You have an active subscription package. Your instance will be provisioned directly under your plan at zero extra charge ($0.00).
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-xs text-slate-200 bg-white/5 p-2.5 rounded-xl border border-white/10">
-                    <div className="text-center">
-                      <span className="block text-[10px] text-slate-400 font-sans">vCPU Cores</span>
-                      <strong className="text-white text-xs">{activeSlot.specs?.cpuCores} vCPU</strong>
-                    </div>
-                    <div className="text-center border-x border-white/10">
-                      <span className="block text-[10px] text-slate-400 font-sans">RAM</span>
-                      <strong className="text-white text-xs">{activeSlot.specs?.ramGb} GB</strong>
-                    </div>
-                    <div className="text-center">
-                      <span className="block text-[10px] text-slate-400 font-sans">NVMe Storage</span>
-                      <strong className="text-emerald-300 text-xs">{activeSlot.specs?.storageGb} GB NVMe</strong>
-                    </div>
-                  </div>
+              {/* PLAN SELECTION */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Base Plan Tier
+                </label>
+                <select
+                  value={selectedPlanId}
+                  onChange={(e) => handlePlanChange(Number(e.target.value))}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                >
+                  {catalogPlans.map((p) => (
+                    <option key={p.planId} value={p.planId}>
+                      {p.name} — {p.cpuCores} vCPU / {p.ramGb}GB RAM (${p.monthlyPrice}/mo)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    vCPU Cores
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="16"
+                    value={customCpu}
+                    onChange={(e) => setCustomCpu(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  />
                 </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Base Plan Tier
-                    </label>
-                    <select
-                      value={selectedPlanId}
-                      onChange={(e) => handlePlanChange(Number(e.target.value))}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                    >
-                      {catalogPlans.map((p) => (
-                        <option key={p.planId} value={p.planId}>
-                          {p.name} — {p.cpuCores} vCPU / {p.ramGb}GB RAM (${p.monthlyPrice}/mo)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    RAM (GB)
+                  </label>
+                  <input
+                    type="number"
+                    min="2"
+                    max="64"
+                    value={customRam}
+                    onChange={(e) => setCustomRam(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    NVMe Disk (GB)
+                  </label>
+                  <input
+                    type="number"
+                    min="20"
+                    max="500"
+                    step="10"
+                    value={customStorage}
+                    onChange={(e) => setCustomStorage(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        vCPU Cores
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="16"
-                        value={customCpu}
-                        onChange={(e) => setCustomCpu(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        RAM (GB)
-                      </label>
-                      <input
-                        type="number"
-                        min="2"
-                        max="64"
-                        value={customRam}
-                        onChange={(e) => setCustomRam(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        NVMe Disk (GB)
-                      </label>
-                      <input
-                        type="number"
-                        min="20"
-                        max="500"
-                        step="10"
-                        value={customStorage}
-                        onChange={(e) => setCustomStorage(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                      />
-                    </div>
-                  </div>
+              {(() => {
+                const plan = catalogPlans.find((p) => p.planId === selectedPlanId) || catalogPlans[0];
+                if (!plan) return null;
+                const extraCpu = Math.max(0, customCpu - plan.cpuCores);
+                const extraRam = Math.max(0, customRam - plan.ramGb);
+                const extraStorage = Math.max(0, customStorage - plan.storageGb);
+                const delta = extraCpu * 2.5 + extraRam * 1.5 + extraStorage * 0.10;
+                const total = Number(plan.monthlyPrice) + delta;
+                const isCoveredBySlot = Boolean(activeSlot && activeSlot.planId === plan.planId && delta === 0);
 
-                  {(() => {
-                    const plan = catalogPlans.find((p) => p.planId === selectedPlanId) || catalogPlans[0];
-                    if (!plan) return null;
-                    const extraCpu = Math.max(0, customCpu - plan.cpuCores);
-                    const extraRam = Math.max(0, customRam - plan.ramGb);
-                    const extraStorage = Math.max(0, customStorage - plan.storageGb);
-                    const delta = extraCpu * 2.5 + extraRam * 1.5 + extraStorage * 0.10;
-                    const total = Number(plan.monthlyPrice) + delta;
-
-                    return (
-                      <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5">
-                        <div className="flex items-center justify-between text-xs text-slate-500">
-                          <span>Base Plan ({plan.name})</span>
-                          <span className="font-semibold text-slate-700">${plan.monthlyPrice}/mo</span>
-                        </div>
-                        {delta > 0 && (
-                          <div className="flex items-center justify-between text-[11px] text-blue-600 font-medium">
-                            <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM{extraStorage > 0 ? `, +${extraStorage}GB NVMe` : ''})</span>
-                            <span>+${delta.toFixed(2)}/mo</span>
+                return (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Base Plan ({plan.name})</span>
+                      <span className="font-semibold text-slate-700">${plan.monthlyPrice}/mo</span>
+                    </div>
+                    {delta > 0 && (
+                      <div className="flex items-center justify-between text-[11px] text-blue-600 font-medium">
+                        <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM{extraStorage > 0 ? `, +${extraStorage}GB NVMe` : ''})</span>
+                        <span>+${delta.toFixed(2)}/mo</span>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700">Estimated Monthly Rate</span>
+                      <div className="text-right">
+                        {isCoveredBySlot ? (
+                          <div>
+                            <span className="text-sm font-extrabold text-emerald-600 font-poppins">$0.00 /mo</span>
+                            <span className="block text-[10px] text-emerald-600 font-medium">Covered by Active Prepaid Slot</span>
                           </div>
-                        )}
-                        <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-700">Live Estimated Rate</span>
+                        ) : (
                           <span className="text-sm font-extrabold text-blue-600 font-poppins">
                             ${total.toFixed(2)}/mo
                           </span>
-                        </div>
+                        )}
                       </div>
-                    );
-                  })()}
-                </>
-              )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* SERVER AUTHENTICATION (PASSWORD vs SSH PUBLIC KEY) */}
               <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-3">
@@ -2418,158 +2376,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* LIVE RESOURCE MONITORING & TELEMETRY */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${selectedInstance.status === 'running' ? 'bg-emerald-400' : 'bg-slate-300'}`}></span>
-                      <span className={`relative inline-flex rounded-full h-2 w-2 ${selectedInstance.status === 'running' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                    </span>
-                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                      <Activity className="w-3.5 h-3.5 text-blue-600" /> Live Resource Telemetry
-                    </h4>
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-400 flex items-center gap-1">
-                    {metricsLoading ? (
-                      <RefreshCw className="w-3 h-3 animate-spin text-blue-500" />
-                    ) : (
-                      <>⚡ Polling 3s</>
-                    )}
-                  </span>
-                </div>
-
-                {selectedInstance.status === 'running' ? (
-                  <div className="space-y-3">
-                    {/* CPU & RAM LIVE METRICS CARDS */}
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* CPU MONITOR CARD */}
-                      <div className="p-3.5 bg-gradient-to-br from-blue-50/60 to-slate-50 rounded-2xl border border-blue-100/80 shadow-xs">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] font-semibold text-slate-600 flex items-center gap-1.5">
-                            <Cpu className="w-3.5 h-3.5 text-blue-600" /> CPU Usage
-                          </span>
-                          <span className="text-xs font-mono font-bold text-blue-600">
-                            {liveMetrics ? `${Math.min(100, Math.max(0, liveMetrics.avgCpu !== undefined ? liveMetrics.avgCpu : liveMetrics.cpuUsage))}%` : `${Math.min(100, selectedInstance.cpuUsage)}%`}
-                          </span>
-                        </div>
-                        {/* Progress bar */}
-                        <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden mb-2.5">
-                          <div 
-                            className="bg-blue-600 h-1.5 rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.avgCpu ?? selectedInstance.cpuUsage))}%` }}
-                          />
-                        </div>
-                        {/* Real-time mini sparkline bar chart */}
-                        <div className="flex items-end gap-1 h-7 pt-1 px-1 bg-white/70 rounded-lg border border-blue-100/60">
-                          {cpuHistory.map((val, idx) => (
-                            <div 
-                              key={idx}
-                              title={`Sample ${idx + 1}: ${val}%`}
-                              className="flex-1 bg-blue-500/80 hover:bg-blue-600 rounded-xs transition-all duration-300"
-                              style={{ height: `${Math.max(12, Math.min(100, val))}%` }}
-                            />
-                          ))}
-                        </div>
-                        <div className="flex justify-between items-center text-[9px] text-slate-400 mt-1.5 font-mono">
-                          <span>{selectedInstance.vCPU} vCPUs</span>
-                          <span>Live trend</span>
-                        </div>
-                      </div>
-
-                      {/* RAM MONITOR CARD */}
-                      <div className="p-3.5 bg-gradient-to-br from-purple-50/60 to-slate-50 rounded-2xl border border-purple-100/80 shadow-xs">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] font-semibold text-slate-600 flex items-center gap-1.5">
-                            <MemoryStick className="w-3.5 h-3.5 text-purple-600" /> RAM Load
-                          </span>
-                          <span className="text-xs font-mono font-bold text-purple-600">
-                            {liveMetrics ? `${liveMetrics.ramPercent}%` : `${selectedInstance.ramUsage}`}
-                          </span>
-                        </div>
-                        {/* Progress bar */}
-                        <div className="w-full bg-slate-200/80 h-1.5 rounded-full overflow-hidden mb-2.5">
-                          <div 
-                            className="bg-purple-600 h-1.5 rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.ramPercent ?? 20))}%` }}
-                          />
-                        </div>
-                        {/* Real-time mini sparkline bar chart */}
-                        <div className="flex items-end gap-1 h-7 pt-1 px-1 bg-white/70 rounded-lg border border-purple-100/60">
-                          {ramHistory.map((val, idx) => (
-                            <div 
-                              key={idx}
-                              title={`Sample ${idx + 1}: ${val}%`}
-                              className="flex-1 bg-purple-500/80 hover:bg-purple-600 rounded-xs transition-all duration-300"
-                              style={{ height: `${Math.max(12, Math.min(100, val))}%` }}
-                            />
-                          ))}
-                        </div>
-                        <div className="flex justify-between items-center text-[9px] text-slate-400 mt-1.5 font-mono">
-                          <span>{liveMetrics?.ramUsedMb ? `${liveMetrics.ramUsedMb} MB` : 'Dynamic'}</span>
-                          <span>{liveMetrics?.ramTotalMb ? `${liveMetrics.ramTotalMb} MB` : `${selectedInstance.ramGB} GB`}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* DISK USAGE & IOPS METRICS */}
-                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <HardDrive className="w-4 h-4 text-amber-600" />
-                          <div>
-                            <p className="text-xs font-semibold text-slate-800">NVMe VHDX Allocation</p>
-                            <p className="text-[10px] text-slate-500 font-mono">
-                              {liveMetrics?.diskUsedGb !== undefined ? `${liveMetrics.diskUsedGb} GB physical / ${liveMetrics.diskTotalGb} GB total` : `${selectedInstance.diskGB} GB Provisioned`}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-xs font-bold font-mono text-slate-700">
-                          {liveMetrics ? `${liveMetrics.diskPercent}%` : '25%'}
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          className="bg-amber-500 h-1.5 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(100, Math.max(5, liveMetrics?.diskPercent ?? 25))}%` }}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-200/60">
-                        <span className="flex items-center gap-1 font-mono">
-                          <span>Read:</span> <strong className="text-slate-700">{liveMetrics?.diskReadMb || 0} MB</strong>
-                        </span>
-                        <span className="flex items-center gap-1 font-mono">
-                          <span>Write:</span> <strong className="text-slate-700">{liveMetrics?.diskWriteMb || 0} MB</strong>
-                        </span>
-                        <span className="flex items-center gap-1 text-emerald-600 font-semibold">
-                          <Check className="w-3 h-3" /> Healthy IO
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* UPTIME & HEALTH STATUS */}
-                    <div className="bg-slate-50 rounded-xl border border-slate-100 p-3 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Clock className="w-4 h-4 text-blue-600" />
-                        <div>
-                          <p className="font-semibold text-slate-800">Hyper-V Engine Uptime</p>
-                          <p className="text-[10px] font-mono text-slate-500">{liveMetrics?.uptime || 'Active'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>{liveMetrics?.status || 'Operating normally'}</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
-                    <Power className="w-5 h-5 text-slate-400 mx-auto mb-1.5" />
-                    <p className="text-xs font-semibold text-slate-700">Server is Powered Off</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Start instance to activate live Hyper-V performance telemetry and IO counters.</p>
-                  </div>
-                )}
-              </div>
 
             </div>
 
@@ -2644,6 +2450,10 @@ export default function Dashboard() {
             }}
             onOpenWebConsole={() => {
               const target = connectGuideVm;
+              if (target.status !== 'running') {
+                toast.info(`Server '${target.name}' is currently powered off. Please start the server to launch Web Console.`);
+                return;
+              }
               setConnectGuideVm(null);
               setConsoleVm(target);
             }}

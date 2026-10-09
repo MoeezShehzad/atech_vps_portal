@@ -62,6 +62,15 @@ export function setupTerminalWebSocket(server) {
       return ws.close();
     }
 
+    if (vm.status === 'STOPPED') {
+      ws.send(`\r\n\x1b[33m====================================================\x1b[0m\r\n`);
+      ws.send(`\x1b[1;33m  [NOTICE] SERVER IS CURRENTLY POWERED OFF\x1b[0m\r\n`);
+      ws.send(`  Virtual machine '${vm.vmName}' is not running.\r\n`);
+      ws.send(`  Please click the Power On button in your dashboard to activate the server.\r\n`);
+      ws.send(`\x1b[33m====================================================\x1b[0m\r\n\r\n`);
+      return ws.close();
+    }
+
     // Dynamic IP resolution
     let targetIp = decoded.ip;
     if (!targetIp || targetIp === 'DHCP Pending' || targetIp === 'DHCP Leasing...') {
@@ -84,6 +93,8 @@ export function setupTerminalWebSocket(server) {
     let shellStream = null;
     let ptyRows = 30;
     let ptyCols = 100;
+    let retryCount = 0;
+    const maxRetries = 3;
     const inputBuffer = [];
 
     function connectSSH(user, pass, isFallback = false) {
@@ -91,6 +102,7 @@ export function setupTerminalWebSocket(server) {
       activeConn = sshConn;
 
       sshConn.on('ready', () => {
+        retryCount = 0;
         if (isFallback) {
           ws.send(`\r\n\x1b[33m[Notice] Initialized via recovery channel. Preparing environment for ${targetUser}...\x1b[0m\r\n`);
         }
@@ -158,6 +170,21 @@ export function setupTerminalWebSocket(server) {
           console.log(`[SSH2 Fallback] Retrying with default account 'ubuntu' to self-heal guest session...`);
           try { sshConn.end(); } catch (e) {}
           return connectSSH('ubuntu', 'root', true);
+        }
+
+        const isNetworkErr = err.code === 'ECONNREFUSED' || err.code === 'EHOSTUNREACH' || err.code === 'ETIMEDOUT' || err.level === 'client-timeout';
+        if (isNetworkErr && retryCount < maxRetries) {
+          retryCount++;
+          if (ws.readyState === ws.OPEN) {
+            ws.send(`\r\n\x1b[33m[Console]\x1b[0m Waiting for guest operating system SSH service to become ready (attempt ${retryCount}/${maxRetries})...\r\n`);
+          }
+          try { sshConn.end(); } catch (e) {}
+          setTimeout(() => {
+            if (ws.readyState === ws.OPEN) {
+              connectSSH(user, pass, isFallback);
+            }
+          }, 3000);
+          return;
         }
 
         if (ws.readyState === ws.OPEN) {
