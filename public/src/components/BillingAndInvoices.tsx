@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
+import { jsPDF } from 'jspdf';
 
 interface Invoice {
   invoiceId: string;
@@ -87,7 +88,7 @@ export default function BillingAndInvoices() {
 
   const handleDownloadInvoice = async (invoiceNumber: string) => {
     try {
-      toast.info('Generating official invoice document...');
+      toast.info('Generating official PDF invoice...');
       let inv = selectedInvoice;
       if (!inv || inv.invoiceNumber !== invoiceNumber) {
         const res = await apiCall(`/billing/invoices/${invoiceNumber}`);
@@ -95,115 +96,165 @@ export default function BillingAndInvoices() {
       }
       if (!inv) throw new Error('Invoice data could not be retrieved.');
 
-      const invoiceHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Invoice ${inv.invoiceNumber} - ATECH Cloud</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 40px; color: #0f172a; background: #fff; }
-    .invoice-box { max-width: 800px; margin: auto; padding: 36px; border: 1px solid #e2e8f0; border-radius: 12px; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #f1f5f9; padding-bottom: 24px; }
-    .logo { font-size: 24px; font-weight: 800; color: #2563eb; letter-spacing: 0.5px; text-transform: uppercase; }
-    .badge { display: inline-block; padding: 4px 12px; background: #dcfce7; color: #166534; font-weight: 700; font-size: 12px; border-radius: 999px; }
-    .info-grid { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px; }
-    .card { background: #f8fafc; padding: 18px 20px; border-radius: 8px; flex: 1; border: 1px solid #f1f5f9; }
-    .card h4 { margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-    th { text-align: left; padding: 12px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; font-size: 12px; color: #64748b; text-transform: uppercase; }
-    td { padding: 14px 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
-    .total-row { display: flex; justify-content: flex-end; margin-top: 10px; }
-    .total-box { width: 300px; }
-    .total-line { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
-    .total-grand { font-size: 18px; font-weight: 800; border-top: 2px solid #0f172a; padding-top: 10px; margin-top: 6px; }
-    .footer { text-align: center; margin-top: 40px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 24px; }
-    .print-bar { margin-bottom: 24px; display: flex; justify-content: flex-end; gap: 10px; }
-    .print-btn { background: #2563eb; color: #fff; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; text-decoration: none; }
-    @media print { .print-bar { display: none; } .invoice-box { border: none; padding: 0; } }
-  </style>
-</head>
-<body>
-  <div class="invoice-box">
-    <div class="print-bar">
-      <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
-    </div>
-    <div class="header">
-      <div>
-        <div class="logo">ATECH CLOUD</div>
-        <p style="font-size: 13px; color: #64748b; margin: 6px 0 0 0; line-height: 1.5;">
-          ATECH VPS Portal & Infrastructure Services<br>
-          customer-support@atechconsult.com
-        </p>
-      </div>
-      <div style="text-align: right;">
-        <h2 style="margin: 0; font-size: 20px;">INVOICE</h2>
-        <div style="font-family: monospace; font-size: 15px; font-weight: 700; color: #2563eb; margin-top: 4px;">${inv.invoiceNumber}</div>
-        <div style="margin-top: 8px;"><span class="badge">PAID IN FULL</span></div>
-      </div>
-    </div>
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
 
-    <div class="info-grid">
-      <div class="card">
-        <h4>Billed To</h4>
-        <div style="font-weight: 700;">${inv.customer?.name || 'Customer'}</div>
-        <div style="color: #64748b; font-size: 13px;">${inv.customer?.email || ''}</div>
-        <div style="color: #64748b; font-size: 13px;">${inv.customer?.city || ''}, ${inv.customer?.country || ''}</div>
-      </div>
-      <div class="card">
-        <h4>Invoice Details</h4>
-        <div style="font-size: 13px;"><strong>Issue Date:</strong> ${new Date(inv.issueDate).toLocaleDateString()}</div>
-        <div style="font-size: 13px;"><strong>Paid Date:</strong> ${inv.paidDate ? new Date(inv.paidDate).toLocaleDateString() : new Date(inv.issueDate).toLocaleDateString()}</div>
-        <div style="font-size: 13px;"><strong>Payment Method:</strong> ${inv.transactionId ? 'Stripe Card (' + inv.transactionId + ')' : 'Direct Card'}</div>
-      </div>
-    </div>
+      // Palette
+      const primaryBlue = [37, 99, 235]; // #2563eb
+      const darkSlate = [15, 23, 42]; // #0f172a
+      const mutedSlate = [100, 116, 139]; // #64748b
+      const lightBg = [248, 250, 252]; // #f8fafc
 
-    <table>
-      <thead>
-        <tr>
-          <th>Description</th>
-          <th>Specs</th>
-          <th>Period</th>
-          <th style="text-align: right;">Amount</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${(inv.items || []).map((item: any) => `
-        <tr>
-          <td><strong>${item.description}</strong></td>
-          <td style="color: #64748b; font-size: 13px;">${item.specs || 'Dedicated Cloud Compute'}</td>
-          <td style="color: #64748b; font-size: 13px;">${item.period || 'Monthly Subscription'}</td>
-          <td style="text-align: right; font-weight: 700;">$${Number(item.amount).toFixed(2)} USD</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>
+      // Company Header - Full Name: Analytical Technical Consulting
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Analytical Technical Consulting', 20, 24);
 
-    <div class="total-row">
-      <div class="total-box">
-        <div class="total-line"><span>Subtotal:</span><span>$${Number(inv.subtotal).toFixed(2)} USD</span></div>
-        <div class="total-line"><span>Tax (0%):</span><span>$${Number(inv.tax || 0).toFixed(2)} USD</span></div>
-        <div class="total-line total-grand"><span>Total Paid:</span><span style="color: #2563eb;">$${Number(inv.total).toFixed(2)} USD</span></div>
-      </div>
-    </div>
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('Cloud Infrastructure & Enterprise Systems', 20, 30);
+      doc.text('Support & Inquiries: customer-support@atechconsult.com', 20, 35);
 
-    <div class="footer">
-      <p>Thank you for choosing ATECH Cloud Services • billing@atechconsult.com</p>
-    </div>
-  </div>
-</body>
-</html>`;
+      // Invoice Header on Right
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      doc.text('INVOICE', 190, 24, { align: 'right' });
 
-      const blob = new Blob([invoiceHtml], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Invoice-${inv.invoiceNumber}.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast.success(`Invoice ${inv.invoiceNumber} downloaded successfully!`);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text(inv.invoiceNumber, 190, 30, { align: 'right' });
+
+      // Paid Badge
+      doc.setFillColor(220, 252, 231);
+      doc.roundedRect(155, 34, 35, 6, 2, 2, 'F');
+      doc.setFontSize(8);
+      doc.setTextColor(22, 101, 52);
+      doc.text('PAID IN FULL', 172.5, 38.5, { align: 'center' });
+
+      // Divider
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(20, 44, 190, 44);
+
+      // Customer & Metrics Cards
+      // Left Card: Billed To
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.roundedRect(20, 50, 80, 26, 2, 2, 'F');
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('BILLED TO', 24, 56);
+      doc.setFontSize(9.5);
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      doc.text(inv.customer?.name || 'Customer', 24, 62);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text(inv.customer?.email || '', 24, 67);
+      doc.text(`${inv.customer?.city || 'Dallas'}, ${inv.customer?.country || 'United States'}`, 24, 72);
+
+      // Right Card: Invoice Details
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.roundedRect(110, 50, 80, 26, 2, 2, 'F');
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('PAYMENT DETAILS', 114, 56);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      doc.text(`Issue Date: ${new Date(inv.issueDate).toLocaleDateString()}`, 114, 62);
+      doc.text(`Payment: ${inv.transactionId ? 'Stripe (' + inv.transactionId + ')' : 'Direct Card (•••• 4242)'}`, 114, 67);
+      doc.text('Status: Verified & Settled', 114, 72);
+
+      // Table Header
+      let y = 86;
+      doc.setFillColor(241, 245, 249);
+      doc.rect(20, y, 170, 7.5, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('SERVICE / ITEM DESCRIPTION', 24, y + 5);
+      doc.text('PERIOD', 125, y + 5);
+      doc.text('AMOUNT (USD)', 185, y + 5, { align: 'right' });
+
+      // Table Items
+      y += 12;
+      const items = inv.items && inv.items.length > 0 ? inv.items : [{
+        description: 'Cloud VPS Compute Plan',
+        specs: 'Dedicated Virtual Machine Instance',
+        period: 'Monthly Subscription',
+        amount: Number(inv.subtotal || inv.total)
+      }];
+
+      for (const item of items) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+        doc.text(item.description, 24, y);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+        doc.text(item.specs || 'Dedicated Hyper-V Compute Allocation', 24, y + 4.5);
+
+        doc.setFontSize(8.5);
+        doc.text(item.period || 'Monthly', 125, y + 2);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+        doc.text(`$${Number(item.amount).toFixed(2)}`, 185, y + 2, { align: 'right' });
+
+        y += 14;
+        doc.setDrawColor(241, 245, 249);
+        doc.line(20, y - 4, 190, y - 4);
+      }
+
+      // Totals
+      y += 4;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('Subtotal:', 140, y);
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      doc.text(`$${Number(inv.subtotal).toFixed(2)}`, 185, y, { align: 'right' });
+
+      y += 6;
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('Tax (0%):', 140, y);
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      doc.text(`$${Number(inv.tax || 0).toFixed(2)}`, 185, y, { align: 'right' });
+
+      y += 8;
+      doc.setDrawColor(15, 23, 42);
+      doc.setLineWidth(0.5);
+      doc.line(140, y - 2, 190, y - 2);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Total Paid:', 140, y + 3.5);
+      doc.text(`$${Number(inv.total).toFixed(2)} USD`, 185, y + 3.5, { align: 'right' });
+
+      // Footer
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('Analytical Technical Consulting • Thank you for your business!', 105, 275, { align: 'center' });
+      doc.text('For questions or support, contact customer-support@atechconsult.com', 105, 280, { align: 'center' });
+
+      doc.save(`Invoice-${inv.invoiceNumber}.pdf`);
+      toast.success(`Invoice ${inv.invoiceNumber}.pdf downloaded!`);
     } catch (e: any) {
-      toast.error('Failed to download invoice: ' + e.message);
+      toast.error('Failed to download invoice PDF: ' + e.message);
     }
   };
 
@@ -465,12 +516,11 @@ export default function BillingAndInvoices() {
               <div className="flex justify-between items-start">
                 <div>
                   <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-extrabold text-xl font-poppins">
-                    <Server className="w-6 h-6" /> ATECH CLOUD
+                    <Server className="w-6 h-6" /> Analytical Technical Consulting
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    ATECH VPS Portal & Infrastructure Services<br />
-                    100 Enterprise Blvd, Suite 400<br />
-                    support@atech.cloud
+                    Cloud Infrastructure & Enterprise Hosting Services<br />
+                    customer-support@atechconsult.com
                   </p>
                 </div>
                 <div className="text-right">

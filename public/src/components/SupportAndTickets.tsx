@@ -48,17 +48,25 @@ export interface Ticket {
   subject: string;
   message: string;
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
-  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+  status: 'OPEN' | 'AWAITING_USER_ACTION' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'CLOSED_TIMEOUT' | 'REOPENED';
   assignedTo?: string | null;
   response?: string | null;
   chatHistory?: ChatMessage[];
   createdAt: string;
   updatedAt: string;
+  timelineDay?: number;
+  timelineLabel?: string;
+  slaState?: string;
+  remainingHours?: number | null;
+  isFollowUp?: boolean;
+  parentTicketId?: number | null;
+  lastAutomatedAction?: string;
 }
 
 interface TicketStats {
   total: number;
   open: number;
+  awaitingAction?: number;
   inProgress: number;
   resolved: number;
   closed: number;
@@ -71,13 +79,17 @@ export default function SupportAndTickets() {
   const [stats, setStats] = useState<TicketStats>({
     total: 0,
     open: 0,
+    awaitingAction: 0,
     inProgress: 0,
     resolved: 0,
     closed: 0,
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'AWAITING_USER_ACTION' | 'REOPENED' | 'RESOLVED' | 'CLOSED_TIMEOUT'>('ALL');
+  const [idleFilter, setIdleFilter] = useState<'ALL' | '3' | '6' | '9'>('ALL');
+  const [lineageFilter, setLineageFilter] = useState<'ALL' | 'ORIGINAL' | 'FOLLOWUP'>('ALL');
+  const [sortBy, setSortBy] = useState<'NEWEST' | 'OLDEST' | 'SLA_URGENT'>('NEWEST');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Active Selected Ticket for Full Thread Chat
@@ -251,14 +263,53 @@ export default function SupportAndTickets() {
     }
   };
 
-  const filteredTickets = tickets.filter((t) => {
-    const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
-    const matchesSearch =
-      t.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.response && t.response.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesStatus && matchesSearch;
-  });
+  const filteredTickets = tickets
+    .filter((t) => {
+      // 1. Status Filter
+      const matchesStatus =
+        statusFilter === 'ALL' ||
+        t.status === statusFilter ||
+        (statusFilter === 'CLOSED_TIMEOUT' && (t.status === 'CLOSED_TIMEOUT' || t.status === 'CLOSED'));
+
+      // 2. Idle Duration Filter (>3 days, >6 days, >9 days)
+      let matchesIdle = true;
+      const days = t.timelineDay ?? 0;
+      if (idleFilter === '3') matchesIdle = days >= 3;
+      else if (idleFilter === '6') matchesIdle = days >= 6;
+      else if (idleFilter === '9') matchesIdle = days >= 9;
+
+      // 3. Lineage Filter (Original vs Follow-up)
+      let matchesLineage = true;
+      if (lineageFilter === 'ORIGINAL') matchesLineage = !t.isFollowUp && !t.parentTicketId;
+      else if (lineageFilter === 'FOLLOWUP') matchesLineage = Boolean(t.isFollowUp || t.parentTicketId);
+
+      // 4. Search Query
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        !q ||
+        t.subject.toLowerCase().includes(q) ||
+        t.message.toLowerCase().includes(q) ||
+        `t-${t.id}`.includes(q) ||
+        (t.lastAutomatedAction && t.lastAutomatedAction.toLowerCase().includes(q)) ||
+        (t.response && t.response.toLowerCase().includes(q));
+
+      return matchesStatus && matchesIdle && matchesLineage && matchesSearch;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'SLA_URGENT') {
+        // Sort by time remaining until Auto-Close (Ascending) - urgent first
+        const remA = a.remainingHours ?? 9999;
+        const remB = b.remainingHours ?? 9999;
+        if (remA !== remB) return remA - remB;
+        // Secondary sort: Last activity newest first
+        return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+      }
+      if (sortBy === 'OLDEST') {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+      // Default: NEWEST (Last Activity Date - Newest First)
+      return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+    });
 
   const getPriorityBadge = (p: string) => {
     switch (p) {
@@ -273,18 +324,23 @@ export default function SupportAndTickets() {
     }
   };
 
-  const getStatusBadge = (s: string) => {
-    switch (s) {
-      case 'OPEN':
-        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20';
-      case 'IN_PROGRESS':
-        return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20';
-      case 'RESOLVED':
-        return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
-      case 'CLOSED':
-        return 'bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20';
+  const getSlaStateBadge = (t: Ticket) => {
+    const state = t.slaState || (t.status === 'AWAITING_USER_ACTION' ? 'Pending Action' : t.status);
+    switch (state) {
+      case 'Open':
+        return 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
+      case 'Reopened':
+        return 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800';
+      case 'Pending Action':
+        return 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800';
+      case 'Autoclosed':
+        return 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800';
+      case 'Resolved':
+        return 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800';
+      case 'Closed':
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700';
       default:
-        return 'bg-slate-100 text-slate-700';
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
     }
   };
 
@@ -342,33 +398,33 @@ export default function SupportAndTickets() {
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Open & Queue</span>
-            <span className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1 block font-poppins">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Open Tickets</span>
+            <span className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mt-1 block font-poppins">
               {stats.open}
             </span>
           </div>
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/50 rounded-xl text-amber-600 dark:text-amber-400">
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/50 rounded-xl text-blue-600 dark:text-blue-400">
             <Clock className="w-5 h-5" />
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">In Progress</span>
-            <span className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 mt-1 block font-poppins">
-              {stats.inProgress}
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Pending User Action</span>
+            <span className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 mt-1 block font-poppins">
+              {stats.awaitingAction ?? 0}
             </span>
           </div>
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/50 rounded-xl text-blue-600 dark:text-blue-400">
-            <MessageSquare className="w-5 h-5" />
+          <div className="p-3 bg-amber-50 dark:bg-amber-950/50 rounded-xl text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="w-5 h-5" />
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div>
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Resolved</span>
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 block">Resolved & Closed</span>
             <span className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1 block font-poppins">
-              {stats.resolved}
+              {stats.resolved + stats.closed}
             </span>
           </div>
           <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 rounded-xl text-emerald-600 dark:text-emerald-400">
@@ -378,32 +434,105 @@ export default function SupportAndTickets() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
-          {(['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const).map((st) => (
-            <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                statusFilter === st
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              {st.replace('_', ' ')}
-            </button>
-          ))}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Status Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+            {[
+              { id: 'ALL', label: 'All Records' },
+              { id: 'OPEN', label: 'Open' },
+              { id: 'AWAITING_USER_ACTION', label: 'Pending Action' },
+              { id: 'REOPENED', label: 'Reopened' },
+              { id: 'RESOLVED', label: 'Resolved' },
+              { id: 'CLOSED_TIMEOUT', label: 'Autoclosed' },
+            ].map((st) => (
+              <button
+                key={st.id}
+                onClick={() => setStatusFilter(st.id as any)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  statusFilter === st.id
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative w-full lg:w-72">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search ID, subject, action..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600"
+            />
+          </div>
         </div>
 
-        <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search tickets by subject or text..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600"
-          />
+        {/* Secondary Filter & Sorting Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-slate-400 font-semibold flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5" /> Inactivity:
+            </span>
+            {[
+              { id: 'ALL', label: 'Any' },
+              { id: '3', label: '>3 Days' },
+              { id: '6', label: '>6 Days' },
+              { id: '9', label: '>9 Days' },
+            ].map((idl) => (
+              <button
+                key={idl.id}
+                onClick={() => setIdleFilter(idl.id as any)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  idleFilter === idl.id
+                    ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                    : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {idl.label}
+              </button>
+            ))}
+
+            <span className="text-slate-300 dark:text-slate-700 mx-1">|</span>
+
+            <span className="text-slate-400 font-semibold">Lineage:</span>
+            {[
+              { id: 'ALL', label: 'All' },
+              { id: 'ORIGINAL', label: 'Original' },
+              { id: 'FOLLOWUP', label: 'Follow-ups' },
+            ].map((lin) => (
+              <button
+                key={lin.id}
+                onClick={() => setLineageFilter(lin.id as any)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  lineageFilter === lin.id
+                    ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700'
+                    : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {lin.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 font-semibold">Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-3 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-600"
+            >
+              <option value="NEWEST">Activity (Newest First)</option>
+              <option value="OLDEST">Creation (Oldest First)</option>
+              <option value="SLA_URGENT">SLA Urgency (Countdown First)</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -436,7 +565,7 @@ export default function SupportAndTickets() {
               <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getPriorityBadge(activeTicket.priority)}`}>
                 {activeTicket.priority} PRIORITY
               </span>
-              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getStatusBadge(activeTicket.status)}`}>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${getSlaStateBadge(activeTicket)}`}>
                 {activeTicket.status.replace('_', ' ')}
               </span>
 
@@ -571,45 +700,87 @@ export default function SupportAndTickets() {
           )}
         </div>
       ) : (
-        /* CLEAN COMPACT TICKET LIST (Ticket 1, Ticket 2, Ticket 3... like Admin Section) */
-        <div className="space-y-3">
-          {filteredTickets.map((t) => {
-            const msgCount = t.chatHistory?.length || (t.response ? 2 : 1);
-            return (
-              <div
-                key={t.id}
-                onClick={() => {
-                  setActiveTicket(t);
-                  setReplyText('');
-                }}
-                className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all bg-white dark:bg-slate-900 shadow-xs group"
-              >
-                <div className="space-y-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-xs font-bold text-slate-400">#{t.id}</span>
-                    <span className="font-bold text-slate-900 dark:text-white text-xs group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                      {t.subject}
-                    </span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${getPriorityBadge(t.priority)}`}>
-                      {t.priority}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 line-clamp-1">{t.message}</p>
-                  <p className="text-[10px] text-slate-400 font-mono">
-                    Submitted on {new Date(t.createdAt).toLocaleDateString()} • {msgCount} message{msgCount === 1 ? '' : 's'}
-                    {t.assignedTo && ` • Engineer: ${t.assignedTo}`}
-                  </p>
-                </div>
+        /* TABLE MATCHING USER IMAGE MOCKUP */
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold">
+                  <th className="py-3.5 px-5 font-semibold">Ticket ID</th>
+                  <th className="py-3.5 px-5 font-semibold">Subject Context</th>
+                  <th className="py-3.5 px-5 font-semibold whitespace-nowrap">Active Timeline</th>
+                  <th className="py-3.5 px-5 font-semibold whitespace-nowrap">SLA State Status</th>
+                  <th className="py-3.5 px-5 font-semibold">Last Automated System Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                {filteredTickets.map((t) => {
+                  return (
+                    <tr
+                      key={t.id}
+                      onClick={() => {
+                        setActiveTicket(t);
+                        setReplyText('');
+                      }}
+                      className="hover:bg-blue-50/40 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+                    >
+                      {/* Ticket ID */}
+                      <td className="py-4 px-5 whitespace-nowrap align-middle">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-slate-600 dark:text-slate-300 font-medium">
+                            T-{t.id}
+                          </span>
+                          {t.isFollowUp || t.parentTicketId ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                              FOLLOW-UP
+                            </span>
+                          ) : t.status === 'OPEN' || t.status === 'REOPENED' ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400">
+                              LIVE
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
 
-                <div className="flex items-center gap-2.5 self-start sm:self-center shrink-0">
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${getStatusBadge(t.status)}`}>
-                    {t.status.replace('_', ' ')}
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-0.5 transition-all" />
-                </div>
-              </div>
-            );
-          })}
+                      {/* Subject Context */}
+                      <td className="py-4 px-5 align-middle max-w-xs md:max-w-md">
+                        <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
+                          {t.subject}
+                        </span>
+                        <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5 font-normal">
+                          {t.message}
+                        </p>
+                      </td>
+
+                      {/* Active Timeline */}
+                      <td className="py-4 px-5 whitespace-nowrap align-middle font-medium text-slate-800 dark:text-slate-200">
+                        {t.timelineLabel || `Day ${t.timelineDay ?? 0}`}
+                      </td>
+
+                      {/* SLA State Status */}
+                      <td className="py-4 px-5 whitespace-nowrap align-middle">
+                        <span
+                          className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getSlaStateBadge(t)}`}
+                        >
+                          {t.slaState || (t.status === 'AWAITING_USER_ACTION' ? 'Pending Action' : t.status)}
+                        </span>
+                      </td>
+
+                      {/* Last Automated System Action */}
+                      <td className="py-4 px-5 align-middle text-slate-500 dark:text-slate-400 text-xs">
+                        <span className="line-clamp-1">
+                          {t.lastAutomatedAction ||
+                            (t.status === 'OPEN'
+                              ? 'Ticket generated. Initial queue validation'
+                              : `Status update recorded`)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

@@ -9,6 +9,7 @@
 
 import prisma from '../lib/prisma.js';
 import { sendTicketCreatedNotification, sendTicketReplyNotification } from '../services/emailService.js';
+import { calculateTicketMetrics } from '../services/ticketAutomationService.js';
 
 export function parseChatHistory(ticket, user = null) {
   let list = [];
@@ -56,17 +57,20 @@ export async function getUserTickets(req, res) {
       orderBy: { createdAt: 'desc' },
     });
 
-    const parsedTickets = tickets.map((t) => ({
-      ...t,
-      chatHistory: parseChatHistory(t, req.user),
-    }));
+    const parsedTickets = tickets.map((t) =>
+      calculateTicketMetrics({
+        ...t,
+        chatHistory: parseChatHistory(t, req.user),
+      })
+    );
 
     const stats = {
       total: tickets.length,
       open: tickets.filter((t) => t.status === 'OPEN').length,
+      awaitingAction: tickets.filter((t) => t.status === 'AWAITING_USER_ACTION').length,
       inProgress: tickets.filter((t) => t.status === 'IN_PROGRESS').length,
       resolved: tickets.filter((t) => t.status === 'RESOLVED').length,
-      closed: tickets.filter((t) => t.status === 'CLOSED').length,
+      closed: tickets.filter((t) => t.status === 'CLOSED' || t.status === 'CLOSED_TIMEOUT').length,
     };
 
     res.json({
@@ -198,6 +202,68 @@ export async function addCustomerMessage(req, res) {
       return res.status(403).json({ error: 'Access denied to this ticket.' });
     }
 
+    // --------------------------------------------------------------------------
+    // SMART REOPEN & LINKING POLICY:
+    // If ticket is CLOSED_TIMEOUT (or CLOSED past SLA timeout):
+    // Block reopening original ticket. Spin up a new linked Follow-up ticket.
+    // --------------------------------------------------------------------------
+    if (ticket.status === 'CLOSED_TIMEOUT') {
+      const followUpSubject = ticket.subject.startsWith('[Follow-up')
+        ? ticket.subject
+        : `[Follow-up to #${ticket.id}] ${ticket.subject}`;
+
+      const followUpThread = [
+        {
+          id: `msg-${Date.now()}`,
+          sender: 'CUSTOMER',
+          senderName: req.user?.fullName || req.user?.email || 'Customer',
+          message: message.trim(),
+          timestamp: new Date().toISOString(),
+        },
+      ];
+
+      const newFollowUpTicket = await prisma.supportTicket.create({
+        data: {
+          userId: ticket.userId,
+          parentTicketId: ticket.id,
+          isFollowUp: true,
+          subject: followUpSubject,
+          message: message.trim(),
+          priority: ticket.priority,
+          status: 'OPEN',
+          assignedTo: ticket.assignedTo || process.env.SUPPORT_EMAIL || 'customer-support@atechconsult.com',
+          chatHistory: JSON.stringify(followUpThread),
+          lastAutomatedAction: `Follow-up spawned referencing parent Ticket #${ticket.id}`,
+        },
+      });
+
+      await prisma.activityLog.create({
+        data: {
+          userId: ticket.userId,
+          action: 'CREATE_FOLLOW_UP_TICKET',
+          status: 'SUCCESS',
+          details: `Automatically generated Follow-up ticket #${newFollowUpTicket.id} linked to closed parent #${ticket.id}`,
+        },
+      });
+
+      sendTicketCreatedNotification({
+        ticket: newFollowUpTicket,
+        customerEmail: req.user?.email,
+        customerName: req.user?.fullName,
+      }).catch((err) => console.warn('[Follow-up creation email error]:', err.message));
+
+      return res.json({
+        success: true,
+        isFollowUpCreated: true,
+        message: `Original ticket #${ticket.id} was closed due to timeout. A new linked Follow-up ticket (#${newFollowUpTicket.id}) has been created for your inquiry.`,
+        ticket: calculateTicketMetrics({
+          ...newFollowUpTicket,
+          chatHistory: followUpThread,
+        }),
+      });
+    }
+
+    // Standard message appending for active or awaiting tickets
     const thread = parseChatHistory(ticket, req.user);
     const newMsg = {
       id: `msg-${Date.now()}`,
@@ -208,11 +274,30 @@ export async function addCustomerMessage(req, res) {
     };
     thread.push(newMsg);
 
+    // If customer responds while "Awaiting User Action", revert status to "OPEN" and reset countdown clock
+    let newStatus = ticket.status;
+    let awaitingSinceUpdate = ticket.awaitingActionSince;
+    let reminderLevelUpdate = ticket.reminderLevel;
+    let lastAutomatedActionUpdate = ticket.lastAutomatedAction;
+
+    if (ticket.status === 'AWAITING_USER_ACTION') {
+      newStatus = 'OPEN';
+      awaitingSinceUpdate = null;
+      reminderLevelUpdate = 0;
+      lastAutomatedActionUpdate = 'Customer responded: SLA timer reset, status reverted to Open';
+    } else if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
+      newStatus = 'REOPENED';
+      lastAutomatedActionUpdate = 'Customer replied: Ticket reopened';
+    }
+
     const updated = await prisma.supportTicket.update({
       where: { id: ticketId },
       data: {
         chatHistory: JSON.stringify(thread),
-        status: ticket.status === 'RESOLVED' || ticket.status === 'CLOSED' ? 'OPEN' : ticket.status,
+        status: newStatus,
+        awaitingActionSince: awaitingSinceUpdate,
+        reminderLevel: reminderLevelUpdate,
+        lastAutomatedAction: lastAutomatedActionUpdate,
       },
     });
 
@@ -227,10 +312,10 @@ export async function addCustomerMessage(req, res) {
 
     res.json({
       success: true,
-      ticket: {
+      ticket: calculateTicketMetrics({
         ...updated,
         chatHistory: thread,
-      },
+      }),
       newMessage: newMsg,
     });
   } catch (error) {
@@ -269,10 +354,10 @@ export async function getTicketDetails(req, res) {
 
     res.json({
       success: true,
-      ticket: {
+      ticket: calculateTicketMetrics({
         ...ticket,
         chatHistory: parseChatHistory(ticket, req.user),
-      },
+      }),
     });
   } catch (error) {
     console.error('getTicketDetails error:', error);

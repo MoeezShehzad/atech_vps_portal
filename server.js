@@ -21,6 +21,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
 import { setupTerminalWebSocket } from './services/terminalService.js';
+import { startTicketAutomationWorker } from './services/ticketAutomationService.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -152,4 +153,5 @@ setupTerminalWebSocket(server);
 server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
   console.log(`Web Terminal WebSocket server attached to /ws/terminal`);
+  startTicketAutomationWorker();
 });

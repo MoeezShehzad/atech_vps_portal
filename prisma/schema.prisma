@@ -366,17 +366,25 @@ model PromoCode {
 }
 
 model SupportTicket {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  subject     String   @db.VarChar(255)
-  message     String   @db.NVarChar(Max)
-  priority    String   @default("NORMAL") @db.VarChar(20) // LOW, NORMAL, HIGH, URGENT
-  status      String   @default("OPEN") @db.VarChar(20)   // OPEN, IN_PROGRESS, RESOLVED, CLOSED
-  assignedTo  String?  @db.VarChar(100)
-  response    String?  @db.NVarChar(Max)
-  chatHistory String?  @map("chat_history") @db.NVarChar(Max) // JSON thread messages
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  id                  Int             @id @default(autoincrement())
+  userId              Int             @map("user_id")
+  subject             String          @db.VarChar(255)
+  message             String          @db.NVarChar(Max)
+  priority            String          @default("NORMAL") @db.VarChar(20) // LOW, NORMAL, HIGH, URGENT
+  status              String          @default("OPEN") @db.VarChar(30)   // OPEN, AWAITING_USER_ACTION, REOPENED, RESOLVED, CLOSED, CLOSED_TIMEOUT
+  assignedTo          String?         @db.VarChar(100)
+  response            String?         @db.NVarChar(Max)
+  chatHistory         String?         @map("chat_history") @db.NVarChar(Max) // JSON thread messages
+  parentTicketId      Int?            @map("parent_ticket_id")
+  isFollowUp          Boolean         @default(false) @map("is_follow_up")
+  awaitingActionSince DateTime?       @map("awaiting_action_since")
+  reminderLevel       Int             @default(0) @map("reminder_level")
+  lastAutomatedAction String?         @map("last_automated_action") @db.VarChar(255)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @default(now()) @updatedAt
+
+  parentTicket        SupportTicket?  @relation("TicketLineage", fields: [parentTicketId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  followUpTickets     SupportTicket[] @relation("TicketLineage")
 
   @@map("Support_Tickets")
 }

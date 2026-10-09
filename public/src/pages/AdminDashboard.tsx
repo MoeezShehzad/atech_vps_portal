@@ -142,7 +142,12 @@ export default function AdminDashboard() {
   const [tickets, setTickets] = useState<any[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [replyText, setReplyText] = useState('');
-  const [replyStatus, setReplyStatus] = useState<'RESOLVED' | 'IN_PROGRESS' | 'CLOSED'>('RESOLVED');
+  const [replyStatus, setReplyStatus] = useState<'AWAITING_USER_ACTION' | 'RESOLVED' | 'IN_PROGRESS' | 'CLOSED'>('AWAITING_USER_ACTION');
+  const [adminTicketStatusFilter, setAdminTicketStatusFilter] = useState<string>('ALL');
+  const [adminTicketIdleFilter, setAdminTicketIdleFilter] = useState<string>('ALL');
+  const [adminTicketLineageFilter, setAdminTicketLineageFilter] = useState<string>('ALL');
+  const [adminTicketSortBy, setAdminTicketSortBy] = useState<string>('SLA_URGENT');
+  const [adminTicketSearch, setAdminTicketSearch] = useState<string>('');
 
   // Audit Logs
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -1456,16 +1461,36 @@ export default function AdminDashboard() {
         {/* TAB 8: SUPPORT TICKETS (OPTION 6) */}
         {activeTab === 'tickets' && (
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-6">
-            <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
-              <LifeBuoy className="w-4 h-4 text-blue-600" /> Customer Support Ticket Center ({tickets.length})
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
+                  <LifeBuoy className="w-4 h-4 text-blue-600" /> Customer Support Queue & SLA Lifecycle Engine ({tickets.length})
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Automated 10-day inactivity countdown, multi-tier reminders (Day 3, 6, 9), and auto-close timeouts.
+                </p>
+              </div>
+              <button
+                onClick={fetchTickets}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1.5 self-start cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Refresh
+              </button>
+            </div>
 
             {selectedTicket ? (
               <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-700 pb-3">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-bold text-slate-400">#{selectedTicket.id}</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
+                        T-{selectedTicket.id}
+                      </span>
+                      {selectedTicket.isFollowUp || selectedTicket.parentTicketId ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                          FOLLOW-UP (Parent: #{selectedTicket.parentTicketId})
+                        </span>
+                      ) : null}
                       <h4 className="font-bold text-slate-900 dark:text-white text-base">{selectedTicket.subject}</h4>
                     </div>
                     <p className="text-xs text-slate-500 mt-1">
@@ -1478,7 +1503,7 @@ export default function AdminDashboard() {
                     </span>
                     <button
                       onClick={() => setSelectedTicket(null)}
-                      className="px-3 py-1 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      className="px-3 py-1 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                     >
                       Back to Queue
                     </button>
@@ -1528,7 +1553,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                       Post Support Message / Diagnostic Resolution:
                     </label>
@@ -1537,10 +1562,11 @@ export default function AdminDashboard() {
                       <select
                         value={replyStatus}
                         onChange={(e) => setReplyStatus(e.target.value as any)}
-                        className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200"
+                        className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
                       >
-                        <option value="RESOLVED">RESOLVED (Completed)</option>
+                        <option value="AWAITING_USER_ACTION">Awaiting User Action (Start 10d SLA Clock)</option>
                         <option value="IN_PROGRESS">IN_PROGRESS (Investigating)</option>
+                        <option value="RESOLVED">RESOLVED (Completed)</option>
                         <option value="CLOSED">CLOSED (Dismissed)</option>
                       </select>
                     </div>
@@ -1558,7 +1584,7 @@ export default function AdminDashboard() {
                     <button
                       onClick={handleReplyTicket}
                       disabled={!replyText.trim()}
-                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-blue-500/20 transition-all disabled:opacity-50"
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-blue-500/20 transition-all disabled:opacity-50 cursor-pointer"
                     >
                       <Send className="w-3.5 h-3.5" /> Dispatch Message to Customer
                     </button>
@@ -1566,50 +1592,268 @@ export default function AdminDashboard() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                {tickets.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-8">Inbox clean! Zero customer support tickets.</p>
-                ) : (
-                  tickets.map((t) => (
-                    <div
-                      key={t.id}
-                      onClick={() => {
-                        setSelectedTicket(t);
-                        setReplyText('');
-                        setReplyStatus(t.status === 'OPEN' ? 'RESOLVED' : t.status);
-                      }}
-                      className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-slate-400">#{t.id}</span>
-                          <span className="font-bold text-slate-900 dark:text-white text-xs">{t.subject}</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                            {t.priority}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 line-clamp-1">{t.message}</p>
-                        <p className="text-[10px] text-slate-400 font-mono">
-                          {t.user?.fullName} ({t.user?.email}) • {new Date(t.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-start sm:self-center">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                            t.status === 'RESOLVED'
-                              ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
-                              : t.status === 'IN_PROGRESS'
-                              ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400'
-                              : 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400'
+              <div className="space-y-4">
+                {/* Advanced Filtering & Sorting Toolbar */}
+                <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    {/* Status Tabs */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+                      {[
+                        { id: 'ALL', label: 'All Records' },
+                        { id: 'OPEN', label: 'Open' },
+                        { id: 'AWAITING_USER_ACTION', label: 'Pending Action' },
+                        { id: 'REOPENED', label: 'Reopened' },
+                        { id: 'RESOLVED', label: 'Resolved' },
+                        { id: 'CLOSED_TIMEOUT', label: 'Autoclosed' },
+                      ].map((st) => (
+                        <button
+                          key={st.id}
+                          onClick={() => setAdminTicketStatusFilter(st.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                            adminTicketStatusFilter === st.id
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                           }`}
                         >
-                          {t.status}
-                        </span>
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="relative w-full lg:w-72">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search ID, customer, subject..."
+                        value={adminTicketSearch}
+                        onChange={(e) => setAdminTicketSearch(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Secondary Filter & Sorting Controls */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-700 text-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-slate-400 font-semibold flex items-center gap-1">
+                        <Filter className="w-3.5 h-3.5" /> Inactivity:
+                      </span>
+                      {[
+                        { id: 'ALL', label: 'Any' },
+                        { id: '3', label: '>3 Days' },
+                        { id: '6', label: '>6 Days' },
+                        { id: '9', label: '>9 Days' },
+                      ].map((idl) => (
+                        <button
+                          key={idl.id}
+                          onClick={() => setAdminTicketIdleFilter(idl.id)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                            adminTicketIdleFilter === idl.id
+                              ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                              : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          {idl.label}
+                        </button>
+                      ))}
+
+                      <span className="text-slate-300 dark:text-slate-700 mx-1">|</span>
+
+                      <span className="text-slate-400 font-semibold">Lineage:</span>
+                      {[
+                        { id: 'ALL', label: 'All' },
+                        { id: 'ORIGINAL', label: 'Original' },
+                        { id: 'FOLLOWUP', label: 'Follow-ups' },
+                      ].map((lin) => (
+                        <button
+                          key={lin.id}
+                          onClick={() => setAdminTicketLineageFilter(lin.id)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                            adminTicketLineageFilter === lin.id
+                              ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700'
+                              : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          {lin.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Sort Dropdown */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400 font-semibold">Sort:</span>
+                      <select
+                        value={adminTicketSortBy}
+                        onChange={(e) => setAdminTicketSortBy(e.target.value)}
+                        className="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer"
+                      >
+                        <option value="SLA_URGENT">SLA Urgency (Countdown First)</option>
+                        <option value="NEWEST">Activity (Newest First)</option>
+                        <option value="OLDEST">Creation (Oldest First)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Queue Table Matching Mockup */}
+                {(() => {
+                  const filtered = tickets
+                    .filter((t: any) => {
+                      const matchesStatus =
+                        adminTicketStatusFilter === 'ALL' ||
+                        t.status === adminTicketStatusFilter ||
+                        (adminTicketStatusFilter === 'CLOSED_TIMEOUT' && (t.status === 'CLOSED_TIMEOUT' || t.status === 'CLOSED'));
+
+                      let matchesIdle = true;
+                      const days = t.timelineDay ?? 0;
+                      if (adminTicketIdleFilter === '3') matchesIdle = days >= 3;
+                      else if (adminTicketIdleFilter === '6') matchesIdle = days >= 6;
+                      else if (adminTicketIdleFilter === '9') matchesIdle = days >= 9;
+
+                      let matchesLineage = true;
+                      if (adminTicketLineageFilter === 'ORIGINAL') matchesLineage = !t.isFollowUp && !t.parentTicketId;
+                      else if (adminTicketLineageFilter === 'FOLLOWUP') matchesLineage = Boolean(t.isFollowUp || t.parentTicketId);
+
+                      const q = adminTicketSearch.toLowerCase();
+                      const matchesSearch =
+                        !q ||
+                        t.subject.toLowerCase().includes(q) ||
+                        t.message.toLowerCase().includes(q) ||
+                        `t-${t.id}`.includes(q) ||
+                        (t.user?.email && t.user.email.toLowerCase().includes(q)) ||
+                        (t.user?.fullName && t.user.fullName.toLowerCase().includes(q)) ||
+                        (t.lastAutomatedAction && t.lastAutomatedAction.toLowerCase().includes(q));
+
+                      return matchesStatus && matchesIdle && matchesLineage && matchesSearch;
+                    })
+                    .sort((a: any, b: any) => {
+                      if (adminTicketSortBy === 'SLA_URGENT') {
+                        const remA = a.remainingHours ?? 9999;
+                        const remB = b.remainingHours ?? 9999;
+                        if (remA !== remB) return remA - remB;
+                        return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+                      }
+                      if (adminTicketSortBy === 'OLDEST') {
+                        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                      }
+                      return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+                    });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <p className="text-xs text-slate-400 text-center py-8">
+                        No support tickets matching current filter criteria.
+                      </p>
+                    );
+                  }
+
+                  const getSlaBadge = (state: string) => {
+                    switch (state) {
+                      case 'Open':
+                        return 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
+                      case 'Reopened':
+                        return 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800';
+                      case 'Pending Action':
+                        return 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800';
+                      case 'Autoclosed':
+                        return 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800';
+                      case 'Resolved':
+                        return 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800';
+                      default:
+                        return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700';
+                    }
+                  };
+
+                  return (
+                    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-semibold">
+                              <th className="py-3.5 px-5 font-semibold">Ticket ID</th>
+                              <th className="py-3.5 px-5 font-semibold">Subject Context</th>
+                              <th className="py-3.5 px-5 font-semibold whitespace-nowrap">Active Timeline</th>
+                              <th className="py-3.5 px-5 font-semibold whitespace-nowrap">SLA State Status</th>
+                              <th className="py-3.5 px-5 font-semibold">Last Automated System Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                            {filtered.map((t: any) => (
+                              <tr
+                                key={t.id}
+                                onClick={() => {
+                                  setSelectedTicket(t);
+                                  setReplyText('');
+                                  setReplyStatus(
+                                    t.status === 'AWAITING_USER_ACTION'
+                                      ? 'RESOLVED'
+                                      : 'AWAITING_USER_ACTION'
+                                  );
+                                }}
+                                className="hover:bg-blue-50/40 dark:hover:bg-slate-800/50 cursor-pointer transition-colors group"
+                              >
+                                {/* Ticket ID */}
+                                <td className="py-4 px-5 whitespace-nowrap align-middle">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-xs text-slate-600 dark:text-slate-300 font-medium">
+                                      T-{t.id}
+                                    </span>
+                                    {t.isFollowUp || t.parentTicketId ? (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                                        FOLLOW-UP
+                                      </span>
+                                    ) : t.status === 'OPEN' || t.status === 'REOPENED' ? (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400">
+                                        LIVE
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </td>
+
+                                {/* Subject Context */}
+                                <td className="py-4 px-5 align-middle max-w-xs md:max-w-md">
+                                  <span className="font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1">
+                                    {t.subject}
+                                  </span>
+                                  <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5 font-normal">
+                                    {t.user?.fullName} ({t.user?.email}) • {t.message}
+                                  </p>
+                                </td>
+
+                                {/* Active Timeline */}
+                                <td className="py-4 px-5 whitespace-nowrap align-middle font-medium text-slate-800 dark:text-slate-200">
+                                  {t.timelineLabel || `Day ${t.timelineDay ?? 0}`}
+                                </td>
+
+                                {/* SLA State Status */}
+                                <td className="py-4 px-5 whitespace-nowrap align-middle">
+                                  <span
+                                    className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getSlaBadge(
+                                      t.slaState || (t.status === 'AWAITING_USER_ACTION' ? 'Pending Action' : t.status)
+                                    )}`}
+                                  >
+                                    {t.slaState || (t.status === 'AWAITING_USER_ACTION' ? 'Pending Action' : t.status)}
+                                  </span>
+                                </td>
+
+                                {/* Last Automated System Action */}
+                                <td className="py-4 px-5 align-middle text-slate-500 dark:text-slate-400 text-xs">
+                                  <span className="line-clamp-1">
+                                    {t.lastAutomatedAction ||
+                                      (t.status === 'OPEN'
+                                        ? 'Ticket generated. Initial queue validation'
+                                        : 'Status update recorded')}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                  ))
-                )}
+                  );
+                })()}
               </div>
             )}
           </div>

@@ -11,6 +11,7 @@ import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
 import { sendTicketReplyNotification } from '../services/emailService.js';
+import { calculateTicketMetrics } from '../services/ticketAutomationService.js';
 
 /**
  * 1. GET /api/admin/overview
@@ -912,11 +913,11 @@ export async function getAdminTickets(req, res) {
           });
         }
       }
-      return {
+      return calculateTicketMetrics({
         ...t,
         user,
         chatHistory,
-      };
+      });
     });
 
     res.json({ success: true, tickets: enriched });
@@ -967,11 +968,11 @@ export async function getAdminTicketDetails(req, res) {
 
     res.json({
       success: true,
-      ticket: {
+      ticket: calculateTicketMetrics({
         ...t,
         user,
         chatHistory,
-      },
+      }),
     });
   } catch (error) {
     console.error('getAdminTicketDetails error:', error);
@@ -1020,13 +1021,32 @@ export async function replyAdminTicket(req, res) {
       });
     }
 
+    const targetStatus = status || (existing.status === 'CLOSED' ? 'CLOSED' : 'RESOLVED');
+
+    // If transitioned to AWAITING_USER_ACTION, start the 10-day countdown clock
+    let awaitingSince = existing.awaitingActionSince;
+    let reminderLvl = existing.reminderLevel;
+    let lastAutoAction = existing.lastAutomatedAction;
+
+    if (targetStatus === 'AWAITING_USER_ACTION') {
+      awaitingSince = new Date();
+      reminderLvl = 0;
+      lastAutoAction = 'Transitioned to Awaiting User Action - 10 day countdown started';
+    } else if (targetStatus === 'RESOLVED' || targetStatus === 'CLOSED') {
+      awaitingSince = null;
+      lastAutoAction = `Ticket marked as ${targetStatus}`;
+    }
+
     const updated = await prisma.supportTicket.update({
       where: { id },
       data: {
         ...(response && { response }),
         chatHistory: JSON.stringify(chatHistory),
-        status: status || (existing.status === 'CLOSED' ? 'CLOSED' : 'RESOLVED'),
+        status: targetStatus,
         assignedTo: req.adminUser.email,
+        awaitingActionSince: awaitingSince,
+        reminderLevel: reminderLvl,
+        lastAutomatedAction: lastAutoAction,
       },
     });
 
@@ -1061,10 +1081,10 @@ export async function replyAdminTicket(req, res) {
 
     res.json({
       success: true,
-      ticket: {
+      ticket: calculateTicketMetrics({
         ...updated,
         chatHistory,
-      },
+      }),
     });
   } catch (error) {
     console.error('replyAdminTicket error:', error);
