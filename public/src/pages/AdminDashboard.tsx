@@ -12,7 +12,7 @@
 //          9. Cluster Audit Trail & Security Stream
 // ==============================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Server,
@@ -445,13 +445,69 @@ export default function AdminDashboard() {
     }
   };
 
+  const adminChatBottomRef = useRef<HTMLDivElement>(null);
+
   // 8. Support Tickets
   const fetchTickets = async () => {
     try {
       const res = await apiCall('/admin/tickets');
-      if (res?.success) setTickets(res.tickets);
+      if (res?.success) {
+        setTickets(res.tickets || []);
+        // CRITICAL FIX: Synchronize selectedTicket with fresh data from server
+        setSelectedTicket((prev: any) => {
+          if (!prev) return null;
+          const fresh = (res.tickets || []).find((t: any) => t.id === prev.id);
+          return fresh || prev;
+        });
+      }
     } catch (e) {}
   };
+
+  // Real-time auto-polling for admin tickets and active conversation every 3.5s
+  useEffect(() => {
+    if (activeTab !== 'tickets') return;
+
+    const interval = setInterval(async () => {
+      try {
+        if (selectedTicket) {
+          const res = await apiCall(`/admin/tickets/${selectedTicket.id}`);
+          if (res?.success && res.ticket) {
+            const fresh = res.ticket;
+            setSelectedTicket((prev: any) => {
+              if (!prev || prev.id !== fresh.id) return prev;
+              const prevLen = prev.chatHistory?.length || 0;
+              const freshLen = fresh.chatHistory?.length || 0;
+              if (
+                prevLen !== freshLen ||
+                prev.status !== fresh.status ||
+                prev.response !== fresh.response ||
+                prev.updatedAt !== fresh.updatedAt
+              ) {
+                return fresh;
+              }
+              return prev;
+            });
+            setTickets((prev) =>
+              prev.map((t) => (t.id === fresh.id ? { ...t, ...fresh } : t))
+            );
+          }
+        } else {
+          // Poll the ticket queue list
+          const res = await apiCall('/admin/tickets');
+          if (res?.success) setTickets(res.tickets || []);
+        }
+      } catch (_) {}
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [activeTab, selectedTicket?.id]);
+
+  // Auto-scroll admin chat to bottom when messages update
+  useEffect(() => {
+    if (selectedTicket) {
+      adminChatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [selectedTicket?.id, selectedTicket?.chatHistory?.length]);
 
   const handleReplyTicket = async () => {
     const msgToSend = replyText.trim();
@@ -1471,6 +1527,7 @@ export default function AdminDashboard() {
                         );
                       });
                     })()}
+                    <div ref={adminChatBottomRef} />
                   </div>
                 </div>
 

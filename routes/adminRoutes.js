@@ -30,6 +30,7 @@ import {
   getSecurityThreats,
   banThreatIp,
   getAdminTickets,
+  getAdminTicketDetails,
   replyAdminTicket,
 } from '../controllers/adminController.js';
 
@@ -82,6 +83,7 @@ router.post('/security/ban-ip', banThreatIp);
 
 // Option 6: Support Tickets Helpdesk
 router.get('/tickets', getAdminTickets);
+router.get('/tickets/:ticketId', getAdminTicketDetails);
 router.post('/tickets/:ticketId/reply', replyAdminTicket);
 
 export default router;

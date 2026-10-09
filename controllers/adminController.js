@@ -925,6 +925,59 @@ export async function getAdminTickets(req, res) {
   }
 }
 
+export async function getAdminTicketDetails(req, res) {
+  try {
+    const id = Number(req.params.ticketId);
+    const t = await prisma.supportTicket.findUnique({
+      where: { id },
+    });
+    if (!t) return res.status(404).json({ error: 'Ticket not found' });
+    const user = (await prisma.user.findUnique({
+      where: { userId: t.userId },
+      select: { userId: true, fullName: true, email: true },
+    })) || { email: `User #${t.userId}`, fullName: 'Customer' };
+
+    let chatHistory = [];
+    if (t.chatHistory) {
+      try {
+        chatHistory = JSON.parse(t.chatHistory);
+      } catch (_) {}
+    }
+    if (!Array.isArray(chatHistory) || chatHistory.length === 0) {
+      if (t.message) {
+        chatHistory.push({
+          id: 'msg-init',
+          sender: 'CUSTOMER',
+          senderName: user.fullName || 'Customer',
+          message: t.message,
+          timestamp: t.createdAt,
+        });
+      }
+      if (t.response) {
+        chatHistory.push({
+          id: 'msg-resp',
+          sender: 'SUPPORT',
+          senderName: t.assignedTo || 'Support Engineer',
+          message: t.response,
+          timestamp: t.updatedAt || t.createdAt,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      ticket: {
+        ...t,
+        user,
+        chatHistory,
+      },
+    });
+  } catch (error) {
+    console.error('getAdminTicketDetails error:', error);
+    res.status(500).json({ error: 'Failed to load ticket details' });
+  }
+}
+
 export async function replyAdminTicket(req, res) {
   try {
     const id = Number(req.params.ticketId);
