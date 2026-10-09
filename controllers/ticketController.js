@@ -132,6 +132,7 @@ export async function createTicket(req, res) {
         message: message.trim(),
         priority: assignedPriority,
         status: 'OPEN',
+        assignedTo: 'moeezshahzad26@gmail.com',
         chatHistory: JSON.stringify(initialThread),
       },
     });
