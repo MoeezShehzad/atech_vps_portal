@@ -166,6 +166,11 @@ class HyperVService {
     });
   }
 
+  // Alias for compatibility
+  async controlPower(vmName, action) {
+    return await this.executePowerAction(vmName, action);
+  }
+
   /**
    * Resize VM hardware specs (CPU cores and RAM)
    */
