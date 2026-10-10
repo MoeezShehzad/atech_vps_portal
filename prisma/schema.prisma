@@ -35,6 +35,7 @@ model User {
   activityLogs    ActivityLog[]
   refreshTokens   RefreshToken[]
   sshKeys         SSHKey[]
+  managedWebsites ManagedWebsite[]
 
   @@map("Users")
 }
@@ -387,4 +388,33 @@ model SupportTicket {
   followUpTickets     SupportTicket[] @relation("TicketLineage")
 
   @@map("Support_Tickets")
+}
+
+model ManagedWebsite {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @map("user_id")
+  name             String   @db.VarChar(100)
+  primaryDomain    String   @map("primary_domain") @db.VarChar(255)
+  stagingDomain    String   @map("staging_domain") @db.VarChar(255)
+  appType          String   @default("WORDPRESS") @map("app_type") @db.VarChar(50)
+  phpVersion       String   @default("8.3") @map("php_version") @db.VarChar(20)
+  status           String   @default("ACTIVE") @db.VarChar(30)
+  containerId      String?  @map("container_id") @db.VarChar(128)
+  port             Int?
+  storagePath      String?  @map("storage_path") @db.VarChar(500)
+  dbName           String?  @map("db_name") @db.VarChar(100)
+  dbUser           String?  @map("db_user") @db.VarChar(100)
+  dbPassword       String?  @map("db_password") @db.VarChar(100)
+  wpAdminUser      String?  @map("wp_admin_user") @db.VarChar(100)
+  wpAdminPassword  String?  @map("wp_admin_password") @db.VarChar(100)
+  sslStatus        String   @default("ACTIVE") @map("ssl_status") @db.VarChar(30)
+  diskUsageMb      Float    @default(0) @map("disk_usage_mb")
+  bandwidthUsageMb Float    @default(0) @map("bandwidth_usage_mb")
+  bandwidthLimitMb Float    @default(50000) @map("bandwidth_limit_mb")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("Managed_Websites")
 }

@@ -53,6 +53,7 @@ const ResourcePools = React.lazy(() => import('../components/ResourcePools'));
 const BillingAndInvoices = React.lazy(() => import('../components/BillingAndInvoices'));
 const ConnectionGuideModal = React.lazy(() => import('../components/ConnectionGuideModal'));
 const SupportAndTickets = React.lazy(() => import('../components/SupportAndTickets'));
+const WebsitesManager = React.lazy(() => import('../components/WebsitesManager'));
 
 interface Instance {
   id: string;
@@ -839,6 +840,17 @@ export default function Dashboard() {
             </div>
           }>
             <SecurityAndLogs />
+          </React.Suspense>
+        )}
+
+        {/* RENDER WEBSITES & APPLICATIONS */}
+        {activeTab === 'websites' && (
+          <React.Suspense fallback={
+            <div className="py-20 flex justify-center">
+              <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+            </div>
+          }>
+            <WebsitesManager />
           </React.Suspense>
         )}
 

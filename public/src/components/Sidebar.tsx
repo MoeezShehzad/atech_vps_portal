@@ -10,7 +10,8 @@ import {
   CreditCard, 
   LifeBuoy,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Globe
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -51,6 +52,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'vms', label: 'Virtual Machines', icon: Server },
+    { id: 'websites', label: 'Websites & Apps', icon: Globe },
     { id: 'storage', label: 'Storage & Disk', icon: HardDrive },
     { id: 'pools', label: 'Resource Pools', icon: Cpu },
     { id: 'billing', label: 'Billing & Invoices', icon: CreditCard },

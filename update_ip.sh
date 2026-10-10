@@ -54,13 +54,26 @@ SESSION_SECRET="atech_vps_super_secret_session_key_2026_99x!"
 GOOGLE_CLIENT_ID="369485207582-d99elbgam5spalb22apu63vje1avu5gq.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET="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"
 
-# SMTP Configuration
-SMTP_HOST=smtp.gmail.com
+# Corporate Mail Suite Configuration (mail.atechconsult.com)
+SMTP_HOST=mail.atechconsult.com
 SMTP_PORT=465
 SMTP_SECURE=true
-SMTP_USER=moeezshahzad26@gmail.com
-SMTP_PASS="mkawgijeaddjfcap"
-SMTP_FROM="ATC Data Center <moeezshahzad26@gmail.com>"
+
+# Support Desk
+SMTP_SUPPORT_USER=customer-support@atechconsult.com
+SMTP_SUPPORT_PASS="uTJ5+5CbUG"
+
+# System & Transactional
+SMTP_NOREPLY_USER=no-reply@atechconsult.com
+SMTP_NOREPLY_PASS="Q)9zVhm9BQ"
+
+# Invoicing & Receipts
+SMTP_BILLING_USER=billing@atechconsult.com
+SMTP_BILLING_PASS="{tSvuZA9Wj"
+
+# Infrastructure & Security Alerts
+SMTP_ALERTS_USER=alerts@atechconsult.com
+SMTP_ALERTS_PASS="yykFkq[55g"
 
 # Networking / URLs
 BACKEND_URL=http://${CURRENT_IP}:5000
