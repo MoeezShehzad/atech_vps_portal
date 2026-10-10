@@ -135,7 +135,7 @@ export default function Home() {
                   <span className="text-emerald-400 font-bold">● ACTIVE</span>
                 </div>
                 <div className="flex justify-between text-slate-300">
-                  <span>Hypervisor Cluster:</span>
+                  <span>Compute Cluster:</span>
                   <span className="text-blue-400 font-bold">HA-NODE-01</span>
                 </div>
                 <div className="flex justify-between text-slate-300">
@@ -257,7 +257,7 @@ export default function Home() {
               </div>
               <h3 className="text-lg font-bold text-slate-950 mb-2">Data Center Management</h3>
               <p className="text-slate-600 text-xs leading-relaxed font-normal">
-                Design, deploy, and maintain hypervisors with high availability, automated backup schedules, and failover clustering.
+                Design, deploy, and maintain enterprise cloud infrastructure with high availability, automated backup schedules, and failover clustering.
               </p>
             </div>
 
@@ -290,7 +290,7 @@ export default function Home() {
           <div className="space-y-3 relative z-10 max-w-xl">
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight">Need a custom enterprise setup?</h2>
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Our engineering team provides tailored server configurations, multi-node hypervisor setups, and custom IT consulting.
+              Our engineering team provides tailored server configurations, multi-node private cloud clusters, and custom IT consulting.
             </p>
           </div>
 

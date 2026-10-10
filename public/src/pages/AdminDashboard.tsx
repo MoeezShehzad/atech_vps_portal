@@ -1,7 +1,7 @@
 // ==============================================================================
 // Page: AdminDashboard.tsx
 // Purpose: Enterprise Administrator Control Center (Cloud Infrastructure Suite)
-//          1. Physical Host & Hyper-V Fleet Telemetry
+//          1. Physical Host & Virtual Compute Fleet Telemetry
 //          2. Directory of Users & Role/Status Management + Ghost Mode Impersonation
 //          3. Global Fleet VM Oversight & Emergency Power Controls
 //          4. Dynamic Plans & Promo Code Manager
@@ -145,8 +145,10 @@ export default function AdminDashboard() {
   const [replyStatus, setReplyStatus] = useState<'AWAITING_USER_ACTION' | 'RESOLVED' | 'IN_PROGRESS' | 'CLOSED'>('AWAITING_USER_ACTION');
   const [adminTicketStatusFilter, setAdminTicketStatusFilter] = useState<string>('ALL');
   const [adminTicketIdleFilter, setAdminTicketIdleFilter] = useState<string>('ALL');
-  const [adminTicketLineageFilter, setAdminTicketLineageFilter] = useState<string>('ALL');
-  const [adminTicketSortBy, setAdminTicketSortBy] = useState<string>('SLA_URGENT');
+  const [adminDateFrom, setAdminDateFrom] = useState<string>('');
+  const [adminDateTo, setAdminDateTo] = useState<string>('');
+  const [adminSortField, setAdminSortField] = useState<'updatedAt' | 'createdAt' | 'id'>('updatedAt');
+  const [adminSortOrder, setAdminSortOrder] = useState<'asc' | 'desc'>('desc');
   const [adminTicketSearch, setAdminTicketSearch] = useState<string>('');
 
   // Audit Logs
@@ -822,7 +824,7 @@ export default function AdminDashboard() {
             {hostStats && (
               <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3">
                 <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-blue-600" /> Physical Hyper-V Node
+                  <Cpu className="w-4 h-4 text-blue-600" /> Physical Compute Node
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-1">
                   <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
@@ -927,7 +929,7 @@ export default function AdminDashboard() {
                 <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins">
                   Cluster-Wide Virtual Machine Fleet ({fleetVMs.length})
                 </h3>
-                <p className="text-xs text-slate-500">Live Hyper-V hypervisor controls across all tenants.</p>
+                <p className="text-xs text-slate-500">Live virtual infrastructure controls across all tenants.</p>
               </div>
             </div>
 
@@ -1480,22 +1482,30 @@ export default function AdminDashboard() {
 
             {selectedTicket ? (
               <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-700 pb-3">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
-                        T-{selectedTicket.id}
-                      </span>
-                      {selectedTicket.isFollowUp || selectedTicket.parentTicketId ? (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
-                          FOLLOW-UP (Parent: #{selectedTicket.parentTicketId})
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-700 pb-3">
+                  <div className="flex items-start sm:items-center gap-3">
+                    {/* Dedicated Top-Left Back Arrow Button */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTicket(null)}
+                      className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition-all shrink-0 cursor-pointer shadow-xs"
+                      title="Back to Queue"
+                      aria-label="Back to Queue"
+                    >
+                      <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                    </button>
+
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
+                          T-{selectedTicket.id}
                         </span>
-                      ) : null}
-                      <h4 className="font-bold text-slate-900 dark:text-white text-base">{selectedTicket.subject}</h4>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-base">{selectedTicket.subject}</h4>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Submitted by: <strong className="text-slate-700 dark:text-slate-300">{selectedTicket.user?.fullName || 'Customer'}</strong> ({selectedTicket.user?.email || 'N/A'}) • {new Date(selectedTicket.createdAt).toLocaleString()}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Submitted by: <strong className="text-slate-700 dark:text-slate-300">{selectedTicket.user?.fullName || 'Customer'}</strong> ({selectedTicket.user?.email || 'N/A'}) • {new Date(selectedTicket.createdAt).toLocaleString()}
-                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
@@ -1503,9 +1513,10 @@ export default function AdminDashboard() {
                     </span>
                     <button
                       onClick={() => setSelectedTicket(null)}
-                      className="px-3 py-1 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-white rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                     >
-                      Back to Queue
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>Back to Queue</span>
                     </button>
                   </div>
                 </div>
@@ -1634,64 +1645,87 @@ export default function AdminDashboard() {
                   </div>
 
                   {/* Secondary Filter & Sorting Controls */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-700 text-xs">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-slate-400 font-semibold flex items-center gap-1">
-                        <Filter className="w-3.5 h-3.5" /> Inactivity:
-                      </span>
-                      {[
-                        { id: 'ALL', label: 'Any' },
-                        { id: '3', label: '>3 Days' },
-                        { id: '6', label: '>6 Days' },
-                        { id: '9', label: '>9 Days' },
-                      ].map((idl) => (
-                        <button
-                          key={idl.id}
-                          onClick={() => setAdminTicketIdleFilter(idl.id)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                            adminTicketIdleFilter === idl.id
-                              ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-                              : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
-                          }`}
-                        >
-                          {idl.label}
-                        </button>
-                      ))}
+                  <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-200 dark:border-slate-700 text-xs">
+                    {/* Left: Inactivity & Date Range Pickers */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-slate-400 font-semibold flex items-center gap-1">
+                          <Filter className="w-3.5 h-3.5" /> Inactivity:
+                        </span>
+                        {[
+                          { id: 'ALL', label: 'Any' },
+                          { id: '3', label: '>3 Days' },
+                          { id: '6', label: '>6 Days' },
+                          { id: '9', label: '>9 Days' },
+                        ].map((idl) => (
+                          <button
+                            key={idl.id}
+                            onClick={() => setAdminTicketIdleFilter(idl.id)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                              adminTicketIdleFilter === idl.id
+                                ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                                : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            {idl.label}
+                          </button>
+                        ))}
+                      </div>
 
-                      <span className="text-slate-300 dark:text-slate-700 mx-1">|</span>
+                      <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
 
-                      <span className="text-slate-400 font-semibold">Lineage:</span>
-                      {[
-                        { id: 'ALL', label: 'All' },
-                        { id: 'ORIGINAL', label: 'Original' },
-                        { id: 'FOLLOWUP', label: 'Follow-ups' },
-                      ].map((lin) => (
-                        <button
-                          key={lin.id}
-                          onClick={() => setAdminTicketLineageFilter(lin.id)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                            adminTicketLineageFilter === lin.id
-                              ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700'
-                              : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
-                          }`}
-                        >
-                          {lin.label}
-                        </button>
-                      ))}
+                      {/* Date Range Filtering */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400 font-semibold">Date:</span>
+                        <input
+                          type="date"
+                          value={adminDateFrom}
+                          onChange={(e) => setAdminDateFrom(e.target.value)}
+                          className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-600"
+                          title="From date"
+                        />
+                        <span className="text-slate-400">to</span>
+                        <input
+                          type="date"
+                          value={adminDateTo}
+                          onChange={(e) => setAdminDateTo(e.target.value)}
+                          className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-600"
+                          title="To date"
+                        />
+                        {(adminDateFrom || adminDateTo) && (
+                          <button
+                            onClick={() => {
+                              setAdminDateFrom('');
+                              setAdminDateTo('');
+                            }}
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Sort Dropdown */}
+                    {/* Right: Sort Field & Sort Order */}
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-400 font-semibold">Sort:</span>
+                      <span className="text-slate-400 font-semibold">Sort by:</span>
                       <select
-                        value={adminTicketSortBy}
-                        onChange={(e) => setAdminTicketSortBy(e.target.value)}
-                        className="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer"
+                        value={adminSortField}
+                        onChange={(e) => setAdminSortField(e.target.value as any)}
+                        className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer"
                       >
-                        <option value="SLA_URGENT">SLA Urgency (Countdown First)</option>
-                        <option value="NEWEST">Activity (Newest First)</option>
-                        <option value="OLDEST">Creation (Oldest First)</option>
+                        <option value="updatedAt">Last Activity</option>
+                        <option value="createdAt">Creation Date</option>
+                        <option value="id">Ticket ID</option>
                       </select>
+
+                      <button
+                        onClick={() => setAdminSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+                        className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer flex items-center gap-1"
+                        title={adminSortOrder === 'desc' ? 'Descending (Newest first)' : 'Ascending (Oldest first)'}
+                      >
+                        <span>{adminSortOrder === 'desc' ? 'Descending ↓' : 'Ascending ↑'}</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1711,9 +1745,17 @@ export default function AdminDashboard() {
                       else if (adminTicketIdleFilter === '6') matchesIdle = days >= 6;
                       else if (adminTicketIdleFilter === '9') matchesIdle = days >= 9;
 
-                      let matchesLineage = true;
-                      if (adminTicketLineageFilter === 'ORIGINAL') matchesLineage = !t.isFollowUp && !t.parentTicketId;
-                      else if (adminTicketLineageFilter === 'FOLLOWUP') matchesLineage = Boolean(t.isFollowUp || t.parentTicketId);
+                      // Date Range Filter
+                      let matchesDate = true;
+                      const ticketTime = new Date(t.createdAt).getTime();
+                      if (adminDateFrom) {
+                        const fromTime = new Date(adminDateFrom).setHours(0, 0, 0, 0);
+                        if (ticketTime < fromTime) matchesDate = false;
+                      }
+                      if (adminDateTo) {
+                        const toTime = new Date(adminDateTo).setHours(23, 59, 59, 999);
+                        if (ticketTime > toTime) matchesDate = false;
+                      }
 
                       const q = adminTicketSearch.toLowerCase();
                       const matchesSearch =
@@ -1725,19 +1767,18 @@ export default function AdminDashboard() {
                         (t.user?.fullName && t.user.fullName.toLowerCase().includes(q)) ||
                         (t.lastAutomatedAction && t.lastAutomatedAction.toLowerCase().includes(q));
 
-                      return matchesStatus && matchesIdle && matchesLineage && matchesSearch;
+                      return matchesStatus && matchesIdle && matchesDate && matchesSearch;
                     })
                     .sort((a: any, b: any) => {
-                      if (adminTicketSortBy === 'SLA_URGENT') {
-                        const remA = a.remainingHours ?? 9999;
-                        const remB = b.remainingHours ?? 9999;
-                        if (remA !== remB) return remA - remB;
-                        return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+                      let comparison = 0;
+                      if (adminSortField === 'id') {
+                        comparison = a.id - b.id;
+                      } else if (adminSortField === 'createdAt') {
+                        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+                      } else {
+                        comparison = new Date(a.updatedAt || a.createdAt).getTime() - new Date(b.updatedAt || b.createdAt).getTime();
                       }
-                      if (adminTicketSortBy === 'OLDEST') {
-                        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-                      }
-                      return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+                      return adminSortOrder === 'desc' ? -comparison : comparison;
                     });
 
                   if (filtered.length === 0) {
@@ -1796,14 +1837,10 @@ export default function AdminDashboard() {
                                 {/* Ticket ID */}
                                 <td className="py-4 px-5 whitespace-nowrap align-middle">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-mono text-xs text-slate-600 dark:text-slate-300 font-medium">
+                                    <span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-bold">
                                       T-{t.id}
                                     </span>
-                                    {t.isFollowUp || t.parentTicketId ? (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
-                                        FOLLOW-UP
-                                      </span>
-                                    ) : t.status === 'OPEN' || t.status === 'REOPENED' ? (
+                                    {t.status === 'OPEN' || t.status === 'REOPENED' ? (
                                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400">
                                         LIVE
                                       </span>
@@ -1911,7 +1948,7 @@ export default function AdminDashboard() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Power Off Fleet Instance?</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Emergency power off command will be issued to Hyper-V host</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Emergency power off command will be issued to host</p>
               </div>
             </div>
 

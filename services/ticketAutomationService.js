@@ -128,56 +128,59 @@ export async function runTicketAutomationCycle() {
         console.log(`[Automation] Ticket #${t.id} auto-closed due to timeout.`);
       }
 
-      // 2. DAY 9: FINAL 48-HOUR WARNING (Notification 3)
+      // 2. DAY 9: COURTEOUS FINAL FOLLOW-UP (Notification 3)
       else if (idleDays >= 9 && t.reminderLevel < 3) {
         await prisma.supportTicket.update({
           where: { id: t.id },
           data: {
             reminderLevel: 3,
-            lastAutomatedAction: 'Notification 3 sent (Final 48-hour warning)',
+            lastAutomatedAction: 'Notification 3 sent (Gentle final reminder)',
           },
         });
 
         transporterSupport.sendMail({
           from: `"ATC Customer Support" <${SUPPORT_EMAIL}>`,
           to: user.email,
-          subject: `[Final Notice] 48 Hours Remaining - Ticket #${t.id}: ${t.subject}`,
+          subject: `[Friendly Check-in] Following up on Ticket #${t.id}: ${t.subject}`,
           html: `
             <div style="font-family:sans-serif;color:#1e293b;padding:24px;max-width:600px;margin:auto;">
-              <h2 style="color:#dc2626;margin-top:0;">Final Warning: 48 Hours Remaining</h2>
+              <h2 style="color:#2563eb;margin-top:0;">Just Checking In: Ticket #${t.id}</h2>
               <p>Hi ${escapeHtml(user.fullName || 'Customer')},</p>
-              <p>We are still waiting for your response regarding ticket <strong>#${t.id}</strong>. If no update is received within 48 hours, this ticket will be closed automatically.</p>
-              <p style="background:#fef2f2;border-left:4px solid #dc2626;padding:14px;border-radius:4px;color:#991b1b;font-size:14px;">
+              <p>We wanted to gently follow up on your ticket <strong>#${t.id}</strong> to ensure everything is running smoothly for you.</p>
+              <p>If you still need assistance, please feel free to reply at your earliest convenience. If everything is already working as expected, no action is needed — this ticket will gracefully close in 48 hours to keep your queue organized.</p>
+              <p style="background:#f8fafc;border-left:4px solid #3b82f6;padding:14px;border-radius:4px;color:#1e293b;font-size:14px;">
                 <strong>Subject:</strong> ${escapeHtml(t.subject)}
               </p>
-              <a href="${APP_URL}/dashboard?tab=support&ticketId=${t.id}" style="background:#dc2626;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:14px;">Reply to Ticket Now</a>
+              <a href="${APP_URL}/dashboard?tab=support&ticketId=${t.id}" style="background:#2563eb;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:14px;">View Ticket & Reply</a>
+              <p style="font-size:12px;color:#64748b;margin-top:18px;">We are always here to help whenever you need us!</p>
             </div>
           `,
         }).catch((e) => console.warn('[Day 9 mail error]:', e.message));
 
-        console.log(`[Automation] Ticket #${t.id} sent Day 9 final warning.`);
+        console.log(`[Automation] Ticket #${t.id} sent Day 9 gentle check-in.`);
       }
 
-      // 3. DAY 6: URGENT REMINDER (Notification 2)
+      // 3. DAY 6: COURTEOUS FOLLOW-UP (Notification 2)
       else if (idleDays >= 6 && t.reminderLevel < 2) {
         await prisma.supportTicket.update({
           where: { id: t.id },
           data: {
             reminderLevel: 2,
-            lastAutomatedAction: 'Notification 2 sent (Day 6 urgent reminder)',
+            lastAutomatedAction: 'Notification 2 sent (Gentle progress check)',
           },
         });
 
         transporterSupport.sendMail({
           from: `"ATC Customer Support" <${SUPPORT_EMAIL}>`,
           to: user.email,
-          subject: `[Urgent Reminder] Ticket #${t.id} is awaiting your input`,
+          subject: `[Gentle Reminder] Update on Ticket #${t.id}: ${t.subject}`,
           html: `
             <div style="font-family:sans-serif;color:#1e293b;padding:24px;max-width:600px;margin:auto;">
-              <h2 style="color:#f59e0b;margin-top:0;">Urgent Reminder: We need your response</h2>
+              <h2 style="color:#2563eb;margin-top:0;">Gentle Follow-up: Ticket #${t.id}</h2>
               <p>Hi ${escapeHtml(user.fullName || 'Customer')},</p>
-              <p>Our team is waiting for your response on ticket <strong>#${t.id}</strong> so we can resolve your issue.</p>
-              <p style="background:#fffbeb;border-left:4px solid #f59e0b;padding:14px;border-radius:4px;color:#92400e;font-size:14px;">
+              <p>We hope you are having a great week! Our support team is following up on your request regarding <strong>#${t.id}</strong> to see if you had a chance to test our previous recommendations.</p>
+              <p>Please let us know if you need any additional help or have questions — we are happy to assist further.</p>
+              <p style="background:#f8fafc;border-left:4px solid #3b82f6;padding:14px;border-radius:4px;color:#1e293b;font-size:14px;">
                 <strong>Subject:</strong> ${escapeHtml(t.subject)}
               </p>
               <a href="${APP_URL}/dashboard?tab=support&ticketId=${t.id}" style="background:#2563eb;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;display:inline-block;margin-top:14px;">View Ticket & Reply</a>
@@ -185,7 +188,7 @@ export async function runTicketAutomationCycle() {
           `,
         }).catch((e) => console.warn('[Day 6 mail error]:', e.message));
 
-        console.log(`[Automation] Ticket #${t.id} sent Day 6 reminder.`);
+        console.log(`[Automation] Ticket #${t.id} sent Day 6 gentle follow-up.`);
       }
 
       // 4. DAY 3: GENTLE REMINDER (Notification 1)
@@ -194,7 +197,7 @@ export async function runTicketAutomationCycle() {
           where: { id: t.id },
           data: {
             reminderLevel: 1,
-            lastAutomatedAction: 'Notification 1 sent (Day 3 gentle reminder)',
+            lastAutomatedAction: 'Notification 1 sent (Gentle initial reminder)',
           },
         });
 
@@ -204,9 +207,9 @@ export async function runTicketAutomationCycle() {
           subject: `[Friendly Reminder] Update on Ticket #${t.id}: ${t.subject}`,
           html: `
             <div style="font-family:sans-serif;color:#1e293b;padding:24px;max-width:600px;margin:auto;">
-              <h2 style="color:#2563eb;margin-top:0;">Gentle Reminder: Awaiting your update</h2>
+              <h2 style="color:#2563eb;margin-top:0;">Friendly Reminder: Ticket #${t.id}</h2>
               <p>Hi ${escapeHtml(user.fullName || 'Customer')},</p>
-              <p>Our engineering team previously provided a response on your ticket <strong>#${t.id}</strong>. Please let us know if our guidance resolved your issue or if you need additional help.</p>
+              <p>Our team previously provided a response on ticket <strong>#${t.id}</strong>. Please let us know if our guidance resolved your issue or if you need additional help.</p>
               <p style="background:#f8fafc;padding:14px;border-radius:8px;border:1px solid #e2e8f0;font-size:14px;">
                 <strong>Subject:</strong> ${escapeHtml(t.subject)}
               </p>

@@ -367,7 +367,7 @@ export default function ResourcePools() {
 
               <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl text-xs text-blue-900 dark:text-blue-300">
                 <p className="text-[11px] leading-relaxed">
-                  Pool expansions are evaluated based on account tier and usually provisioned within 10 minutes by the Hyper-V hypervisor scheduler.
+                  Pool expansions are evaluated based on account tier and usually provisioned within 10 minutes by our automated cloud provisioning scheduler.
                 </p>
               </div>
 

@@ -75,7 +75,7 @@ export default function ConnectionGuideModal({
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Laptop className="w-4 h-4" /> OpenSSH (Linux/Mac/PowerShell)
+            <Laptop className="w-4 h-4" /> OpenSSH (Terminal / Command Prompt)
           </button>
           <button
             onClick={() => setActiveTab('putty')}

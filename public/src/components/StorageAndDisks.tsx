@@ -65,14 +65,14 @@ export default function StorageAndDisks() {
       vms.forEach((vm: any) => {
         virtualDisks.push({
           id: `disk-${vm.vmId}-os`,
-          diskName: `${vm.name.toLowerCase()}-root.vhdx`,
+          diskName: `${vm.name.toLowerCase()}-disk0`,
           vmId: vm.vmId,
           vmName: vm.name,
           capacityGb: vm.storageGb || vm.diskGB || 40,
           type: 'NVMe Gen4 SSD',
           bus: 'SCSI Controller (0:0)',
           status: vm.status === 'RUNNING' ? 'ONLINE' : 'ONLINE',
-          path: `D:\\Hyper-V\\Virtual Hard Disks\\${vm.name}.vhdx`,
+          path: `/dev/cloud-storage/vol-${vm.vmId}`,
         });
       });
       setDisks(virtualDisks);
@@ -145,14 +145,14 @@ export default function StorageAndDisks() {
 
       const newVol: VirtualDisk = {
         id: `vol-${Date.now()}`,
-        diskName: `${attachVolumeName.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}.vhdx`,
+        diskName: `${attachVolumeName.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}-vol`,
         vmId: attachTargetVmId,
         vmName: targetVm ? targetVm.name : 'Virtual Machine',
         capacityGb: attachVolumeSize,
-        type: 'Block Storage (VHDX)',
+        type: 'Block Storage (NVMe)',
         bus: 'SCSI Controller (0:1)',
         status: 'ONLINE',
-        path: `D:\\Hyper-V\\Virtual Hard Disks\\${attachVolumeName}.vhdx`,
+        path: `/dev/cloud-storage/${attachVolumeName.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`,
       };
 
       setDisks((prev) => [...prev, newVol]);
@@ -179,7 +179,7 @@ export default function StorageAndDisks() {
             </span>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Manage attached VHDX virtual hard disks, perform on-the-fly disk expansions, and attach secondary block storage.
+            Manage attached virtual hard drives, perform on-the-fly disk expansions, and attach secondary block storage.
           </p>
         </div>
 
@@ -264,7 +264,7 @@ export default function StorageAndDisks() {
         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div>
             <h2 className="font-bold text-slate-900 dark:text-white font-poppins">Attached Virtual Hard Disks</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">All provisioned VHDX files and dynamically expanding volumes</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">All provisioned virtual disks and dynamically expanding volumes</p>
           </div>
           <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg">
             {disks.length} Volume{disks.length === 1 ? '' : 's'}

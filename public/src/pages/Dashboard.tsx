@@ -897,8 +897,8 @@ export default function Dashboard() {
                   <h1 className="text-2xl font-bold text-blue-950 dark:text-white font-poppins">
                     Infrastructure Dashboard
                   </h1>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400">
-                    Hyper-V Cluster Online
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400">
+                    Enterprise Cloud Online
                   </span>
                 </div>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -1016,7 +1016,7 @@ export default function Dashboard() {
                 <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-950 via-slate-900 to-indigo-950 p-8 md:p-12 text-white shadow-xl border border-slate-800">
                   <div className="relative z-10 max-w-2xl space-y-4">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold">
-                      <Sparkles className="w-3.5 h-3.5" /> High-Performance Gen 2 Hyper-V Cloud
+                      <Sparkles className="w-3.5 h-3.5" /> High-Performance Cloud Infrastructure
                     </div>
                     <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight font-poppins">
                       Launch Your First Virtual Private Server
@@ -1127,7 +1127,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* LIVE HYPER-V RESOURCE MONITORING & PERFORMANCE DASHBOARD */}
+            {/* LIVE RESOURCE MONITORING & PERFORMANCE DASHBOARD */}
             {instances.length > 0 && (() => {
               const activeMonitoringVm = instances.find((i) => i.vmId === activeTelemetryVmId) || instances[0];
               const isVmRunning = activeMonitoringVm?.status === 'running';
@@ -1143,7 +1143,7 @@ export default function Dashboard() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h2 className="text-base font-bold text-slate-900 dark:text-white font-poppins">
-                            Live Hyper-V Telemetry & Resource Load
+                            Live Server Telemetry & Resource Load
                           </h2>
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             isVmRunning ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
@@ -1153,7 +1153,7 @@ export default function Dashboard() {
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                          High-resolution telemetry stream directly from Windows Hyper-V Host cluster
+                          High-resolution telemetry stream directly from cloud compute nodes
                         </p>
                       </div>
                     </div>
@@ -1245,7 +1245,7 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* 3. NVME STORAGE VHDX & WINDOWS TASK MANAGER GRAPH */}
+                      {/* 3. NVME STORAGE & PERFORMANCE GRAPH */}
                       <div className="p-4 bg-gradient-to-br from-amber-50/50 to-slate-50 dark:from-slate-800/80 dark:to-slate-900/80 rounded-2xl border border-amber-100/90 dark:border-amber-900/30 shadow-xs flex flex-col justify-between space-y-3">
                         <div>
                           <div className="flex items-center justify-between mb-2">
@@ -1295,7 +1295,7 @@ export default function Dashboard() {
                         {activeMonitoringVm.name} is Powered Off
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1">
-                        Power on this virtual machine to start streaming real-time Hyper-V CPU usage, memory demand, and NVMe disk throughput directly to this dashboard.
+                        Power on this virtual machine to start streaming real-time CPU usage, memory demand, and NVMe disk throughput directly to this dashboard.
                       </p>
                     </div>
                   )}
@@ -1692,7 +1692,7 @@ export default function Dashboard() {
               Deploy New Virtual Machine
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
-              Instant Generation 2 Hyper-V provisioning from enterprise image templates.
+              Instant cloud provisioning from enterprise image templates.
             </p>
 
             <form onSubmit={handleDeploySubmit} className="space-y-4">
@@ -2016,7 +2016,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Power Off Machine?</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Graceful shutdown command will be issued to Hyper-V</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Graceful shutdown command will be issued to the server</p>
               </div>
             </div>
 
@@ -2070,7 +2070,7 @@ export default function Dashboard() {
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                  <strong className="text-slate-900 font-mono">{deletingInstance.name}</strong> ({deletingInstance.ip}) is currently active and running. For cloud data protection and hypervisor integrity, active virtual machines must be powered off before permanent termination.
+                  <strong className="text-slate-900 font-mono">{deletingInstance.name}</strong> ({deletingInstance.ip}) is currently active and running. For cloud data protection and storage integrity, active virtual machines must be powered off before permanent termination.
                 </p>
 
                 <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 mb-5 space-y-1.5">
@@ -2134,7 +2134,7 @@ export default function Dashboard() {
 
                 <p className="text-xs text-slate-600 leading-relaxed mb-3">
                   Are you sure you want to permanently terminate <strong className="text-slate-900 font-mono">{deletingInstance.name}</strong> ({deletingInstance.ip})?
-                  The Hyper-V VM and all associated VHDX storage will be unlinked and deleted, and its IP will be released.
+                  The virtual machine and all associated storage will be unlinked and deleted, and its IP will be released.
                 </p>
 
                 <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3 mb-4">
@@ -2609,7 +2609,7 @@ export default function Dashboard() {
 
               <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-900">
                 <p className="text-[11px] leading-relaxed">
-                  This command updates the guest password directly via the hypervisor bridge. VM does not need to restart.
+                  This command updates the guest password directly. VM does not need to restart.
                 </p>
               </div>
 

@@ -6,7 +6,7 @@ export default function Services() {
     {
       icon: <Server className="w-6 h-6 text-blue-600" />,
       title: "Data Center Design & Management",
-      description: "Architecture and management of highly available hosting platforms, Hyper-V clusters, and virtual private servers."
+      description: "Architecture and management of highly available hosting platforms, private cloud clusters, and virtual private servers."
     },
     {
       icon: <Shield className="w-6 h-6 text-blue-600" />,
@@ -21,7 +21,7 @@ export default function Services() {
     {
       icon: <Cpu className="w-6 h-6 text-blue-600" />,
       title: "Hardware Sizing & Optimization",
-      description: "Utilization analysis to optimize CPU, memory, and NVMe storage allocations across hypervisors."
+      description: "Utilization analysis to optimize CPU, memory, and NVMe storage allocations across cloud clusters."
     },
     {
       icon: <Database className="w-6 h-6 text-blue-600" />,
@@ -31,7 +31,7 @@ export default function Services() {
     {
       icon: <Settings className="w-6 h-6 text-blue-600" />,
       title: "System Automation & Scripting",
-      description: "Custom PowerShell and Bash scripts for routine server operations, health checks, and state transitions."
+      description: "Automated workflows and management scripts for routine server operations, health checks, and state transitions."
     }
   ];
 

@@ -203,7 +203,7 @@ export default function BillingAndInvoices() {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
         doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
-        doc.text(item.specs || 'Dedicated Hyper-V Compute Allocation', 24, y + 4.5);
+        doc.text(item.specs || 'Dedicated Cloud Compute Allocation', 24, y + 4.5);
 
         doc.setFontSize(8.5);
         doc.text(item.period || 'Monthly', 125, y + 2);

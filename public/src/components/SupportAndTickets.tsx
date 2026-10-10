@@ -88,8 +88,10 @@ export default function SupportAndTickets() {
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'AWAITING_USER_ACTION' | 'REOPENED' | 'RESOLVED' | 'CLOSED_TIMEOUT'>('ALL');
   const [idleFilter, setIdleFilter] = useState<'ALL' | '3' | '6' | '9'>('ALL');
-  const [lineageFilter, setLineageFilter] = useState<'ALL' | 'ORIGINAL' | 'FOLLOWUP'>('ALL');
-  const [sortBy, setSortBy] = useState<'NEWEST' | 'OLDEST' | 'SLA_URGENT'>('NEWEST');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [sortField, setSortField] = useState<'updatedAt' | 'createdAt' | 'id'>('updatedAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Active Selected Ticket for Full Thread Chat
@@ -100,6 +102,8 @@ export default function SupportAndTickets() {
 
   // New Ticket Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState<string>('TECHNICAL');
+  const [otherCategoryText, setOtherCategoryText] = useState<string>('');
   const [newSubject, setNewSubject] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [newPriority, setNewPriority] = useState<'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'>('NORMAL');
@@ -184,12 +188,19 @@ export default function SupportAndTickets() {
       return;
     }
 
+    let finalSubjectText = newSubject.trim();
+    if (newCategory === 'OTHER' && otherCategoryText.trim()) {
+      finalSubjectText = `[${otherCategoryText.trim()}] ${finalSubjectText}`;
+    } else if (newCategory !== 'OTHER' && newCategory) {
+      finalSubjectText = `[${newCategory}] ${finalSubjectText}`;
+    }
+
     setSubmitting(true);
     try {
       const res = await apiCall('/tickets', {
         method: 'POST',
         body: JSON.stringify({
-          subject: newSubject.trim(),
+          subject: finalSubjectText,
           message: newMessage.trim(),
           priority: newPriority,
           vmId: selectedVmId ? Number(selectedVmId) : undefined,
@@ -201,6 +212,8 @@ export default function SupportAndTickets() {
         setIsCreateOpen(false);
         setNewSubject('');
         setNewMessage('');
+        setNewCategory('TECHNICAL');
+        setOtherCategoryText('');
         setNewPriority('NORMAL');
         setSelectedVmId('');
         fetchTickets();
@@ -278,10 +291,17 @@ export default function SupportAndTickets() {
       else if (idleFilter === '6') matchesIdle = days >= 6;
       else if (idleFilter === '9') matchesIdle = days >= 9;
 
-      // 3. Lineage Filter (Original vs Follow-up)
-      let matchesLineage = true;
-      if (lineageFilter === 'ORIGINAL') matchesLineage = !t.isFollowUp && !t.parentTicketId;
-      else if (lineageFilter === 'FOLLOWUP') matchesLineage = Boolean(t.isFollowUp || t.parentTicketId);
+      // 3. Date Range Filter (From Date to To Date)
+      let matchesDate = true;
+      const ticketTime = new Date(t.createdAt).getTime();
+      if (dateFrom) {
+        const fromTime = new Date(dateFrom).setHours(0, 0, 0, 0);
+        if (ticketTime < fromTime) matchesDate = false;
+      }
+      if (dateTo) {
+        const toTime = new Date(dateTo).setHours(23, 59, 59, 999);
+        if (ticketTime > toTime) matchesDate = false;
+      }
 
       // 4. Search Query
       const q = searchQuery.toLowerCase();
@@ -293,22 +313,20 @@ export default function SupportAndTickets() {
         (t.lastAutomatedAction && t.lastAutomatedAction.toLowerCase().includes(q)) ||
         (t.response && t.response.toLowerCase().includes(q));
 
-      return matchesStatus && matchesIdle && matchesLineage && matchesSearch;
+      return matchesStatus && matchesIdle && matchesDate && matchesSearch;
     })
     .sort((a, b) => {
-      if (sortBy === 'SLA_URGENT') {
-        // Sort by time remaining until Auto-Close (Ascending) - urgent first
-        const remA = a.remainingHours ?? 9999;
-        const remB = b.remainingHours ?? 9999;
-        if (remA !== remB) return remA - remB;
-        // Secondary sort: Last activity newest first
-        return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+      let comparison = 0;
+      if (sortField === 'id') {
+        comparison = a.id - b.id;
+      } else if (sortField === 'createdAt') {
+        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else {
+        // Default: updatedAt
+        comparison = new Date(a.updatedAt || a.createdAt).getTime() - new Date(b.updatedAt || b.createdAt).getTime();
       }
-      if (sortBy === 'OLDEST') {
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      }
-      // Default: NEWEST (Last Activity Date - Newest First)
-      return new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime();
+
+      return sortOrder === 'desc' ? -comparison : comparison;
     });
 
   const getPriorityBadge = (p: string) => {
@@ -358,7 +376,7 @@ export default function SupportAndTickets() {
             </span>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Open engineering tickets for VM networking, hypervisor diagnostics, OS installations, and storage assistance.
+            Open engineering tickets for instance configurations, networking setup, billing inquiries, and technical guidance.
           </p>
         </div>
 
@@ -474,64 +492,87 @@ export default function SupportAndTickets() {
         </div>
 
         {/* Secondary Filter & Sorting Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-slate-400 font-semibold flex items-center gap-1">
-              <Filter className="w-3.5 h-3.5" /> Inactivity:
-            </span>
-            {[
-              { id: 'ALL', label: 'Any' },
-              { id: '3', label: '>3 Days' },
-              { id: '6', label: '>6 Days' },
-              { id: '9', label: '>9 Days' },
-            ].map((idl) => (
-              <button
-                key={idl.id}
-                onClick={() => setIdleFilter(idl.id as any)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                  idleFilter === idl.id
-                    ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-                    : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                {idl.label}
-              </button>
-            ))}
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
+          {/* Left: Inactivity & Date Range Pickers */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 font-semibold flex items-center gap-1">
+                <Filter className="w-3.5 h-3.5" /> Inactivity:
+              </span>
+              {[
+                { id: 'ALL', label: 'Any' },
+                { id: '3', label: '>3 Days' },
+                { id: '6', label: '>6 Days' },
+                { id: '9', label: '>9 Days' },
+              ].map((idl) => (
+                <button
+                  key={idl.id}
+                  onClick={() => setIdleFilter(idl.id as any)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    idleFilter === idl.id
+                      ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                      : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  {idl.label}
+                </button>
+              ))}
+            </div>
 
-            <span className="text-slate-300 dark:text-slate-700 mx-1">|</span>
+            <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
 
-            <span className="text-slate-400 font-semibold">Lineage:</span>
-            {[
-              { id: 'ALL', label: 'All' },
-              { id: 'ORIGINAL', label: 'Original' },
-              { id: 'FOLLOWUP', label: 'Follow-ups' },
-            ].map((lin) => (
-              <button
-                key={lin.id}
-                onClick={() => setLineageFilter(lin.id as any)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                  lineageFilter === lin.id
-                    ? 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-800 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-700'
-                    : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                {lin.label}
-              </button>
-            ))}
+            {/* Date Range Filtering */}
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 font-semibold">Date:</span>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="px-2.5 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-600"
+                title="From date"
+              />
+              <span className="text-slate-400">to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="px-2.5 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-600"
+                title="To date"
+              />
+              {(dateFrom || dateTo) && (
+                <button
+                  onClick={() => {
+                    setDateFrom('');
+                    setDateTo('');
+                  }}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Sort Dropdown */}
+          {/* Right: Sort Field & Sort Order */}
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-semibold">Sort:</span>
+            <span className="text-slate-400 font-semibold">Sort by:</span>
             <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="px-3 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-600"
+              value={sortField}
+              onChange={(e) => setSortField(e.target.value as any)}
+              className="px-2.5 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer"
             >
-              <option value="NEWEST">Activity (Newest First)</option>
-              <option value="OLDEST">Creation (Oldest First)</option>
-              <option value="SLA_URGENT">SLA Urgency (Countdown First)</option>
+              <option value="updatedAt">Last Activity</option>
+              <option value="createdAt">Creation Date</option>
+              <option value="id">Ticket ID</option>
             </select>
+
+            <button
+              onClick={() => setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+              className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer flex items-center gap-1"
+              title={sortOrder === 'desc' ? 'Descending (Newest first)' : 'Ascending (Oldest first)'}
+            >
+              <span>{sortOrder === 'desc' ? 'Descending ↓' : 'Ascending ↑'}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -546,19 +587,32 @@ export default function SupportAndTickets() {
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
           {/* Header & Back Button */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
-                  Ticket #{activeTicket.id}
-                </span>
-                <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins">{activeTicket.subject}</h3>
+            <div className="flex items-start sm:items-center gap-3">
+              {/* Dedicated Top-Left Back Arrow Button */}
+              <button
+                type="button"
+                onClick={() => setActiveTicket(null)}
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 transition-all shrink-0 cursor-pointer shadow-xs"
+                title="Back to Tickets"
+                aria-label="Back to Tickets"
+              >
+                <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+              </button>
+
+              <div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
+                    Ticket #{activeTicket.id}
+                  </span>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins">{activeTicket.subject}</h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Submitted on {new Date(activeTicket.createdAt).toLocaleString()}
+                  {activeTicket.assignedTo && (
+                    <> • Assigned Engineer: <strong className="text-slate-700 dark:text-slate-300">{activeTicket.assignedTo}</strong></>
+                  )}
+                </p>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Submitted on {new Date(activeTicket.createdAt).toLocaleString()}
-                {activeTicket.assignedTo && (
-                  <> • Assigned Engineer: <strong className="text-slate-700 dark:text-slate-300">{activeTicket.assignedTo}</strong></>
-                )}
-              </p>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
@@ -580,15 +634,6 @@ export default function SupportAndTickets() {
                   <span>{closingId === activeTicket.id ? 'Resolving...' : 'Resolve & Close'}</span>
                 </button>
               )}
-
-              <button
-                type="button"
-                onClick={() => setActiveTicket(null)}
-                className="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 inline-flex items-center gap-1.5 transition-all cursor-pointer"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Back to All Tickets</span>
-              </button>
             </div>
           </div>
 
@@ -727,14 +772,10 @@ export default function SupportAndTickets() {
                       {/* Ticket ID */}
                       <td className="py-4 px-5 whitespace-nowrap align-middle">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-slate-600 dark:text-slate-300 font-medium">
+                          <span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-bold">
                             T-{t.id}
                           </span>
-                          {t.isFollowUp || t.parentTicketId ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
-                              FOLLOW-UP
-                            </span>
-                          ) : t.status === 'OPEN' || t.status === 'REOPENED' ? (
+                          {t.status === 'OPEN' || t.status === 'REOPENED' ? (
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400">
                               LIVE
                             </span>
@@ -809,6 +850,35 @@ export default function SupportAndTickets() {
 
             {/* Form */}
             <form onSubmit={handleCreateTicket} className="p-6 space-y-4">
+              {/* Category Selection with 'Other' support */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Topic / Category *
+                </label>
+                <select
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 cursor-pointer"
+                >
+                  <option value="TECHNICAL">Technical & Server Diagnostics</option>
+                  <option value="BILLING">Billing, Invoices & Subscriptions</option>
+                  <option value="NETWORK">Networking & Port Forwarding</option>
+                  <option value="ACCESS">Account Access & Credentials</option>
+                  <option value="OTHER">Other (Specify custom topic)</option>
+                </select>
+
+                {newCategory === 'OTHER' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter your custom topic or inquiry area..."
+                    value={otherCategoryText}
+                    onChange={(e) => setOtherCategoryText(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-blue-300 dark:border-blue-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 animate-in fade-in duration-150"
+                  />
+                )}
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                   Subject Line *
