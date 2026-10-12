@@ -123,7 +123,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/tickets', ticketRoutes);
-app.use('/api/sites', siteRoutes);
+// app.use('/api/sites', siteRoutes); // Disabled: Platform focused purely on Dedicated Cloud VPS
 
 // Public announcements route for website navbar ticker
 app.get('/api/announcements', async (req, res) => {
