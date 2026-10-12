@@ -36,6 +36,26 @@ try {
             }
         }
 
+        # If multiple IPs discovered (e.g. stale DHCP lease + active lease), keep only the responsive one
+        if ($IPs.Count -gt 1) {
+            $ActiveIPs = @()
+            foreach ($candidate in $IPs) {
+                try {
+                    $tcpClient = New-Object System.Net.Sockets.TcpClient
+                    $connectTask = $tcpClient.BeginConnect($candidate, 22, $null, $null)
+                    $connected = $connectTask.AsyncWaitHandle.WaitOne(500, $false)
+                    if ($connected) {
+                        $tcpClient.EndConnect($connectTask)
+                        $ActiveIPs += $candidate
+                    }
+                    $tcpClient.Close()
+                } catch {}
+            }
+            if ($ActiveIPs.Count -gt 0) {
+                $IPs = $ActiveIPs
+            }
+        }
+
         # Real-time resource metering and telemetry
         $Measure = $null
         try {

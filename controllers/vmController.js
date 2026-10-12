@@ -97,16 +97,16 @@ export async function getUserVMs(req, res) {
                   }).catch(() => {});
                   vm.ipPool[0].ipAddress = discoveredIp;
                 }
-              } else {
                 const newIpRecord = await prisma.iPPool.create({
                   data: {
                     ipAddress: discoveredIp,
                     subnetMask: '255.255.240.0',
-                    gateway: '192.168.0.1',
+                    gateway: '172.27.32.1',
+                    ipType: 'PUBLIC_IPV4',
                     status: 'ASSIGNED',
                     assignedVmId: vm.vmId,
                   },
-                }).catch(() => {});
+                }).catch((err) => console.error('[iPPool create error]:', err.message));
                 if (newIpRecord) vm.ipPool = [newIpRecord];
               }
             }
@@ -408,7 +408,8 @@ export async function deployVM(req, res) {
         data: {
           ipAddress: 'DHCP Leasing...',
           subnetMask: '255.255.240.0',
-          gateway: '192.168.0.1',
+          gateway: '172.27.32.1',
+          ipType: 'PUBLIC_IPV4',
           status: 'AVAILABLE',
         },
       });
@@ -963,11 +964,12 @@ export async function getConsoleSession(req, res) {
               data: {
                 ipAddress: liveIp,
                 subnetMask: '255.255.240.0',
-                gateway: '192.168.0.1',
+                gateway: '172.27.32.1',
+                ipType: 'PUBLIC_IPV4',
                 status: 'ASSIGNED',
                 assignedVmId: vm.vmId,
               },
-            }).catch(() => {});
+            }).catch((err) => console.error('[iPPool create error]:', err.message));
           }
         }
       }
