@@ -48,7 +48,7 @@ export async function createTenantSite(site) {
   const siteDir = `/var/atc/sites/site_${site.id}/public_html`;
   const domainName = site.domain;
   const customDomain = site.customDomain ? site.customDomain.trim() : '';
-  const serverNames = [domainName, customDomain].filter(Boolean).join(' ');
+  const serverNames = [...new Set([domainName, customDomain].filter(Boolean))].join(' ');
 
   // 1. Create directory structure
   await runOnWorker(`sudo mkdir -p "${siteDir}" && sudo chown -R 33:33 "${siteDir}" 2>/dev/null || sudo chown -R ubuntu:ubuntu "${siteDir}"`);
@@ -63,10 +63,10 @@ server {
 
     location / {
         proxy_pass http://site_${site.id}:80;
-        proxy_set_header Host \\$host;
-        proxy_set_header X-Real-IP \\$remote_addr;
-        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \\$scheme;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 `.trim();
