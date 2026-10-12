@@ -51,10 +51,118 @@ export function setupTerminalWebSocket(server) {
     }
 
     const userId = decoded.userId;
+    const siteIdParam = Number(url.searchParams.get('siteId'));
+    const siteId = siteIdParam || decoded.siteId;
     const vmId = vmIdParam || decoded.vmId;
 
+    // =========================================================================
+    // BRANCH A: Container Sandbox Terminal (for Managed Web Hosting / Developers)
+    // =========================================================================
+    if (siteId) {
+      const site = await prisma.managedWebsite.findFirst({
+        where: { id: siteId, userId },
+      });
+
+      if (!site) {
+        ws.send('\r\n\x1b[31m[ERROR] Managed website container not found or access denied.\x1b[0m\r\n');
+        return ws.close();
+      }
+
+      if (site.status === 'STOPPED') {
+        ws.send(`\r\n\x1b[33m====================================================\x1b[0m\r\n`);
+        ws.send(`\x1b[1;33m  [NOTICE] CONTAINER IS CURRENTLY STOPPED\x1b[0m\r\n`);
+        ws.send(`  Site container 'site_${site.id}' is offline.\r\n`);
+        ws.send(`  Please click the Start button in the ATC Websites Manager.\r\n`);
+        ws.send(`\x1b[33m====================================================\x1b[0m\r\n\r\n`);
+        return ws.close();
+      }
+
+      ws.send(`\r\n\x1b[36m====================================================\x1b[0m\r\n`);
+      ws.send(`\x1b[1;32m  ATC CLOUD DEVELOPER SANDBOX CONSOLE\x1b[0m\r\n`);
+      ws.send(`  Site: \x1b[33m${site.name}\x1b[0m | App: \x1b[35m${site.appType}\x1b[0m\r\n`);
+      ws.send(`  Container: \x1b[36msite_${site.id}\x1b[0m (Isolated Environment)\r\n`);
+      ws.send(`\x1b[36m====================================================\x1b[0m\r\n\r\n`);
+
+      const workerHost = process.env.ATC_WORKER_HOST || '172.27.47.192';
+      const sshConn = new SSHClient();
+      let shellStream = null;
+      let ptyRows = 30;
+      let ptyCols = 100;
+
+      sshConn.on('ready', () => {
+        // Spawn docker exec interactive shell directly inside tenant container
+        const execCmd = `docker exec -it site_${site.id} /bin/bash 2>/dev/null || docker exec -it site_${site.id} /bin/sh`;
+        sshConn.exec(execCmd, { pty: { term: 'xterm-256color', rows: ptyRows, cols: ptyCols } }, (err, stream) => {
+          if (err) {
+            if (ws.readyState === ws.OPEN) {
+              ws.send(`\r\n\x1b[31m[ERROR] Failed to attach to container: ${err.message}\x1b[0m\r\n`);
+              ws.close();
+            }
+            return sshConn.end();
+          }
+
+          shellStream = stream;
+          stream.on('data', (data) => {
+            if (ws.readyState === ws.OPEN) ws.send(data.toString('utf-8'));
+          });
+          stream.stderr.on('data', (data) => {
+            if (ws.readyState === ws.OPEN) ws.send(data.toString('utf-8'));
+          });
+          stream.on('close', () => {
+            if (ws.readyState === ws.OPEN) ws.close();
+            sshConn.end();
+          });
+        });
+      });
+
+      sshConn.on('error', (err) => {
+        if (ws.readyState === ws.OPEN) {
+          ws.send(`\r\n\x1b[31m[SSH Error] Worker node unreachable: ${err.message}\x1b[0m\r\n`);
+          ws.close();
+        }
+      });
+
+      ws.on('message', (msg) => {
+        if (typeof msg === 'string' ? msg.charCodeAt(0) === 123 : (msg && msg[0] === 123)) {
+          try {
+            const str = msg.toString();
+            if (str.startsWith('{"type":"resize"')) {
+              const parsed = JSON.parse(str);
+              if (parsed.cols && parsed.rows && shellStream && shellStream.setWindow) {
+                shellStream.setWindow(Number(parsed.rows), Number(parsed.cols), 0, 0);
+              }
+              return;
+            }
+          } catch {}
+        }
+        if (shellStream && shellStream.writable) {
+          shellStream.write(msg);
+        }
+      });
+
+      ws.on('close', () => {
+        try {
+          if (shellStream) shellStream.end();
+          sshConn.end();
+        } catch (_) {}
+      });
+
+      sshConn.connect({
+        host: workerHost,
+        port: 22,
+        username: process.env.ATC_WORKER_USER || 'ubuntu',
+        password: process.env.ATC_WORKER_PASS || 'root',
+        readyTimeout: 10000,
+      });
+
+      return;
+    }
+
+    // =========================================================================
+    // BRANCH B: Full Virtual Machine Terminal (Hyper-V Guest)
+    // =========================================================================
     if (!vmId) {
-      ws.send('\r\n\x1b[31m[ERROR] Valid vmId is required.\x1b[0m\r\n');
+      ws.send('\r\n\x1b[31m[ERROR] Valid vmId or siteId is required.\x1b[0m\r\n');
       return ws.close();
     }
 

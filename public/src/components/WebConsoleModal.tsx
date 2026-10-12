@@ -13,9 +13,11 @@ import {
 import { apiCall } from '../services/api';
 
 interface WebConsoleModalProps {
-  vmId: number;
-  vmName: string;
-  vmIp: string;
+  vmId?: number;
+  siteId?: number;
+  vmName?: string;
+  siteName?: string;
+  vmIp?: string;
   adminUser?: string;
   adminPassword?: string;
   onClose: () => void;
@@ -24,7 +26,9 @@ interface WebConsoleModalProps {
 
 export default function WebConsoleModal({
   vmId,
+  siteId,
   vmName,
+  siteName,
   vmIp,
   adminUser: initialUser = 'ubuntu',
   adminPassword: initialPassword = 'root',
@@ -35,6 +39,8 @@ export default function WebConsoleModal({
   const xtermInstance = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+
+  const displayName = siteName || vmName || 'Web Terminal';
 
   const onSessionEndRef = useRef(onSessionEnd);
   useEffect(() => {
@@ -63,19 +69,28 @@ export default function WebConsoleModal({
     term.write('\r\n\x1b[36m[Console]\x1b[0m Requesting secure session ticket...\r\n');
 
     try {
-      const session = await apiCall(`/vms/${vmId}/console-session`, { method: 'POST' });
-
-      if (!isMountedRef.current) return;
-
-      if (!session || !session.ticket) {
-        throw new Error(session?.error || 'Failed to obtain console session ticket.');
-      }
-
-      term.write(`\x1b[32m[Console]\x1b[0m Ticket granted. Establishing SSH bridge to ${session.ip || vmIp}...\r\n`);
-
+      let session: any;
+      let wsUrl = '';
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/api/ws/terminal?ticket=${encodeURIComponent(session.ticket)}&vmId=${vmId}`;
+
+      if (siteId) {
+        session = await apiCall(`/sites/${siteId}/console-session`, { method: 'POST' });
+        if (!isMountedRef.current) return;
+        if (!session || !session.ticket) {
+          throw new Error(session?.error || 'Failed to obtain container console session ticket.');
+        }
+        term.write(`\x1b[32m[Console]\x1b[0m Ticket granted. Attaching to container sandbox (site_${siteId})...\r\n`);
+        wsUrl = `${protocol}//${host}/api/ws/terminal?ticket=${encodeURIComponent(session.ticket)}&siteId=${siteId}`;
+      } else {
+        session = await apiCall(`/vms/${vmId}/console-session`, { method: 'POST' });
+        if (!isMountedRef.current) return;
+        if (!session || !session.ticket) {
+          throw new Error(session?.error || 'Failed to obtain console session ticket.');
+        }
+        term.write(`\x1b[32m[Console]\x1b[0m Ticket granted. Establishing SSH bridge to ${session.ip || vmIp}...\r\n`);
+        wsUrl = `${protocol}//${host}/api/ws/terminal?ticket=${encodeURIComponent(session.ticket)}&vmId=${vmId}`;
+      }
 
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
@@ -337,7 +352,7 @@ export default function WebConsoleModal({
             }`} />
             <TerminalIcon className="w-4 h-4 text-blue-400" />
             <div className="flex flex-col">
-              <span className="text-xs font-bold text-white font-mono">{vmName}</span>
+              <span className="text-xs font-bold text-white font-mono">{displayName}</span>
               <span className="text-[10px] text-emerald-400 font-mono">
                 {connectionStatus === 'connected' ? 'Terminal Active' : connectionStatus.toUpperCase()}
               </span>
@@ -385,7 +400,7 @@ export default function WebConsoleModal({
               }`} />
               <TerminalIcon className="w-4 h-4 text-blue-400" />
               <span className="text-xs font-bold text-white font-mono tracking-wide">
-                {vmName}
+                {displayName}
               </span>
             </div>
 

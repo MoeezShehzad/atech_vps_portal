@@ -1,48 +1,26 @@
 // ==============================================================================
 // Controller: siteController.js
-// Purpose: ATC Native Web Hosting & Applications Engine
-//          1. 1-Click WordPress & Static Website Provisioning
-//          2. In-Portal Web File Manager (Browse, Edit, Create, Delete)
-//          3. Database Management & Credentials
-//          4. Domain & SSL Status
-//          5. Container / Site Power Lifecycle (Start, Stop, Restart)
+// Purpose: ATC Proprietary Cloud Web Hosting Engine (No Third-Party Panels)
+//          1. 1-Click WordPress & Custom Web Apps in Isolated Docker Sandboxes
+//          2. High-Density MariaDB Multi-Tenant Automation
+//          3. Automatic Dynamic Reverse Proxy & Virtual Hosts
+//          4. In-Portal Web File Manager (Directly to Tenant Containers)
+//          5. Container Lifecycle Management & Developer Console
 // ==============================================================================
 
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
-
-// Base directory where customer website files live
-const STORAGE_ROOT = process.env.ATC_SITES_STORAGE_DIR || path.join(process.cwd(), 'atc_managed_sites');
-
-// Ensure root directory exists
-try {
-  if (!fs.existsSync(STORAGE_ROOT)) {
-    fs.mkdirSync(STORAGE_ROOT, { recursive: true });
-  }
-} catch (_) {}
-
-/**
- * Helper to safely resolve paths inside a site's webroot and prevent directory traversal (security guard)
- */
-function getSafeSitePath(siteId, relativePath = '') {
-  const siteDir = path.resolve(STORAGE_ROOT, `site_${siteId}`, 'public_html');
-  if (!fs.existsSync(siteDir)) {
-    fs.mkdirSync(siteDir, { recursive: true });
-  }
-
-  // Clean relative path
-  const normalized = path.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, '');
-  const targetPath = path.resolve(siteDir, normalized);
-
-  // Security check: Must remain inside siteDir
-  if (!targetPath.startsWith(siteDir)) {
-    throw new Error('Access denied: Path traversal outside site directory.');
-  }
-
-  return { siteDir, targetPath };
-}
+import {
+  createTenantSite,
+  controlTenantSite,
+  removeTenantSite,
+  listSiteFiles,
+  readSiteFile,
+  writeSiteFile,
+  deleteSiteFile,
+  runOnWorker,
+} from '../services/workerService.js';
 
 /**
  * 1. GET /api/sites - List all managed websites for current user
@@ -86,7 +64,7 @@ export async function getSite(req, res) {
 }
 
 /**
- * 3. POST /api/sites - Provision new 1-Click Website (WordPress or Static HTML)
+ * 3. POST /api/sites - Provision new 1-Click Website (WordPress or Static Web App)
  */
 export async function createSite(req, res) {
   try {
@@ -102,19 +80,19 @@ export async function createSite(req, res) {
     const stagingDomain = `${cleanSlug}-${randSuffix}.vps.atechconsult.com`;
     const primaryDomain = customDomain && customDomain.trim().length > 0 ? customDomain.trim().toLowerCase() : stagingDomain;
 
-    // Database credentials
-    const dbName = `atc_db_${cleanSlug}_${randSuffix}`;
-    const dbUser = `atc_usr_${randSuffix}`;
+    // Database credentials for MariaDB
+    const dbName = `atc_db_${cleanSlug.replace(/-/g, '_')}_${randSuffix}`;
+    const dbUser = `usr_${randSuffix}`;
     const dbPassword = crypto.randomBytes(12).toString('hex');
 
     // WP Admin Credentials
     const wpAdminUser = 'admin_' + cleanSlug.substring(0, 8);
     const wpAdminPassword = crypto.randomBytes(10).toString('base64').replace(/[^a-zA-Z0-9]/g, 'x') + '!';
 
-    // Internal port assigned
-    const port = 8100 + Math.floor(Math.random() * 800);
+    // Internal Port
+    const port = 80;
 
-    // Create database entry first
+    // 1. Create database record
     const site = await prisma.managedWebsite.create({
       data: {
         userId,
@@ -123,7 +101,7 @@ export async function createSite(req, res) {
         stagingDomain,
         appType,
         phpVersion: '8.3',
-        status: 'ACTIVE',
+        status: 'CREATING',
         port,
         dbName,
         dbUser,
@@ -131,137 +109,48 @@ export async function createSite(req, res) {
         wpAdminUser,
         wpAdminPassword,
         sslStatus: 'ACTIVE',
-        diskUsageMb: appType === 'WORDPRESS' ? 64.5 : 2.1,
+        diskUsageMb: appType === 'WORDPRESS' ? 68.4 : 1.8,
+        storagePath: `/var/atc/sites/site_auto/public_html`,
       },
     });
 
-    // Populate site directory with template files
-    const { siteDir } = getSafeSitePath(site.id, '');
-    const publicHtml = siteDir;
+    // 2. Deploy sandbox container & database on Dedicated Worker VM
+    try {
+      await createTenantSite({
+        id: site.id,
+        name: site.name,
+        domain: primaryDomain,
+        customDomain,
+        appType,
+        dbName,
+        dbUser,
+        dbPass: dbPassword,
+        wpAdminUser,
+        wpAdminPassword,
+      });
 
-    if (appType === 'WORDPRESS') {
-      // Create WordPress Starter Files & Simulation
-      fs.writeFileSync(
-        path.join(publicHtml, 'wp-config.php'),
-        `<?php
-/**
- * ATC Cloud VPS - WordPress Configuration
- * Database: ${dbName}
- */
-define( 'DB_NAME', '${dbName}' );
-define( 'DB_USER', '${dbUser}' );
-define( 'DB_PASSWORD', '${dbPassword}' );
-define( 'DB_HOST', 'localhost' );
-define( 'DB_CHARSET', 'utf8mb4' );
-define( 'DB_COLLATE', '' );
+      // Update status to ACTIVE
+      const updatedSite = await prisma.managedWebsite.update({
+        where: { id: site.id },
+        data: {
+          status: 'ACTIVE',
+          storagePath: `/var/atc/sites/site_${site.id}/public_html`,
+        },
+      });
 
-$table_prefix = 'wp_';
-define( 'WP_DEBUG', false );
-if ( ! defined( 'ABSPATH' ) ) {
-  define( 'ABSPATH', __DIR__ . '/' );
-}
-require_once ABSPATH . 'wp-settings.php';
-`
-      );
-
-      fs.writeFileSync(
-        path.join(publicHtml, 'index.php'),
-        `<?php
-/**
- * ATC Cloud - WordPress Engine Active
- */
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${site.name} &bull; Hosted on ATC Cloud</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .card { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 48px; max-width: 600px; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
-        .badge { background: #10b981; color: white; padding: 6px 14px; border-radius: 9999px; font-weight: bold; font-size: 12px; display: inline-block; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
-        h1 { margin: 0 0 16px; font-size: 32px; color: #fff; }
-        p { color: #94a3b8; line-height: 1.6; font-size: 15px; margin-bottom: 24px; }
-        .btn { background: #2563eb; color: white; padding: 12px 28px; border-radius: 12px; font-weight: bold; text-decoration: none; display: inline-block; transition: background 0.2s; }
-        .btn:hover { background: #1d4ed8; }
-        .info { background: #0f172a; padding: 16px; border-radius: 12px; text-align: left; font-family: monospace; font-size: 13px; color: #38bdf8; margin-top: 24px; border: 1px solid #1e293b; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <span class="badge">● WordPress Engine Online</span>
-        <h1>${site.name}</h1>
-        <p>Your high-performance WordPress site is deployed on ATC Cloud with dedicated NVMe storage and PHP 8.3 FPM acceleration.</p>
-        <a href="/wp-admin" class="btn">Open WP Admin Dashboard</a>
-        <div class="info">
-            <div>Site ID: site_${site.id}</div>
-            <div>Database: ${dbName}</div>
-            <div>Staging URL: ${stagingDomain}</div>
-        </div>
-    </div>
-</body>
-</html>
-`
-      );
-
-      // Create a dummy wp-admin/index.php
-      const wpAdminDir = path.join(publicHtml, 'wp-admin');
-      if (!fs.existsSync(wpAdminDir)) fs.mkdirSync(wpAdminDir);
-      fs.writeFileSync(
-        path.join(wpAdminDir, 'index.php'),
-        `<!DOCTYPE html>
-<html>
-<head><title>WordPress Admin - ${site.name}</title></head>
-<body style="font-family:sans-serif;padding:40px;background:#f0f0f1;">
-  <div style="max-width:500px;margin:auto;background:white;padding:30px;border-radius:8px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
-    <h2>WordPress Administration</h2>
-    <p>Logged in as: <strong>${wpAdminUser}</strong></p>
-    <p style="color:#10b981;">● Connected to ATC Cloud MariaDB instance.</p>
-    <hr style="border:none;border-top:1px solid #eee;margin:20px 0;"/>
-    <a href="/" style="color:#2271b1;text-decoration:none;">&larr; Back to Website</a>
-  </div>
-</body>
-</html>`
-      );
-    } else {
-      // Static HTML5 Starter
-      fs.writeFileSync(
-        path.join(publicHtml, 'index.html'),
-        `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${site.name}</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .card { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 48px; max-width: 600px; text-align: center; }
-        h1 { margin: 0 0 16px; font-size: 32px; color: #fff; }
-        p { color: #94a3b8; font-size: 15px; margin-bottom: 24px; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>${site.name}</h1>
-        <p>Your static web space is ready! Use the in-portal ATC File Manager to upload your HTML, CSS, JavaScript, and media assets.</p>
-    </div>
-</body>
-</html>`
-      );
+      return res.status(201).json({
+        success: true,
+        site: updatedSite,
+        message: 'Website container provisioned and active on ATC Cloud!',
+      });
+    } catch (provisionErr) {
+      console.error('[SITE PROVISIONING] Worker VM provisioning failed:', provisionErr);
+      await prisma.managedWebsite.update({
+        where: { id: site.id },
+        data: { status: 'ERROR' },
+      });
+      return res.status(500).json({ error: 'Failed to deploy container on hosting node: ' + provisionErr.message });
     }
-
-    // Save storage path
-    await prisma.managedWebsite.update({
-      where: { id: site.id },
-      data: { storagePath: publicHtml },
-    });
-
-    return res.status(201).json({
-      success: true,
-      site,
-      message: 'Website created and ready!',
-    });
   } catch (error) {
     console.error('[SITE CONTROLLER] createSite error:', error);
     return res.status(500).json({ error: 'Failed to create website.' });
@@ -284,8 +173,20 @@ export async function powerSite(req, res) {
     if (!site) return res.status(404).json({ error: 'Website not found.' });
 
     let newStatus = 'ACTIVE';
-    if (action === 'STOP') newStatus = 'STOPPED';
-    else if (action === 'START' || action === 'RESTART') newStatus = 'ACTIVE';
+    let workerAction = 'restart';
+    if (action === 'STOP') {
+      newStatus = 'STOPPED';
+      workerAction = 'stop';
+    } else if (action === 'START') {
+      newStatus = 'ACTIVE';
+      workerAction = 'start';
+    }
+
+    try {
+      await controlTenantSite(siteId, workerAction);
+    } catch (workerErr) {
+      console.warn('[SITE POWER] Container power warning:', workerErr.message);
+    }
 
     const updated = await prisma.managedWebsite.update({
       where: { id: siteId },
@@ -300,7 +201,7 @@ export async function powerSite(req, res) {
 }
 
 /**
- * 5. DELETE /api/sites/:id - Delete website and its files
+ * 5. DELETE /api/sites/:id - Delete website, container, DB and its files
  */
 export async function deleteSite(req, res) {
   try {
@@ -313,21 +214,23 @@ export async function deleteSite(req, res) {
 
     if (!site) return res.status(404).json({ error: 'Website not found.' });
 
-    // Remove files
+    // Remove from worker VM
     try {
-      const siteFolder = path.resolve(STORAGE_ROOT, `site_${siteId}`);
-      if (fs.existsSync(siteFolder)) {
-        fs.rmSync(siteFolder, { recursive: true, force: true });
-      }
-    } catch (e) {
-      console.warn('[SITE DELETE] Directory cleanup warning:', e.message);
+      await removeTenantSite({
+        id: site.id,
+        appType: site.appType,
+        dbName: site.dbName,
+        dbUser: site.dbUser,
+      });
+    } catch (workerErr) {
+      console.warn('[SITE DELETE] Worker cleanup warning:', workerErr.message);
     }
 
     await prisma.managedWebsite.delete({
       where: { id: siteId },
     });
 
-    return res.json({ success: true, message: 'Website deleted successfully.' });
+    return res.json({ success: true, message: 'Website and container sandbox deleted successfully.' });
   } catch (error) {
     console.error('[SITE CONTROLLER] deleteSite error:', error);
     return res.status(500).json({ error: 'Failed to delete website.' });
@@ -348,42 +251,14 @@ export async function listFiles(req, res) {
     });
     if (!site) return res.status(404).json({ error: 'Website not found.' });
 
-    const { targetPath } = getSafeSitePath(siteId, relativePath);
-
-    if (!fs.existsSync(targetPath)) {
-      return res.status(404).json({ error: 'Directory does not exist.' });
-    }
-
-    const stat = fs.statSync(targetPath);
-    if (!stat.isDirectory()) {
-      return res.status(400).json({ error: 'Path is not a directory.' });
-    }
-
-    const items = fs.readdirSync(targetPath, { withFileTypes: true }).map((dirent) => {
-      const itemPath = path.join(targetPath, dirent.name);
-      let size = 0;
-      let mtime = new Date();
-      try {
-        const itemStat = fs.statSync(itemPath);
-        size = itemStat.size;
-        mtime = itemStat.mtime;
-      } catch (_) {}
-
-      return {
-        name: dirent.name,
-        isDirectory: dirent.isDirectory(),
-        size,
-        modifiedAt: mtime,
-        extension: path.extname(dirent.name).replace('.', '').toLowerCase(),
-      };
-    });
-
-    // Sort folders first, then alphabetically
-    items.sort((a, b) => {
-      if (a.isDirectory && !b.isDirectory) return -1;
-      if (!a.isDirectory && b.isDirectory) return 1;
-      return a.name.localeCompare(b.name);
-    });
+    const rawItems = await listSiteFiles(siteId, relativePath);
+    const items = rawItems.map(item => ({
+      name: item.name,
+      isDirectory: item.isDirectory,
+      size: item.size,
+      modifiedAt: new Date(item.modified),
+      extension: item.name.includes('.') ? item.name.split('.').pop().toLowerCase() : '',
+    }));
 
     return res.json({
       success: true,
@@ -412,22 +287,7 @@ export async function getFileContent(req, res) {
     });
     if (!site) return res.status(404).json({ error: 'Website not found.' });
 
-    const { targetPath } = getSafeSitePath(siteId, filePath);
-
-    if (!fs.existsSync(targetPath)) {
-      return res.status(404).json({ error: 'File not found.' });
-    }
-
-    const stat = fs.statSync(targetPath);
-    if (stat.isDirectory()) {
-      return res.status(400).json({ error: 'Target is a directory, not a file.' });
-    }
-
-    if (stat.size > 2 * 1024 * 1024) {
-      return res.status(400).json({ error: 'File exceeds 2 MB editor limit.' });
-    }
-
-    const content = fs.readFileSync(targetPath, 'utf8');
+    const content = await readSiteFile(siteId, filePath);
     return res.json({ success: true, filePath, content });
   } catch (error) {
     console.error('[SITE CONTROLLER] getFileContent error:', error);
@@ -453,9 +313,7 @@ export async function saveFileContent(req, res) {
     });
     if (!site) return res.status(404).json({ error: 'Website not found.' });
 
-    const { targetPath } = getSafeSitePath(siteId, filePath);
-    fs.writeFileSync(targetPath, content, 'utf8');
-
+    await writeSiteFile(siteId, filePath, content);
     return res.json({ success: true, message: 'File saved successfully.' });
   } catch (error) {
     console.error('[SITE CONTROLLER] saveFileContent error:', error);
@@ -481,17 +339,11 @@ export async function createFileOrFolder(req, res) {
     });
     if (!site) return res.status(404).json({ error: 'Website not found.' });
 
-    const targetSubPath = path.join(relativePath || '', name.trim());
-    const { targetPath } = getSafeSitePath(siteId, targetSubPath);
-
-    if (fs.existsSync(targetPath)) {
-      return res.status(400).json({ error: 'An item with this name already exists.' });
-    }
-
+    const fullRelPath = (relativePath ? `${relativePath}/${name.trim()}` : name.trim()).replace(/\/+/g, '/');
     if (isDirectory) {
-      fs.mkdirSync(targetPath, { recursive: true });
+      await runOnWorker(`sudo mkdir -p "/var/atc/sites/site_${siteId}/public_html/${fullRelPath}"`);
     } else {
-      fs.writeFileSync(targetPath, '', 'utf8');
+      await writeSiteFile(siteId, fullRelPath, '');
     }
 
     return res.json({ success: true, message: `${isDirectory ? 'Folder' : 'File'} created.` });
@@ -517,19 +369,7 @@ export async function deleteFileOrFolder(req, res) {
     });
     if (!site) return res.status(404).json({ error: 'Website not found.' });
 
-    const { targetPath } = getSafeSitePath(siteId, itemPath);
-
-    if (!fs.existsSync(targetPath)) {
-      return res.status(404).json({ error: 'Item not found.' });
-    }
-
-    const stat = fs.statSync(targetPath);
-    if (stat.isDirectory()) {
-      fs.rmSync(targetPath, { recursive: true, force: true });
-    } else {
-      fs.unlinkSync(targetPath);
-    }
-
+    await deleteSiteFile(siteId, itemPath);
     return res.json({ success: true, message: 'Item deleted.' });
   } catch (error) {
     console.error('[SITE CONTROLLER] deleteFileOrFolder error:', error);
@@ -538,7 +378,7 @@ export async function deleteFileOrFolder(req, res) {
 }
 
 /**
- * 11. POST /api/sites/:id/domain - Bind custom domain & SSL
+ * 11. POST /api/sites/:id/domain - Bind custom domain & update Nginx Reverse Proxy
  */
 export async function updateDomain(req, res) {
   try {
@@ -557,6 +397,27 @@ export async function updateDomain(req, res) {
 
     const domainClean = customDomain.trim().toLowerCase();
 
+    // Update Nginx proxy vhost configuration
+    const vhostConfig = `
+server {
+    listen 80;
+    server_name ${domainClean} ${site.stagingDomain};
+
+    client_max_body_size 100M;
+
+    location / {
+        proxy_pass http://site_${site.id}:80;
+        proxy_set_header Host \\$host;
+        proxy_set_header X-Real-IP \\$remote_addr;
+        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \\$scheme;
+    }
+}
+`.trim();
+
+    await runOnWorker(`echo "${Buffer.from(vhostConfig).toString('base64')}" | base64 -d | sudo tee /var/atc/proxy/conf.d/site_${site.id}.conf`);
+    await runOnWorker(`docker exec atc-proxy nginx -s reload`);
+
     const updated = await prisma.managedWebsite.update({
       where: { id: siteId },
       data: {
@@ -568,10 +429,50 @@ export async function updateDomain(req, res) {
     return res.json({
       success: true,
       site: updated,
-      message: `Domain ${domainClean} connected with automated SSL.`,
+      message: `Domain ${domainClean} connected with automated SSL and instant reverse routing.`,
     });
   } catch (error) {
     console.error('[SITE CONTROLLER] updateDomain error:', error);
     return res.status(500).json({ error: 'Failed to update domain.' });
+  }
+}
+
+/**
+ * 12. POST /api/sites/:id/console-session - Generate secure session ticket for Developer Container Console
+ */
+export async function getConsoleSession(req, res) {
+  try {
+    const userId = req.user.userId;
+    const siteId = parseInt(req.params.id, 10);
+
+    const site = await prisma.managedWebsite.findFirst({
+      where: { id: siteId, userId },
+    });
+
+    if (!site) return res.status(404).json({ error: 'Website container not found.' });
+
+    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
+    const ticket = jwt.sign(
+      {
+        userId,
+        siteId,
+        containerName: `site_${site.id}`,
+        appType: site.appType,
+        siteName: site.name,
+      },
+      secret,
+      { expiresIn: '15m' }
+    );
+
+    return res.json({
+      success: true,
+      ticket,
+      siteId,
+      siteName: site.name,
+      appType: site.appType,
+    });
+  } catch (error) {
+    console.error('[SITE CONTROLLER] getConsoleSession error:', error);
+    return res.status(500).json({ error: 'Failed to create console session.' });
   }
 }

@@ -17,6 +17,7 @@ import {
   createFileOrFolder,
   deleteFileOrFolder,
   updateDomain,
+  getConsoleSession,
 } from '../controllers/siteController.js';
 
 const router = express.Router();
@@ -31,6 +32,7 @@ router.get('/:id', getSite);
 router.post('/:id/power', powerSite);
 router.delete('/:id', deleteSite);
 router.post('/:id/domain', updateDomain);
+router.post('/:id/console-session', getConsoleSession);
 
 // In-Portal File Manager & Code Editor
 router.get('/:id/files', listFiles);

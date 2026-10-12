@@ -35,9 +35,11 @@ import {
   Eye,
   EyeOff,
   Code2,
+  Terminal,
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
+import WebConsoleModal from './WebConsoleModal';
 
 interface ManagedWebsite {
   id: number;
@@ -98,6 +100,9 @@ export default function WebsitesManager() {
   // Copy helper state
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+
+  // Developer Web Console state
+  const [consoleSite, setConsoleSite] = useState<ManagedWebsite | null>(null);
 
   // Fetch Sites
   const fetchSites = async () => {
@@ -348,6 +353,13 @@ export default function WebsitesManager() {
             >
               <ExternalLink className="w-3.5 h-3.5" /> Visit Website
             </a>
+            <button
+              onClick={() => setConsoleSite(selectedSite)}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
+              title="Open Developer Container Terminal Sandbox"
+            >
+              <Terminal className="w-3.5 h-3.5 text-blue-400" /> Web Console
+            </button>
             <button
               onClick={() => handlePowerAction(selectedSite.id, selectedSite.status === 'ACTIVE' ? 'STOP' : 'START')}
               className="p-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
@@ -1122,6 +1134,15 @@ export default function WebsitesManager() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Developer Sandbox Web Console Modal */}
+      {consoleSite && (
+        <WebConsoleModal
+          siteId={consoleSite.id}
+          siteName={consoleSite.name}
+          onClose={() => setConsoleSite(null)}
+        />
       )}
     </div>
   );
