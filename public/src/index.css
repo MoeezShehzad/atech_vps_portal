@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+@theme {
+  --color-atc-blue: #2e75b5;
+  --color-atc-blue-hover: #246299;
+  --color-atc-blue-dark: #1b4d77;
+  --color-atc-blue-light: #eff6fc;
+  --color-atc-gold: #f6d407;
+  --color-atc-gold-hover: #e0be04;
+  --color-atc-gold-dark: #b89c03;
+  --color-atc-gold-light: #fefce8;
+  --color-atc-navy: #0b1120;
+
+  --color-blue-600: #2e75b5;
+  --color-blue-700: #246299;
+  --color-blue-800: #1b4d77;
+  --color-blue-500: #3f88ca;
+  --color-blue-50: #eff6fc;
+  --color-blue-100: #dceaf7;
+}
+
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *, .dark, .dark *));
 
 /* iOS-Style Ultra-Smooth Spring Transition */
@@ -84,7 +103,7 @@ html.dark select option {
 
 select option:checked,
 select option:hover {
-  background-color: #2563eb !important;
+  background-color: #2e75b5 !important;
   color: #ffffff !important;
 }
 
@@ -93,7 +112,7 @@ select option:hover {
 *::selection,
 input::selection,
 textarea::selection {
-  background-color: #2563eb !important;
+  background-color: #2e75b5 !important;
   color: #ffffff !important;
 }
 

@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
+import atcLogo from '../assets/ATC_Logo.png';
 
 interface SidebarProps {
   activeTab: string;
@@ -77,16 +78,25 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* Brand Header */}
-        <div className={`shrink-0 border-b border-slate-100 dark:border-slate-800 flex items-center ${collapsed ? 'p-4 justify-center' : 'p-6 space-x-3'}`}>
-          <div className="bg-blue-600 p-2.5 rounded-xl text-white shadow-sm shadow-blue-500/20 shrink-0">
-            <Server className="h-6 w-6" />
+        <div className={`shrink-0 border-b border-slate-100 dark:border-slate-800 flex items-center transition-all ${collapsed ? 'p-3.5 justify-center' : 'px-5 py-4 space-x-3'}`}>
+          <div className="flex items-center justify-center shrink-0">
+            <img 
+              src={atcLogo} 
+              alt="ATC Logo" 
+              className={`object-contain transition-all ${collapsed ? 'w-8 h-8' : 'w-8 h-8 rounded-lg drop-shadow-xs'}`} 
+            />
           </div>
           {!collapsed && (
-            <div className="overflow-hidden">
-              <h1 className="font-bold text-lg text-slate-900 dark:text-white leading-tight font-poppins truncate">
-                ATEC VPS
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">Portal Console</p>
+            <div className="overflow-hidden min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h1 className="font-bold text-base text-slate-900 dark:text-white leading-tight font-poppins truncate tracking-tight">
+                  ATC CLOUD
+                </h1>
+                <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-600 dark:text-amber-400 border border-amber-400/30">
+                  VPS
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">Infrastructure Portal</p>
             </div>
           )}
         </div>
@@ -102,16 +112,19 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 type="button"
                 onClick={() => setActiveTab(item.id)}
                 title={collapsed ? item.label : undefined}
-                className={`w-full flex items-center rounded-xl text-sm font-semibold transition-all group ${
+                className={`w-full flex items-center rounded-xl text-sm font-semibold transition-all group relative ${
                   collapsed
                     ? 'justify-center p-3'
                     : 'space-x-3 px-4 py-3'
                 } ${
                   isActive
-                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/60 font-bold'
+                    ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200/70 dark:border-blue-900/60 font-bold shadow-xs'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-slate-100'
                 }`}
               >
+                {isActive && (
+                  <span className="absolute left-1 top-2.5 bottom-2.5 w-1 bg-amber-400 rounded-full" />
+                )}
                 <Icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'}`} />
                 {!collapsed && <span className="truncate">{item.label}</span>}
               </button>
