@@ -84,12 +84,15 @@ server {
     `;
     await runOnWorker(`docker exec -i atc-mariadb mariadb -uroot -pATC_SuperSecretMariaDb2026! -e "${sqlCmd.replace(/\n/g, ' ')}"`);
 
-    // Run WordPress container with tight resource bounds (192MB RAM, 0.75 CPU limit)
+    const previewPort = site.port || (8100 + (site.id % 800));
+
+    // Run WordPress container with tight resource bounds and dedicated preview port
     await runOnWorker(`
       docker run -d \\
         --name site_${site.id} \\
         --restart unless-stopped \\
         --network atc-net \\
+        -p ${previewPort}:80 \\
         --memory=192m \\
         --cpus=0.75 \\
         -v ${siteDir}:/var/www/html \\
@@ -99,8 +102,20 @@ server {
         -e WORDPRESS_DB_NAME=${site.dbName} \\
         wordpress:php8.2-apache
     `);
+
+    // Give container 2s to write wp-config.php and inject dynamic siteurl
+    setTimeout(async () => {
+      try {
+        await runOnWorker(`
+          if grep -q "<?php" ${siteDir}/wp-config.php 2>/dev/null && ! grep -q "WP_HOME" ${siteDir}/wp-config.php 2>/dev/null; then
+            sed -i "/<?php/a define('WP_HOME', 'http://' . \\$_SERVER['HTTP_HOST']);\\ndefine('WP_SITEURL', 'http://' . \\$_SERVER['HTTP_HOST']);" ${siteDir}/wp-config.php
+          fi
+        `);
+      } catch (_) {}
+    }, 2000);
   } else {
     // Static HTML / Custom Web App
+    const previewPort = site.port || (8100 + (site.id % 800));
     const defaultIndex = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -126,12 +141,13 @@ server {
 
     await runOnWorker(`echo "${Buffer.from(defaultIndex).toString('base64')}" | base64 -d | sudo tee ${siteDir}/index.html`);
 
-    // Run ultra-lightweight Nginx container (32MB RAM)
+    // Run ultra-lightweight Nginx container (32MB RAM) with preview port
     await runOnWorker(`
       docker run -d \\
         --name site_${site.id} \\
         --restart unless-stopped \\
         --network atc-net \\
+        -p ${previewPort}:80 \\
         --memory=32m \\
         --cpus=0.25 \\
         -v ${siteDir}:/usr/share/nginx/html:ro \\

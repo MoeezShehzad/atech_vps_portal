@@ -334,19 +334,32 @@ export default function WebsitesManager() {
                   {selectedSite.appType === 'WORDPRESS' ? 'WordPress 6.7' : 'Static HTML5'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-2">
                 <span>Domain: <strong>{selectedSite.primaryDomain}</strong></span>
                 <span>&bull;</span>
                 <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
                   <ShieldCheck className="w-3.5 h-3.5" /> SSL Secured
                 </span>
+                {selectedSite.port && (
+                  <>
+                    <span>&bull;</span>
+                    <a
+                      href={`http://172.27.47.192:${selectedSite.port}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Direct Preview (Port {selectedSite.port})
+                    </a>
+                  </>
+                )}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5">
             <a
-              href={`http://${selectedSite.primaryDomain}`}
+              href={selectedSite.port ? `http://172.27.47.192:${selectedSite.port}` : `http://${selectedSite.primaryDomain}`}
               target="_blank"
               rel="noreferrer"
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-blue-500/20"
@@ -476,7 +489,7 @@ export default function WebsitesManager() {
                     </div>
                   </div>
                   <a
-                    href={`http://${selectedSite.primaryDomain}/wp-admin`}
+                    href={selectedSite.port ? `http://172.27.47.192:${selectedSite.port}/wp-admin` : `http://${selectedSite.primaryDomain}/wp-admin`}
                     target="_blank"
                     rel="noreferrer"
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-blue-600/30"
@@ -524,6 +537,43 @@ export default function WebsitesManager() {
                 </div>
               </div>
             )}
+            {/* DNS Setup Guidance Banner */}
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200 dark:border-amber-900/50 rounded-2xl p-5 shadow-xs">
+              <div className="flex items-start gap-3.5">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div className="space-y-1.5 text-xs">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                    Connecting Your Domain: <span className="text-amber-600 dark:text-amber-400 font-mono">{selectedSite.primaryDomain}</span>
+                  </h4>
+                  <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                    If your browser shows <code className="bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded text-[11px] font-mono text-amber-800 dark:text-amber-200">ERR_NAME_NOT_RESOLVED</code>, it means this custom domain does not have a DNS record pointed to your server yet.
+                  </p>
+                  <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3 font-mono text-[11px] space-y-1 mt-2">
+                    <div className="text-slate-500">Go to your domain registrar (GoDaddy, Namecheap, Cloudflare) and create:</div>
+                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">
+                      Type: <span className="text-slate-800 dark:text-slate-200">A</span> &nbsp;|&nbsp; 
+                      Host: <span className="text-slate-800 dark:text-slate-200">{selectedSite.primaryDomain.split('.')[0]}</span> &nbsp;|&nbsp; 
+                      Points to: <span className="text-blue-600 dark:text-blue-400">172.27.47.192</span>
+                    </div>
+                  </div>
+                  {selectedSite.port && (
+                    <p className="text-slate-500 dark:text-slate-400 pt-1">
+                      💡 <strong>Instant Preview Available:</strong> You can test and build your website right now using the direct preview URL:{' '}
+                      <a
+                        href={`http://172.27.47.192:${selectedSite.port}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 dark:text-blue-400 font-bold underline"
+                      >
+                        http://172.27.47.192:{selectedSite.port}
+                      </a>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

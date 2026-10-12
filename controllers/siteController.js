@@ -89,8 +89,8 @@ export async function createSite(req, res) {
     const wpAdminUser = 'admin_' + cleanSlug.substring(0, 8);
     const wpAdminPassword = crypto.randomBytes(10).toString('base64').replace(/[^a-zA-Z0-9]/g, 'x') + '!';
 
-    // Internal Port
-    const port = 80;
+    // Internal Dedicated Preview Port (for zero-DNS instant access)
+    const port = 8100 + Math.floor(Math.random() * 800);
 
     // 1. Create database record
     const site = await prisma.managedWebsite.create({
@@ -122,6 +122,7 @@ export async function createSite(req, res) {
         domain: primaryDomain,
         customDomain,
         appType,
+        port,
         dbName,
         dbUser,
         dbPass: dbPassword,
