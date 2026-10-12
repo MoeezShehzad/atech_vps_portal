@@ -63,7 +63,7 @@ SMTP_SECURE=true
 SMTP_SUPPORT_USER=customer-support@atechconsult.com
 SMTP_SUPPORT_PASS="uTJ5+5CbUG"
 
-# System & Transactional
+# System & Transactional (Verification, Password Reset, Server Ready)
 SMTP_NOREPLY_USER=no-reply@atechconsult.com
 SMTP_NOREPLY_PASS="Q)9zVhm9BQ"
 

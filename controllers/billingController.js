@@ -124,8 +124,20 @@ export async function getBillingOverview(req, res) {
     // Format Subscriptions for client JSON
     const formattedSubscriptions = subscriptions.map((s) => {
       const now = new Date();
-      const nextDate = s.nextBillingDate ? new Date(s.nextBillingDate) : new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
-      const daysRemaining = Math.max(0, Math.ceil((nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      // Target renewal/expiry: prefer endDate, then nextBillingDate, or fallback to startDate + 30 days
+      let targetDate = s.endDate ? new Date(s.endDate) : (s.nextBillingDate ? new Date(s.nextBillingDate) : null);
+      if (!targetDate && s.startDate) {
+        targetDate = new Date(new Date(s.startDate).getTime() + 30 * 24 * 60 * 60 * 1000);
+      }
+      if (!targetDate && s.createdAt) {
+        targetDate = new Date(new Date(s.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000);
+      }
+      if (!targetDate) {
+        targetDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      }
+
+      const diffMs = targetDate.getTime() - now.getTime();
+      const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
 
       return {
         subscriptionId: s.subscriptionId,
@@ -134,7 +146,7 @@ export async function getBillingOverview(req, res) {
         currency: s.currency || 'USD',
         status: s.status,
         startDate: s.startDate,
-        nextBillingDate: nextDate,
+        nextBillingDate: targetDate,
         daysRemaining,
         vmCount: s.virtualMachines.length,
         vms: s.virtualMachines.map((v) => ({
@@ -146,6 +158,12 @@ export async function getBillingOverview(req, res) {
       };
     });
 
+    // Primary next billing date from earliest active subscription
+    const activeSubs = formattedSubscriptions.filter((sub) => sub.status === 'ACTIVE' || sub.status === 'active');
+    const primaryNextBillingDate = activeSubs.length > 0 
+      ? activeSubs[0].nextBillingDate 
+      : (formattedSubscriptions.length > 0 ? formattedSubscriptions[0].nextBillingDate : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+
     return res.json({
       success: true,
       user,
@@ -153,7 +171,7 @@ export async function getBillingOverview(req, res) {
         monthlySpend: Number(monthlySpend.toFixed(2)),
         activeSubscriptionsCount: subscriptions.length,
         currency: 'USD',
-        nextBillingDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000),
+        nextBillingDate: primaryNextBillingDate,
         paymentMethod: {
           brand: 'Visa',
           last4: '4242',

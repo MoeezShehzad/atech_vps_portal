@@ -887,8 +887,8 @@ export default function Dashboard() {
           </React.Suspense>
         )}
 
-        {/* RENDER DASHBOARD / VMS VIEWS */}
-        {(activeTab === 'dashboard' || activeTab === 'vms') && (
+        {/* RENDER DASHBOARD VIEW */}
+        {activeTab === 'dashboard' && (
           <div className="max-w-7xl mx-auto space-y-8">
             
             {/* MINIMALIST COMPACT HEADER */}
