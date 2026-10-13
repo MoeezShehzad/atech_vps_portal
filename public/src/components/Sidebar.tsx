@@ -52,7 +52,6 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'storage', label: 'Storage & Disk', icon: HardDrive },
-    { id: 'pools', label: 'Resource Pools', icon: Cpu },
     { id: 'billing', label: 'Billing & Invoices', icon: CreditCard },
     { id: 'security', label: 'Security & Logs', icon: Shield },
     { id: 'support', label: 'Support & Helpdesk', icon: LifeBuoy },

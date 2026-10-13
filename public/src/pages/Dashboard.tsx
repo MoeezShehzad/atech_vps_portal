@@ -52,7 +52,6 @@ import WindowsResourceGraph from '../components/WindowsResourceGraph';
 const WebConsoleModal = React.lazy(() => import('../components/WebConsoleModal'));
 const SecurityAndLogs = React.lazy(() => import('../components/SecurityAndLogs'));
 const StorageAndDisks = React.lazy(() => import('../components/StorageAndDisks'));
-const ResourcePools = React.lazy(() => import('../components/ResourcePools'));
 const BillingAndInvoices = React.lazy(() => import('../components/BillingAndInvoices'));
 const ConnectionGuideModal = React.lazy(() => import('../components/ConnectionGuideModal'));
 const SupportAndTickets = React.lazy(() => import('../components/SupportAndTickets'));
@@ -863,17 +862,6 @@ export default function Dashboard() {
             </div>
           }>
             <StorageAndDisks />
-          </React.Suspense>
-        )}
-
-        {/* RENDER RESOURCE POOLS & QUOTAS */}
-        {activeTab === 'pools' && (
-          <React.Suspense fallback={
-            <div className="py-20 flex justify-center">
-              <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
-            </div>
-          }>
-            <ResourcePools />
           </React.Suspense>
         )}
 
