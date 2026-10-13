@@ -20,7 +20,7 @@ import billingRoutes from './routes/billingRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
-import siteRoutes from './routes/siteRoutes.js';
+import appStoreRoutes from './routes/appStoreRoutes.js';
 import { setupTerminalWebSocket } from './services/terminalService.js';
 import { startTicketAutomationWorker } from './services/ticketAutomationService.js';
 
@@ -123,7 +123,7 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/tickets', ticketRoutes);
-// app.use('/api/sites', siteRoutes); // Disabled: Platform focused purely on Dedicated Cloud VPS
+app.use('/api/apps', appStoreRoutes);
 
 // Public announcements route for website navbar ticker
 app.get('/api/announcements', async (req, res) => {

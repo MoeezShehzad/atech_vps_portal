@@ -111,8 +111,12 @@ try {
     if ($SSHPublicKey) {
         $KeyEscaped = $SSHPublicKey.Trim() -replace '"', '\"'
         $Commands += "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo `"$KeyEscaped`" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
-        $Commands += "echo $DefaultPass | sudo -S mkdir -p /root/.ssh && sudo chmod 700 /root/.ssh && echo `"$KeyEscaped`" | sudo tee -a /root/.ssh/authorized_keys >/dev/null && sudo chmod 600 /root/.ssh/authorized_keys"
     }
+
+    # Update hostname to match assigned IP (e.g. 172-27-36-3) so prompt is ubuntu@XX-XX-XX-XX
+    $FormattedHostname = $ResolvedIP -replace '\.', '-'
+    $Commands += "echo $DefaultPass | sudo -S hostnamectl set-hostname $FormattedHostname"
+    $Commands += "echo '127.0.0.1 $FormattedHostname' | sudo tee -a /etc/hosts >/dev/null"
 
     $FullCmd = $Commands -join " ; "
 

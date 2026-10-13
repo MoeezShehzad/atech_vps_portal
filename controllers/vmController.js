@@ -231,7 +231,7 @@ export async function deployVM(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { planId, imageId, vmName, customCpu, customRam, customStorage, username, password, authMethod, sshKeyId, sshPublicKey } = req.body;
+    const { planId, imageId, vmName, customCpu, customRam, customStorage, username, password, authMethod, sshKeyId, sshPublicKey, appId } = req.body;
     const adminUsername = (username && username.trim()) ? username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') : 'ubuntu';
     const adminPassword = (password && password.trim()) ? password.trim() : '';
 
@@ -494,6 +494,15 @@ export async function deployVM(req, res) {
       }).catch((mailErr) => {
         console.warn('[VM Provision Email Warning]:', mailErr.message);
       });
+
+      // Trigger automated 1-Click App installation if requested
+      if (appId) {
+        import('../services/appStoreService.js').then(({ installAppOnVM }) => {
+          installAppOnVM({ vmId: newVm.vmId, userId, appId }).catch((appErr) => {
+            console.warn(`[Auto 1-Click App Install Notice on ${cleanVmName}]:`, appErr.message);
+          });
+        }).catch(() => {});
+      }
 
       return res.status(201).json({
         success: true,

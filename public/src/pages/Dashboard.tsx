@@ -36,6 +36,7 @@ import {
   Camera,
   KeyRound,
   DownloadCloud,
+  Boxes,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
@@ -216,6 +217,13 @@ export default function Dashboard() {
   const [deployPassword, setDeployPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [deployLoading, setDeployLoading] = useState(false);
+
+  // 1-Click Apps selection state inside Deploy Modal
+  const [deployTab, setDeployTab] = useState<'os' | 'apps'>('os');
+  const [selectedAppId, setSelectedAppId] = useState<string>('');
+  const [marketplaceApps, setMarketplaceApps] = useState<any[]>([]);
+  const [appSearch, setAppSearch] = useState('');
+  const [appCategory, setAppCategory] = useState('all');
 
   // Web Terminal Console state
   const [consoleVm, setConsoleVm] = useState<Instance | null>(null);
@@ -402,6 +410,14 @@ export default function Dashboard() {
           }
         })
         .catch((err) => console.warn('Could not load SSH keys for deploy:', err));
+
+      apiCall('/apps')
+        .then((data) => {
+          if (data && data.apps) {
+            setMarketplaceApps(data.apps);
+          }
+        })
+        .catch(() => {});
     }
   }, [isDeployOpen]);
 
@@ -478,6 +494,7 @@ export default function Dashboard() {
         username: deployUsername.trim() || 'ubuntu',
         password: deployPassword.trim() || 'root',
         authMethod,
+        appId: deployTab === 'apps' && selectedAppId ? selectedAppId : undefined,
       };
 
       if (authMethod === 'sshKey') {
@@ -776,6 +793,9 @@ export default function Dashboard() {
     if (!deployPassword) {
       generateStrongPassword();
     }
+    setDeployTab('os');
+    setSelectedAppId('');
+    setAppSearch('');
     setIsDeployOpen(true);
   };
 
@@ -831,7 +851,6 @@ export default function Dashboard() {
 
         {/* RENDER ACCOUNT SETTINGS WHEN TAB IS SETTINGS */}
         {activeTab === 'settings' && <AccountSettings />}
-
         {/* RENDER SECURITY & AUDIT LOGS WHEN TAB IS SECURITY */}
         {activeTab === 'security' && (
           <React.Suspense fallback={
@@ -1486,6 +1505,216 @@ export default function Dashboard() {
                 </div>
               );
             })()}
+
+            {/* INSTANCE TABLE SECTION (When user has active VMs) */}
+            {instances.length > 0 && (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                
+                {/* TABLE CONTROLS & FILTER TABS */}
+                <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  
+                  {/* STATUS FILTER TABS */}
+                  <div className="flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-800 p-1 rounded-xl w-fit">
+                    <button
+                      onClick={() => setStatusFilter('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                        statusFilter === 'all'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      All
+                      <span className="bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-md text-[10px]">
+                        {instances.length}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setStatusFilter('running')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                        statusFilter === 'running'
+                          ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Running
+                      <span className="bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 px-1.5 py-0.5 rounded-md text-[10px]">
+                        {runningCount}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setStatusFilter('stopped')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                        statusFilter === 'stopped'
+                          ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Stopped
+                      <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-md text-[10px]">
+                        {stoppedCount}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* SEARCH INPUT */}
+                  <div className="relative w-full md:w-64">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search instances or IP..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* TABLE */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
+                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
+                      <tr>
+                        <th className="px-6 py-3.5">Instance Name</th>
+                        <th className="px-6 py-3.5">Status</th>
+                        <th className="px-6 py-3.5">IP Address</th>
+                        <th className="px-6 py-3.5">Hardware Specs</th>
+                        <th className="px-6 py-3.5">Monthly Rate</th>
+                        <th className="px-6 py-3.5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {filteredInstances.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-xs">
+                            No virtual servers found matching criteria.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredInstances.map((inst) => (
+                          <tr 
+                            key={inst.id} 
+                            onClick={() => setSelectedInstance(inst)}
+                            className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                          >
+                            <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white flex items-center gap-3">
+                              <Server className="w-4 h-4 text-slate-400" />
+                              <div>
+                                <p>{inst.name}</p>
+                                <p className="text-[10px] text-slate-400 font-normal">{inst.os}</p>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                  inst.status === 'running'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : inst.status === 'provisioning'
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse'
+                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                }`}
+                              >
+                                <span
+                                  className={`w-1.5 h-1.5 rounded-full ${
+                                    inst.status === 'running'
+                                      ? 'bg-emerald-500'
+                                      : inst.status === 'provisioning'
+                                      ? 'bg-blue-500 animate-ping'
+                                      : 'bg-slate-400'
+                                  }`}
+                                />
+                                {inst.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 font-mono text-xs text-slate-600 dark:text-slate-300">{inst.ip}</td>
+                            <td className="px-6 py-4 text-xs font-medium text-slate-700 dark:text-slate-300">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Cpu className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> {inst.vCPU} vCPU
+                                <span className="text-slate-300 dark:text-slate-600">•</span>
+                                <MemoryStick className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> {inst.ramGB} GB RAM
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 font-bold text-slate-900 dark:text-white font-poppins text-xs">
+                              ${inst.monthlyPrice}/mo
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {/* POWER BUTTON */}
+                                <button
+                                  onClick={(e) =>
+                                    handlePowerAction(
+                                      inst.vmId,
+                                      inst.status === 'running' ? 'STOP' : 'START',
+                                      e
+                                    )
+                                  }
+                                  disabled={actionLoadingId === inst.vmId}
+                                  title={inst.status === 'running' ? 'Power Off' : 'Power On'}
+                                  className={`p-1.5 rounded-lg border transition-all ${
+                                    inst.status === 'running'
+                                      ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 hover:border-rose-200 dark:hover:border-rose-800'
+                                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 hover:border-emerald-200 dark:hover:border-emerald-800'
+                                  }`}
+                                >
+                                  <Power className={`w-4 h-4 ${actionLoadingId === inst.vmId ? 'animate-spin' : ''}`} />
+                                </button>
+
+                                {/* SSH CONNECTION GUIDE BUTTON */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConnectGuideVm(inst);
+                                  }}
+                                  title="SSH Connection Guide (Terminal / PuTTY)"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all"
+                                >
+                                  <KeyRound className="w-4 h-4" />
+                                </button>
+
+                                {/* WEB TERMINAL CONSOLE BUTTON */}
+                                {inst.status === 'running' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setConsoleVm(inst);
+                                    }}
+                                    title="Open In-Browser Web Console Terminal"
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all"
+                                  >
+                                    <Terminal className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {/* RESIZE SPECS BUTTON */}
+                                <button
+                                  onClick={(e) => openResizeModal(inst, e)}
+                                  title="Scale CPU & RAM Specs"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all"
+                                >
+                                  <Sliders className="w-4 h-4" />
+                                </button>
+                                
+                                {/* DELETE ACTION BUTTON */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingInstance(inst);
+                                  }}
+                                  title="Terminate / Destroy Server"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-200 dark:hover:border-rose-800 transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1653,7 +1882,7 @@ export default function Dashboard() {
       {/* DEPLOY NEW INSTANCE MODAL */}
       {isDeployOpen && (
         <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] overflow-y-auto">
             <button 
               onClick={() => setIsDeployOpen(false)}
               className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -1664,9 +1893,40 @@ export default function Dashboard() {
             <h3 className="text-xl font-bold text-slate-900 dark:text-white font-poppins mb-1">
               Deploy New Virtual Machine
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
-              Instant cloud provisioning from enterprise image templates.
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
+              Provision an enterprise cloud instance with a Clean OS or 1-Click Pre-Installed Application.
             </p>
+
+            {/* DEPLOYMENT MODE TABS */}
+            <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-5 border border-slate-200/70 dark:border-slate-700/60">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeployTab('os');
+                  setSelectedAppId('');
+                }}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  deployTab === 'os'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Server className="w-3.5 h-3.5" />
+                Clean OS Distribution
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeployTab('apps')}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  deployTab === 'apps'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-blue-500" />
+                1-Click Apps (Marketplace)
+              </button>
+            </div>
 
             <form onSubmit={handleDeploySubmit} className="space-y-4">
               <div>
@@ -1683,22 +1943,117 @@ export default function Dashboard() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Operating System / Master Image
-                </label>
-                <select
-                  value={selectedImageId}
-                  onChange={(e) => setSelectedImageId(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
-                >
-                  {catalogImages.map((img) => (
-                    <option key={img.imageId} value={img.imageId}>
-                      {img.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 1-CLICK APPS MARKETPLACE SELECTOR */}
+              {deployTab === 'apps' ? (
+                <div className="space-y-3 bg-slate-50/80 dark:bg-slate-800/40 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/70">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Select 1-Click Application
+                    </label>
+                    <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+                      {selectedAppId ? `App Selected` : `Choose from 50+ Apps`}
+                    </span>
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search apps (docker, wordpress, aapanel, nextcloud, redis, etc.)..."
+                      value={appSearch}
+                      onChange={(e) => setAppSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  {/* Scrollable Apps Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto pr-1">
+                    {marketplaceApps
+                      .filter((app) => {
+                        const q = appSearch.trim().toLowerCase();
+                        return (
+                          !q ||
+                          app.name.toLowerCase().includes(q) ||
+                          app.description.toLowerCase().includes(q) ||
+                          (app.tags && app.tags.some((t: string) => t.toLowerCase().includes(q)))
+                        );
+                      })
+                      .map((app) => {
+                        const isSelected = selectedAppId === app.id;
+                        return (
+                          <div
+                            key={app.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedAppId('');
+                              } else {
+                                setSelectedAppId(app.id);
+                                if (app.minRamGb && app.minRamGb > customRam) {
+                                  setCustomRam(app.minRamGb);
+                                }
+                              }
+                            }}
+                            className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                              isSelected
+                                ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-500 shadow-xs ring-1 ring-blue-500/30'
+                                : 'bg-white dark:bg-slate-800/90 border-slate-200 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-1 mb-1">
+                              <span className="font-semibold text-xs text-slate-900 dark:text-white truncate">
+                                {app.name}
+                              </span>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+                              <span>Port {app.defaultPort}</span>
+                              <span className="font-mono">v{app.version}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {selectedAppId ? (
+                    <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <Zap className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span>Pre-installing <strong>{marketplaceApps.find(a => a.id === selectedAppId)?.name || selectedAppId}</strong></span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAppId('')}
+                        className="text-xs text-slate-400 hover:text-slate-600 underline cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+                      Click an application above to have it pre-installed automatically on first boot.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                /* CLEAN OS SELECTOR */
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Operating System / Master Image
+                  </label>
+                  <select
+                    value={selectedImageId}
+                    onChange={(e) => setSelectedImageId(Number(e.target.value))}
+                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
+                  >
+                    {catalogImages.map((img) => (
+                      <option key={img.imageId} value={img.imageId}>
+                        {img.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* PLAN SELECTION */}
               <div>
