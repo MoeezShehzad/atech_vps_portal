@@ -1200,14 +1200,13 @@ export default function Dashboard() {
                         <th className="px-6 py-3.5">Status</th>
                         <th className="px-6 py-3.5">IP Address</th>
                         <th className="px-6 py-3.5">Hardware Specs</th>
-                        <th className="px-6 py-3.5">Monthly Rate</th>
                         <th className="px-6 py-3.5 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {filteredInstances.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-xs">
+                          <td colSpan={5} className="px-6 py-10 text-center text-slate-400 text-xs">
                             No virtual servers found matching criteria.
                           </td>
                         </tr>
@@ -1258,9 +1257,6 @@ export default function Dashboard() {
                                 <span className="text-slate-300 dark:text-slate-600">•</span>
                                 <MemoryStick className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> {inst.ramGB} GB RAM
                               </span>
-                            </td>
-                            <td className="px-6 py-4 font-bold text-slate-900 dark:text-white font-poppins text-xs">
-                              ${inst.monthlyPrice}/mo
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
@@ -2530,7 +2526,7 @@ export default function Dashboard() {
                     <Sliders className="w-3.5 h-3.5" /> Resize Specs
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div className="p-3.5 bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
                     <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
                       <Cpu className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
@@ -2553,14 +2549,6 @@ export default function Dashboard() {
                       <span>NVMe Storage</span>
                     </div>
                     <p className="font-bold text-slate-900 dark:text-white text-sm font-mono">{selectedInstance.diskGB} GB</p>
-                  </div>
-
-                  <div className="p-3.5 bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
-                    <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
-                      <DollarSign className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Monthly Rate</span>
-                    </div>
-                    <p className="font-bold text-slate-900 dark:text-white text-sm font-mono">${selectedInstance.monthlyPrice}/mo</p>
                   </div>
                 </div>
               </div>
