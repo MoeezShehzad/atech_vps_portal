@@ -41,8 +41,8 @@ function checkPortOpen(host, port, timeout = 2500) {
   });
 }
 
-async function provisionGuestVM({ vmName, adminUsername, adminPassword, sshPublicKey }) {
-  console.log(`[GUEST PROVISIONER] Starting background provisioning for VM '${vmName}'...`);
+async function provisionGuestVM({ vmName, adminUsername, adminPassword, sshPublicKey, appId }) {
+  console.log(`[GUEST PROVISIONER] Starting background provisioning for VM '${vmName}'${appId ? ` (App: ${appId})` : ''}...`);
   const deadline = Date.now() + 150000; // 2.5 minutes timeout
   let targetIp = null;
 
@@ -96,6 +96,9 @@ echo "${defaultPass}" | sudo -S bash -c "echo '${formattedHostname}' > /etc/host
 echo "${defaultPass}" | sudo -S sed -i 's/127.0.1.1.*/127.0.1.1 ${formattedHostname}/g' /etc/hosts 2>/dev/null || true
 echo "127.0.0.1 ${formattedHostname}" | sudo -S tee -a /etc/hosts >/dev/null || true
 
+# Configure passwordless sudo for cloud automation (standard cloud-init behavior)
+echo "${defaultPass}" | sudo -S bash -c "echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-ubuntu-nopasswd && chmod 0440 /etc/sudoers.d/99-ubuntu-nopasswd"
+
 # Apply selected password to root and ubuntu safely via base64 decode
 echo "${defaultPass}" | sudo -S bash -c "P=\$(echo '${b64Pass}' | base64 -d); echo \"root:\$P\" | chpasswd && echo \"ubuntu:\$P\" | chpasswd"
 
@@ -109,6 +112,7 @@ echo "${defaultPass}" | sudo -S systemctl reload ssh 2>/dev/null || sudo -S syst
         script += `
 id -u ${safeUser} 2>/dev/null || echo "${defaultPass}" | sudo -S useradd -m -s /bin/bash -G sudo ${safeUser}
 echo "${defaultPass}" | sudo -S bash -c "P=\$(echo '${b64Pass}' | base64 -d); echo \"${safeUser}:\$P\" | chpasswd"
+echo "${defaultPass}" | sudo -S bash -c "echo '${safeUser} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-${safeUser}-nopasswd && chmod 0440 /etc/sudoers.d/99-${safeUser}-nopasswd"
 `;
       }
 
@@ -320,6 +324,7 @@ const server = http.createServer(async (req, res) => {
         adminUsername: data.adminUsername || 'ubuntu',
         adminPassword: data.adminPassword || '',
         sshPublicKey: data.sshPublicKey || '',
+        appId: data.appId || '',
       }).catch((e) => console.error('[GUEST PROVISION ASYNC ERROR]:', e));
 
       res.writeHead(200, { 'Content-Type': 'application/json' });

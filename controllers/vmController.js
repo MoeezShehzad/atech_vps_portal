@@ -505,6 +505,7 @@ export async function deployVM(req, res) {
         adminUsername,
         adminPassword,
         sshPublicKey: resolvedPublicKey,
+        appId,
       });
 
       await prisma.activityLog.create({
