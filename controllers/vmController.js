@@ -85,9 +85,10 @@ export async function getUserVMs(req, res) {
             }
           }
 
-          // If state changed in Hyper-V (e.g. stopped/started outside portal)
+          // If state changed in Hyper-V (e.g. stopped/started/paused outside portal)
           if (liveInfo && liveInfo.State) {
-            const liveStatus = liveInfo.State.toUpperCase() === 'RUNNING' ? 'RUNNING' : 'STOPPED';
+            const raw = liveInfo.State.toUpperCase();
+            const liveStatus = raw === 'RUNNING' ? 'RUNNING' : (raw === 'PAUSED' ? 'PAUSED' : 'STOPPED');
             if (liveStatus !== vm.status) {
               await prisma.virtualMachine.update({
                 where: { vmId: vm.vmId },
@@ -562,8 +563,8 @@ export async function powerAction(req, res) {
     const vmId = Number(req.params.id);
     const { action } = req.body;
 
-    if (!['START', 'STOP', 'RESTART', 'FORCE_STOP'].includes(action?.toUpperCase())) {
-      return res.status(400).json({ error: 'Invalid power action. Allowed: START, STOP, RESTART, FORCE_STOP' });
+    if (!['START', 'STOP', 'RESTART', 'FORCE_STOP', 'PAUSE', 'RESUME'].includes(action?.toUpperCase())) {
+      return res.status(400).json({ error: 'Invalid power action. Allowed: START, STOP, RESTART, FORCE_STOP, PAUSE, RESUME' });
     }
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -595,7 +596,12 @@ export async function powerAction(req, res) {
       }
     }
 
-    const newStatus = normAction === 'START' || normAction === 'RESTART' ? 'RUNNING' : 'STOPPED';
+    let newStatus = 'STOPPED';
+    if (normAction === 'START' || normAction === 'RESTART' || normAction === 'RESUME') {
+      newStatus = 'RUNNING';
+    } else if (normAction === 'PAUSE') {
+      newStatus = 'PAUSED';
+    }
 
     await prisma.virtualMachine.update({
       where: { vmId },

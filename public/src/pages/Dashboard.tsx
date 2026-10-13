@@ -37,6 +37,8 @@ import {
   KeyRound,
   DownloadCloud,
   Boxes,
+  Pause,
+  Play,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
@@ -64,7 +66,7 @@ interface Instance {
   adminUser?: string;
   adminPassword?: string;
   os: string;
-  status: 'running' | 'stopped' | 'provisioning';
+  status: 'running' | 'stopped' | 'provisioning' | 'paused' | string;
   cpuUsage: number;
   ramUsage: string;
   diskUsage: string;
@@ -181,7 +183,7 @@ export default function Dashboard() {
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'stopped'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'stopped' | 'paused'>('all');
 
   // Modals state
   const [isDeployOpen, setIsDeployOpen] = useState(false);
@@ -207,14 +209,8 @@ export default function Dashboard() {
   const [customCpu, setCustomCpu] = useState<number>(2);
   const [customRam, setCustomRam] = useState<number>(4);
   const [customStorage, setCustomStorage] = useState<number>(50);
-  const [deployUsername, setDeployUsername] = useState(() => {
-    try {
-      return localStorage.getItem('atech_preferred_admin_user') || 'ubuntu';
-    } catch {
-      return 'ubuntu';
-    }
-  });
-  const [deployPassword, setDeployPassword] = useState('');
+  const [deployUsername, setDeployUsername] = useState('ubuntu');
+  const [deployPassword, setDeployPassword] = useState('root');
   const [showPassword, setShowPassword] = useState(false);
   const [deployLoading, setDeployLoading] = useState(false);
 
@@ -442,19 +438,22 @@ export default function Dashboard() {
     setIsDeployOpen(true);
   };
 
-  // Power action (START / STOP / RESTART)
-  const executePowerAction = async (vmId: number, action: 'START' | 'STOP' | 'RESTART') => {
+  // Power action (START / STOP / RESTART / PAUSE / RESUME)
+  const executePowerAction = async (vmId: number, action: 'START' | 'STOP' | 'RESTART' | 'PAUSE' | 'RESUME') => {
     setActionLoadingId(vmId);
     try {
-      await apiCall(`/vms/${vmId}/power`, {
+      const res = await apiCall(`/vms/${vmId}/power`, {
         method: 'POST',
         body: JSON.stringify({ action }),
       });
       await fetchVMs();
       if (selectedInstance && selectedInstance.vmId === vmId) {
-        const nextStatus = action === 'START' || action === 'RESTART' ? 'running' : 'stopped';
+        let nextStatus = 'stopped';
+        if (action === 'START' || action === 'RESTART' || action === 'RESUME') nextStatus = 'running';
+        else if (action === 'PAUSE') nextStatus = 'paused';
         setSelectedInstance({ ...selectedInstance, status: nextStatus });
       }
+      toast.success(res?.message || `VM ${action.toLowerCase()} completed.`);
     } catch (err: any) {
       toast.error(err.message || 'Error executing power command', 'Power Action Failed');
     } finally {
@@ -462,7 +461,7 @@ export default function Dashboard() {
     }
   };
 
-  const handlePowerAction = async (vmId: number, action: 'START' | 'STOP' | 'RESTART', e?: React.MouseEvent) => {
+  const handlePowerAction = async (vmId: number, action: 'START' | 'STOP' | 'RESTART' | 'PAUSE' | 'RESUME', e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (action === 'STOP') {
       const target = instances.find((i) => i.vmId === vmId);
@@ -772,6 +771,7 @@ export default function Dashboard() {
   const totalStorage = instances.reduce((acc, inst) => acc + inst.diskGB, 0);
   const runningCount = instances.filter((i) => i.status === 'running').length;
   const stoppedCount = instances.filter((i) => i.status === 'stopped').length;
+  const pausedCount = instances.filter((i) => i.status === 'paused').length;
   const activeSlot = activeSubscriptions.find((s) => s.hasAvailableSlot);
 
   const handleOpenDeployModal = () => {
@@ -784,15 +784,8 @@ export default function Dashboard() {
     }
     const randId = Math.floor(1000 + Math.random() * 9000);
     setNewHostname(`srv-vps-${randId}`);
-    let savedUser = '';
-    try {
-      savedUser = localStorage.getItem('atech_preferred_admin_user') || '';
-    } catch {}
-    const autoUser = savedUser || (user?.email ? user.email.split('@')[0].replace(/[^a-z0-9_-]/g, '').toLowerCase() : 'ubuntu');
-    setDeployUsername(autoUser || 'ubuntu');
-    if (!deployPassword) {
-      generateStrongPassword();
-    }
+    setDeployUsername('ubuntu');
+    setDeployPassword('root');
     setDeployTab('os');
     setSelectedAppId('');
     setAppSearch('');
@@ -1141,6 +1134,20 @@ export default function Dashboard() {
                     </button>
 
                     <button
+                      onClick={() => setStatusFilter('paused')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
+                        statusFilter === 'paused'
+                          ? 'bg-white dark:bg-slate-900 text-amber-700 dark:text-amber-400 shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      Paused
+                      <span className="bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-400 px-1.5 py-0.5 rounded-md text-[10px]">
+                        {pausedCount}
+                      </span>
+                    </button>
+
+                    <button
                       onClick={() => setStatusFilter('stopped')}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
                         statusFilter === 'stopped'
@@ -1223,6 +1230,8 @@ export default function Dashboard() {
                                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                                   inst.status === 'running'
                                     ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : inst.status === 'paused'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
                                     : inst.status === 'provisioning'
                                     ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse'
                                     : 'bg-slate-100 text-slate-600 border border-slate-200'
@@ -1232,6 +1241,8 @@ export default function Dashboard() {
                                   className={`w-1.5 h-1.5 rounded-full ${
                                     inst.status === 'running'
                                       ? 'bg-emerald-500'
+                                      : inst.status === 'paused'
+                                      ? 'bg-amber-500'
                                       : inst.status === 'provisioning'
                                       ? 'bg-blue-500 animate-ping'
                                       : 'bg-slate-400'
@@ -1252,7 +1263,7 @@ export default function Dashboard() {
                               ${inst.monthlyPrice}/mo
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-1.5">
                                 {/* POWER BUTTON */}
                                 <button
                                   onClick={(e) =>
@@ -1264,13 +1275,39 @@ export default function Dashboard() {
                                   }
                                   disabled={actionLoadingId === inst.vmId}
                                   title={inst.status === 'running' ? 'Power Off' : 'Power On'}
-                                  className={`p-1.5 rounded-lg border transition-all ${
+                                  className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
                                     inst.status === 'running'
                                       ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 hover:border-rose-200 dark:hover:border-rose-800'
                                       : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 hover:border-emerald-200 dark:hover:border-emerald-800'
                                   }`}
                                 >
-                                  <Power className={`w-4 h-4 ${actionLoadingId === inst.vmId ? 'animate-spin' : ''}`} />
+                                  <Power className={`w-3.5 h-3.5 ${actionLoadingId === inst.vmId ? 'animate-spin' : ''}`} />
+                                </button>
+
+                                {/* REBOOT BUTTON */}
+                                <button
+                                  onClick={(e) => handlePowerAction(inst.vmId, 'RESTART', e)}
+                                  disabled={actionLoadingId === inst.vmId}
+                                  title="Reboot / Restart Server"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:border-amber-200 dark:hover:border-amber-800 transition-all cursor-pointer"
+                                >
+                                  <RefreshCw className={`w-3.5 h-3.5 ${actionLoadingId === inst.vmId ? 'animate-spin' : ''}`} />
+                                </button>
+
+                                {/* PAUSE / RESUME BUTTON */}
+                                <button
+                                  onClick={(e) => handlePowerAction(inst.vmId, inst.status === 'paused' ? 'RESUME' : 'PAUSE', e)}
+                                  disabled={actionLoadingId === inst.vmId || inst.status === 'stopped'}
+                                  title={inst.status === 'paused' ? 'Resume Server' : 'Pause Server'}
+                                  className={`p-1.5 rounded-lg border transition-all ${
+                                    inst.status === 'stopped'
+                                      ? 'opacity-40 cursor-not-allowed border-slate-200 dark:border-slate-700 text-slate-400'
+                                      : inst.status === 'paused'
+                                      ? 'border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer'
+                                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:border-indigo-200 dark:hover:border-indigo-800 cursor-pointer'
+                                  }`}
+                                >
+                                  {inst.status === 'paused' ? <Play className="w-3.5 h-3.5 text-emerald-600" /> : <Pause className="w-3.5 h-3.5 text-indigo-500" />}
                                 </button>
 
                                 {/* SSH CONNECTION GUIDE BUTTON */}
@@ -1280,9 +1317,9 @@ export default function Dashboard() {
                                     setConnectGuideVm(inst);
                                   }}
                                   title="SSH Connection Guide (Terminal / PuTTY)"
-                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer"
                                 >
-                                  <KeyRound className="w-4 h-4" />
+                                  <KeyRound className="w-3.5 h-3.5" />
                                 </button>
 
                                 {/* WEB TERMINAL CONSOLE BUTTON */}
@@ -1293,9 +1330,9 @@ export default function Dashboard() {
                                       setConsoleVm(inst);
                                     }}
                                     title="Open In-Browser Web Console Terminal"
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all"
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all cursor-pointer"
                                   >
-                                    <Terminal className="w-4 h-4" />
+                                    <Terminal className="w-3.5 h-3.5" />
                                   </button>
                                 )}
 
@@ -1303,9 +1340,9 @@ export default function Dashboard() {
                                 <button
                                   onClick={(e) => openResizeModal(inst, e)}
                                   title="Scale CPU & RAM Specs"
-                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer"
                                 >
-                                  <Sliders className="w-4 h-4" />
+                                  <Sliders className="w-3.5 h-3.5" />
                                 </button>
                                 
                                 {/* DELETE ACTION BUTTON */}
@@ -1315,9 +1352,9 @@ export default function Dashboard() {
                                     setDeletingInstance(inst);
                                   }}
                                   title="Terminate / Destroy Server"
-                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-200 dark:hover:border-rose-800 transition-all"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-200 dark:hover:border-rose-800 transition-all cursor-pointer"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             </td>
@@ -1506,215 +1543,6 @@ export default function Dashboard() {
               );
             })()}
 
-            {/* INSTANCE TABLE SECTION (When user has active VMs) */}
-            {instances.length > 0 && (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                
-                {/* TABLE CONTROLS & FILTER TABS */}
-                <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  
-                  {/* STATUS FILTER TABS */}
-                  <div className="flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-800 p-1 rounded-xl w-fit">
-                    <button
-                      onClick={() => setStatusFilter('all')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                        statusFilter === 'all'
-                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                      }`}
-                    >
-                      All
-                      <span className="bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-md text-[10px]">
-                        {instances.length}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setStatusFilter('running')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                        statusFilter === 'running'
-                          ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-sm'
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                      }`}
-                    >
-                      Running
-                      <span className="bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 px-1.5 py-0.5 rounded-md text-[10px]">
-                        {runningCount}
-                      </span>
-                    </button>
-
-                    <button
-                      onClick={() => setStatusFilter('stopped')}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                        statusFilter === 'stopped'
-                          ? 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 shadow-sm'
-                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                      }`}
-                    >
-                      Stopped
-                      <span className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-md text-[10px]">
-                        {stoppedCount}
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* SEARCH INPUT */}
-                  <div className="relative w-full md:w-64">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Search instances or IP..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
-                    />
-                  </div>
-                </div>
-
-                {/* TABLE */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
-                    <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
-                      <tr>
-                        <th className="px-6 py-3.5">Instance Name</th>
-                        <th className="px-6 py-3.5">Status</th>
-                        <th className="px-6 py-3.5">IP Address</th>
-                        <th className="px-6 py-3.5">Hardware Specs</th>
-                        <th className="px-6 py-3.5">Monthly Rate</th>
-                        <th className="px-6 py-3.5 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {filteredInstances.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="px-6 py-10 text-center text-slate-400 text-xs">
-                            No virtual servers found matching criteria.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredInstances.map((inst) => (
-                          <tr 
-                            key={inst.id} 
-                            onClick={() => setSelectedInstance(inst)}
-                            className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
-                          >
-                            <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white flex items-center gap-3">
-                              <Server className="w-4 h-4 text-slate-400" />
-                              <div>
-                                <p>{inst.name}</p>
-                                <p className="text-[10px] text-slate-400 font-normal">{inst.os}</p>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                                  inst.status === 'running'
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                    : inst.status === 'provisioning'
-                                    ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse'
-                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                }`}
-                              >
-                                <span
-                                  className={`w-1.5 h-1.5 rounded-full ${
-                                    inst.status === 'running'
-                                      ? 'bg-emerald-500'
-                                      : inst.status === 'provisioning'
-                                      ? 'bg-blue-500 animate-ping'
-                                      : 'bg-slate-400'
-                                  }`}
-                                />
-                                {inst.status}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 font-mono text-xs text-slate-600 dark:text-slate-300">{inst.ip}</td>
-                            <td className="px-6 py-4 text-xs font-medium text-slate-700 dark:text-slate-300">
-                              <span className="inline-flex items-center gap-1.5">
-                                <Cpu className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> {inst.vCPU} vCPU
-                                <span className="text-slate-300 dark:text-slate-600">•</span>
-                                <MemoryStick className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> {inst.ramGB} GB RAM
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 font-bold text-slate-900 dark:text-white font-poppins text-xs">
-                              ${inst.monthlyPrice}/mo
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                {/* POWER BUTTON */}
-                                <button
-                                  onClick={(e) =>
-                                    handlePowerAction(
-                                      inst.vmId,
-                                      inst.status === 'running' ? 'STOP' : 'START',
-                                      e
-                                    )
-                                  }
-                                  disabled={actionLoadingId === inst.vmId}
-                                  title={inst.status === 'running' ? 'Power Off' : 'Power On'}
-                                  className={`p-1.5 rounded-lg border transition-all ${
-                                    inst.status === 'running'
-                                      ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 hover:border-rose-200 dark:hover:border-rose-800'
-                                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 hover:border-emerald-200 dark:hover:border-emerald-800'
-                                  }`}
-                                >
-                                  <Power className={`w-4 h-4 ${actionLoadingId === inst.vmId ? 'animate-spin' : ''}`} />
-                                </button>
-
-                                {/* SSH CONNECTION GUIDE BUTTON */}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setConnectGuideVm(inst);
-                                  }}
-                                  title="SSH Connection Guide (Terminal / PuTTY)"
-                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all"
-                                >
-                                  <KeyRound className="w-4 h-4" />
-                                </button>
-
-                                {/* WEB TERMINAL CONSOLE BUTTON */}
-                                {inst.status === 'running' && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setConsoleVm(inst);
-                                    }}
-                                    title="Open In-Browser Web Console Terminal"
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all"
-                                  >
-                                    <Terminal className="w-4 h-4" />
-                                  </button>
-                                )}
-                                {/* RESIZE SPECS BUTTON */}
-                                <button
-                                  onClick={(e) => openResizeModal(inst, e)}
-                                  title="Scale CPU & RAM Specs"
-                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all"
-                                >
-                                  <Sliders className="w-4 h-4" />
-                                </button>
-                                
-                                {/* DELETE ACTION BUTTON */}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeletingInstance(inst);
-                                  }}
-                                  title="Terminate / Destroy Server"
-                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-200 dark:hover:border-rose-800 transition-all"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -2807,10 +2635,10 @@ export default function Dashboard() {
             </div>
 
             {/* STICKY DRAWER FOOTER ACTIONS */}
-            <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 p-4 md:p-5 flex items-center gap-3">
+            <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 p-4 md:p-5 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setSelectedInstance(null)}
-                className="py-2.5 px-4 rounded-xl font-semibold text-xs transition-all border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="py-2.5 px-3.5 rounded-xl font-semibold text-xs transition-all border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 Close
               </button>
@@ -2824,19 +2652,54 @@ export default function Dashboard() {
                   )
                 }
                 disabled={actionLoadingId === selectedInstance.vmId}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer border shadow-xs ${
+                className={`py-2.5 px-3.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer border shadow-xs ${
                   selectedInstance.status === 'running'
                     ? 'border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-400 bg-amber-50/60 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50'
                     : 'border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50'
                 }`}
               >
-                <Power className={`w-4 h-4 ${actionLoadingId === selectedInstance.vmId ? 'animate-spin' : ''}`} />
+                <Power className={`w-3.5 h-3.5 ${actionLoadingId === selectedInstance.vmId ? 'animate-spin' : ''}`} />
                 {selectedInstance.status === 'running' ? 'Power Off' : 'Power On'}
               </button>
 
               <button
+                onClick={(e) => handlePowerAction(selectedInstance.vmId, 'RESTART', e)}
+                disabled={actionLoadingId === selectedInstance.vmId || selectedInstance.status !== 'running'}
+                className="py-2.5 px-3.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+                title="Reboot Guest VM"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${actionLoadingId === selectedInstance.vmId ? 'animate-spin' : ''}`} />
+                Reboot
+              </button>
+
+              <button
+                onClick={(e) =>
+                  handlePowerAction(
+                    selectedInstance.vmId,
+                    selectedInstance.status === 'paused' ? 'RESUME' : 'PAUSE',
+                    e
+                  )
+                }
+                disabled={actionLoadingId === selectedInstance.vmId || (selectedInstance.status !== 'running' && selectedInstance.status !== 'paused')}
+                className="py-2.5 px-3.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-purple-200 dark:border-purple-800/60 text-purple-700 dark:text-purple-400 bg-purple-50/60 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+                title={selectedInstance.status === 'paused' ? 'Resume VM Execution' : 'Pause (Suspend) VM Execution'}
+              >
+                {selectedInstance.status === 'paused' ? (
+                  <>
+                    <Play className="w-3.5 h-3.5" />
+                    Resume
+                  </>
+                ) : (
+                  <>
+                    <Pause className="w-3.5 h-3.5" />
+                    Pause
+                  </>
+                )}
+              </button>
+
+              <button
                 onClick={() => setDeletingInstance(selectedInstance)}
-                className="py-2.5 px-4 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 bg-rose-50/60 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 cursor-pointer"
+                className="ml-auto py-2.5 px-3.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 bg-rose-50/60 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Destroy

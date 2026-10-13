@@ -5,7 +5,7 @@
 
 param (
     [Parameter(Mandatory=$true)][string]$VMName,
-    [Parameter(Mandatory=$true)][ValidateSet("START", "STOP", "RESTART", "FORCE_STOP")][string]$Action
+    [Parameter(Mandatory=$true)][ValidateSet("START", "STOP", "RESTART", "FORCE_STOP", "PAUSE", "RESUME")][string]$Action
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,7 +21,9 @@ try {
 
     switch ($Action) {
         "START" {
-            if ($VM.State -ne "Running") {
+            if ($VM.State -eq "Paused") {
+                Resume-VM -Name $VMName -Confirm:$false -ErrorAction Stop
+            } elseif ($VM.State -ne "Running") {
                 Start-VM -Name $VMName -Confirm:$false -ErrorAction Stop
             }
         }
@@ -43,13 +45,32 @@ try {
         "RESTART" {
             if ($VM.State -eq "Running") {
                 Restart-VM -Name $VMName -Force -Confirm:$false -ErrorAction Stop
+            } elseif ($VM.State -eq "Paused") {
+                Resume-VM -Name $VMName -Confirm:$false -ErrorAction Stop
+                Restart-VM -Name $VMName -Force -Confirm:$false -ErrorAction Stop
             } else {
                 Start-VM -Name $VMName -Confirm:$false -ErrorAction Stop
             }
         }
+        "PAUSE" {
+            if ($VM.State -eq "Running") {
+                Suspend-VM -Name $VMName -Confirm:$false -ErrorAction Stop
+            }
+        }
+        "RESUME" {
+            if ($VM.State -eq "Paused") {
+                Resume-VM -Name $VMName -Confirm:$false -ErrorAction Stop
+            }
+        }
     }
 
-    $StateStr = if ($Action -eq "START" -or $Action -eq "RESTART") { "Running" } else { "Off" }
+    $StateStr = switch ($Action) {
+        "PAUSE"   { "Paused" }
+        "RESUME"  { "Running" }
+        "START"   { "Running" }
+        "RESTART" { "Running" }
+        default   { "Off" }
+    }
     $ResultObj = @{
         Status = "SUCCESS"
         Action = $Action

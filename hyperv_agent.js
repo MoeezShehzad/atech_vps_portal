@@ -78,8 +78,10 @@ async function provisionGuestVM({ vmName, adminUsername, adminPassword, sshPubli
     conn.on('ready', () => {
       console.log(`[GUEST PROVISIONER] SSH connected to ${targetIp} as ${defaultUser}.`);
 
-      const safePass = (adminPassword || defaultPass).replace(/"/g, '\\"');
+      const effectivePass = adminPassword || defaultPass;
+      const b64Pass = Buffer.from(effectivePass).toString('base64');
       const safeUser = (adminUsername || defaultUser).toLowerCase().replace(/[^a-z0-9_-]/g, '');
+      const formattedHostname = targetIp.replace(/\./g, '-');
 
       let script = `
 echo "${defaultPass}" | sudo -S growpart /dev/sda 3 2>/dev/null || true
@@ -87,19 +89,27 @@ echo "${defaultPass}" | sudo -S pvresize /dev/sda3 2>/dev/null || true
 echo "${defaultPass}" | sudo -S lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
 echo "${defaultPass}" | sudo -S resize2fs /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
 echo "${defaultPass}" | sudo -S resize2fs /dev/sda3 2>/dev/null || true
+
+# Professional IP-formatted hostname (e.g. ubuntu@172-27-46-60)
+echo "${defaultPass}" | sudo -S hostnamectl set-hostname "${formattedHostname}"
+echo "${defaultPass}" | sudo -S bash -c "echo '${formattedHostname}' > /etc/hostname"
+echo "${defaultPass}" | sudo -S sed -i 's/127.0.1.1.*/127.0.1.1 ${formattedHostname}/g' /etc/hosts 2>/dev/null || true
+echo "127.0.0.1 ${formattedHostname}" | sudo -S tee -a /etc/hosts >/dev/null || true
+
+# Apply selected password to root and ubuntu safely via base64 decode
+echo "${defaultPass}" | sudo -S bash -c "P=\$(echo '${b64Pass}' | base64 -d); echo \"root:\$P\" | chpasswd && echo \"ubuntu:\$P\" | chpasswd"
+
+# Ensure PasswordAuthentication is enabled in OpenSSH
+echo "${defaultPass}" | sudo -S sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+echo "${defaultPass}" | sudo -S sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config.d/*.conf 2>/dev/null || true
+echo "${defaultPass}" | sudo -S systemctl reload ssh 2>/dev/null || sudo -S systemctl restart ssh 2>/dev/null || true
 `;
 
-      if (adminPassword) {
+      if (safeUser !== 'ubuntu' && safeUser !== 'root') {
         script += `
-echo "root:${safePass}" | sudo chpasswd
-echo "ubuntu:${safePass}" | sudo chpasswd
-`;
-        if (safeUser !== 'ubuntu' && safeUser !== 'root') {
-          script += `
 id -u ${safeUser} 2>/dev/null || echo "${defaultPass}" | sudo -S useradd -m -s /bin/bash -G sudo ${safeUser}
-echo "${safeUser}:${safePass}" | sudo chpasswd
+echo "${defaultPass}" | sudo -S bash -c "P=\$(echo '${b64Pass}' | base64 -d); echo \"${safeUser}:\$P\" | chpasswd"
 `;
-        }
       }
 
       if (sshPublicKey && sshPublicKey.trim()) {

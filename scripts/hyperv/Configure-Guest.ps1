@@ -95,15 +95,14 @@ try {
 
     if ($AdminPassword) {
         $SafePass = $AdminPassword -replace '"', '\"'
-        # Update baseline users
-        $Commands += "echo 'ubuntu:$SafePass' | sudo -S chpasswd"
-        $Commands += "echo 'root:$SafePass' | sudo -S chpasswd"
+        # Update baseline users (root and ubuntu)
+        $Commands += "echo $DefaultPass | sudo -S bash -c `"echo 'ubuntu:$SafePass' | chpasswd && echo 'root:$SafePass' | chpasswd`""
 
         # Create custom username if specified
         if ($AdminUsername -and ($AdminUsername -ne 'ubuntu') -and ($AdminUsername -ne 'root')) {
             $SafeUser = $AdminUsername.ToLower() -replace '[^a-z0-9_-]', ''
-            $Commands += "id -u $SafeUser 2>/dev/null || sudo useradd -m -s /bin/bash -G sudo $SafeUser"
-            $Commands += "echo '$SafeUser:$SafePass' | sudo chpasswd"
+            $Commands += "id -u $SafeUser 2>/dev/null || echo $DefaultPass | sudo -S useradd -m -s /bin/bash -G sudo $SafeUser"
+            $Commands += "echo $DefaultPass | sudo -S bash -c `"echo '$SafeUser:$SafePass' | chpasswd`""
         }
     }
 
@@ -113,9 +112,11 @@ try {
         $Commands += "mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo `"$KeyEscaped`" >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
     }
 
-    # Update hostname to match assigned IP (e.g. 172-27-36-3) so prompt is ubuntu@XX-XX-XX-XX
+    # Update hostname to match assigned IP in hyphenated format (e.g. 172-27-46-60)
     $FormattedHostname = $ResolvedIP -replace '\.', '-'
     $Commands += "echo $DefaultPass | sudo -S hostnamectl set-hostname $FormattedHostname"
+    $Commands += "echo $DefaultPass | sudo -S bash -c `"echo '$FormattedHostname' > /etc/hostname`""
+    $Commands += "echo $DefaultPass | sudo -S sed -i 's/127.0.1.1.*/127.0.1.1 $FormattedHostname/g' /etc/hosts"
     $Commands += "echo '127.0.0.1 $FormattedHostname' | sudo tee -a /etc/hosts >/dev/null"
 
     $FullCmd = $Commands -join " ; "
