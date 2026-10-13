@@ -21,6 +21,14 @@ import {
   deleteVMSnapshot,
   resetVMPassword,
   rebuildVMInstance,
+  getVMBackups,
+  createVMBackup,
+  restoreVMBackup,
+  deleteVMBackup,
+  toggleVMBackups,
+  getVMFirewall,
+  addVMFirewallRule,
+  deleteVMFirewallRule,
 } from '../controllers/vmController.js';
 
 const router = express.Router();
@@ -67,5 +75,17 @@ router.post('/:id/reset-password', resetVMPassword);
 
 // 11. Rebuild VM instance
 router.post('/:id/rebuild', rebuildVMInstance);
+
+// 12. Automated Scheduled Backups ($2/mo add-on)
+router.get('/:id/backups', getVMBackups);
+router.post('/:id/backups', createVMBackup);
+router.post('/:id/backups/:backupId/restore', restoreVMBackup);
+router.delete('/:id/backups/:backupId', deleteVMBackup);
+router.patch('/:id/toggle-backups', toggleVMBackups);
+
+// 13. Cloud Firewall (Security Groups)
+router.get('/:id/firewall', getVMFirewall);
+router.post('/:id/firewall/rules', addVMFirewallRule);
+router.delete('/:id/firewall/rules/:ruleId', deleteVMFirewallRule);
 
 export default router;
