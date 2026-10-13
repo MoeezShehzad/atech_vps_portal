@@ -134,6 +134,18 @@ interface ActiveSubscription {
   };
 }
 
+interface ResizePricing {
+  newPrice: number;
+  priceDelta: number;
+  daysRemaining?: number;
+  totalDays?: number;
+  unusedOldCredit?: number;
+  proratedNewCost?: number;
+  dueToday?: number;
+  hourlyRate?: number;
+  nextBillingDate?: string;
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -243,7 +255,7 @@ export default function Dashboard() {
   const [resizeCpu, setResizeCpu] = useState<number>(2);
   const [resizeRam, setResizeRam] = useState<number>(4);
   const [resizeStorage, setResizeStorage] = useState<number>(50);
-  const [resizePricing, setResizePricing] = useState<{ newPrice: number; priceDelta: number } | null>(null);
+  const [resizePricing, setResizePricing] = useState<ResizePricing | null>(null);
   const [resizeLoading, setResizeLoading] = useState(false);
 
   // 1. Fetch user VMs and catalog from API
@@ -545,7 +557,7 @@ export default function Dashboard() {
           body: JSON.stringify({ cpuCores: resizeCpu, ramGb: resizeRam, storageGb: resizeStorage }),
         });
         if (data) {
-          setResizePricing({ newPrice: data.newPrice, priceDelta: data.priceDelta });
+          setResizePricing(data);
         }
       } catch (err) {
         console.error('Preview resize error:', err);
@@ -1643,24 +1655,52 @@ export default function Dashboard() {
                 </p>
               </div>
 
-              {/* DYNAMIC PRICE PREVIEW */}
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-slate-500">Updated Monthly Rate</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Current: ${resizingInstance.monthlyPrice}/mo
-                  </p>
+              {/* GOOGLE-STYLE PRORATED PRICE PREVIEW */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 font-medium">
+                  <span>Billing Cycle Status:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {resizePricing?.daysRemaining ?? 15} days remaining in cycle
+                  </span>
                 </div>
-                <div className="text-right">
-                  <p className="text-2xl font-extrabold text-blue-950 font-poppins">
-                    ${resizePricing?.newPrice || resizingInstance.monthlyPrice}
-                    <span className="text-xs font-normal text-slate-500">/mo</span>
-                  </p>
-                  {resizePricing && resizePricing.priceDelta !== 0 && (
-                    <span className={`text-[10px] font-bold ${resizePricing.priceDelta > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
-                      {resizePricing.priceDelta > 0 ? `+$${resizePricing.priceDelta}/mo upgrade` : `-$${Math.abs(resizePricing.priceDelta)}/mo downgrade`}
-                    </span>
-                  )}
+
+                {resizePricing?.unusedOldCredit !== undefined && resizePricing.priceDelta > 0 && (
+                  <div className="space-y-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px]">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Unused Current Plan Credit ({resizePricing.daysRemaining}d):</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
+                        -${resizePricing.unusedOldCredit?.toFixed(2)} USD
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Prorated Upgraded Specs ({resizePricing.daysRemaining}d):</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-semibold font-mono">
+                        +${resizePricing.proratedNewCost?.toFixed(2)} USD
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-white text-xs">Amount Due Today (Prorated):</p>
+                    <p className="text-[10px] text-slate-400">
+                      ~${resizePricing?.hourlyRate || '0.00'}/hr equivalent
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">
+                      ${resizePricing?.dueToday !== undefined ? resizePricing.dueToday.toFixed(2) : (resizePricing?.newPrice || resizingInstance.monthlyPrice)}
+                      <span className="text-xs font-normal text-slate-500"> USD</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/60 dark:border-slate-700/60 flex justify-between">
+                  <span>Next Recurring Monthly Bill:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">
+                    ${resizePricing?.newPrice || resizingInstance.monthlyPrice}/mo
+                  </span>
                 </div>
               </div>
 
@@ -1668,21 +1708,21 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => setResizingInstance(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={resizeLoading}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all flex items-center gap-2 cursor-pointer"
                 >
                   {resizeLoading ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Adjusting Specs...
                     </>
                   ) : (
-                    'Apply Specification Changes'
+                    `Apply Specification Changes ${resizePricing?.dueToday ? `($${resizePricing.dueToday.toFixed(2)})` : ''}`
                   )}
                 </button>
               </div>

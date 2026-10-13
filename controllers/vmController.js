@@ -7,7 +7,11 @@ import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
 import { calculateResizePrice, calculateCustomPrice } from '../services/pricingService.js';
-import { sendVmProvisionedEmail, sendInvoiceReceiptEmail } from '../services/emailService.js';
+import { 
+  sendVmProvisionedEmail, 
+  sendInvoiceReceiptEmail, 
+  sendSpecificationResizeReceiptEmail 
+} from '../services/emailService.js';
 
 /**
  * 1. GET /api/vms - Get all VMs for current user
@@ -723,6 +727,45 @@ export async function resizeVM(req, res) {
       });
     }
 
+    // Generate Invoice and Payment if there is an amount due today
+    let generatedInvoice = null;
+    if (priceInfo.dueToday > 0 && vm.subscriptionId) {
+      try {
+        const invNum = `INV-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+        generatedInvoice = await prisma.invoice.create({
+          data: {
+            userId,
+            subscriptionId: vm.subscriptionId,
+            invoiceNumber: invNum,
+            subtotal: priceInfo.dueToday,
+            tax: 0.00,
+            discount: 0.00,
+            total: priceInfo.dueToday,
+            currency: 'USD',
+            status: 'PAID',
+            issueDate: new Date(),
+            dueDate: new Date(),
+            paidDate: new Date(),
+          },
+        });
+
+        await prisma.payment.create({
+          data: {
+            userId,
+            invoiceId: generatedInvoice.invoiceId,
+            paymentGateway: 'STRIPE_CARD',
+            transactionId: `txn_upg_${Date.now()}_${vmId}`,
+            amount: priceInfo.dueToday,
+            currency: 'USD',
+            status: 'COMPLETED',
+            paymentDate: new Date(),
+          },
+        });
+      } catch (invErr) {
+        console.warn('[VM Controller] Non-fatal notice: invoice creation warning:', invErr.message);
+      }
+    }
+
     // Log Activity
     await prisma.activityLog.create({
       data: {
@@ -730,15 +773,45 @@ export async function resizeVM(req, res) {
         vmId,
         action: 'RESIZE_SPECS',
         status: 'SUCCESS',
-        details: `Resized specs to ${targetCpu} vCPU, ${targetRam} GB RAM, ${targetStorage} GB NVMe. New monthly rate: $${priceInfo.newPrice}/mo (Delta: $${priceInfo.priceDelta})`,
+        details: `Hardware upgraded: ${targetCpu} vCPU, ${targetRam} GB RAM, ${targetStorage} GB NVMe. Due today: $${priceInfo.dueToday} (Prorated). New monthly rate: $${priceInfo.newPrice}/mo`,
       },
     });
+
+    // Send Enterprise Email Receipt (asynchronous / non-blocking)
+    try {
+      const user = await prisma.user.findUnique({
+        where: { userId },
+        select: { email: true, fullName: true },
+      });
+
+      if (user?.email) {
+        sendSpecificationResizeReceiptEmail({
+          email: user.email,
+          fullName: user.fullName,
+          invoiceNumber: generatedInvoice ? generatedInvoice.invoiceNumber : `INV-${new Date().getFullYear()}-SPEC-ADJ`,
+          vmName: vm.vmName,
+          previousSpecs: `${vm.cpuCores} vCPU, ${vm.ramGb} GB RAM, ${vm.storageGb} GB NVMe`,
+          newSpecs: `${targetCpu} vCPU, ${targetRam} GB RAM, ${targetStorage} GB NVMe`,
+          daysRemaining: priceInfo.daysRemaining,
+          totalDays: priceInfo.totalDays,
+          unusedCredit: priceInfo.unusedOldCredit,
+          proratedCost: priceInfo.proratedNewCost,
+          amountCharged: priceInfo.dueToday,
+          newMonthlyPrice: priceInfo.newPrice,
+          nextBillingDate: priceInfo.nextBillingDate,
+          currency: 'USD',
+        }).catch((err) => console.warn('[Email Warning] Receipt sending caught:', err.message));
+      }
+    } catch (mailErr) {
+      console.warn('[Email Notice] User fetch for receipt warning:', mailErr.message);
+    }
 
     return res.json({
       success: true,
       message: `Hardware specs upgraded to ${targetCpu} vCPU, ${targetRam} GB RAM, and ${targetStorage} GB NVMe Storage.`,
       vm: updatedVm,
       pricing: priceInfo,
+      invoice: generatedInvoice,
     });
   } catch (error) {
     console.error('[VM Controller] Resize error:', error);

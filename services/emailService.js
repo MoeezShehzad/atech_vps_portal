@@ -496,6 +496,123 @@ export async function sendInvoiceReceiptEmail({ email, fullName, invoiceNumber, 
   }
 }
 
+/**
+ * Specification Adjustment & Storage Expansion Receipt Email (Enterprise Prorated)
+ */
+export async function sendSpecificationResizeReceiptEmail({
+  email,
+  fullName,
+  invoiceNumber,
+  vmName,
+  previousSpecs,
+  newSpecs,
+  daysRemaining,
+  totalDays,
+  unusedCredit,
+  proratedCost,
+  amountCharged,
+  newMonthlyPrice,
+  nextBillingDate,
+  currency = 'USD',
+}) {
+  const invoiceUrl = `${APP_URL}/dashboard?tab=billing`;
+  const formattedNextDate = nextBillingDate ? new Date(nextBillingDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'Next Cycle';
+
+  const contentHtml = `
+    <p style="margin-top:0;font-size:15px;color:#334155;line-height:1.6;">
+      Hi ${escapeHtml(fullName || 'Valued Customer')},
+    </p>
+    <p style="font-size:14px;color:#334155;line-height:1.6;">
+      Your cloud server <strong>${escapeHtml(vmName)}</strong> has been upgraded with expanded specifications. 
+      In accordance with our fair-use billing policy, your invoice has been automatically prorated for the remaining 
+      <strong>${daysRemaining} days</strong> of your billing cycle.
+    </p>
+
+    <!-- SPECIFICATION COMPARISON TABLE -->
+    <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin:22px 0;background-color:#f8fafc;">
+      <div style="background-color:#0f172a;color:#ffffff;padding:12px 18px;font-size:13px;font-weight:700;letter-spacing:0.3px;">
+        SPECIFICATION ADJUSTMENT SUMMARY
+      </div>
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="padding:14px 18px;font-size:13px;color:#1e293b;">
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:8px 0;color:#64748b;">Virtual Server:</td>
+          <td align="right" style="padding:8px 0;font-weight:700;font-family:monospace;">${escapeHtml(vmName)}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:8px 0;color:#64748b;">Previous Allocation:</td>
+          <td align="right" style="padding:8px 0;font-family:monospace;">${escapeHtml(previousSpecs)}</td>
+        </tr>
+        <tr style="border-bottom:1px solid #e2e8f0;">
+          <td style="padding:8px 0;color:#64748b;font-weight:600;">Upgraded Allocation:</td>
+          <td align="right" style="padding:8px 0;font-weight:700;color:#2563eb;font-family:monospace;">${escapeHtml(newSpecs)}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#64748b;">Billing Cycle Remaining:</td>
+          <td align="right" style="padding:8px 0;font-weight:600;">${daysRemaining} of ${totalDays} days</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- PRORATED FINANCIAL RECEIPT -->
+    <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin:22px 0;">
+      <div style="background-color:#f1f5f9;padding:12px 18px;font-size:13px;font-weight:700;color:#334155;">
+        INVOICE RECEIPT #${escapeHtml(invoiceNumber)}
+      </div>
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="padding:14px 18px;font-size:13px;color:#1e293b;">
+        <tr>
+          <td style="padding:6px 0;color:#64748b;">Unused Previous Plan Credit (${daysRemaining}d):</td>
+          <td align="right" style="padding:6px 0;font-weight:600;color:#16a34a;">-$${Number(unusedCredit).toFixed(2)} ${escapeHtml(currency)}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 0;color:#64748b;">Prorated Upgraded Specification (${daysRemaining}d):</td>
+          <td align="right" style="padding:6px 0;font-weight:600;color:#0f172a;">+$${Number(proratedCost).toFixed(2)} ${escapeHtml(currency)}</td>
+        </tr>
+        <tr style="border-top:1px solid #cbd5e1;">
+          <td style="padding:10px 0;font-weight:700;font-size:14px;color:#0f172a;">Amount Charged Today:</td>
+          <td align="right" style="padding:10px 0;font-weight:800;font-size:16px;color:#2563eb;">
+            $${Number(amountCharged).toFixed(2)} ${escapeHtml(currency)}
+          </td>
+        </tr>
+        <tr style="border-top:1px dashed #e2e8f0;">
+          <td style="padding:8px 0;font-size:12px;color:#64748b;">Next Recurring Monthly Bill (Starting ${formattedNextDate}):</td>
+          <td align="right" style="padding:8px 0;font-weight:700;font-size:13px;color:#334155;">
+            $${Number(newMonthlyPrice).toFixed(2)} /mo
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <p style="font-size:12px;color:#64748b;line-height:1.5;">
+      Your next monthly invoice will be unified automatically into a single renewal on ${formattedNextDate}. 
+      You can review and download the official PDF receipt from your customer billing portal.
+    </p>
+  `;
+
+  const html = wrapEmailTemplate({
+    title: `Payment Receipt: Invoice ${invoiceNumber}`,
+    subtitle: `Specification Upgrade • ${vmName}`,
+    categoryBadge: 'Billing',
+    contentHtml,
+    ctaText: 'View Invoices in Portal',
+    ctaUrl: invoiceUrl,
+    footerNote: 'ATC Cloud Billing • For questions regarding your invoice, reply to billing@atechconsult.com',
+  });
+
+  try {
+    const info = await transporterBilling.sendMail({
+      from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
+      to: email,
+      subject: `[Receipt] Invoice ${invoiceNumber} - Hardware Upgrade ($${Number(amountCharged).toFixed(2)} ${currency})`,
+      html,
+    });
+    console.log(`[Billing] Upgrade receipt sent to ${email} (Message ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Billing Error] Upgrade receipt dispatch failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 // ==============================================================================
 // 4. INFRASTRUCTURE & SECURITY ALERTS (alerts@atechconsult.com)
 // ==============================================================================
@@ -549,5 +666,6 @@ export default {
   sendTicketCreatedNotification,
   sendTicketReplyNotification,
   sendInvoiceReceiptEmail,
+  sendSpecificationResizeReceiptEmail,
   sendSystemAlertEmail,
 };

@@ -46,6 +46,8 @@ export default function StorageAndDisks() {
   const [selectedDisk, setSelectedDisk] = useState<VirtualDisk | null>(null);
   const [newCapacity, setNewCapacity] = useState(50);
   const [expandLoading, setExpandLoading] = useState(false);
+  const [expandQuote, setExpandQuote] = useState<any>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
 
   const [isAttachOpen, setIsAttachOpen] = useState(false);
   const [attachTargetVmId, setAttachTargetVmId] = useState<number | null>(null);
@@ -87,11 +89,46 @@ export default function StorageAndDisks() {
     fetchStorageData();
   }, []);
 
+  // Fetch live prorated financial quote whenever disk or capacity changes
+  useEffect(() => {
+    if (!isExpandOpen || !selectedDisk) return;
+    const targetVm = instances.find((v) => v.vmId === selectedDisk.vmId);
+    if (!targetVm) return;
+
+    let active = true;
+    const fetchQuote = async () => {
+      try {
+        setQuoteLoading(true);
+        const data = await apiCall(`/vms/${selectedDisk.vmId}/preview-resize`, {
+          method: 'POST',
+          body: JSON.stringify({
+            cpuCores: targetVm.cpuCores || targetVm.vCPU,
+            ramGb: targetVm.ramGb || targetVm.ramGB,
+            storageGb: newCapacity,
+          }),
+        });
+        if (active && data) {
+          setExpandQuote(data);
+        }
+      } catch (e) {
+        console.warn('[Storage Quote Warning]:', e);
+      } finally {
+        if (active) setQuoteLoading(false);
+      }
+    };
+
+    fetchQuote();
+    return () => {
+      active = false;
+    };
+  }, [isExpandOpen, selectedDisk, newCapacity, instances]);
+
   const totalAllocatedGb = disks.reduce((acc, d) => acc + d.capacityGb, 0);
 
   const handleOpenExpand = (disk: VirtualDisk) => {
     setSelectedDisk(disk);
-    setNewCapacity(disk.capacityGb + 10);
+    setNewCapacity(disk.capacityGb + 50);
+    setExpandQuote(null);
     setIsExpandOpen(true);
   };
 
@@ -110,7 +147,7 @@ export default function StorageAndDisks() {
       if (!targetVm) throw new Error('Target VM not found');
 
       // Call resize API
-      await apiCall(`/vms/${selectedDisk.vmId}/resize`, {
+      const result = await apiCall(`/vms/${selectedDisk.vmId}/resize`, {
         method: 'PATCH',
         body: JSON.stringify({
           cpuCores: targetVm.cpuCores || targetVm.vCPU,
@@ -119,7 +156,8 @@ export default function StorageAndDisks() {
         }),
       });
 
-      toast.success(`Virtual Disk expanded to ${newCapacity} GB NVMe.`);
+      const chargedAmount = result?.pricing?.dueToday ? `$${result.pricing.dueToday.toFixed(2)}` : 'prorated amount';
+      toast.success(`Virtual Disk expanded to ${newCapacity} GB NVMe. Charged ${chargedAmount} today.`);
       setIsExpandOpen(false);
       fetchStorageData();
     } catch (err: any) {
@@ -368,16 +406,49 @@ export default function StorageAndDisks() {
               </div>
             </div>
 
-            <form onSubmit={handleExpandSubmit} className="space-y-5">
+            <form onSubmit={handleExpandSubmit} className="space-y-4">
+              {/* Quick Add-on Presets */}
               <div>
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-2">
+                  Select Storage Add-On Tier
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { addGb: 25, label: '+25 GB NVMe', monthly: '$2.50/mo' },
+                    { addGb: 50, label: '+50 GB NVMe', monthly: '$5.00/mo' },
+                    { addGb: 100, label: '+100 GB NVMe', monthly: '$10.00/mo' },
+                    { addGb: 250, label: '+250 GB NVMe', monthly: '$25.00/mo' },
+                  ].map((tier) => {
+                    const isSelected = newCapacity === selectedDisk.capacityGb + tier.addGb;
+                    return (
+                      <button
+                        type="button"
+                        key={tier.addGb}
+                        onClick={() => setNewCapacity(selectedDisk.capacityGb + tier.addGb)}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50/70 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/20'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="font-bold text-xs">{tier.label}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">{tier.monthly}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Slider for custom capacity */}
+              <div className="pt-1">
                 <div className="flex justify-between text-xs font-semibold mb-2">
-                  <span className="text-slate-700 dark:text-slate-300">New Disk Capacity (GB)</span>
+                  <span className="text-slate-700 dark:text-slate-300">Custom Target Capacity</span>
                   <span className="text-blue-600 dark:text-blue-400 font-bold font-mono text-sm">{newCapacity} GB NVMe</span>
                 </div>
                 <input
                   type="range"
                   min={selectedDisk.capacityGb}
-                  max={selectedDisk.capacityGb + 200}
+                  max={selectedDisk.capacityGb + 500}
                   step="5"
                   value={newCapacity}
                   onChange={(e) => setNewCapacity(Number(e.target.value))}
@@ -385,14 +456,47 @@ export default function StorageAndDisks() {
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                   <span>Current: {selectedDisk.capacityGb} GB</span>
-                  <span>Max: {selectedDisk.capacityGb + 200} GB</span>
+                  <span>Expansion: +{newCapacity - selectedDisk.capacityGb} GB</span>
+                  <span>Max: {selectedDisk.capacityGb + 500} GB</span>
                 </div>
               </div>
 
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/60 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              {/* Google-Style Prorated Financial Quote Card */}
+              {quoteLoading ? (
+                <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 text-xs text-slate-500">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" /> Calculating prorated billing quote...
+                </div>
+              ) : expandQuote && (
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/80 space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                    <span>Billing Cycle Status:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {expandQuote.daysRemaining || 15} days remaining in cycle
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+                    <span>Monthly Storage Rate:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      +${expandQuote.priceDelta ? expandQuote.priceDelta.toFixed(2) : '0.00'}/mo
+                      <span className="text-[10px] text-slate-400 ml-1 font-mono">(~${expandQuote.hourlyRate || '0.00'}/hr)</span>
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between font-bold">
+                    <span className="text-slate-900 dark:text-white">Amount Due Today (Prorated):</span>
+                    <span className="text-base text-blue-600 dark:text-blue-400 font-mono">
+                      ${expandQuote.dueToday ? expandQuote.dueToday.toFixed(2) : '0.00'} USD
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 pt-0.5">
+                    * Next renewal automatically unifies into your monthly VPS bill at ${expandQuote.newPrice ? expandQuote.newPrice.toFixed(2) : '0.00'}/mo.
+                  </p>
+                </div>
+              )}
+
+              <div className="p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/60 rounded-xl text-[11px] text-amber-900 dark:text-amber-200 flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
                 <span>
-                  Disks can only be expanded, not shrunk. After expanding, your guest OS partition is automatically resized by the agent.
+                  Disks can only expand, never shrink. File system partition expands dynamically without downtime.
                 </span>
               </div>
 
@@ -407,9 +511,15 @@ export default function StorageAndDisks() {
                 <button
                   type="submit"
                   disabled={expandLoading || newCapacity <= selectedDisk.capacityGb}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  {expandLoading ? 'Expanding...' : 'Confirm Expansion'}
+                  {expandLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Expanding...
+                    </>
+                  ) : (
+                    `Confirm & Expand ${expandQuote?.dueToday ? `($${expandQuote.dueToday.toFixed(2)})` : ''}`
+                  )}
                 </button>
               </div>
             </form>

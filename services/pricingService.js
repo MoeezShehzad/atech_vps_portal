@@ -41,7 +41,8 @@ export function calculateCustomPrice(plan, targetSpecs) {
 }
 
 /**
- * Calculates price change between current VM specs and proposed new specs.
+ * Calculates price change between current VM specs and proposed new specs
+ * including enterprise Google-style billing cycle proration.
  */
 export function calculateResizePrice(currentVm, newCpuCores, newRamGb, newStorageGb) {
   const currentRam = currentVm.ramGb;
@@ -60,6 +61,56 @@ export function calculateResizePrice(currentVm, newCpuCores, newRamGb, newStorag
 
   const newPrice = Math.max(4.99, Number((currentPrice + totalDelta).toFixed(2)));
 
+  // ============================================================================
+  // ENTERPRISE PRORATION LOGIC (Billing Cycle Synchronization)
+  // ============================================================================
+  const now = new Date();
+  const sub = currentVm.subscription;
+  let totalDays = 30;
+  let daysRemaining = 15;
+  let nextBillingDate = null;
+
+  if (sub && sub.nextBillingDate) {
+    const nextDate = new Date(sub.nextBillingDate);
+    const startDate = sub.startDate ? new Date(sub.startDate) : new Date(now.getTime() - 15 * 86400000);
+    nextBillingDate = sub.nextBillingDate;
+
+    if (nextDate > now) {
+      const msDiff = nextDate.getTime() - startDate.getTime();
+      const calcTotalDays = Math.max(1, Math.round(msDiff / (1000 * 60 * 60 * 24)));
+      totalDays = calcTotalDays > 0 ? calcTotalDays : 30;
+
+      const msRemaining = nextDate.getTime() - now.getTime();
+      daysRemaining = Math.max(0, Math.ceil(msRemaining / (1000 * 60 * 60 * 24)));
+    } else {
+      // Past due or renewing today
+      totalDays = 30;
+      daysRemaining = 30;
+    }
+  } else {
+    // If no explicit subscription cycle recorded, assume 30-day window with 15 days default
+    totalDays = 30;
+    daysRemaining = 15;
+    const futureDate = new Date(now.getTime() + 15 * 86400000);
+    nextBillingDate = futureDate.toISOString();
+  }
+
+  // Ratio of billing period remaining (clamped between 0 and 1)
+  const prorationRatio = Math.min(1, Math.max(0, daysRemaining / totalDays));
+
+  // Prorated figures
+  const unusedOldCredit = Number((currentPrice * prorationRatio).toFixed(2));
+  const proratedNewCost = Number((newPrice * prorationRatio).toFixed(2));
+  
+  // Amount due today: exactly the difference between new prorated cost and unused credit
+  // Or priceDelta * prorationRatio
+  const dueTodayRaw = totalDelta * prorationRatio;
+  const dueToday = Number(Math.max(0, dueTodayRaw).toFixed(2));
+  const accountCredit = Number(Math.max(0, -dueTodayRaw).toFixed(2));
+
+  // Hourly equivalent rate (~720 hours in a month)
+  const hourlyRate = Number((Math.max(0, totalDelta) / 720).toFixed(4));
+
   return {
     currentPrice,
     newPrice,
@@ -67,6 +118,15 @@ export function calculateResizePrice(currentVm, newCpuCores, newRamGb, newStorag
     ramDelta,
     cpuDelta,
     storageDelta,
+    totalDays,
+    daysRemaining,
+    prorationRatio: Number(prorationRatio.toFixed(4)),
+    unusedOldCredit,
+    proratedNewCost,
+    dueToday,
+    accountCredit,
+    hourlyRate,
+    nextBillingDate,
     currency: 'USD',
   };
 }
