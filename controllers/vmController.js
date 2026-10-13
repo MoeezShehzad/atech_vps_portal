@@ -202,7 +202,7 @@ export async function getUserVMs(req, res) {
         ramGB: vm.ramGb,
         diskGB: vm.storageGb,
         bandwidthGb: vm.plan?.bandwidthMbps || 80,
-        bandwidthUsedGb: parseFloat((Math.min(vm.plan?.bandwidthMbps || 80, (((vm.vmId * 7.3 + 14.2) % ((vm.plan?.bandwidthMbps || 80) * 0.7)) + 4.2)).toFixed(1)),
+        bandwidthUsedGb: parseFloat(Math.min(vm.plan?.bandwidthMbps || 80, (((vm.vmId * 7.3 + 14.2) % ((vm.plan?.bandwidthMbps || 80) * 0.7)) + 4.2)).toFixed(1)),
         backupEnabled: (vm.backups && vm.backups.length > 0) || Boolean(vm.plan?.backupEnabled),
         monthlyPrice: vm.subscription?.monthlyPrice ? Number(vm.subscription.monthlyPrice) : (vm.plan?.monthlyPrice ? Number(vm.plan.monthlyPrice) : 9.99),
         createdAt: vm.createdAt.toISOString().split('T')[0],
