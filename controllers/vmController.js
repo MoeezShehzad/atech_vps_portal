@@ -62,15 +62,27 @@ export async function getUserVMs(req, res) {
         for (const vm of vms) {
           let liveInfo = hostVmMap.get(vm.vmName.toLowerCase());
 
-          // If liveList was fetched, liveInfo already reflects whether VM exists on host
+          // If not found on Hyper-V host, the VM was deleted: mark TERMINATED and free allocated IP
+          if (!liveInfo) {
+            // Guard: If it was created within the last 60 seconds and still PROVISIONING, give it a moment
+            const isFresh = vm.status === 'PROVISIONING' && (Date.now() - new Date(vm.createdAt).getTime() < 60000);
+            if (!isFresh) {
+              await prisma.virtualMachine.update({
+                where: { vmId: vm.vmId },
+                data: {
+                  status: 'TERMINATED',
+                  terminatedAt: new Date(),
+                },
+              }).catch(() => {});
 
-          // If not found in Hyper-V, mark as STOPPED rather than abruptly deleting user DB record
-          if (!liveInfo && vm.status === 'RUNNING') {
-            await prisma.virtualMachine.update({
-              where: { vmId: vm.vmId },
-              data: { status: 'STOPPED' },
-            }).catch(() => {});
-            vm.status = 'STOPPED';
+              await prisma.iPPool.updateMany({
+                where: { assignedVmId: vm.vmId },
+                data: { status: 'AVAILABLE', assignedVmId: null },
+              }).catch(() => {});
+
+              // Exclude terminated VM from the dashboard's active VM list
+              continue;
+            }
           }
 
           // If state changed in Hyper-V (e.g. stopped/started outside portal)

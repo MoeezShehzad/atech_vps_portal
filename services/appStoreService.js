@@ -77,28 +77,37 @@ export async function installAppOnVM({ vmId, userId, appId }) {
     throw new Error(`Application '${appId}' is not found in the 1-Click catalog.`);
   }
 
-  const vm = await prisma.virtualMachine.findFirst({
-    where: { vmId: Number(vmId), userId: Number(userId) },
-    include: { ipPool: true },
-  });
-
-  if (!vm) {
-    throw new Error('Target virtual machine not found or unauthorized.');
-  }
-
-  if (vm.status !== 'RUNNING') {
-    throw new Error(`Virtual machine '${vm.vmName}' is currently ${vm.status}. Please power it on before installing apps.`);
-  }
-
-  // Determine reachable IP
+  // Poll for VM to be ready and have an IP address (retry up to 15 times, 5s interval = 75s)
+  let vm = null;
   let targetIp = null;
-  if (vm.ipPool && vm.ipPool.length > 0) {
-    const valid = vm.ipPool.find(ip => ip.ipAddress && !ip.ipAddress.startsWith('DHCP'));
-    if (valid) targetIp = valid.ipAddress;
+  const maxIpAttempts = 15;
+
+  for (let attempt = 1; attempt <= maxIpAttempts; attempt++) {
+    vm = await prisma.virtualMachine.findFirst({
+      where: { vmId: Number(vmId), userId: Number(userId) },
+      include: { ipPool: true },
+    });
+
+    if (!vm) {
+      throw new Error('Target virtual machine not found or unauthorized.');
+    }
+
+    if (vm.ipPool && vm.ipPool.length > 0) {
+      const valid = vm.ipPool.find(ip => ip.ipAddress && !ip.ipAddress.startsWith('DHCP'));
+      if (valid) {
+        targetIp = valid.ipAddress;
+        break;
+      }
+    }
+
+    // Wait 5 seconds before checking again
+    if (attempt < maxIpAttempts) {
+      await new Promise(r => setTimeout(r, 5000));
+    }
   }
 
   if (!targetIp) {
-    throw new Error(`Virtual machine does not have an active IP address assigned yet.`);
+    throw new Error(`Virtual machine '${vm?.vmName || vmId}' did not obtain a valid IP address in time.`);
   }
 
   const targetUser = vm.adminUser || 'ubuntu';
@@ -107,85 +116,99 @@ export async function installAppOnVM({ vmId, userId, appId }) {
   // Construct batch bash command string
   const fullCommand = app.installCommands.join(' && ');
 
+  // Attempt SSH connection with retry (up to 12 attempts, 5s delay = 60s)
   return new Promise((resolve, reject) => {
-    const conn = new SSHClient();
-    let stdoutBuffer = '';
-    let stderrBuffer = '';
+    let attempts = 0;
+    const maxAttempts = 12;
 
-    conn.on('ready', () => {
-      conn.exec(fullCommand, (err, stream) => {
-        if (err) {
-          conn.end();
-          return reject(new Error(`Failed to initiate remote execution: ${err.message}`));
-        }
+    const tryConnect = () => {
+      attempts++;
+      const conn = new SSHClient();
+      let stdoutBuffer = '';
+      let stderrBuffer = '';
 
-        stream.on('data', (data) => {
-          stdoutBuffer += data.toString();
-        });
-
-        stream.stderr.on('data', (data) => {
-          stderrBuffer += data.toString();
-        });
-
-        stream.on('close', async (code) => {
-          conn.end();
-
-          const isSuccess = code === 0 || stdoutBuffer.length > 0;
-          const accessUrl = app.defaultPort === 80 
-            ? `http://${targetIp}` 
-            : app.defaultPort === 443 
-              ? `https://${targetIp}` 
-              : `http://${targetIp}:${app.defaultPort}`;
-
-          const resolvedGuide = app.accessGuide.replace(/{IP}/g, targetIp);
-
-          // Log in database ActivityLog
-          await prisma.activityLog.create({
-            data: {
-              userId: Number(userId),
-              vmId: Number(vmId),
-              action: 'INSTALL_APP',
-              status: isSuccess ? 'COMPLETED' : 'FAILED',
-              ipAddress: targetIp,
-              details: JSON.stringify({
-                appId: app.id,
-                appName: app.name,
-                port: app.defaultPort,
-                accessUrl,
-                exitCode: code,
-                summary: isSuccess ? 'Successfully provisioned application.' : stderrBuffer.slice(-200),
-              }),
-            },
-          });
-
-          if (!isSuccess && code !== 0) {
-            return reject(new Error(`Application installation failed: ${stderrBuffer.slice(-300) || 'Unknown error'}`));
+      conn.on('ready', () => {
+        conn.exec(fullCommand, (err, stream) => {
+          if (err) {
+            conn.end();
+            return reject(new Error(`Failed to initiate remote execution: ${err.message}`));
           }
 
-          resolve({
-            success: true,
-            appId: app.id,
-            appName: app.name,
-            vmName: vm.vmName,
-            ip: targetIp,
-            port: app.defaultPort,
-            accessUrl,
-            guide: resolvedGuide,
+          stream.on('data', (data) => {
+            stdoutBuffer += data.toString();
+          });
+
+          stream.stderr.on('data', (data) => {
+            stderrBuffer += data.toString();
+          });
+
+          stream.on('close', async (code) => {
+            conn.end();
+
+            const isSuccess = code === 0 || stdoutBuffer.length > 0;
+            const accessUrl = app.defaultPort === 80 
+              ? `http://${targetIp}` 
+              : app.defaultPort === 443 
+                ? `https://${targetIp}` 
+                : `http://${targetIp}:${app.defaultPort}`;
+
+            const resolvedGuide = app.accessGuide.replace(/{IP}/g, targetIp);
+
+            // Log in database ActivityLog
+            await prisma.activityLog.create({
+              data: {
+                userId: Number(userId),
+                vmId: Number(vmId),
+                action: 'INSTALL_APP',
+                status: isSuccess ? 'COMPLETED' : 'FAILED',
+                ipAddress: targetIp,
+                details: JSON.stringify({
+                  appId: app.id,
+                  appName: app.name,
+                  port: app.defaultPort,
+                  accessUrl,
+                  exitCode: code,
+                  summary: isSuccess ? 'Successfully provisioned application.' : stderrBuffer.slice(-200),
+                }),
+              },
+            }).catch(() => {});
+
+            if (!isSuccess && code !== 0) {
+              return reject(new Error(`Application installation failed: ${stderrBuffer.slice(-300) || 'Unknown error'}`));
+            }
+
+            resolve({
+              success: true,
+              appId: app.id,
+              appName: app.name,
+              vmName: vm.vmName,
+              ip: targetIp,
+              port: app.defaultPort,
+              accessUrl,
+              guide: resolvedGuide,
+            });
           });
         });
       });
-    });
 
-    conn.on('error', (err) => {
-      reject(new Error(`SSH connection to VM failed (${targetIp}:22): ${err.message}`));
-    });
+      conn.on('error', (err) => {
+        conn.end();
+        if (attempts < maxAttempts) {
+          setTimeout(tryConnect, 5000);
+        } else {
+          reject(new Error(`SSH connection to VM failed after ${maxAttempts} attempts (${targetIp}:22): ${err.message}`));
+        }
+      });
 
-    conn.connect({
-      host: targetIp,
-      port: 22,
-      username: targetUser,
-      password: targetPass,
-      readyTimeout: 20000,
-    });
+      conn.connect({
+        host: targetIp,
+        port: 22,
+        username: targetUser,
+        password: targetPass,
+        readyTimeout: 10000,
+      });
+    };
+
+    tryConnect();
   });
 }

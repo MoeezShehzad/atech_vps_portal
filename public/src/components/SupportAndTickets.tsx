@@ -87,7 +87,6 @@ export default function SupportAndTickets() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'AWAITING_USER_ACTION' | 'REOPENED' | 'RESOLVED' | 'CLOSED_TIMEOUT'>('ALL');
-  const [idleFilter, setIdleFilter] = useState<'ALL' | '3' | '6' | '9'>('ALL');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [sortField, setSortField] = useState<'updatedAt' | 'createdAt' | 'id'>('updatedAt');
@@ -284,14 +283,7 @@ export default function SupportAndTickets() {
         t.status === statusFilter ||
         (statusFilter === 'CLOSED_TIMEOUT' && (t.status === 'CLOSED_TIMEOUT' || t.status === 'CLOSED'));
 
-      // 2. Idle Duration Filter (>3 days, >6 days, >9 days)
-      let matchesIdle = true;
-      const days = t.timelineDay ?? 0;
-      if (idleFilter === '3') matchesIdle = days >= 3;
-      else if (idleFilter === '6') matchesIdle = days >= 6;
-      else if (idleFilter === '9') matchesIdle = days >= 9;
-
-      // 3. Date Range Filter (From Date to To Date)
+      // 2. Date Range Filter (From Date to To Date)
       let matchesDate = true;
       const ticketTime = new Date(t.createdAt).getTime();
       if (dateFrom) {
@@ -303,7 +295,7 @@ export default function SupportAndTickets() {
         if (ticketTime > toTime) matchesDate = false;
       }
 
-      // 4. Search Query
+      // 3. Search Query
       const q = searchQuery.toLowerCase();
       const matchesSearch =
         !q ||
@@ -313,7 +305,7 @@ export default function SupportAndTickets() {
         (t.lastAutomatedAction && t.lastAutomatedAction.toLowerCase().includes(q)) ||
         (t.response && t.response.toLowerCase().includes(q));
 
-      return matchesStatus && matchesIdle && matchesDate && matchesSearch;
+      return matchesStatus && matchesDate && matchesSearch;
     })
     .sort((a, b) => {
       let comparison = 0;
@@ -493,33 +485,8 @@ export default function SupportAndTickets() {
 
         {/* Secondary Filter & Sorting Controls */}
         <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
-          {/* Left: Inactivity & Date Range Pickers */}
+          {/* Left: Date Range Pickers */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-400 font-semibold flex items-center gap-1">
-                <Filter className="w-3.5 h-3.5" /> Inactivity:
-              </span>
-              {[
-                { id: 'ALL', label: 'Any' },
-                { id: '3', label: '>3 Days' },
-                { id: '6', label: '>6 Days' },
-                { id: '9', label: '>9 Days' },
-              ].map((idl) => (
-                <button
-                  key={idl.id}
-                  onClick={() => setIdleFilter(idl.id as any)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    idleFilter === idl.id
-                      ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
-                      : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  {idl.label}
-                </button>
-              ))}
-            </div>
-
-            <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
 
             {/* Date Range Filtering */}
             <div className="flex items-center gap-2">

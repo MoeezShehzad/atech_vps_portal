@@ -10,90 +10,90 @@ interface ExtendedPlan extends VPSPlan {
   yearlyTotalPrice?: number;
 }
 
-// IONOS Live Pricing & Specs Structure
-const IONOS_VPS_PLANS: ExtendedPlan[] = [
-  {
+// Helper to format and enrich database plans for frontend presentation
+const enrichDbPlan = (plan: VPSPlan): ExtendedPlan => {
+  const regular = Number(plan.monthlyPrice) || 0;
+  const promo = Number((regular * 0.85).toFixed(2)); // 15% discount for 1-year billing
+  const yearlyTotal = Math.round(promo * 12);
+
+  let tag: string | undefined;
+  if (plan.planId === 2) tag = 'BESTSELLER';
+  else if (plan.planId === 3) tag = 'BEST VALUE';
+  else if (plan.planId === 4) tag = 'HIGH COMPUTE';
+
+  return {
+    ...plan,
+    monthlyPrice: regular,
+    regularPriceMonthly: regular,
+    promoPriceMonthly: promo,
+    yearlyTotalPrice: yearlyTotal,
+    promoSaveText: 'Save 15%',
+    tag,
+  };
+};
+
+// Standard Database Fallback if Network/API is offline
+const DEFAULT_FALLBACK_PLANS: ExtendedPlan[] = [
+  enrichDbPlan({
     planId: 1,
-    name: 'VPS M+',
-    cpuCores: 4,
-    ramGb: 4,
-    storageGb: 120,
+    name: 'VPS Basic',
+    cpuCores: 2,
+    ramGb: 2,
+    storageGb: 50,
     storageType: 'NVMe',
     bandwidthMbps: 1000,
     ipv4Addresses: 1,
     backupEnabled: false,
     snapshotEnabled: true,
-    maxSnapshots: 3,
-    monthlyPrice: 11,
-    promoPriceMonthly: 4,
-    regularPriceMonthly: 11,
-    yearlyTotalPrice: 105,
-    promoSaveText: 'Save 16%',
+    monthlyPrice: 4.97,
     currency: 'USD',
     isActive: true,
-  },
-  {
+  }),
+  enrichDbPlan({
     planId: 2,
-    name: 'VPS L+',
-    cpuCores: 6,
+    name: 'VPS Pro',
+    cpuCores: 4,
     ramGb: 8,
-    storageGb: 240,
+    storageGb: 120,
     storageType: 'NVMe',
-    bandwidthMbps: 1000,
+    bandwidthMbps: 2000,
     ipv4Addresses: 1,
     backupEnabled: true,
     snapshotEnabled: true,
-    maxSnapshots: 5,
-    monthlyPrice: 21,
-    promoPriceMonthly: 6,
-    regularPriceMonthly: 21,
-    yearlyTotalPrice: 207,
-    promoSaveText: 'Save 18%',
-    tag: 'BESTSELLER',
+    monthlyPrice: 14.99,
     currency: 'USD',
     isActive: true,
-  },
-  {
+  }),
+  enrichDbPlan({
     planId: 3,
-    name: 'VPS XL+',
+    name: 'VPS Enterprise',
     cpuCores: 8,
     ramGb: 16,
-    storageGb: 480,
+    storageGb: 250,
     storageType: 'NVMe',
-    bandwidthMbps: 1000,
-    ipv4Addresses: 1,
+    bandwidthMbps: 5000,
+    ipv4Addresses: 2,
     backupEnabled: true,
     snapshotEnabled: true,
-    maxSnapshots: 10,
-    monthlyPrice: 44,
-    promoPriceMonthly: 11,
-    regularPriceMonthly: 44,
-    yearlyTotalPrice: 429,
-    promoSaveText: 'Save 19%',
-    tag: 'BEST VALUE',
+    monthlyPrice: 29.99,
     currency: 'USD',
     isActive: true,
-  },
-  {
+  }),
+  enrichDbPlan({
     planId: 4,
-    name: 'VPS XXL+',
-    cpuCores: 12,
-    ramGb: 24,
-    storageGb: 720,
+    name: 'VPS Ultra Compute',
+    cpuCores: 16,
+    ramGb: 32,
+    storageGb: 500,
     storageType: 'NVMe',
-    bandwidthMbps: 1000,
-    ipv4Addresses: 1,
+    bandwidthMbps: 10000,
+    ipv4Addresses: 2,
     backupEnabled: true,
     snapshotEnabled: true,
-    maxSnapshots: 15,
-    monthlyPrice: 68,
-    promoPriceMonthly: 18,
-    regularPriceMonthly: 68,
-    yearlyTotalPrice: 666,
-    promoSaveText: 'Save 18%',
+    monthlyPrice: 59.99,
     currency: 'USD',
     isActive: true,
-  },
+  }),
 ];
 
 export default function Pricing() {
@@ -114,16 +114,13 @@ export default function Pricing() {
       try {
         const data = await fetchVpsPlans();
         if (Array.isArray(data) && data.length > 0) {
-          const merged = data.map((plan, index) => ({
-            ...plan,
-            ...IONOS_VPS_PLANS[index % IONOS_VPS_PLANS.length],
-          }));
-          setPlans(merged);
+          const enriched = data.map(enrichDbPlan);
+          setPlans(enriched);
         } else {
-          setPlans(IONOS_VPS_PLANS);
+          setPlans(DEFAULT_FALLBACK_PLANS);
         }
       } catch (err) {
-        setPlans(IONOS_VPS_PLANS);
+        setPlans(DEFAULT_FALLBACK_PLANS);
       } finally {
         setLoading(false);
       }
@@ -262,7 +259,7 @@ export default function Pricing() {
 
                       {billingCycle === 'yearly' ? (
                         <p className="text-[11px] text-emerald-600 font-semibold mt-1">
-                          for 3 months, then ${plan.regularPriceMonthly}/mo
+                          Billed annually (${plan.yearlyTotalPrice}/yr), save 15%
                         </p>
                       ) : (
                         <p className="text-[11px] text-slate-400 mt-1">Billed monthly, cancel anytime</p>
@@ -273,16 +270,16 @@ export default function Pricing() {
                   {/* SPECS LIST */}
                   <ul className="space-y-3 text-xs text-slate-600 border-t border-slate-100 pt-4">
                     <li className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{plan.cpuCores} vCores</span> CPU
+                      <span className="font-bold text-slate-900">{plan.cpuCores} vCPU Cores</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="font-bold text-slate-900">{plan.ramGb} GB</span> RAM
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{plan.storageGb} GB</span> {plan.storageType} SSD
+                      <span className="font-bold text-slate-900">{plan.storageGb} GB</span> {plan.storageType || 'NVMe'} SSD
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">1 Gbps</span> Unlimited Traffic
+                      <span className="font-bold text-slate-900">{plan.bandwidthMbps >= 1000 ? `${plan.bandwidthMbps / 1000} Gbps` : `${plan.bandwidthMbps} Mbps`}</span> High-Speed Uplink
                     </li>
                   </ul>
                 </div>

@@ -2055,107 +2055,111 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* PLAN SELECTION */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Base Plan Tier
-                </label>
-                <select
-                  value={selectedPlanId}
-                  onChange={(e) => handlePlanChange(Number(e.target.value))}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
-                >
-                  {catalogPlans.map((p) => (
-                    <option key={p.planId} value={p.planId}>
-                      {p.name} — {p.cpuCores} vCPU / {p.ramGb}GB RAM (${p.monthlyPrice}/mo)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    vCPU Cores
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="16"
-                    value={customCpu}
-                    onChange={(e) => setCustomCpu(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
-                  />
+              {/* PLAN SELECTION: If already purchased, hide plan selection as requested. If new user, show plan selector */}
+              {activeSlot ? (
+                <div className="bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      Using Active Plan Slot: <strong className="text-emerald-700 dark:text-emerald-400">{activeSlot.planName}</strong> ({activeSlot.specs?.cpuCores} vCPU, {activeSlot.specs?.ramGb}GB RAM, {activeSlot.specs?.storageGb}GB NVMe)
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">$0.00 / Prepaid</span>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    RAM (GB)
-                  </label>
-                  <input
-                    type="number"
-                    min="2"
-                    max="64"
-                    value={customRam}
-                    onChange={(e) => setCustomRam(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    NVMe Disk (GB)
-                  </label>
-                  <input
-                    type="number"
-                    min="20"
-                    max="500"
-                    step="10"
-                    value={customStorage}
-                    onChange={(e) => setCustomStorage(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
-                  />
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Select Cloud Plan Tier
+                    </label>
+                    <select
+                      value={selectedPlanId}
+                      onChange={(e) => handlePlanChange(Number(e.target.value))}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
+                    >
+                      {catalogPlans.map((p) => (
+                        <option key={p.planId} value={p.planId}>
+                          {p.name} — {p.cpuCores} vCPU / {p.ramGb}GB RAM / {p.storageGb}GB NVMe (${p.monthlyPrice}/mo)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-              {(() => {
-                const plan = catalogPlans.find((p) => p.planId === selectedPlanId) || catalogPlans[0];
-                if (!plan) return null;
-                const extraCpu = Math.max(0, customCpu - plan.cpuCores);
-                const extraRam = Math.max(0, customRam - plan.ramGb);
-                const extraStorage = Math.max(0, customStorage - plan.storageGb);
-                const delta = extraCpu * 2.5 + extraRam * 1.5 + extraStorage * 0.10;
-                const total = Number(plan.monthlyPrice) + delta;
-                const isCoveredBySlot = Boolean(activeSlot && activeSlot.planId === plan.planId && delta === 0);
-
-                return (
-                  <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                      <span>Base Plan ({plan.name})</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">${plan.monthlyPrice}/mo</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        vCPU Cores
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="16"
+                        value={customCpu}
+                        onChange={(e) => setCustomCpu(Number(e.target.value))}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
+                      />
                     </div>
-                    {delta > 0 && (
-                      <div className="flex items-center justify-between text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-                        <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM{extraStorage > 0 ? `, +${extraStorage}GB NVMe` : ''})</span>
-                        <span>+${delta.toFixed(2)}/mo</span>
-                      </div>
-                    )}
-                    <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Estimated Monthly Rate</span>
-                      <div className="text-right">
-                        {isCoveredBySlot ? (
-                          <div>
-                            <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 font-poppins">$0.00 /mo</span>
-                            <span className="block text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Covered by Active Prepaid Slot</span>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        RAM (GB)
+                      </label>
+                      <input
+                        type="number"
+                        min="2"
+                        max="64"
+                        value={customRam}
+                        onChange={(e) => setCustomRam(Number(e.target.value))}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        NVMe Disk (GB)
+                      </label>
+                      <input
+                        type="number"
+                        min="20"
+                        max="500"
+                        step="10"
+                        value={customStorage}
+                        onChange={(e) => setCustomStorage(Number(e.target.value))}
+                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const plan = catalogPlans.find((p) => p.planId === selectedPlanId) || catalogPlans[0];
+                    if (!plan) return null;
+                    const extraCpu = Math.max(0, customCpu - plan.cpuCores);
+                    const extraRam = Math.max(0, customRam - plan.ramGb);
+                    const extraStorage = Math.max(0, customStorage - plan.storageGb);
+                    const delta = extraCpu * 2.5 + extraRam * 1.5 + extraStorage * 0.10;
+                    const total = Number(plan.monthlyPrice) + delta;
+
+                    return (
+                      <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 space-y-1.5">
+                        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                          <span>Base Plan ({plan.name})</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-200">${plan.monthlyPrice}/mo</span>
+                        </div>
+                        {delta > 0 && (
+                          <div className="flex items-center justify-between text-[11px] text-blue-600 dark:text-blue-400 font-medium">
+                            <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM{extraStorage > 0 ? `, +${extraStorage}GB NVMe` : ''})</span>
+                            <span>+${delta.toFixed(2)}/mo</span>
                           </div>
-                        ) : (
+                        )}
+                        <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Estimated Monthly Rate</span>
                           <span className="text-sm font-extrabold text-blue-600 dark:text-blue-400 font-poppins">
                             ${total.toFixed(2)}/mo
                           </span>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })()}
+                    );
+                  })()}
+                </>
+              )}
 
               {/* SERVER AUTHENTICATION (PASSWORD vs SSH PUBLIC KEY) */}
               <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
