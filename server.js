@@ -29,6 +29,7 @@ import appStoreRoutes from './routes/appStoreRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import { setupTerminalWebSocket } from './services/terminalService.js';
 import { startTicketAutomationWorker } from './services/ticketAutomationService.js';
+import { startTrialAutomationWorker } from './services/trialService.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -178,4 +179,5 @@ server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
   console.log(`Web Terminal WebSocket server attached to /ws/terminal`);
   startTicketAutomationWorker();
+  startTrialAutomationWorker();
 });

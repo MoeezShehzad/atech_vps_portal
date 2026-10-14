@@ -15,6 +15,7 @@ model User {
   phone         String?   @db.VarChar(30)
   address       String?   @db.VarChar(255)
   city          String?   @db.VarChar(100)
+  state         String?   @db.VarChar(100)
   postalCode    String?   @map("postal_code") @db.VarChar(20)
   country       String?   @db.VarChar(100)
   googleId      String?   @unique(map: "uq_users_google_id") @map("google_id") @db.VarChar(255)
@@ -31,6 +32,7 @@ model User {
   virtualMachines VirtualMachine[]
   invoices        Invoice[]
   payments        Payment[]
+  paymentMethods  UserPaymentMethod[]
   securityLogs    SecurityLog[]
   activityLogs    ActivityLog[]
   refreshTokens   RefreshToken[]
@@ -126,9 +128,11 @@ model Subscription {
   nextBillingDate DateTime? @map("next_billing_date")
   endDate         DateTime? @map("end_date")
   monthlyPrice    Decimal   @map("monthly_price") @db.Decimal(10, 2)
-  currency        String    @db.Char(3)
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+  currency         String    @db.Char(3)
+  trialWarningSent Boolean?  @default(false) @map("trial_warning_sent")
+  trialConvertedAt DateTime? @map("trial_converted_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
 
   user            User             @relation(fields: [userId], references: [userId])
   plan            VPSPlan          @relation(fields: [planId], references: [planId])
@@ -418,3 +422,22 @@ model ManagedWebsite {
 
   @@map("Managed_Websites")
 }
+
+model UserPaymentMethod {
+  methodId            Int      @id @default(autoincrement()) @map("method_id")
+  userId              Int      @map("user_id")
+  cardBrand           String   @map("card_brand") @db.VarChar(50)
+  last4               String   @db.VarChar(4)
+  expMonth            String   @map("exp_month") @db.VarChar(2)
+  expYear             String   @map("exp_year") @db.VarChar(4)
+  cardholderName      String   @map("cardholder_name") @db.VarChar(150)
+  encryptedCardNumber String   @map("encrypted_card_number") @db.NVarChar(Max)
+  encryptedCvc        String   @map("encrypted_cvc") @db.NVarChar(Max)
+  isDefault           Boolean  @default(true) @map("is_default")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("User_Payment_Methods")
+}

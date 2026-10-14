@@ -652,6 +652,197 @@ export async function sendSystemAlertEmail({ subject, alertLevel = 'WARNING', de
     console.error(`[Alerts Error] Alert dispatch failed:`, err.message);
     return { success: false, error: err.message };
   }
+/**
+ * 30-Day Free Trial Welcome Email
+ */
+export async function sendTrialStartedEmail({ email, fullName, planName, trialEndsDate, cardLast4 }) {
+  const endsStr = new Date(trialEndsDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const html = wrapEmailTemplate({
+    title: 'Your 30-Day Free Trial is Active!',
+    subtitle: `Welcome to ATECH Cloud • ${planName}`,
+    categoryBadge: '30-Day Free Trial',
+    contentHtml: `
+      <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
+        Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
+      </p>
+      <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
+        Welcome to ATECH Cloud! Your <strong>30-Day Free Trial</strong> has officially started. You now have full access to deploy and run your virtual machine with high-performance NVMe storage, dedicated compute, and 1 Gbps networking.
+      </p>
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;line-height:1.8;">
+          <tr>
+            <td style="color:#64748b;padding-bottom:6px;">Trial Package:</td>
+            <td align="right" style="color:#0f172a;font-weight:700;padding-bottom:6px;">${escapeHtml(planName)}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;padding-bottom:6px;">Specs:</td>
+            <td align="right" style="color:#0f172a;font-weight:600;padding-bottom:6px;">2 vCPU Cores • 2 GB RAM • 50 GB NVMe</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;padding-bottom:6px;">Amount Charged Today:</td>
+            <td align="right" style="color:#10b981;font-weight:700;padding-bottom:6px;">$0.00 USD (Free)</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;padding-bottom:6px;">Payment Method on File:</td>
+            <td align="right" style="color:#0f172a;font-weight:600;padding-bottom:6px;">Card ending in ${escapeHtml(cardLast4)}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Trial Expiration Date:</td>
+            <td align="right" style="color:#2563eb;font-weight:700;">${endsStr}</td>
+          </tr>
+        </table>
+      </div>
+      <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:8px;">
+        💡 <strong>Zero Commitment:</strong> You can cancel your trial anytime directly from your dashboard before ${endsStr} with one click, and your card will never be charged.
+      </p>
+    `,
+    ctaText: 'Launch Your Trial VM',
+    ctaUrl: `${APP_URL}/dashboard`,
+    footerNote: 'Thank you for choosing Analytical Technical Consulting Cloud Services.',
+  });
+
+  return await transporterNoReply.sendMail({
+    from: `"ATC Cloud" <${NOREPLY_EMAIL}>`,
+    to: email,
+    subject: `Your 30-Day Free Trial is Ready! (${planName})`,
+    html,
+  });
+}
+
+/**
+ * 30-Day Free Trial Expiration Warning & Rating Request Email (~7 Days Remaining)
+ */
+export async function sendTrialWarningEmail({ email, fullName, daysRemaining, trialEndsDate, planName, monthlyPrice }) {
+  const endsStr = new Date(trialEndsDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const html = wrapEmailTemplate({
+    title: `Your Free Trial Ends in ${daysRemaining} Days`,
+    subtitle: `Rate our service & manage your subscription`,
+    categoryBadge: 'Trial Ending Soon',
+    contentHtml: `
+      <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
+        Hi <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
+      </p>
+      <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
+        You have <strong>${daysRemaining} days remaining</strong> on your 30-Day Free Trial for <strong>${escapeHtml(planName)}</strong>, concluding on <strong>${endsStr}</strong>.
+      </p>
+
+      <!-- Feedback / Rating Prompt -->
+      <div style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:20px;margin-bottom:24px;text-align:center;">
+        <h4 style="margin:0 0 8px 0;font-size:15px;color:#1e40af;font-weight:700;">How are your virtual workloads performing?</h4>
+        <p style="margin:0 0 16px 0;font-size:13px;color:#3b82f6;">Help us improve by rating your cloud experience so far:</p>
+        <div style="font-size:24px;letter-spacing:6px;margin-bottom:8px;">
+          ⭐⭐⭐⭐⭐
+        </div>
+        <p style="margin:0;font-size:12px;color:#60a5fa;">Click below to leave us a quick feedback rating</p>
+      </div>
+
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin-bottom:20px;font-size:13px;color:#475569;line-height:1.6;">
+        <p style="margin:0 0 8px 0;font-weight:700;color:#0f172a;">What happens next?</p>
+        <ul style="margin:0;padding-left:20px;">
+          <li><strong>Keep your server running:</strong> Do nothing! On ${endsStr}, your subscription will seamlessly renew at $${Number(monthlyPrice || 4.99).toFixed(2)}/mo to ensure zero downtime.</li>
+          <li><strong>Cancel anytime:</strong> If you do not wish to continue, you can cancel your trial with 1-click in your account dashboard before ${endsStr} and your card will not be charged.</li>
+        </ul>
+      </div>
+    `,
+    ctaText: 'Rate Service & Manage Trial',
+    ctaUrl: `${APP_URL}/dashboard?tab=billing`,
+    footerNote: 'Analytical Technical Consulting • Automated Trial Lifecycle Engine',
+  });
+
+  return await transporterBilling.sendMail({
+    from: `"ATC Billing & Feedback" <${BILLING_EMAIL}>`,
+    to: email,
+    subject: `[Notice] Your 30-Day Free Trial ends in ${daysRemaining} days (${endsStr})`,
+    html,
+  });
+}
+
+/**
+ * 30-Day Trial Converted to Paid Subscription Email
+ */
+export async function sendTrialConvertedPaidEmail({ email, fullName, invoiceNumber, amount, cardLast4, nextRenewalDate, planName }) {
+  const nextDateStr = new Date(nextRenewalDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const html = wrapEmailTemplate({
+    title: 'Trial Concluded — Subscription Active',
+    subtitle: `Invoice #${invoiceNumber} Successfully Settled`,
+    categoryBadge: 'Paid Subscription',
+    contentHtml: `
+      <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
+        Dear <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
+      </p>
+      <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
+        Your 30-day free trial has concluded, and your <strong>${escapeHtml(planName)}</strong> package has officially transitioned to an active monthly subscription. Your server remains 100% online with zero interruption.
+      </p>
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;line-height:1.8;">
+          <tr>
+            <td style="color:#64748b;">Invoice Reference:</td>
+            <td align="right" style="color:#0f172a;font-weight:700;">#${escapeHtml(invoiceNumber)}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Amount Paid:</td>
+            <td align="right" style="color:#10b981;font-weight:700;">$${Number(amount).toFixed(2)} USD</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Payment Method:</td>
+            <td align="right" style="color:#0f172a;font-weight:600;">Card ending in •••• ${escapeHtml(cardLast4)}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Next Renewal Date:</td>
+            <td align="right" style="color:#2563eb;font-weight:700;">${nextDateStr}</td>
+          </tr>
+        </table>
+      </div>
+      <p style="font-size:13px;line-height:1.6;color:#64748b;">
+        Your official tax invoice receipt has been generated and is available for download in your portal.
+      </p>
+    `,
+    ctaText: 'View Invoice & Server Dashboard',
+    ctaUrl: `${APP_URL}/dashboard?tab=billing`,
+    footerNote: 'Thank you for your ongoing partnership with Analytical Technical Consulting.',
+  });
+
+  return await transporterBilling.sendMail({
+    from: `"ATC Billing" <${BILLING_EMAIL}>`,
+    to: email,
+    subject: `[Invoice Paid] ${planName} Subscription Active (#${invoiceNumber})`,
+    html,
+  });
+}
+
+/**
+ * Free Trial Cancelled Confirmation Email
+ */
+export async function sendTrialCancelledEmail({ email, fullName, planName }) {
+  const html = wrapEmailTemplate({
+    title: 'Your Free Trial Has Been Cancelled',
+    subtitle: `Zero charges applied to your card`,
+    categoryBadge: 'Trial Cancelled',
+    contentHtml: `
+      <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
+        Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
+      </p>
+      <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
+        This email confirms that your 30-day free trial for <strong>${escapeHtml(planName)}</strong> has been cancelled as requested.
+      </p>
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:24px;font-size:13px;color:#475569;">
+        ✅ <strong>No Charges:</strong> Your payment method on file has not been charged, and no future recurring payments will occur.
+      </div>
+      <p style="font-size:13px;line-height:1.6;color:#64748b;">
+        If you change your mind or need high-performance cloud compute in the future, you can resume your service anytime from the ATECH Cloud Portal.
+      </p>
+    `,
+    ctaText: 'Visit ATC Cloud',
+    ctaUrl: `${APP_URL}/pricing`,
+    footerNote: 'Analytical Technical Consulting Cloud Customer Success',
+  });
+
+  return await transporterBilling.sendMail({
+    from: `"ATC Cloud" <${BILLING_EMAIL}>`,
+    to: email,
+    subject: `Confirmation: Your 30-Day Free Trial has been cancelled`,
+    html,
+  });
 }
 
 export default {
@@ -668,4 +859,9 @@ export default {
   sendInvoiceReceiptEmail,
   sendSpecificationResizeReceiptEmail,
   sendSystemAlertEmail,
+  sendTrialStartedEmail,
+  sendTrialWarningEmail,
+  sendTrialConvertedPaidEmail,
+  sendTrialCancelledEmail,
 };
+

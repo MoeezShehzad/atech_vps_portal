@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
+import { setupUserTrial } from '../services/trialService.js';
 
 // --- CENTRALIZED AUTH CONFIGURATION ---
 const JWT_SECRET = process.env.JWT_SECRET || 'atech_vps_default_jwt_secret_must_change';
@@ -244,7 +245,7 @@ export const googleAuthCallback = async (req, res) => {
   }
 };
 
-// --- REGISTER USER (WITH EMAIL VERIFICATION LINK) ---
+// --- REGISTER USER (WITH OPTIONAL 30-DAY TRIAL & EMAIL VERIFICATION) ---
 export const register = async (req, res) => {
   const {
     fullName,
@@ -253,8 +254,10 @@ export const register = async (req, res) => {
     phone,
     address,
     city,
+    state,
     postalCode,
     country,
+    cardData,
   } = req.body;
 
   // Validation Guard
@@ -290,9 +293,10 @@ export const register = async (req, res) => {
           phone: phone || null,
           address: address || null,
           city: city || null,
+          state: state || null,
           postalCode: postalCode || null,
           country: country || null,
-          emailVerified: false, // Explicitly set unverified
+          emailVerified: !!cardData, // Verified automatically if card is securely provided for trial
           provider: 'LOCAL',
         },
       });
@@ -309,14 +313,62 @@ export const register = async (req, res) => {
       return user;
     });
 
-    // Generate Email Verification Token (Expires in 24 hours)
+    let trialResult = null;
+    if (cardData && cardData.cardNumber) {
+      try {
+        trialResult = await setupUserTrial({
+          userId: newUser.userId,
+          cardData,
+          ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '',
+        });
+      } catch (trialErr) {
+        console.error('[Trial Setup Warning during Registration]:', trialErr.message);
+        // If card fails validation, return clear error
+        return res.status(400).json({
+          error: `Failed to activate free trial: ${trialErr.message}`,
+        });
+      }
+    }
+
+    // If card provided for 30-day trial, immediately issue login session
+    if (cardData && cardData.cardNumber) {
+      const roles = ['Customer'];
+      const accessToken = generateAccessToken(newUser.userId, newUser.email, roles);
+      const refreshToken = await createAndStoreRefreshToken(newUser.userId);
+      setRefreshTokenCookie(res, refreshToken);
+
+      await prisma.user.update({
+        where: { userId: newUser.userId },
+        data: { lastLoginAt: new Date() },
+      });
+
+      return res.status(201).json({
+        message: 'Registration successful! Your 30-Day Free Trial has been activated.',
+        accessToken,
+        token: accessToken,
+        user: {
+          userId: newUser.userId,
+          fullName: newUser.fullName,
+          email: newUser.email,
+          roles,
+          emailVerified: true,
+        },
+        trial: trialResult ? {
+          subscriptionId: trialResult.subscription?.subscriptionId,
+          trialEndsAt: trialResult.trialEndsAt,
+          daysLeft: trialResult.daysLeft,
+          cardLast4: trialResult.cardLast4,
+          cardBrand: trialResult.cardBrand,
+        } : null,
+      });
+    }
+
+    // Otherwise standard email verification flow
     const verificationToken = jwt.sign(
       { userId: newUser.userId, email: newUser.email },
       JWT_VERIFY_SECRET,
       { expiresIn: '24h' }
     );
-
-    const verifyUrl = `${BACKEND_URL}/api/auth/verify-email?token=${verificationToken}`;
 
     let emailSent = false;
     try {
@@ -329,7 +381,7 @@ export const register = async (req, res) => {
     }
 
     if (!emailSent) {
-      // If email sending was unsuccessful or SMTP is offline, auto-verify so user can login immediately
+      // Auto-verify if mail offline
       await prisma.user.update({
         where: { userId: newUser.userId },
         data: { emailVerified: true },

@@ -18,7 +18,9 @@ import {
   FileText,
   Download,
   Eye,
-  EyeOff
+  EyeOff,
+  Sparkles,
+  AlertTriangle
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
@@ -58,6 +60,8 @@ export default function BillingAndInvoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [showCardDetails, setShowCardDetails] = useState(false);
+  const [revealedCard, setRevealedCard] = useState<any>(null);
+  const [cancellingTrialId, setCancellingTrialId] = useState<number | null>(null);
 
   const fetchBilling = async () => {
     try {
@@ -70,6 +74,44 @@ export default function BillingAndInvoices() {
       toast.error(err.message || 'Failed to load billing history');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleCardDetails = async () => {
+    if (!showCardDetails && !revealedCard) {
+      try {
+        const res = await apiCall('/billing/payment-method/reveal');
+        if (res && res.card) {
+          setRevealedCard(res.card);
+        }
+      } catch (err: any) {
+        console.warn('Could not reveal card:', err.message);
+      }
+    }
+    setShowCardDetails(!showCardDetails);
+  };
+
+  const handleCancelTrial = async (subscriptionId: number) => {
+    const confirmed = window.confirm(
+      'Are you sure you want to cancel your 30-Day Free Trial?\n\n' +
+      '• No charges will ever be made to your payment card.\n' +
+      '• Your trial VPS instance will be decommissioned.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setCancellingTrialId(subscriptionId);
+      const res = await apiCall('/billing/cancel-trial', {
+        method: 'POST',
+        body: JSON.stringify({ subscriptionId }),
+      });
+      toast.success(res.message || 'Free trial cancelled successfully. Zero charges applied.');
+      await fetchBilling();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to cancel free trial');
+    } finally {
+      setCancellingTrialId(null);
     }
   };
 
@@ -337,7 +379,7 @@ export default function BillingAndInvoices() {
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => setShowCardDetails(!showCardDetails)}
+                onClick={handleToggleCardDetails}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                 title={showCardDetails ? 'Hide card & expiry details' : 'Show full card & expiry details'}
               >
@@ -349,16 +391,16 @@ export default function BillingAndInvoices() {
             </div>
           </div>
           <div className="text-sm font-bold text-slate-900 dark:text-white font-mono flex items-center gap-1.5">
-            <span>{summary?.paymentMethod?.brand || 'Visa'}</span>
+            <span>{revealedCard?.brand || summary?.paymentMethod?.brand || 'Visa'}</span>
             <span>
               {showCardDetails
-                ? `4242 4242 4242 ${summary?.paymentMethod?.last4 || '4242'}`
+                ? (revealedCard?.fullNumber || `•••• •••• •••• ${summary?.paymentMethod?.last4 || '4242'}`)
                 : `•••• ${summary?.paymentMethod?.last4 || '4242'}`}
             </span>
           </div>
           <p className="text-[11px] text-slate-400 font-mono">
             {showCardDetails
-              ? `Expires ${summary?.paymentMethod?.expMonth || '12'}/${summary?.paymentMethod?.expYear || '2028'}`
+              ? `Expires ${revealedCard?.expMonth || summary?.paymentMethod?.expMonth || '12'}/${revealedCard?.expYear || summary?.paymentMethod?.expYear || '2028'}`
               : 'Expires ••/••••'}
           </p>
         </div>
@@ -387,44 +429,85 @@ export default function BillingAndInvoices() {
                   <th className="py-3.5 px-6">Rate</th>
                   <th className="py-3.5 px-6">Renewal Countdown</th>
                   <th className="py-3.5 px-6">Status</th>
+                  <th className="py-3.5 px-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
-                {subscriptions.map((sub) => (
-                  <tr key={sub.subscriptionId} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white">
-                      {sub.planName}
-                    </td>
-                    <td className="py-4 px-6">
-                      {sub.vms.length > 0 ? (
-                        <div className="space-y-0.5">
-                          <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                            <Server className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                            {sub.vms[0].vmName}
-                          </div>
-                          <div className="text-[11px] text-slate-400 font-mono">{sub.vms[0].specs}</div>
+                {subscriptions.map((sub) => {
+                  const isTrial = sub.status === 'TRIAL' || sub.status === 'trial';
+                  return (
+                    <tr key={sub.subscriptionId} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white">
+                        <div className="flex items-center gap-2">
+                          <span>{sub.planName}</span>
+                          {isTrial && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full">
+                              <Sparkles className="w-2.5 h-2.5 text-amber-500" /> Free Trial
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-slate-400 italic">Available Slot</span>
-                      )}
-                    </td>
-                    <td className="py-4 px-6 font-mono font-bold text-slate-900 dark:text-white">
-                      ${sub.monthlyPrice.toFixed(2)} / mo
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 font-mono">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        Renews in {sub.daysRemaining} days
-                      </span>
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        Active
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-4 px-6">
+                        {sub.vms.length > 0 ? (
+                          <div className="space-y-0.5">
+                            <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                              <Server className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                              {sub.vms[0].vmName}
+                            </div>
+                            <div className="text-[11px] text-slate-400 font-mono">{sub.vms[0].specs}</div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic">Available Slot</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 font-mono">
+                        {isTrial ? (
+                          <div>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">$0.00</span>
+                            <span className="text-[10px] text-slate-400 block">${sub.monthlyPrice.toFixed(2)}/mo after trial</span>
+                          </div>
+                        ) : (
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            ${sub.monthlyPrice.toFixed(2)} / mo
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 font-mono">
+                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                          {isTrial ? `Trial ends in ${sub.daysRemaining} days` : `Renews in ${sub.daysRemaining} days`}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        {isTrial ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            30-Day Trial
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Active
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        {isTrial ? (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelTrial(sub.subscriptionId)}
+                            disabled={cancellingTrialId === sub.subscriptionId}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 dark:border-rose-800 transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            {cancellingTrialId === sub.subscriptionId ? 'Cancelling...' : 'Cancel Free Trial'}
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

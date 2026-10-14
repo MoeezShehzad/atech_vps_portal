@@ -4,6 +4,8 @@
 // ==============================================================================
 
 import prisma from '../lib/prisma.js';
+import { cancelUserTrial } from '../services/trialService.js';
+import { decryptSensitive } from '../services/stripeService.js';
 
 /**
  * 1. GET /api/billing/overview - Overview of active subscriptions, monthly spend & invoices
@@ -159,10 +161,16 @@ export async function getBillingOverview(req, res) {
     });
 
     // Primary next billing date from earliest active subscription
-    const activeSubs = formattedSubscriptions.filter((sub) => sub.status === 'ACTIVE' || sub.status === 'active');
+    const activeSubs = formattedSubscriptions.filter((sub) => sub.status === 'ACTIVE' || sub.status === 'active' || sub.status === 'TRIAL');
     const primaryNextBillingDate = activeSubs.length > 0 
       ? activeSubs[0].nextBillingDate 
       : (formattedSubscriptions.length > 0 ? formattedSubscriptions[0].nextBillingDate : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+
+    // Look up user's default saved card
+    const savedCard = await prisma.userPaymentMethod.findFirst({
+      where: { userId, isDefault: true },
+      orderBy: { createdAt: 'desc' },
+    });
 
     return res.json({
       success: true,
@@ -173,12 +181,12 @@ export async function getBillingOverview(req, res) {
         currency: 'USD',
         nextBillingDate: primaryNextBillingDate,
         paymentMethod: {
-          brand: 'Visa',
-          last4: '4242',
-          expMonth: '12',
-          expYear: '2028',
+          brand: savedCard ? savedCard.cardBrand : 'Visa',
+          last4: savedCard ? savedCard.last4 : '4242',
+          expMonth: savedCard ? savedCard.expMonth : '12',
+          expYear: savedCard ? savedCard.expYear : '2028',
           funding: 'Credit',
-          holderName: user.fullName || 'Authorized Customer',
+          holderName: (savedCard && savedCard.cardholderName) || user.fullName || 'Authorized Customer',
         },
       },
       subscriptions: formattedSubscriptions,
@@ -260,3 +268,71 @@ export async function getInvoiceDetails(req, res) {
     return res.status(500).json({ error: 'Failed to retrieve invoice details' });
   }
 }
+
+/**
+ * 3. POST /api/billing/cancel-trial - Instant user cancellation of free trial
+ */
+export async function cancelTrialSubscription(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const { subscriptionId } = req.body;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!subscriptionId) return res.status(400).json({ error: 'subscriptionId is required' });
+
+    const result = await cancelUserTrial(userId, subscriptionId);
+    return res.json({
+      success: true,
+      message: 'Your 30-day free trial has been cancelled. No charges will be made to your card.',
+      result,
+    });
+  } catch (err) {
+    console.error('[cancelTrialSubscription Error]:', err.message);
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * 4. GET /api/billing/payment-method/reveal - Reveal full card number and expiry upon secure eye-click
+ */
+export async function getRevealedPaymentMethod(req, res) {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const pm = await prisma.userPaymentMethod.findFirst({
+      where: { userId, isDefault: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!pm) {
+      return res.status(404).json({ error: 'No saved card found' });
+    }
+
+    let fullCardNumber = `•••• •••• •••• ${pm.last4}`;
+    if (pm.encryptedCardNumber) {
+      try {
+        const decrypted = decryptSensitive(pm.encryptedCardNumber);
+        // Format with spaces every 4 digits: 4111 1111 1111 1111
+        fullCardNumber = decrypted.replace(/(\d{4})(?=\d)/g, '$1 ');
+      } catch (e) {
+        console.warn('Failed to decrypt card number:', e.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      card: {
+        brand: pm.cardBrand,
+        fullNumber: fullCardNumber,
+        last4: pm.last4,
+        expMonth: pm.expMonth,
+        expYear: pm.expYear,
+        holderName: pm.cardholderName,
+      },
+    });
+  } catch (err) {
+    console.error('[getRevealedPaymentMethod Error]:', err.message);
+    return res.status(500).json({ error: 'Failed to retrieve card details' });
+  }
+}
+

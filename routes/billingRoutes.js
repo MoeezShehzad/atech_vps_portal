@@ -5,7 +5,12 @@
 
 import express from 'express';
 import authenticateToken from '../middleware/authMiddleware.js';
-import { getBillingOverview, getInvoiceDetails } from '../controllers/billingController.js';
+import { 
+  getBillingOverview, 
+  getInvoiceDetails,
+  cancelTrialSubscription,
+  getRevealedPaymentMethod,
+} from '../controllers/billingController.js';
 
 const router = express.Router();
 
@@ -13,5 +18,7 @@ router.use(authenticateToken);
 
 router.get('/overview', getBillingOverview);
 router.get('/invoices/:id', getInvoiceDetails);
+router.post('/cancel-trial', cancelTrialSubscription);
+router.get('/payment-method/reveal', getRevealedPaymentMethod);
 
 export default router;
