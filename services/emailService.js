@@ -652,6 +652,8 @@ export async function sendSystemAlertEmail({ subject, alertLevel = 'WARNING', de
     console.error(`[Alerts Error] Alert dispatch failed:`, err.message);
     return { success: false, error: err.message };
   }
+}
+
 /**
  * 30-Day Free Trial Welcome Email
  */
