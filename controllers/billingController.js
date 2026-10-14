@@ -198,12 +198,13 @@ export async function getInvoiceDetails(req, res) {
     const userId = req.user?.userId;
     const invoiceId = req.params.id;
 
+    const isAdmin = req.adminUser || req.user?.role?.toLowerCase() === 'admin' || req.user?.roleName?.toLowerCase() === 'admin';
     const invoice = await prisma.invoice.findFirst({
       where: {
-        userId,
+        ...(isAdmin ? {} : { userId }),
         OR: [
           { invoiceNumber: invoiceId },
-          !isNaN(Number(invoiceId)) ? { invoiceId: BigInt(invoiceId) } : {},
+          !isNaN(Number(invoiceId)) ? { invoiceId: BigInt(invoiceId) } : undefined,
         ].filter(Boolean),
       },
       include: {

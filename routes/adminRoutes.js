@@ -35,6 +35,7 @@ import {
   getUserFullProfile,
   getAdminBillingOverview,
   getAdminInvoices,
+  getAdminInvoiceDetails,
   processAdminRefund,
   markInvoiceAsPaid,
   voidAdminInvoice,
@@ -74,6 +75,7 @@ router.get('/audit-logs', getAdminAuditLogs);
 // 5. Complete Financial & Payments Management
 router.get('/billing/overview', getAdminBillingOverview);
 router.get('/billing/invoices', getAdminInvoices);
+router.get('/billing/invoices/:id', getAdminInvoiceDetails);
 router.post('/billing/refund', processAdminRefund);
 router.post('/billing/mark-paid', markInvoiceAsPaid);
 router.post('/billing/void-invoice', voidAdminInvoice);
@@ -82,6 +84,7 @@ router.post('/billing/subscription-control', adminUpdateSubscription);
 // Route aliases for frontend client compatibility
 router.get('/invoices', getAdminInvoices);
 router.get('/invoices/overview', getAdminBillingOverview);
+router.get('/invoices/:id', getAdminInvoiceDetails);
 router.post('/invoices/:id/refund', processAdminRefund);
 router.post('/invoices/:id/mark-paid', markInvoiceAsPaid);
 router.post('/invoices/:id/void', voidAdminInvoice);

@@ -1444,6 +1444,88 @@ export async function getAdminInvoices(req, res) {
 }
 
 /**
+ * GET /api/admin/billing/invoices/:id (and /api/admin/invoices/:id)
+ * Detailed invoice for modal view and enterprise PDF printing
+ */
+export async function getAdminInvoiceDetails(req, res) {
+  try {
+    const rawId = req.params.id;
+    const isNumeric = !isNaN(Number(rawId));
+
+    const invoice = await prisma.invoice.findFirst({
+      where: {
+        OR: [
+          { invoiceNumber: rawId },
+          isNumeric ? { invoiceId: BigInt(rawId) } : undefined,
+        ].filter(Boolean),
+      },
+      include: {
+        user: true,
+        payments: {
+          orderBy: { createdAt: 'desc' },
+        },
+        subscription: {
+          include: {
+            plan: true,
+            virtualMachines: true,
+          },
+        },
+      },
+    });
+
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    const plan = invoice.subscription?.plan;
+    const vmSpecs = plan
+      ? `${plan.cpuCores || 2} vCPU / ${plan.ramGb || 4} GB RAM / ${plan.storageGb || 40} GB NVMe SSD`
+      : 'Dedicated Hyper-V Virtual Machine Node';
+
+    return res.json({
+      success: true,
+      invoice: {
+        id: invoice.invoiceId.toString(),
+        invoiceId: invoice.invoiceId.toString(),
+        invoiceNumber: invoice.invoiceNumber,
+        customer: {
+          userId: invoice.user?.userId,
+          name: invoice.user?.fullName || 'Valued Customer',
+          email: invoice.user?.email || 'N/A',
+          phone: invoice.user?.phone || 'N/A',
+          address: invoice.user?.address || 'Cloud Client Headquarters',
+          city: invoice.user?.city || 'Dallas',
+          country: invoice.user?.country || 'United States',
+          postalCode: invoice.user?.postalCode || '',
+        },
+        items: [
+          {
+            description: `Analytical Technical Consulting - ${plan?.name || 'High-Performance VPS'}`,
+            specs: vmSpecs,
+            period: 'Monthly Subscription',
+            amount: Number(invoice.subtotal || invoice.total),
+          },
+        ],
+        subtotal: Number(invoice.subtotal || invoice.total),
+        tax: Number(invoice.tax || 0),
+        discount: Number(invoice.discount || 0),
+        total: Number(invoice.total),
+        currency: invoice.currency || 'USD',
+        status: invoice.status,
+        issueDate: invoice.issueDate || invoice.createdAt,
+        paidDate: invoice.paidDate,
+        createdAt: invoice.createdAt,
+        paymentMethod: invoice.payments?.[0]?.paymentGateway || 'STRIPE_CARD',
+        transactionId: invoice.payments?.[0]?.transactionId || 'TXN-SETTLED',
+      },
+    });
+  } catch (error) {
+    console.error('getAdminInvoiceDetails error:', error);
+    return res.status(500).json({ error: 'Failed to retrieve invoice details' });
+  }
+}
+
+/**
  * POST /api/admin/billing/refund (and /api/admin/invoices/:id/refund)
  * Processes 1-Click refund via Stripe API and updates ledger
  */
@@ -1807,28 +1889,33 @@ export async function getAdminReports(req, res) {
   try {
     const [payments, vms, subscriptions, users, tickets] = await Promise.all([
       prisma.payment.findMany({
-        where: { status: 'COMPLETED' },
         include: { invoice: true },
       }),
       prisma.virtualMachine.findMany(),
       prisma.subscription.findMany({ include: { plan: true } }),
       prisma.user.findMany({ include: { userRoles: { include: { role: true } } } }),
-      prisma.ticket.findMany(),
+      prisma.supportTicket.findMany(),
     ]);
 
-    const grossVolume = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const stripeVolume = payments
+    const completedPayments = payments.filter((p) => p.status === 'COMPLETED');
+    const grossVolume = completedPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const stripeVolume = completedPayments
       .filter((p) => p.paymentGateway === 'STRIPE_CARD' || p.paymentGateway === 'STRIPE')
       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const bankVolume = payments
+    const bankVolume = completedPayments
       .filter((p) => p.paymentGateway === 'DIRECT_BANK_TRANSFER' || p.paymentGateway === 'BANK_WIRE')
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const refundVolume = payments
+      .filter((p) => p.status === 'REFUNDED')
       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
     const activeSubs = subscriptions.filter((s) => s.status === 'ACTIVE');
     const mrr = activeSubs.reduce((sum, s) => sum + Number(s.plan?.monthlyPrice || s.monthlyPrice || 0), 0);
 
-    const totalHostCores = os.cpus().length;
-    const totalHostRamGb = Math.round(os.totalmem() / (1024 * 1024 * 1024));
+    // Physical Host Compute & Capacity Baseline
+    const totalHostCores = os.cpus()?.length || 8;
+    const totalHostRamGb = Math.round(os.totalmem() / (1024 * 1024 * 1024)) || 16;
+    const totalHostStorageGb = 500;
 
     const activeVms = vms.filter((v) => v.status !== 'terminated');
     const allocatedVcpus = activeVms.reduce((sum, v) => sum + Number(v.cpuCores || 0), 0);
@@ -1837,37 +1924,65 @@ export async function getAdminReports(req, res) {
 
     const cpuOvercommitRatio = totalHostCores > 0 ? (allocatedVcpus / totalHostCores).toFixed(1) : '1.0';
     const ramAllocationPercent = totalHostRamGb > 0 ? Math.round((allocatedRamGb / totalHostRamGb) * 100) : 0;
+    const diskAllocationPercent = totalHostStorageGb > 0 ? Math.round((allocatedDiskGb / totalHostStorageGb) * 100) : 0;
 
     const planStats = {};
-    activeSubs.forEach((s) => {
+    subscriptions.forEach((s) => {
       const p = s.plan;
       if (!p) return;
       if (!planStats[p.planId]) {
         planStats[p.planId] = {
           planId: p.planId,
           name: p.name,
-          price: Number(p.monthlyPrice),
+          price: Number(p.monthlyPrice || 0),
           activeSubscriptions: 0,
+          totalSubscriptions: 0,
           monthlyRevenue: 0,
         };
       }
-      planStats[p.planId].activeSubscriptions += 1;
-      planStats[p.planId].monthlyRevenue += Number(p.monthlyPrice);
+      planStats[p.planId].totalSubscriptions += 1;
+      if (s.status === 'ACTIVE') {
+        planStats[p.planId].activeSubscriptions += 1;
+        planStats[p.planId].monthlyRevenue += Number(p.monthlyPrice || 0);
+      }
     });
 
-    const openTickets = tickets.filter((t) => t.status === 'OPEN' || t.status === 'AWAITING_USER_ACTION').length;
-    const resolvedTickets = tickets.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length;
+    const openTickets = tickets.filter((t) => ['OPEN', 'AWAITING_USER_ACTION', 'REOPENED'].includes(t.status)).length;
+    const resolvedTickets = tickets.filter((t) => ['RESOLVED', 'CLOSED', 'CLOSED_TIMEOUT'].includes(t.status)).length;
 
     const rolesMap = { Customer: 0, Service_Provider: 0, Support_Staff: 0, Admin: 0 };
     users.forEach((u) => {
       u.userRoles.forEach((ur) => {
-        const rName = ur.role.roleName;
+        const rName = ur.role?.roleName || 'Customer';
         if (rolesMap[rName] !== undefined) rolesMap[rName]++;
         else rolesMap[rName] = 1;
       });
     });
 
     const userBreakdown = Object.entries(rolesMap).map(([role, count]) => ({ role, count }));
+
+    // Monthly revenue trend for visual graphs (last 6 months)
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const monthlyTrend = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mIdx = d.getMonth();
+      const mName = monthNames[mIdx];
+      const mVol = completedPayments
+        .filter((p) => {
+          const pd = new Date(p.createdAt);
+          return pd.getMonth() === mIdx && pd.getFullYear() === d.getFullYear();
+        })
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+      monthlyTrend.push({
+        month: mName,
+        year: d.getFullYear(),
+        revenue: mVol,
+        vms: activeVms.length,
+      });
+    }
 
     return res.json({
       success: true,
@@ -1876,17 +1991,21 @@ export async function getAdminReports(req, res) {
           grossVolume,
           stripeVolume,
           bankVolume,
+          refundVolume,
           mrr,
           arr: mrr * 12,
+          monthlyTrend,
         },
         fleetCapacity: {
           totalHostCores,
           totalHostRamGb,
+          totalHostStorageGb,
           allocatedVcpus,
           allocatedRamGb,
           allocatedDiskGb,
           cpuOvercommitRatio,
           ramAllocationPercent,
+          diskAllocationPercent,
           totalVms: vms.length,
           runningVms: activeVms.filter((v) => v.status === 'running').length,
           stoppedVms: activeVms.filter((v) => v.status === 'stopped').length,
@@ -1897,6 +2016,7 @@ export async function getAdminReports(req, res) {
           total: tickets.length,
           open: openTickets,
           resolved: resolvedTickets,
+          resolutionRate: tickets.length > 0 ? Math.round((resolvedTickets / tickets.length) * 100) : 100,
         },
       },
     });

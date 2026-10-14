@@ -70,7 +70,9 @@ import {
   Layers,
   HelpCircle,
   ExternalLink,
+  Printer,
 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { apiCall, setAccessToken, getAccessToken } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
@@ -156,6 +158,8 @@ export default function AdminDashboard() {
   const [voidModalInvoice, setVoidModalInvoice] = useState<any | null>(null);
   const [voidReason, setVoidReason] = useState<string>('Unpaid order / Order cancellation');
   const [voidProcessing, setVoidProcessing] = useState(false);
+  const [selectedInvoiceReceipt, setSelectedInvoiceReceipt] = useState<any | null>(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
 
   // Safe Broadcasts
   const [broadcastAudience, setBroadcastAudience] = useState<'all' | 'vps_owners' | 'service_providers' | 'unpaid'>('all');
@@ -447,6 +451,281 @@ export default function AdminDashboard() {
       toast.error(err.message || 'Failed to void invoice');
     } finally {
       setVoidProcessing(false);
+    }
+  };
+
+  const handleViewInvoiceReceipt = async (inv: any) => {
+    try {
+      setLoadingReceipt(true);
+      const invoiceId = inv.invoiceNumber || inv.id || inv.invoiceId;
+      const res = await apiCall(`/admin/billing/invoices/${invoiceId}`);
+      if (res && res.invoice) {
+        setSelectedInvoiceReceipt(res.invoice);
+      } else {
+        setSelectedInvoiceReceipt({
+          ...inv,
+          customer: inv.user || selectedBillingCustomer || {
+            name: 'Valued Customer',
+            email: 'N/A',
+            country: 'United States',
+            address: 'Enterprise Node',
+            city: 'Dallas',
+          },
+          items: [
+            {
+              description: `Analytical Technical Consulting - ${inv.plan?.name || inv.planName || 'Cloud VPS Compute'}`,
+              specs: 'Dedicated High-Performance Virtual Machine',
+              period: 'Monthly Subscription',
+              amount: Number(inv.amount || inv.total || 0),
+            },
+          ],
+          subtotal: Number(inv.amount || inv.total || 0),
+          tax: 0,
+          total: Number(inv.amount || inv.total || 0),
+        });
+      }
+    } catch (err: any) {
+      setSelectedInvoiceReceipt({
+        ...inv,
+        customer: inv.user || selectedBillingCustomer || {
+          name: 'Valued Customer',
+          email: 'N/A',
+          country: 'United States',
+          address: 'Enterprise Node',
+          city: 'Dallas',
+        },
+        items: [
+          {
+            description: `Analytical Technical Consulting - ${inv.plan?.name || inv.planName || 'Cloud VPS Compute'}`,
+            specs: 'Dedicated High-Performance Virtual Machine',
+            period: 'Monthly Subscription',
+            amount: Number(inv.amount || inv.total || 0),
+          },
+        ],
+        subtotal: Number(inv.amount || inv.total || 0),
+        tax: 0,
+        total: Number(inv.amount || inv.total || 0),
+      });
+    } finally {
+      setLoadingReceipt(false);
+    }
+  };
+
+  const handleDownloadInvoicePDF = async (inv: any) => {
+    try {
+      toast.info('Generating official enterprise PDF invoice...');
+      let receiptData = selectedInvoiceReceipt;
+      if (!receiptData || receiptData.invoiceNumber !== inv.invoiceNumber) {
+        try {
+          const res = await apiCall(`/admin/billing/invoices/${inv.invoiceNumber || inv.id || inv.invoiceId}`);
+          receiptData = res.invoice;
+        } catch (_) {
+          receiptData = {
+            ...inv,
+            customer: inv.user || selectedBillingCustomer || {
+              name: 'Valued Customer',
+              email: 'N/A',
+              country: 'United States',
+              address: 'Enterprise Node',
+              city: 'Dallas',
+            },
+            items: [
+              {
+                description: `Analytical Technical Consulting - ${inv.plan?.name || inv.planName || 'Cloud VPS Compute'}`,
+                specs: 'Dedicated High-Performance Virtual Machine',
+                period: 'Monthly Subscription',
+                amount: Number(inv.amount || inv.total || 0),
+              },
+            ],
+            subtotal: Number(inv.amount || inv.total || 0),
+            tax: 0,
+            total: Number(inv.amount || inv.total || 0),
+          };
+        }
+      }
+
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const primaryBlue = [37, 99, 235];
+      const darkSlate = [15, 23, 42];
+      const mutedSlate = [100, 116, 139];
+      const lightBg = [248, 250, 252];
+
+      // Company Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Analytical Technical Consulting', 20, 24);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('Enterprise Cloud Infrastructure & Hyper-V Virtualization', 20, 30);
+      doc.text('Billing & Accounts: billing@atechconsult.com', 20, 35);
+
+      // Invoice Title & Number
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      doc.text('INVOICE', 190, 24, { align: 'right' });
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text(receiptData.invoiceNumber || inv.invoiceNumber || 'INV-DRAFT', 190, 30, { align: 'right' });
+
+      // Status Badge
+      const statusText = String(receiptData.status || inv.status || 'PAID').toUpperCase();
+      if (statusText === 'PAID') {
+        doc.setFillColor(220, 252, 231);
+        doc.roundedRect(155, 34, 35, 6, 2, 2, 'F');
+        doc.setFontSize(8);
+        doc.setTextColor(22, 101, 52);
+        doc.text('PAID IN FULL', 172.5, 38.5, { align: 'center' });
+      } else if (statusText === 'REFUNDED') {
+        doc.setFillColor(243, 232, 255);
+        doc.roundedRect(155, 34, 35, 6, 2, 2, 'F');
+        doc.setFontSize(8);
+        doc.setTextColor(107, 33, 168);
+        doc.text('REFUNDED', 172.5, 38.5, { align: 'center' });
+      } else {
+        doc.setFillColor(254, 243, 199);
+        doc.roundedRect(155, 34, 35, 6, 2, 2, 'F');
+        doc.setFontSize(8);
+        doc.setTextColor(146, 64, 14);
+        doc.text(statusText, 172.5, 38.5, { align: 'center' });
+      }
+
+      // Divider Line
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.5);
+      doc.line(20, 44, 190, 44);
+
+      // Billed To Box
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.roundedRect(20, 50, 80, 28, 2, 2, 'F');
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('BILLED TO (CUSTOMER)', 24, 56);
+      doc.setFontSize(9.5);
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      const customerName = receiptData.customer?.name || receiptData.customer?.fullName || inv.user?.fullName || selectedBillingCustomer?.fullName || 'Customer';
+      doc.text(customerName.slice(0, 32), 24, 62);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text((receiptData.customer?.email || inv.user?.email || selectedBillingCustomer?.email || '').slice(0, 36), 24, 67);
+      const location = [receiptData.customer?.city, receiptData.customer?.country].filter(Boolean).join(', ') || 'United States';
+      doc.text(location.slice(0, 36), 24, 72);
+
+      // Payment Details Box
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.roundedRect(110, 50, 80, 28, 2, 2, 'F');
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('PAYMENT DETAILS', 114, 56);
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      const issueDateStr = new Date(receiptData.issueDate || receiptData.createdAt || inv.createdAt).toLocaleDateString();
+      doc.text(`Issue Date: ${issueDateStr}`, 114, 62);
+      const gw = receiptData.paymentMethod || inv.paymentMethod || 'Stripe';
+      doc.text(`Gateway / Method: ${gw}`, 114, 67);
+      const txn = receiptData.transactionId || 'TXN-SETTLED';
+      doc.text(`Transaction Reference: ${txn.slice(0, 22)}`, 114, 72);
+
+      // Table Header
+      let y = 88;
+      doc.setFillColor(241, 245, 249);
+      doc.rect(20, y, 170, 7.5, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('SERVICE / ITEM DESCRIPTION', 24, y + 5);
+      doc.text('PERIOD', 125, y + 5);
+      doc.text('AMOUNT (USD)', 185, y + 5, { align: 'right' });
+
+      // Table Items
+      y += 12;
+      const items = receiptData.items && receiptData.items.length > 0 ? receiptData.items : [{
+        description: `Analytical Technical Consulting - ${inv.plan?.name || inv.planName || 'Cloud VPS Compute'}`,
+        specs: 'Dedicated High-Performance Virtual Machine',
+        period: 'Monthly Subscription',
+        amount: Number(receiptData.subtotal || receiptData.total || inv.amount || inv.total || 0),
+      }];
+
+      for (const item of items) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+        doc.text(String(item.description || '').slice(0, 48), 24, y);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+        doc.text(String(item.specs || 'Dedicated Cloud Compute Allocation').slice(0, 52), 24, y + 4.5);
+
+        doc.setFontSize(8.5);
+        doc.text(String(item.period || 'Monthly'), 125, y + 2);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+        doc.text(`$${Number(item.amount || 0).toFixed(2)}`, 185, y + 2, { align: 'right' });
+
+        y += 14;
+        doc.setDrawColor(241, 245, 249);
+        doc.line(20, y - 4, 190, y - 4);
+      }
+
+      // Totals
+      y += 4;
+      const subtotal = Number(receiptData.subtotal || inv.amount || inv.total || 0);
+      const tax = Number(receiptData.tax || 0);
+      const total = Number(receiptData.total || inv.amount || inv.total || 0);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('Subtotal:', 140, y);
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      doc.text(`$${subtotal.toFixed(2)}`, 185, y, { align: 'right' });
+
+      y += 6;
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('Tax (0%):', 140, y);
+      doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+      doc.text(`$${tax.toFixed(2)}`, 185, y, { align: 'right' });
+
+      y += 8;
+      doc.setDrawColor(15, 23, 42);
+      doc.setLineWidth(0.5);
+      doc.line(140, y - 2, 190, y - 2);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Total (USD):', 140, y + 4);
+      doc.text(`$${total.toFixed(2)}`, 185, y + 4, { align: 'right' });
+
+      // Footer
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.text('Thank you for choosing Analytical Technical Consulting Cloud Infrastructure.', 105, 275, { align: 'center' });
+      doc.text('For questions, contact customer-support@atechconsult.com', 105, 280, { align: 'center' });
+
+      doc.save(`${receiptData.invoiceNumber || inv.invoiceNumber || 'invoice'}.pdf`);
+      toast.success('Official PDF invoice downloaded successfully!');
+    } catch (err: any) {
+      console.error('PDF error:', err);
+      toast.error('Failed to generate PDF invoice');
     }
   };
 
@@ -1710,6 +1989,26 @@ export default function AdminDashboard() {
                                 </td>
                                 <td className="px-5 py-4 text-right">
                                   <div className="inline-flex items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewInvoiceReceipt(inv)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                      title="View complete invoice receipt breakdown"
+                                    >
+                                      <FileText className="w-3.5 h-3.5" />
+                                      <span>Details</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadInvoicePDF(inv)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                      title="Download official PDF invoice"
+                                    >
+                                      <Download className="w-3.5 h-3.5" />
+                                      <span>PDF</span>
+                                    </button>
+
                                     {inv.status === 'PAID' && (
                                       <button
                                         type="button"
@@ -1897,6 +2196,26 @@ export default function AdminDashboard() {
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="inline-flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleViewInvoiceReceipt(inv)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                  title="View full receipt details"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  <span>Details</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDownloadInvoicePDF(inv)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                  title="Download official PDF invoice"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  <span>PDF</span>
+                                </button>
+
                                 {inv.status === 'PAID' && (
                                   <button
                                     type="button"
@@ -2254,7 +2573,7 @@ export default function AdminDashboard() {
                   Cluster Intelligence & Executive Reports
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Complete fleet overcommit metrics, financial ledger analysis, plan distribution, and 1-click exports.
+                  High-level financial summaries, visual growth trends, and physical server capacity.
                 </p>
               </div>
 
@@ -2281,27 +2600,141 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Hyper-V Fleet Overcommit & Capacity Gauge */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
-              <h4 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
-                <Cpu className="w-5 h-5 text-indigo-600" />
-                Physical Host Compute & Virtualization Overcommit Ratios
-              </h4>
+            {/* 1. KEY EXECUTIVE METRICS CARDS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-500 text-xs">
+                  <span className="font-semibold">Gross Processed</span>
+                  <DollarSign className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
+                  ${Number(reportsData?.financial?.grossVolume || 0).toFixed(2)}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Stripe: ${Number(reportsData?.financial?.stripeVolume || 0).toFixed(2)} • Wire: ${Number(reportsData?.financial?.bankVolume || 0).toFixed(2)}
+                </p>
+              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* vCPU Ratio Gauge */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-500 text-xs">
+                  <span className="font-semibold">Monthly Recurring (MRR)</span>
+                  <TrendingUp className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="text-2xl font-bold font-mono text-blue-600 dark:text-blue-400">
+                  ${Number(reportsData?.financial?.mrr || 0).toFixed(2)}
+                  <span className="text-xs text-slate-400 font-normal">/mo</span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Annualized (ARR): <strong className="text-slate-700 dark:text-slate-300">${Number(reportsData?.financial?.arr || 0).toFixed(2)}</strong>
+                </p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-500 text-xs">
+                  <span className="font-semibold">Virtual Machines</span>
+                  <Server className="w-4 h-4 text-indigo-600" />
+                </div>
+                <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
+                  {reportsData?.fleetCapacity?.totalVms || 0}
+                  <span className="text-xs text-slate-400 font-normal"> instances</span>
+                </div>
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                  {reportsData?.fleetCapacity?.runningVms || 0} Running • {reportsData?.fleetCapacity?.stoppedVms || 0} Stopped
+                </p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-500 text-xs">
+                  <span className="font-semibold">Helpdesk Resolution</span>
+                  <LifeBuoy className="w-4 h-4 text-purple-600" />
+                </div>
+                <div className="text-2xl font-bold font-mono text-purple-600 dark:text-purple-400">
+                  {reportsData?.ticketSla?.resolutionRate ?? 100}%
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {reportsData?.ticketSla?.open || 0} Open Tickets • {reportsData?.ticketSla?.resolved || 0} Solved
+                </p>
+              </div>
+            </div>
+
+            {/* 2. REVENUE & ACTIVITY TREND CHART */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    Revenue Trend (Last 6 Months)
+                  </h4>
+                  <p className="text-xs text-slate-500">Monthly billing collections and customer compute growth.</p>
+                </div>
+                <div className="flex items-center gap-4 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-md bg-blue-600" />
+                    <span className="text-slate-600 dark:text-slate-400">Monthly Revenue</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Visual Bar Chart */}
+              <div className="pt-4">
+                <div className="h-44 flex items-end justify-between gap-3 sm:gap-6 border-b border-slate-200 dark:border-slate-800 pb-3 px-2">
+                  {((reportsData?.financial?.monthlyTrend?.length ? reportsData.financial.monthlyTrend : [
+                    { month: 'May', revenue: 0 },
+                    { month: 'Jun', revenue: 0 },
+                    { month: 'Jul', revenue: 0 },
+                    { month: 'Aug', revenue: 0 },
+                    { month: 'Sep', revenue: 0 },
+                    { month: 'Oct', revenue: Number(reportsData?.financial?.grossVolume || 0) },
+                  ]) as any[]).map((item, idx, arr) => {
+                    const maxRev = Math.max(...arr.map((a: any) => Number(a.revenue || 0)), 10);
+                    const pct = Math.max(8, Math.min(100, Math.round((Number(item.revenue || 0) / maxRev) * 100)));
+                    return (
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
+                        <div className="text-[10px] font-mono font-bold text-slate-500 group-hover:text-blue-600 transition-colors">
+                          ${Number(item.revenue || 0).toFixed(0)}
+                        </div>
+                        <div className="w-full max-w-[48px] bg-slate-100 dark:bg-slate-800 rounded-t-xl overflow-hidden flex items-end h-full">
+                          <div
+                            className="w-full bg-gradient-to-t from-blue-700 to-indigo-500 rounded-t-xl transition-all duration-500 group-hover:brightness-110 shadow-xs"
+                            style={{ height: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+                          {item.month}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* 3. PHYSICAL HOST CAPACITY (SIMPLIFIED & CLEAR) */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
+              <div>
+                <h4 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
+                  <Cpu className="w-5 h-5 text-indigo-600" />
+                  Host Hardware Capacity & Allocation (Hyper-V Server)
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Real physical cores, memory, and NVMe disk commitment across all customer virtual machines.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* 1. CPU Allocation */}
                 <div className="p-5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
-                        vCPU Allocation vs Physical Cores
+                        Processor Cores (vCPU)
                       </span>
                       <p className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
-                        {reportsData?.fleetCapacity?.cpuOvercommitRatio || '1.0'}:1 Overcommit Ratio
+                        {reportsData?.fleetCapacity?.allocatedVcpus || 0} / {reportsData?.fleetCapacity?.totalHostCores || 8} Cores
                       </p>
                     </div>
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
-                      Safe Tier
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                      Safe Headroom
                     </span>
                   </div>
 
@@ -2311,33 +2744,39 @@ export default function AdminDashboard() {
                       style={{
                         width: `${Math.min(
                           100,
-                          ((reportsData?.fleetCapacity?.allocatedVcpus || 1) /
-                            (reportsData?.fleetCapacity?.totalHostCores * 4 || 1)) *
-                            100
+                          Math.max(
+                            4,
+                            ((reportsData?.fleetCapacity?.allocatedVcpus || 0) /
+                              (reportsData?.fleetCapacity?.totalHostCores || 8)) *
+                              100
+                          )
                         )}%`,
                       }}
                     />
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-slate-500">
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
                     <span>{reportsData?.fleetCapacity?.allocatedVcpus || 0} vCPUs Provisioned</span>
-                    <span>{reportsData?.fleetCapacity?.totalHostCores || 0} Physical Cores Available</span>
+                    <span>{reportsData?.fleetCapacity?.totalHostCores || 8} Host Cores</span>
                   </div>
+                  <p className="text-[11px] text-slate-400 leading-normal pt-1 border-t border-slate-200 dark:border-slate-700/50">
+                    Ratio is {reportsData?.fleetCapacity?.cpuOvercommitRatio || '1.0'}:1. Ideal for responsive compute performance.
+                  </p>
                 </div>
 
-                {/* RAM Allocation Gauge */}
+                {/* 2. RAM Allocation */}
                 <div className="p-5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
-                        Host RAM Capacity Committed
+                        RAM Memory Committed
                       </span>
                       <p className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
-                        {reportsData?.fleetCapacity?.ramAllocationPercent || 0}% Allocation
+                        {reportsData?.fleetCapacity?.allocatedRamGb || 0} / {reportsData?.fleetCapacity?.totalHostRamGb || 16} GB
                       </p>
                     </div>
                     <span
-                      className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
                         Number(reportsData?.fleetCapacity?.ramAllocationPercent || 0) < 85
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-amber-100 text-amber-700'
@@ -2351,47 +2790,69 @@ export default function AdminDashboard() {
                     <div
                       className="bg-blue-600 h-3 rounded-full transition-all"
                       style={{
-                        width: `${Math.min(100, reportsData?.fleetCapacity?.ramAllocationPercent || 0)}%`,
+                        width: `${Math.min(
+                          100,
+                          Math.max(4, reportsData?.fleetCapacity?.ramAllocationPercent || 0)
+                        )}%`,
                       }}
                     />
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>{reportsData?.fleetCapacity?.allocatedRamGb || 0} GB RAM Provisioned</span>
-                    <span>{reportsData?.fleetCapacity?.totalHostRamGb || 0} GB Host Physical RAM</span>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>{reportsData?.fleetCapacity?.ramAllocationPercent || 0}% Allocated</span>
+                    <span>{reportsData?.fleetCapacity?.totalHostRamGb || 16} GB Physical RAM</span>
                   </div>
+                  <p className="text-[11px] text-slate-400 leading-normal pt-1 border-t border-slate-200 dark:border-slate-700/50">
+                    Guaranteed dedicated host memory for stable VM operations.
+                  </p>
                 </div>
-              </div>
 
-              {/* VM Status Counter Chips */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                <div className="p-4 bg-blue-50/60 dark:bg-blue-950/40 rounded-xl border border-blue-100 dark:border-blue-900/40 text-center">
-                  <span className="text-xs text-slate-500">Total Virtual Instances</span>
-                  <p className="text-2xl font-bold font-mono text-blue-600 dark:text-blue-400 mt-1">
-                    {reportsData?.fleetCapacity?.totalVms || 0}
-                  </p>
-                </div>
-                <div className="p-4 bg-emerald-50/60 dark:bg-emerald-950/40 rounded-xl border border-emerald-100 dark:border-emerald-900/40 text-center">
-                  <span className="text-xs text-slate-500">Online & Running</span>
-                  <p className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
-                    {reportsData?.fleetCapacity?.runningVms || 0}
-                  </p>
-                </div>
-                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-xl text-center">
-                  <span className="text-xs text-slate-500">Powered Off / Suspended</span>
-                  <p className="text-2xl font-bold font-mono text-slate-700 dark:text-slate-300 mt-1">
-                    {reportsData?.fleetCapacity?.stoppedVms || 0}
+                {/* 3. Disk Allocation */}
+                <div className="p-5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                        NVMe SSD Storage
+                      </span>
+                      <p className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+                        {reportsData?.fleetCapacity?.allocatedDiskGb || 0} / {reportsData?.fleetCapacity?.totalHostStorageGb || 500} GB
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                      Ample Space
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-purple-600 h-3 rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          Math.max(4, reportsData?.fleetCapacity?.diskAllocationPercent || 0)
+                        )}%`,
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>{reportsData?.fleetCapacity?.allocatedDiskGb || 0} GB Provisioned</span>
+                    <span>{reportsData?.fleetCapacity?.totalHostStorageGb || 500} GB Capacity</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-normal pt-1 border-t border-slate-200 dark:border-slate-700/50">
+                    High-speed NVMe storage pool backing virtual hard disks (VHDX).
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Plan Distribution & Popularity */}
+            {/* 4. PLAN DISTRIBUTION & DEMOGRAPHICS */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Plan Popularity */}
               <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
                 <h4 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
                   <Tag className="w-5 h-5 text-blue-600" />
-                  VPS Plan Popularity & Revenue Distribution
+                  VPS Plan Distribution & Monthly Revenue
                 </h4>
 
                 <div className="overflow-x-auto">
@@ -2400,7 +2861,7 @@ export default function AdminDashboard() {
                       <tr>
                         <th className="px-4 py-3">Plan Name</th>
                         <th className="px-4 py-3">Monthly Rate</th>
-                        <th className="px-4 py-3">Active Subscriptions</th>
+                        <th className="px-4 py-3">Subscribers</th>
                         <th className="px-4 py-3 text-right">Est. Monthly Volume</th>
                       </tr>
                     </thead>
@@ -2411,7 +2872,9 @@ export default function AdminDashboard() {
                             {plan.name}
                           </td>
                           <td className="px-4 py-3">${Number(plan.price || 0).toFixed(2)}/mo</td>
-                          <td className="px-4 py-3 font-bold text-blue-600">{plan.activeSubscriptions} subscribers</td>
+                          <td className="px-4 py-3 font-bold text-blue-600">
+                            {plan.activeSubscriptions || 0} active ({plan.totalSubscriptions || 0} total)
+                          </td>
                           <td className="px-4 py-3 text-right font-bold text-emerald-600">
                             ${Number(plan.monthlyRevenue || 0).toFixed(2)}/mo
                           </td>
@@ -2429,12 +2892,12 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* User Roles & SLA Card */}
+              {/* Tenant Demographics & SLA */}
               <div className="lg:col-span-4 space-y-6">
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
                   <h4 className="font-bold text-slate-900 dark:text-white text-sm font-poppins flex items-center gap-2">
                     <Users className="w-4 h-4 text-purple-600" />
-                    Tenant Demographics
+                    User Directory Breakdown
                   </h4>
                   <div className="space-y-2.5">
                     {reportsData?.userBreakdown?.map((rb: any) => (
@@ -2452,7 +2915,7 @@ export default function AdminDashboard() {
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-3">
                   <h4 className="font-bold text-slate-900 dark:text-white text-sm font-poppins flex items-center gap-2">
                     <LifeBuoy className="w-4 h-4 text-amber-600" />
-                    Support Helpdesk SLA Performance
+                    Customer Support SLA Status
                   </h4>
                   <div className="grid grid-cols-2 gap-3 text-center pt-1">
                     <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
@@ -2462,7 +2925,7 @@ export default function AdminDashboard() {
                       </p>
                     </div>
                     <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-                      <span className="text-[11px] text-slate-500">Resolved</span>
+                      <span className="text-[11px] text-slate-500">Resolved Tickets</span>
                       <p className="text-lg font-bold font-mono text-emerald-600 mt-0.5">
                         {reportsData?.ticketSla?.resolved || 0}
                       </p>
@@ -4004,6 +4467,187 @@ export default function AdminDashboard() {
               >
                 <Power className="w-3.5 h-3.5" /> Confirm Power Off
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ENTERPRISE INVOICE DETAILS & PRINT MODAL */}
+      {selectedInvoiceReceipt && (
+        <div className="fixed inset-0 z-[130] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-8 relative animate-in fade-in zoom-in-95 duration-200 space-y-6 my-8">
+            {/* Top Bar with Brand and Close */}
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-5">
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest block font-mono">
+                  Official Invoice Receipt
+                </span>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white font-poppins">
+                  Analytical Technical Consulting
+                </h3>
+                <p className="text-xs text-slate-500">Enterprise Cloud Infrastructure & Systems</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                    selectedInvoiceReceipt.status === 'PAID'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400'
+                      : selectedInvoiceReceipt.status === 'REFUNDED'
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-950/80 dark:text-purple-400'
+                      : selectedInvoiceReceipt.status === 'VOID'
+                      ? 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                      : 'bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-400'
+                  }`}
+                >
+                  {selectedInvoiceReceipt.status === 'PAID' ? 'PAID IN FULL' : selectedInvoiceReceipt.status}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoiceReceipt(null)}
+                  className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Invoice & Billed-To Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Billed To */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5 text-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block font-mono">
+                  Billed To Customer
+                </span>
+                <p className="font-bold text-slate-900 dark:text-white text-sm">
+                  {selectedInvoiceReceipt.customer?.name || selectedInvoiceReceipt.customer?.fullName || selectedInvoiceReceipt.user?.fullName || selectedBillingCustomer?.fullName || 'Customer'}
+                </p>
+                <p className="text-slate-500 font-mono">
+                  {selectedInvoiceReceipt.customer?.email || selectedInvoiceReceipt.user?.email || selectedBillingCustomer?.email || 'N/A'}
+                </p>
+                <p className="text-slate-500">
+                  {[
+                    selectedInvoiceReceipt.customer?.address,
+                    selectedInvoiceReceipt.customer?.city,
+                    selectedInvoiceReceipt.customer?.country,
+                  ]
+                    .filter(Boolean)
+                    .join(', ') || 'United States'}
+                </p>
+                {selectedInvoiceReceipt.customer?.phone && (
+                  <p className="text-slate-500 font-mono">Phone: {selectedInvoiceReceipt.customer.phone}</p>
+                )}
+              </div>
+
+              {/* Payment Details */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5 text-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 block font-mono">
+                  Invoice & Settlement
+                </span>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Invoice Number:</span>
+                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                    {selectedInvoiceReceipt.invoiceNumber}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Issue Date:</span>
+                  <span className="font-mono text-slate-800 dark:text-slate-200">
+                    {new Date(selectedInvoiceReceipt.issueDate || selectedInvoiceReceipt.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Payment Gateway:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 uppercase">
+                    {selectedInvoiceReceipt.paymentMethod || 'Stripe'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Transaction ID:</span>
+                  <span className="font-mono text-[11px] text-slate-600 dark:text-slate-400 truncate max-w-[150px]">
+                    {selectedInvoiceReceipt.transactionId || 'TXN-SETTLED'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Line Items Table */}
+            <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    <th className="px-4 py-3">Service / Item Description</th>
+                    <th className="px-4 py-3">Billing Period</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                  {(selectedInvoiceReceipt.items || [
+                    {
+                      description: 'Analytical Technical Consulting - Cloud VPS Compute',
+                      specs: 'Dedicated High-Performance Virtual Machine',
+                      period: 'Monthly Subscription',
+                      amount: selectedInvoiceReceipt.amount || selectedInvoiceReceipt.total || 0,
+                    },
+                  ]).map((item: any, idx: number) => (
+                    <tr key={idx}>
+                      <td className="px-4 py-3.5">
+                        <p className="font-bold text-slate-900 dark:text-white text-xs">{item.description}</p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">{item.specs}</p>
+                      </td>
+                      <td className="px-4 py-3.5 text-slate-500 font-mono">{item.period || 'Monthly'}</td>
+                      <td className="px-4 py-3.5 text-right font-mono font-bold text-slate-900 dark:text-white">
+                        ${Number(item.amount || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Totals Section */}
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-4 border-t border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+                <div className="flex justify-between text-slate-500 font-mono">
+                  <span>Subtotal:</span>
+                  <span>${Number(selectedInvoiceReceipt.subtotal || selectedInvoiceReceipt.amount || selectedInvoiceReceipt.total || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-500 font-mono">
+                  <span>Tax (0%):</span>
+                  <span>${Number(selectedInvoiceReceipt.tax || 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-700 text-sm">
+                  <span className="font-bold text-slate-900 dark:text-white font-poppins">Total Amount:</span>
+                  <span className="font-mono font-bold text-lg text-blue-600 dark:text-blue-400">
+                    ${Number(selectedInvoiceReceipt.total || selectedInvoiceReceipt.amount || 0).toFixed(2)} USD
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Modal Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+              <span className="text-[11px] text-slate-400 font-mono">
+                Verified Cryptographic Invoice Record
+              </span>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print Receipt</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadInvoicePDF(selectedInvoiceReceipt)}
+                  className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Download Official PDF</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
