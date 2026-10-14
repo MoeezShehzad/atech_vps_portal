@@ -70,9 +70,26 @@ export async function getUserVMs(req, res) {
 
           // If not found on Hyper-V host:
           if (!liveInfo) {
+            const ageMs = Date.now() - new Date(vm.createdAt).getTime();
+
+            // If it was provisioning and stuck for > 2.5 minutes, mark it as FAILED
+            if (vm.status === 'PROVISIONING' && ageMs > 150000) {
+              await prisma.virtualMachine.update({
+                where: { vmId: vm.vmId },
+                data: {
+                  status: 'FAILED',
+                  provisioningStatus: 'FAILED',
+                  provisioningError: 'Provisioning timed out before host confirmation.',
+                },
+              }).catch(() => {});
+              vm.status = 'FAILED';
+              synced.push(vm);
+              continue;
+            }
+
             // Only terminate if the VM was specifically linked to a Hyper-V ID
             if (vm.hypervVmId) {
-              const isFresh = vm.status === 'PROVISIONING' && (Date.now() - new Date(vm.createdAt).getTime() < 60000);
+              const isFresh = vm.status === 'PROVISIONING' && ageMs < 60000;
               if (!isFresh) {
                 await prisma.virtualMachine.update({
                   where: { vmId: vm.vmId },
@@ -157,7 +174,7 @@ export async function getUserVMs(req, res) {
       include: {
         plan: true,
         virtualMachines: {
-          where: { status: { not: 'TERMINATED' } },
+          where: { status: { notIn: ['TERMINATED', 'FAILED'] } },
         },
       },
       orderBy: { endDate: 'desc' },
@@ -362,7 +379,7 @@ export async function deployVM(req, res) {
         status: { in: ['ACTIVE', 'TRIAL'] },
         endDate: { gt: now },
         virtualMachines: {
-          none: { status: { not: 'TERMINATED' } },
+          none: { status: { notIn: ['TERMINATED', 'FAILED'] } },
         },
       },
       include: { plan: true },

@@ -307,7 +307,18 @@ export default function Dashboard() {
   const [resizePricing, setResizePricing] = useState<ResizePricing | null>(null);
   const [resizeLoading, setResizeLoading] = useState(false);
 
-  // 1. Fetch user VMs and catalog from API
+  // Saved payment method on file
+  const [savedMethod, setSavedMethod] = useState<{
+    methodId: number;
+    brand: string;
+    last4: string;
+    expMonth: string;
+    expYear: string;
+    holderName?: string;
+  } | null>(null);
+  const [useSavedMethodForTrial, setUseSavedMethodForTrial] = useState(true);
+
+  // 1. Fetch user VMs, subscriptions and saved payment method from API
   const fetchVMs = useCallback(async () => {
     try {
       const data = await apiCall('/vms');
@@ -318,6 +329,15 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Failed to load user VMs:', err);
     }
+
+    try {
+      const pmData = await apiCall('/payments/saved-method');
+      if (pmData && pmData.hasSavedMethod && pmData.method) {
+        setSavedMethod(pmData.method);
+      } else {
+        setSavedMethod(null);
+      }
+    } catch (_) {}
   }, []);
 
   const fetchCatalog = async () => {
@@ -1039,6 +1059,25 @@ export default function Dashboard() {
     e.preventDefault();
     setTrialError('');
 
+    if (savedMethod && useSavedMethodForTrial) {
+      setTrialLoading(true);
+      try {
+        await apiCall('/billing/activate-trial', {
+          method: 'POST',
+          body: JSON.stringify({ useSavedMethod: true }),
+        });
+
+        toast.success('🎉 30-Day Free Trial activated! Your Ubuntu VPS has been provisioned and is now running on Hyper-V.');
+        setIsTrialModalOpen(false);
+        await fetchVMs();
+      } catch (err: any) {
+        setTrialError(err.message || 'Failed to activate free trial.');
+      } finally {
+        setTrialLoading(false);
+      }
+      return;
+    }
+
     if (trialPaymentType === 'card') {
       const cleanCard = trialCardNumber.replace(/\s/g, '');
       if (cleanCard.length < 13 || cleanCard.length > 19) {
@@ -1085,7 +1124,7 @@ export default function Dashboard() {
         body: JSON.stringify(payload),
       });
 
-      toast.success('🎉 30-Day Free Trial activated! Your Ubuntu VPS has been provisioned and is now running.');
+      toast.success('🎉 30-Day Free Trial activated! Your Ubuntu VPS has been provisioned and is now running on Hyper-V.');
       setIsTrialModalOpen(false);
       await fetchVMs();
     } catch (err: any) {
@@ -2196,219 +2235,316 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* PAYMENT METHOD SELECTOR */}
+            {/* PAYMENT METHOD SECTION */}
             <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Select Verification Method
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTrialPaymentType('card')}
-                    className={`p-3 rounded-2xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                      trialPaymentType === 'card'
-                        ? 'border-blue-600 bg-blue-50/60 text-blue-900 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-500 shadow-xs'
-                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                    }`}
-                  >
-                    <CreditCard className="w-4 h-4 text-blue-600" />
-                    Credit / Debit Card
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTrialPaymentType('bank')}
-                    className={`p-3 rounded-2xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                      trialPaymentType === 'bank'
-                        ? 'border-blue-600 bg-blue-50/60 text-blue-900 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-500 shadow-xs'
-                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                    }`}
-                  >
-                    <Building2 className="w-4 h-4 text-blue-600" />
-                    Direct Bank Account
-                  </button>
-                </div>
-              </div>
-
-              {trialError && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>{trialError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleActivateTrial} className="space-y-3.5">
-                {trialPaymentType === 'card' ? (
-                  <>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                        Name on Card <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={trialCardholder}
-                        onChange={(e) => setTrialCardholder(e.target.value)}
-                        placeholder="John Doe"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
-                          Card Number (Visa, Mastercard, Amex, Discover) <span className="text-rose-500">*</span>
-                        </label>
-                        <span className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400">
-                          {trialCardBrand}
-                        </span>
+              {savedMethod && useSavedMethodForTrial ? (
+                /* REUSE SAVED CARD ON FILE */
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                          <CreditCard className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900 dark:text-white">
+                            {savedMethod.brand} on File (•••• {savedMethod.last4})
+                          </p>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Expires {savedMethod.expMonth}/{savedMethod.expYear} • {savedMethod.holderName || user?.fullName || 'Authorized Customer'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          required
-                          value={trialCardNumber}
-                          onChange={(e) => handleTrialCardChange(e.target.value)}
-                          placeholder="4111 2222 3333 4444"
-                          maxLength={19}
-                          className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono tracking-wider focus:outline-none focus:border-blue-600"
-                        />
-                        <CreditCard className="w-4 h-4 text-slate-400 absolute right-3.5 top-3 pointer-events-none" />
-                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 text-[10px] font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Saved on File
+                      </span>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                          Expiration (MM/YY) <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={trialCardExpiry}
-                          onChange={(e) => handleTrialExpiryChange(e.target.value)}
-                          placeholder="12/28"
-                          maxLength={5}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600 text-center"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                          Security Code (CVC) <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="password"
-                          required
-                          value={trialCardCvc}
-                          onChange={(e) => setTrialCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                          placeholder="123"
-                          maxLength={4}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600 text-center"
-                        />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                        Account Holder Legal Name <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={trialCardholder}
-                        onChange={(e) => setTrialCardholder(e.target.value)}
-                        placeholder="John Doe"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                        Bank Name <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={trialBankName}
-                        onChange={(e) => setTrialBankName(e.target.value)}
-                        placeholder="Chase, Bank of America, Wells Fargo..."
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                          Routing Number (9 Digits) <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={trialRoutingNumber}
-                          onChange={(e) => setTrialRoutingNumber(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                          placeholder="123456789"
-                          maxLength={9}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                          Account Number <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={trialAccountNumber}
-                          onChange={(e) => setTrialAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 17))}
-                          placeholder="000123456789"
-                          maxLength={17}
-                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600"
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* ZERO CHARGE BADGE */}
-                <div className="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200 text-xs space-y-1">
-                  <div className="flex items-center justify-between font-bold">
-                    <span className="flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" /> Total Charged Today
-                    </span>
-                    <span className="text-base text-emerald-600 dark:text-emerald-400 font-mono">$0.00 USD</span>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                      Your saved payment method will be used to secure your free trial. <strong>You will not be charged today ($0.00).</strong>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setUseSavedMethodForTrial(false)}
+                      className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <Plus className="w-3 h-3" /> Enter a different card or bank account
+                    </button>
                   </div>
-                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 leading-snug">
-                    Your card or account is encrypted via AES-256-GCM. 30 days of full VPS access. Cancel anytime with 1-click in the Billing tab before the trial ends.
-                  </p>
-                </div>
 
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsTrialModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={trialLoading}
-                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
-                  >
-                    {trialLoading ? (
+                  {trialError && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{trialError}</span>
+                    </div>
+                  )}
+
+                  {/* ZERO CHARGE BADGE */}
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200 text-xs space-y-1">
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" /> Total Charged Today
+                      </span>
+                      <span className="text-base text-emerald-600 dark:text-emerald-400 font-mono">$0.00 USD</span>
+                    </div>
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-300 leading-snug">
+                      Your card or account is encrypted via AES-256-GCM. 30 days of full VPS access. Cancel anytime with 1-click in the Billing tab before the trial ends.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsTrialModalOpen(false)}
+                      className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleActivateTrial}
+                      disabled={trialLoading}
+                      className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {trialLoading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" /> Provisioning VM on Hyper-V...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 text-amber-300" /> Confirm & Activate 30-Day Free Trial ($0.00)
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* NEW PAYMENT METHOD INPUT FORM */
+                <>
+                  {savedMethod && (
+                    <div className="flex items-center justify-between pb-1">
+                      <button
+                        type="button"
+                        onClick={() => setUseSavedMethodForTrial(true)}
+                        className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        ← Use saved payment method ({savedMethod.brand} •••• {savedMethod.last4})
+                      </button>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Select Verification Method
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTrialPaymentType('card')}
+                        className={`p-3 rounded-2xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                          trialPaymentType === 'card'
+                            ? 'border-blue-600 bg-blue-50/60 text-blue-900 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-500 shadow-xs'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                        }`}
+                      >
+                        <CreditCard className="w-4 h-4 text-blue-600" />
+                        Credit / Debit Card
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTrialPaymentType('bank')}
+                        className={`p-3 rounded-2xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                          trialPaymentType === 'bank'
+                            ? 'border-blue-600 bg-blue-50/60 text-blue-900 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-500 shadow-xs'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                        }`}
+                      >
+                        <Building2 className="w-4 h-4 text-blue-600" />
+                        Direct Bank Account
+                      </button>
+                    </div>
+                  </div>
+
+                  {trialError && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{trialError}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleActivateTrial} className="space-y-3.5">
+                    {trialPaymentType === 'card' ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" /> Provisioning Server...
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                            Name on Card <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={trialCardholder}
+                            onChange={(e) => setTrialCardholder(e.target.value)}
+                            placeholder="John Doe"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                              Card Number (Visa, Mastercard, Amex, Discover) <span className="text-rose-500">*</span>
+                            </label>
+                            <span className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400">
+                              {trialCardBrand}
+                            </span>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              required
+                              value={trialCardNumber}
+                              onChange={(e) => handleTrialCardChange(e.target.value)}
+                              placeholder="4111 2222 3333 4444"
+                              maxLength={19}
+                              className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono tracking-wider focus:outline-none focus:border-blue-600"
+                            />
+                            <CreditCard className="w-4 h-4 text-slate-400 absolute right-3.5 top-3 pointer-events-none" />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                              Expiration (MM/YY) <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={trialCardExpiry}
+                              onChange={(e) => handleTrialExpiryChange(e.target.value)}
+                              placeholder="12/28"
+                              maxLength={5}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600 text-center"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                              Security Code (CVC) <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                              type="password"
+                              required
+                              value={trialCardCvc}
+                              onChange={(e) => setTrialCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                              placeholder="123"
+                              maxLength={4}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600 text-center"
+                            />
+                          </div>
+                        </div>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4 text-amber-300" /> Activate Free Trial & Deploy VPS
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                            Account Holder Legal Name <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={trialCardholder}
+                            onChange={(e) => setTrialCardholder(e.target.value)}
+                            placeholder="John Doe"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                            Bank Name <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={trialBankName}
+                            onChange={(e) => setTrialBankName(e.target.value)}
+                            placeholder="Chase, Bank of America, Wells Fargo..."
+                            className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                              Routing Number (9 Digits) <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={trialRoutingNumber}
+                              onChange={(e) => setTrialRoutingNumber(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                              placeholder="123456789"
+                              maxLength={9}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                              Account Number <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={trialAccountNumber}
+                              onChange={(e) => setTrialAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 17))}
+                              placeholder="000123456789"
+                              maxLength={17}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600"
+                            />
+                          </div>
+                        </div>
                       </>
                     )}
-                  </button>
-                </div>
-              </form>
+
+                    {/* ZERO CHARGE BADGE */}
+                    <div className="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200 text-xs space-y-1">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" /> Total Charged Today
+                        </span>
+                        <span className="text-base text-emerald-600 dark:text-emerald-400 font-mono">$0.00 USD</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-300 leading-snug">
+                        Your card or account is encrypted via AES-256-GCM. 30 days of full VPS access. Cancel anytime with 1-click in the Billing tab before the trial ends.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsTrialModalOpen(false)}
+                        className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={trialLoading}
+                        className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        {trialLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" /> Provisioning VM on Hyper-V...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4 text-amber-300" /> Activate Free Trial & Deploy VPS
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
             </div>
           </div>
         </div>

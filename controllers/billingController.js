@@ -187,7 +187,18 @@ export async function getBillingOverview(req, res) {
           expYear: savedCard ? savedCard.expYear : '2028',
           funding: 'Credit',
           holderName: (savedCard && savedCard.cardholderName) || user.fullName || 'Authorized Customer',
+          hasSavedMethod: Boolean(savedCard),
         },
+        savedPaymentMethod: savedCard
+          ? {
+              methodId: savedCard.methodId,
+              brand: savedCard.cardBrand,
+              last4: savedCard.last4,
+              expMonth: savedCard.expMonth,
+              expYear: savedCard.expYear,
+              holderName: savedCard.cardholderName || user.fullName || 'Authorized Customer',
+            }
+          : null,
       },
       subscriptions: formattedSubscriptions,
       invoices: formattedInvoices,
@@ -344,10 +355,7 @@ export async function activateTrialSubscription(req, res) {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const cardData = req.body;
-    if (!cardData) {
-      return res.status(400).json({ error: 'Payment method details are required.' });
-    }
+    const cardData = req.body || {};
 
     const trialResult = await setupUserTrial({
       userId,
@@ -357,7 +365,7 @@ export async function activateTrialSubscription(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: '🎉 30-Day Free Trial activated! Your VPS has been provisioned and is now running.',
+      message: '🎉 30-Day Free Trial activated! Your VPS has been provisioned and is now running on Hyper-V.',
       trial: trialResult,
     });
   } catch (err) {

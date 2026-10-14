@@ -6,13 +6,13 @@
 
 import prisma from '../lib/prisma.js';
 
-// Host agent candidates (prioritize direct host gateway)
-const PRIMARY_HOST = process.env.HYPERV_HOST_URL || process.env.HYPERV_AGENT_URL || 'http://172.19.112.1:5050';
+// Host agent candidates (prioritize direct Windows host gateway on Hyper-V Default Switch)
+const PRIMARY_HOST = process.env.HYPERV_HOST_URL || process.env.HYPERV_AGENT_URL || 'http://172.27.32.1:5050';
 const HOST_CANDIDATES = [
   PRIMARY_HOST,
-  'http://172.19.112.1:5050',
-  'http://127.0.0.1:5050',
+  'http://172.27.32.1:5050',
   'http://localhost:5050',
+  'http://127.0.0.1:5050',
 ].filter((v, i, a) => v && a.indexOf(v) === i);
 
 const DEFAULT_TEMPLATE = 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx';
@@ -20,6 +20,35 @@ const DEFAULT_TEMPLATE = 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx';
 class HyperVService {
   constructor() {
     this.activeHost = PRIMARY_HOST;
+    this.lastHostCheck = 0;
+  }
+
+  /**
+   * Fast pre-flight check to verify which host agent is reachable.
+   * Prevents long hangs if the host agent is offline.
+   */
+  async findReachableHost() {
+    if (this.activeHost && Date.now() - this.lastHostCheck < 15000) {
+      return this.activeHost;
+    }
+
+    const candidates = [this.activeHost, ...HOST_CANDIDATES.filter((h) => h !== this.activeHost)].filter(Boolean);
+
+    for (const host of candidates) {
+      try {
+        const ping = await fetch(`${host}/health`, {
+          method: 'GET',
+          signal: AbortSignal.timeout(2500),
+        });
+        if (ping.ok) {
+          this.activeHost = host;
+          this.lastHostCheck = Date.now();
+          return host;
+        }
+      } catch (_) {}
+    }
+
+    return null;
   }
 
   /**
@@ -27,53 +56,47 @@ class HyperVService {
    * Uses cached active host for fast execution and dynamic timeouts.
    */
   async dispatchToHost(endpoint, method = 'POST', body = null) {
-    let lastError = null;
-
-    // Generous timeouts: 3min for disk provisioning, 60s for power/destroy/resize, 25s for status
     const isLongOp = endpoint.includes('/create') || endpoint.includes('/rebuild');
     const isMediumOp = endpoint.includes('/destroy') || endpoint.includes('/power') || endpoint.includes('/resize');
     const timeoutMs = isLongOp ? 180000 : (isMediumOp ? 60000 : 25000);
 
-    // Try current active host first
-    const candidates = [this.activeHost, ...HOST_CANDIDATES.filter((h) => h !== this.activeHost)];
-
-    for (const baseUrl of candidates) {
-      const url = `${baseUrl}${endpoint}`;
-      try {
-        console.log(`[HYPER-V DISPATCH] -> ${method} ${url}`);
-
-        const response = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: body ? JSON.stringify(body) : undefined,
-          signal: AbortSignal.timeout(timeoutMs),
-        });
-
-        const data = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          const errMsg = data.error || data.stderr || `Host Agent returned HTTP ${response.status}`;
-          if (errMsg.includes('permission') || errMsg.includes('authorization policy') || errMsg.includes('Access is denied')) {
-            throw new Error(`Hyper-V Permission Denied on Windows: Host Agent requires Administrator privileges.`);
-          }
-          throw new Error(errMsg);
-        }
-
-        // Cache working host
-        this.activeHost = baseUrl;
-        return data;
-      } catch (err) {
-        lastError = err;
-        console.warn(`[HYPER-V DISPATCH NOTICE] ${baseUrl}${endpoint}: ${err.message}`);
-        if (err.message.includes('Hyper-V Permission Denied')) {
-          throw err;
-        }
-      }
+    const host = await this.findReachableHost();
+    if (!host) {
+      console.error(`[HYPER-V HOST UNREACHABLE] Could not connect to Windows Host Agent on ${PRIMARY_HOST}`);
+      throw new Error(`Windows Hyper-V Host Agent is offline or unreachable at 172.27.32.1:5050. Please ensure hyperv_agent.js is running on the Windows host.`);
     }
 
-    console.error(`[HYPER-V HOST UNREACHABLE] Could not connect to Windows Host Agent on ${PRIMARY_HOST}`);
-    const details = lastError ? ` (${lastError.message})` : '';
-    throw new Error(`Windows Hyper-V Host Agent is not responding${details}. Please make sure hyperv_agent.js is running on Windows.`);
+    const url = `${host}${endpoint}`;
+    try {
+      console.log(`[HYPER-V DISPATCH] -> ${method} ${url}`);
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const errMsg = data.error || data.stderr || `Host Agent returned HTTP ${response.status}`;
+        if (errMsg.includes('permission') || errMsg.includes('authorization policy') || errMsg.includes('Access is denied')) {
+          throw new Error(`Hyper-V Permission Denied on Windows: Host Agent requires Administrator privileges.`);
+        }
+        throw new Error(errMsg);
+      }
+
+      this.lastHostCheck = Date.now();
+      return data;
+    } catch (err) {
+      this.lastHostCheck = 0; // force re-probe on next request
+      console.warn(`[HYPER-V DISPATCH NOTICE] ${url}: ${err.message}`);
+      if (err.message.includes('Hyper-V Permission Denied')) {
+        throw err;
+      }
+      throw err;
+    }
   }
 
   /**

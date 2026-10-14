@@ -79,6 +79,29 @@ export default function Checkout() {
     }
   }, [user]);
 
+  const [savedPaymentMethod, setSavedPaymentMethod] = useState<{
+    methodId: number;
+    brand: string;
+    last4: string;
+    expMonth: string;
+    expYear: string;
+    holderName?: string;
+  } | null>(null);
+  const [useSavedCard, setUseSavedCard] = useState(true);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      apiCall('/payments/saved-method')
+        .then((res) => {
+          if (res && res.hasSavedMethod && res.method) {
+            setSavedPaymentMethod(res.method);
+            setUseSavedCard(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isAuthenticated]);
+
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank_transfer' | 'paypal'>('card');
   const [selectedCardBrand, setSelectedCardBrand] = useState<'Visa' | 'Mastercard' | 'American Express'>('Visa');
   const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvc: '', name: '' });
@@ -167,6 +190,10 @@ export default function Checkout() {
     }
 
     if (currentStep === 'payment' && paymentMethod === 'card') {
+      if (savedPaymentMethod && useSavedCard) {
+        setErrors({});
+        return true;
+      }
       if (!cardDetails.name.trim()) newErrors.cardName = 'Cardholder name is required';
       const cleanNum = cardDetails.number.replace(/\s+/g, '');
       if (!cleanNum || cleanNum.length < 13) newErrors.cardNumber = 'Valid card number is required';
@@ -235,18 +262,25 @@ export default function Checkout() {
 
     try {
       if (paymentMethod === 'card') {
+        const payload: any = {
+          planId: orderData.plan?.planId || 1,
+          amount: orderData.monthlyTotal,
+          customerInfo,
+        };
+
+        if (savedPaymentMethod && useSavedCard) {
+          payload.useSavedMethod = true;
+        } else {
+          payload.cardBrand = selectedCardBrand;
+          payload.cardNumber = cardDetails.number;
+          payload.cardExpiry = cardDetails.expiry;
+          payload.cardCvc = cardDetails.cvc;
+          payload.cardName = cardDetails.name || `${customerInfo.firstName} ${customerInfo.lastName}`.trim();
+        }
+
         const res = await apiCall('/payments/process-card', {
           method: 'POST',
-          body: JSON.stringify({
-            planId: orderData.plan?.planId || 1,
-            amount: orderData.monthlyTotal,
-            cardBrand: selectedCardBrand,
-            cardNumber: cardDetails.number,
-            cardExpiry: cardDetails.expiry,
-            cardCvc: cardDetails.cvc,
-            cardName: cardDetails.name || `${customerInfo.firstName} ${customerInfo.lastName}`.trim(),
-            customerInfo,
-          }),
+          body: JSON.stringify(payload),
         });
 
         if (res.success) {
@@ -817,104 +851,151 @@ export default function Checkout() {
                 {/* 1. CREDIT / DEBIT CARD PANEL (Matches Stripe Elements in Image 1) */}
                 {paymentMethod === 'card' && (
                   <div className="space-y-4 text-xs pt-2">
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1.5">Cardholder Name *</label>
-                      <input
-                        type="text"
-                        value={cardDetails.name}
-                        onChange={(e) => setCardDetails({ ...cardDetails, name: e.target.value })}
-                        className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                          errors.cardName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                        }`}
-                        placeholder="Cardholder Name"
-                      />
-                      {errors.cardName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardName}</p>}
-                    </div>
-
-                    {/* Row 1: Card number (6 cols), Expiration (3 cols), Security code (3 cols) */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                      {/* Card Number */}
-                      <div className="md:col-span-6">
-                        <label className="block font-bold text-slate-700 mb-1.5">Card number *</label>
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={cardDetails.number}
-                            onChange={(e) => handleCardNumberChange(e.target.value)}
-                            maxLength={19}
-                            className={`w-full p-3 pr-28 rounded-xl bg-slate-50 border text-slate-900 font-mono tracking-wider focus:outline-none focus:bg-white transition-colors font-medium ${
-                              errors.cardNumber ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                            }`}
-                            placeholder="1234 1234 1234 1234"
-                          />
-                          {/* Embedded Brand Badges */}
-                          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 select-none pointer-events-none">
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
-                              selectedCardBrand === 'Visa'
-                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                                : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
-                            }`}>
-                              VISA
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
-                              selectedCardBrand === 'Mastercard'
-                                ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                                : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
-                            }`}>
-                              MC
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
-                              selectedCardBrand === 'American Express'
-                                ? 'bg-sky-500 text-white border-sky-500 shadow-xs'
-                                : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
-                            }`}>
-                              AMEX
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border bg-slate-100 text-slate-400 border-slate-200 opacity-60">
-                              DISC
-                            </span>
+                    {savedPaymentMethod && useSavedCard ? (
+                      /* Saved Card on File Banner */
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border-2 border-blue-600 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                              💳
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-900">
+                                {savedPaymentMethod.brand} on File (•••• {savedPaymentMethod.last4})
+                              </p>
+                              <p className="text-[11px] text-slate-500">
+                                Expires {savedPaymentMethod.expMonth}/{savedPaymentMethod.expYear} • {savedPaymentMethod.holderName || `${customerInfo.firstName} ${customerInfo.lastName}`.trim()}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        {errors.cardNumber && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardNumber}</p>}
-                      </div>
-
-                      {/* Expiration Date */}
-                      <div className="md:col-span-3">
-                        <label className="block font-bold text-slate-700 mb-1.5">Expiration date *</label>
-                        <input
-                          type="text"
-                          value={cardDetails.expiry}
-                          onChange={(e) => handleExpiryChange(e.target.value)}
-                          maxLength={5}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.cardExpiry ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="MM / YY"
-                        />
-                        {errors.cardExpiry && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardExpiry}</p>}
-                      </div>
-
-                      {/* Security code */}
-                      <div className="md:col-span-3">
-                        <label className="block font-bold text-slate-700 mb-1.5">Security code *</label>
-                        <div className="relative">
-                          <input
-                            type="password"
-                            value={cardDetails.cvc}
-                            onChange={(e) => setCardDetails({ ...cardDetails, cvc: e.target.value.replace(/[^0-9]/g, '').slice(0, 4) })}
-                            maxLength={4}
-                            className={`w-full p-3 pr-10 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
-                              errors.cardCvc ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                            }`}
-                            placeholder="CVC"
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none select-none flex items-center gap-0.5">
-                            💳<span className="text-[9px] font-mono font-bold">123</span>
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                            Verified
                           </span>
                         </div>
-                        {errors.cardCvc && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardCvc}</p>}
+                        <p className="text-[11px] text-slate-600">
+                          Your saved card on file will be charged directly for this cloud instance order.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setUseSavedCard(false)}
+                          className="text-[11px] text-blue-600 font-semibold hover:underline cursor-pointer flex items-center gap-1"
+                        >
+                          + Enter a different credit or debit card
+                        </button>
                       </div>
-                    </div>
+                    ) : (
+                      <>
+                        {savedPaymentMethod && (
+                          <div className="flex items-center justify-between pb-1">
+                            <button
+                              type="button"
+                              onClick={() => setUseSavedCard(true)}
+                              className="text-xs text-blue-600 font-semibold hover:underline cursor-pointer flex items-center gap-1"
+                            >
+                              ← Use saved payment method ({savedPaymentMethod.brand} •••• {savedPaymentMethod.last4})
+                            </button>
+                          </div>
+                        )}
+                        <div>
+                          <label className="block font-bold text-slate-700 mb-1.5">Cardholder Name *</label>
+                          <input
+                            type="text"
+                            value={cardDetails.name}
+                            onChange={(e) => setCardDetails({ ...cardDetails, name: e.target.value })}
+                            className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                              errors.cardName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                            }`}
+                            placeholder="Cardholder Name"
+                          />
+                          {errors.cardName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardName}</p>}
+                        </div>
+
+                        {/* Row 1: Card number (6 cols), Expiration (3 cols), Security code (3 cols) */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                          {/* Card Number */}
+                          <div className="md:col-span-6">
+                            <label className="block font-bold text-slate-700 mb-1.5">Card number *</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={cardDetails.number}
+                                onChange={(e) => handleCardNumberChange(e.target.value)}
+                                maxLength={19}
+                                className={`w-full p-3 pr-28 rounded-xl bg-slate-50 border text-slate-900 font-mono tracking-wider focus:outline-none focus:bg-white transition-colors font-medium ${
+                                  errors.cardNumber ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                                }`}
+                                placeholder="1234 1234 1234 1234"
+                              />
+                              {/* Embedded Brand Badges */}
+                              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 select-none pointer-events-none">
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                                  selectedCardBrand === 'Visa'
+                                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+                                }`}>
+                                  VISA
+                                </span>
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                                  selectedCardBrand === 'Mastercard'
+                                    ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+                                }`}>
+                                  MC
+                                </span>
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                                  selectedCardBrand === 'American Express'
+                                    ? 'bg-sky-500 text-white border-sky-500 shadow-xs'
+                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+                                }`}>
+                                  AMEX
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border bg-slate-100 text-slate-400 border-slate-200 opacity-60">
+                                  DISC
+                                </span>
+                              </div>
+                            </div>
+                            {errors.cardNumber && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardNumber}</p>}
+                          </div>
+
+                          {/* Expiration Date */}
+                          <div className="md:col-span-3">
+                            <label className="block font-bold text-slate-700 mb-1.5">Expiration date *</label>
+                            <input
+                              type="text"
+                              value={cardDetails.expiry}
+                              onChange={(e) => handleExpiryChange(e.target.value)}
+                              maxLength={5}
+                              className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
+                                errors.cardExpiry ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                              }`}
+                              placeholder="MM / YY"
+                            />
+                            {errors.cardExpiry && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardExpiry}</p>}
+                          </div>
+
+                          {/* Security code */}
+                          <div className="md:col-span-3">
+                            <label className="block font-bold text-slate-700 mb-1.5">Security code *</label>
+                            <div className="relative">
+                              <input
+                                type="password"
+                                value={cardDetails.cvc}
+                                onChange={(e) => setCardDetails({ ...cardDetails, cvc: e.target.value.replace(/[^0-9]/g, '').slice(0, 4) })}
+                                maxLength={4}
+                                className={`w-full p-3 pr-10 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
+                                  errors.cardCvc ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                                }`}
+                                placeholder="CVC"
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none select-none flex items-center gap-0.5">
+                                💳<span className="text-[9px] font-mono font-bold">123</span>
+                              </span>
+                            </div>
+                            {errors.cardCvc && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardCvc}</p>}
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     {/* Row 2: Country & ZIP Code */}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3">

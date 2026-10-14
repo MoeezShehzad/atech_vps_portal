@@ -9,6 +9,7 @@ import {
   createIntent,
   processCardPayment,
   processBankPayment,
+  getSavedPaymentMethod,
 } from '../controllers/paymentController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -18,6 +19,7 @@ const router = express.Router();
 router.get('/config', getPaymentConfig);
 
 // Authenticated payment processing routes
+router.get('/saved-method', authenticateToken, getSavedPaymentMethod);
 router.post('/create-intent', authenticateToken, createIntent);
 router.post('/process-card', authenticateToken, processCardPayment);
 router.post('/process-bank-transfer', authenticateToken, processBankPayment);

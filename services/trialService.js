@@ -4,6 +4,7 @@
 // ==============================================================================
 
 import prisma from '../lib/prisma.js';
+import hypervService from './hypervService.js';
 import { encryptSensitive, decryptSensitive, processTestCardCharge } from './stripeService.js';
 import {
   sendTrialStartedEmail,
@@ -15,14 +16,12 @@ import {
 
 /**
  * 1. Setup a 30-Day Free Trial for a Newly Registered User
- * Stores credit card in AES-256-GCM encrypted format, allocates VPS Basic package,
+ * Stores credit card in AES-256-GCM encrypted format (or reuses saved card),
+ * allocates VPS Basic package, provisions real Hyper-V VM on Windows,
  * creates $0.00 trial invoice, and sets countdown.
  */
 export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
   if (!userId) throw new Error('Valid User ID is required to initialize trial.');
-  if (!cardData) {
-    throw new Error('Valid Credit Card, Debit Card or Bank Account is required to secure the 30-day free trial.');
-  }
 
   // Prevent duplicate active trials
   const existingSub = await prisma.subscription.findFirst({
@@ -38,76 +37,102 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
     throw new Error('You already have an active subscription or free trial.');
   }
 
-  const {
-    cardNumber,
-    cardExpiry,
-    cardCvc,
-    cardholderName,
-    cardBrand: clientBrand,
-    paymentType, // 'card' or 'bank'
-    bankName,
-    routingNumber,
-    accountNumber,
-  } = cardData;
+  // Check if user already has a saved payment method on file
+  const existingPm = await prisma.userPaymentMethod.findFirst({
+    where: { userId, isDefault: true },
+    orderBy: { createdAt: 'desc' },
+  });
 
-  let detectedBrand = clientBrand || 'Visa';
+  const isReusingSaved = Boolean(
+    (cardData?.useSavedMethod || (!cardData?.cardNumber && !cardData?.accountNumber)) && existingPm
+  );
+
+  let detectedBrand = 'Visa';
   let last4 = '4242';
   let expMonth = '12';
   let expYear = '2028';
-  let encryptedCardNumber = '';
-  let encryptedCvc = '';
-  let finalHolder = cardholderName || 'Authorized Customer';
+  let finalHolder = 'Authorized Customer';
 
-  if (paymentType === 'bank' || accountNumber) {
-    // Direct Bank Account / ACH
-    const cleanAccount = String(accountNumber || '').replace(/\D/g, '');
-    const cleanRouting = String(routingNumber || '').replace(/\D/g, '');
-    if (cleanAccount.length < 4) {
-      throw new Error('Please enter a valid bank account number.');
-    }
-    last4 = cleanAccount.slice(-4);
-    detectedBrand = bankName ? `Bank Account (${bankName})` : 'Direct Bank Account';
-    encryptedCardNumber = encryptSensitive(cleanAccount);
-    encryptedCvc = encryptSensitive(cleanRouting || '000000000');
-    expMonth = '12';
-    expYear = '2030';
+  if (isReusingSaved) {
+    detectedBrand = existingPm.cardBrand;
+    last4 = existingPm.last4;
+    expMonth = existingPm.expMonth;
+    expYear = existingPm.expYear;
+    finalHolder = existingPm.cardholderName || 'Authorized Customer';
+    console.log(`[TRIAL SETUP] Reusing existing saved payment method: ${detectedBrand} (•••• ${last4}) for user #${userId}`);
   } else {
-    // Credit or Debit Card
-    const cleanCard = String(cardNumber || '').replace(/[\s-]/g, '');
-    if (cleanCard.length < 13 || cleanCard.length > 19) {
-      throw new Error('Invalid card number length. Please check your credit/debit card number.');
+    if (!cardData) {
+      throw new Error('Valid Credit Card, Debit Card or Bank Account is required to secure the 30-day free trial.');
     }
 
-    if (cleanCard.startsWith('4')) detectedBrand = 'Visa';
-    else if (/^5[1-5]/.test(cleanCard) || /^2[2-7]/.test(cleanCard)) detectedBrand = 'Mastercard';
-    else if (/^3[47]/.test(cleanCard)) detectedBrand = 'American Express';
-    else if (/^6(?:011|5)/.test(cleanCard)) detectedBrand = 'Discover';
+    const {
+      cardNumber,
+      cardExpiry,
+      cardCvc,
+      cardholderName,
+      cardBrand: clientBrand,
+      paymentType, // 'card' or 'bank'
+      bankName,
+      routingNumber,
+      accountNumber,
+    } = cardData;
 
-    last4 = cleanCard.slice(-4);
-    const cleanCvc = String(cardCvc || '').replace(/\D/g, '').slice(0, 4);
+    detectedBrand = clientBrand || 'Visa';
+    finalHolder = cardholderName || 'Authorized Customer';
+    let encryptedCardNumber = '';
+    let encryptedCvc = '';
 
-    const [expMonthRaw, expYearRaw] = String(cardExpiry || '12/28').split('/').map((s) => s.trim());
-    expMonth = expMonthRaw ? expMonthRaw.padStart(2, '0') : '12';
-    expYear = expYearRaw ? (expYearRaw.length === 2 ? `20${expYearRaw}` : expYearRaw) : '2028';
+    if (paymentType === 'bank' || accountNumber) {
+      // Direct Bank Account / ACH
+      const cleanAccount = String(accountNumber || '').replace(/\D/g, '');
+      const cleanRouting = String(routingNumber || '').replace(/\D/g, '');
+      if (cleanAccount.length < 4) {
+        throw new Error('Please enter a valid bank account number.');
+      }
+      last4 = cleanAccount.slice(-4);
+      detectedBrand = bankName ? `Bank Account (${bankName})` : 'Direct Bank Account';
+      encryptedCardNumber = encryptSensitive(cleanAccount);
+      encryptedCvc = encryptSensitive(cleanRouting || '000000000');
+      expMonth = '12';
+      expYear = '2030';
+    } else {
+      // Credit or Debit Card
+      const cleanCard = String(cardNumber || '').replace(/[\s-]/g, '');
+      if (cleanCard.length < 13 || cleanCard.length > 19) {
+        throw new Error('Invalid card number length. Please check your credit/debit card number.');
+      }
 
-    encryptedCardNumber = encryptSensitive(cleanCard);
-    encryptedCvc = encryptSensitive(cleanCvc || '123');
+      if (cleanCard.startsWith('4')) detectedBrand = 'Visa';
+      else if (/^5[1-5]/.test(cleanCard) || /^2[2-7]/.test(cleanCard)) detectedBrand = 'Mastercard';
+      else if (/^3[47]/.test(cleanCard)) detectedBrand = 'American Express';
+      else if (/^6(?:011|5)/.test(cleanCard)) detectedBrand = 'Discover';
+
+      last4 = cleanCard.slice(-4);
+      const cleanCvc = String(cardCvc || '').replace(/\D/g, '').slice(0, 4);
+
+      const [expMonthRaw, expYearRaw] = String(cardExpiry || '12/28').split('/').map((s) => s.trim());
+      expMonth = expMonthRaw ? expMonthRaw.padStart(2, '0') : '12';
+      expYear = expYearRaw ? (expYearRaw.length === 2 ? `20${expYearRaw}` : expYearRaw) : '2028';
+
+      encryptedCardNumber = encryptSensitive(cleanCard);
+      encryptedCvc = encryptSensitive(cleanCvc || '123');
+    }
+
+    // Save encrypted payment method in User_Payment_Methods
+    await prisma.userPaymentMethod.create({
+      data: {
+        userId,
+        cardBrand: detectedBrand,
+        last4,
+        expMonth,
+        expYear,
+        cardholderName: finalHolder,
+        encryptedCardNumber,
+        encryptedCvc,
+        isDefault: true,
+      },
+    });
   }
-
-  // 1. Save encrypted payment method in User_Payment_Methods
-  await prisma.userPaymentMethod.create({
-    data: {
-      userId,
-      cardBrand: detectedBrand,
-      last4,
-      expMonth,
-      expYear,
-      cardholderName: finalHolder,
-      encryptedCardNumber,
-      encryptedCvc,
-      isDefault: true,
-    },
-  });
 
   // 2. Find VPS Basic Plan (2 vCPU Cores, 2 GB RAM, 50 GB NVMe)
   let basicPlan = await prisma.vPSPlan.findFirst({
@@ -182,8 +207,8 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
       cpuCores: basicPlan?.cpuCores || 2,
       ramGb: basicPlan?.ramGb || 2,
       storageGb: basicPlan?.storageGb || 50,
-      status: 'RUNNING',
-      provisioningStatus: 'COMPLETED',
+      status: 'PROVISIONING',
+      provisioningStatus: 'IN_PROGRESS',
       adminUser: 'ubuntu',
       adminPassword: 'AtechSecure2026!',
       startedAt: now,
@@ -195,6 +220,27 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
       where: { ipId: ipRecord.ipId },
       data: { status: 'ASSIGNED', assignedVmId: trialVm.vmId },
     }).catch(() => {});
+  }
+
+  // Trigger real VM creation on Windows Hyper-V Host
+  try {
+    await hypervService.createVM({
+      vmId: trialVm.vmId,
+      vmName,
+      cpuCores: basicPlan?.cpuCores || 2,
+      ramGb: basicPlan?.ramGb || 2,
+      storageGb: basicPlan?.storageGb || 50,
+      templatePath: image.templatePath || 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx',
+      adminUsername: 'ubuntu',
+      adminPassword: 'AtechSecure2026!',
+    });
+  } catch (hvErr) {
+    console.error(`[Trial Hyper-V Error] Failed to create physical VM '${vmName}':`, hvErr.message);
+    await prisma.virtualMachine.update({
+      where: { vmId: trialVm.vmId },
+      data: { status: 'FAILED', provisioningStatus: 'FAILED', provisioningError: hvErr.message },
+    }).catch(() => {});
+    throw new Error(`Failed to provision virtual server on host: ${hvErr.message}`);
   }
 
   // 5. Generate $0.00 Official Trial Activation Invoice

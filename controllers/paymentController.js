@@ -78,15 +78,61 @@ export async function processCardPayment(req, res) {
       cardCvc,
       cardName,
       customerInfo,
+      useSavedMethod,
     } = req.body;
 
     if (!amount || Number(amount) <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid order amount.' });
     }
 
-    const cleanCard = String(cardNumber || '').replace(/[\s-]/g, '');
-    const last4 = cleanCard.length >= 4 ? cleanCard.slice(-4) : '4242';
-    const [expMonth, expYear] = String(cardExpiry || '12/28').split('/').map((s) => s.trim());
+    // Check if user has an existing default payment method
+    const savedMethod = await prisma.userPaymentMethod.findFirst({
+      where: { userId, isDefault: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const isReusingSaved = Boolean((useSavedMethod || (!cardNumber && !cardCvc)) && savedMethod);
+
+    let effectiveBrand = cardBrand;
+    let effectiveLast4 = '4242';
+    let effectiveExpMonth = '12';
+    let effectiveExpYear = '2028';
+    let effectiveCardName = cardName || req.user.fullName || 'Authorized Customer';
+
+    if (isReusingSaved) {
+      effectiveBrand = savedMethod.cardBrand;
+      effectiveLast4 = savedMethod.last4;
+      effectiveExpMonth = savedMethod.expMonth;
+      effectiveExpYear = savedMethod.expYear;
+      effectiveCardName = savedMethod.cardholderName || req.user.fullName || 'Authorized Customer';
+      console.log(`[CHECKOUT CHARGE] Charging saved card ${effectiveBrand} (•••• ${effectiveLast4}) for user #${userId}`);
+    } else {
+      const cleanCard = String(cardNumber || '').replace(/[\s-]/g, '');
+      effectiveLast4 = cleanCard.length >= 4 ? cleanCard.slice(-4) : '4242';
+      const [expMonth, expYear] = String(cardExpiry || '12/28').split('/').map((s) => s.trim());
+      effectiveExpMonth = expMonth || '12';
+      effectiveExpYear = expYear || '2028';
+      effectiveCardName = cardName || req.user.fullName || 'Authorized Customer';
+
+      // Save as default payment method if user doesn't already have one
+      if (cleanCard && cleanCard.length >= 13) {
+        try {
+          await prisma.userPaymentMethod.create({
+            data: {
+              userId,
+              cardBrand: effectiveBrand,
+              last4: effectiveLast4,
+              expMonth: effectiveExpMonth,
+              expYear: effectiveExpYear,
+              cardholderName: effectiveCardName,
+              encryptedCardNumber: encryptSensitive(cleanCard),
+              encryptedCvc: encryptSensitive(String(cardCvc || '123')),
+              isDefault: !savedMethod,
+            },
+          });
+        } catch (_) {}
+      }
+    }
 
     // 1. Fetch Plan details from Database
     const plan = await prisma.vPSPlan.findFirst({
@@ -101,12 +147,12 @@ export async function processCardPayment(req, res) {
     const stripeResult = await processTestCardCharge({
       amount,
       currency: 'usd',
-      cardBrand,
-      last4,
-      expMonth,
-      expYear,
+      cardBrand: effectiveBrand,
+      last4: effectiveLast4,
+      expMonth: effectiveExpMonth,
+      expYear: effectiveExpYear,
       customerEmail: req.user.email,
-      customerName: cardName || req.user.fullName,
+      customerName: effectiveCardName,
       metadata: {
         userId: String(userId),
         planId: String(plan.planId),
@@ -348,3 +394,41 @@ export async function processBankPayment(req, res) {
     return res.status(400).json({ success: false, error: err.message || 'Failed to process bank transfer.' });
   }
 }
+
+/**
+ * 5. GET /api/payments/saved-method - Retrieve user's default saved card on file
+ */
+export async function getSavedPaymentMethod(req, res) {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const pm = await prisma.userPaymentMethod.findFirst({
+      where: { userId, isDefault: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!pm) {
+      return res.json({ success: true, hasSavedMethod: false, method: null });
+    }
+
+    return res.json({
+      success: true,
+      hasSavedMethod: true,
+      method: {
+        methodId: pm.methodId,
+        brand: pm.cardBrand,
+        last4: pm.last4,
+        expMonth: pm.expMonth,
+        expYear: pm.expYear,
+        holderName: pm.cardholderName,
+      },
+    });
+  } catch (err) {
+    console.error('[getSavedPaymentMethod Error]:', err);
+    return res.status(500).json({ success: false, error: 'Failed to retrieve saved payment method.' });
+  }
+}
+
