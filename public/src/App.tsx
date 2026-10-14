@@ -60,7 +60,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 flex flex-col justify-between font-sans">
+    <div className="min-h-screen bg-white text-slate-900 flex flex-col justify-between font-poppins font-sans">
       {/* Resets scroll position on every page navigation */}
       <ScrollToTop />
 

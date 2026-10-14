@@ -1,6 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400;1,500;1,600;1,700&display=swap');
 @import "tailwindcss";
 
 @theme {
+  --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-poppins: 'Poppins', sans-serif;
+
   --color-atc-blue: #2e75b5;
   --color-atc-blue-hover: #246299;
   --color-atc-blue-dark: #1b4d77;
@@ -23,6 +27,7 @@
 
 /* iOS-Style Ultra-Smooth Spring Transition */
 html {
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color-scheme: light dark;
 }
 
@@ -82,8 +87,13 @@ input[type="range"],
   transition-duration: 0s !important;
 }
 
+body, button, input, select, textarea {
+  font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
 body {
   @apply bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 font-sans antialiased;
+  font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
