@@ -76,46 +76,6 @@ export async function getSecurityOverview(req, res) {
 }
 
 /**
- * 2. GET /api/security/logs
- * Returns unified chronological timeline of Security Logs & Activity Logs
- */
-export async function getAuditLogs(req, res) {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    const category = req.query.category || 'ALL'; // ALL, AUTH, VMS, SECURITY
-    const limit = Math.min(Number(req.query.limit) || 50, 100);
-    const search = (req.query.search || '').trim().toLowerCase();
-
-    // Query Security Logs
-    let securityLogs = [];
-    if (category === 'ALL' || category === 'AUTH' || category === 'SECURITY') {
-      securityLogs = await prisma.securityLog.findMany({
-        where: { userId },
-        orderBy: { timestamp: 'desc' },
-        take: limit,
-      });
-    }
-
-    // Query Activity Logs
-    let activityLogs = [];
-    if (category === 'ALL' || category === 'VMS') {
-      activityLogs = await prisma.activityLog.findMany({
-        where: { userId },
-        include: {
-          vm: {
-            select: { vmName: true, hostname: true },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-      });
-    }
-
-/**
  * Sanitizes and formats audit log details into human-friendly text,
  * preventing any raw JSON, gateway internals, or transaction ID leakage.
  */
@@ -156,6 +116,46 @@ export function sanitizeAuditDetails(action, rawDetails) {
 
   return clean;
 }
+
+/**
+ * 2. GET /api/security/logs
+ * Returns unified chronological timeline of Security Logs & Activity Logs
+ */
+export async function getAuditLogs(req, res) {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const category = req.query.category || 'ALL'; // ALL, AUTH, VMS, SECURITY
+    const limit = Math.min(Number(req.query.limit) || 50, 100);
+    const search = (req.query.search || '').trim().toLowerCase();
+
+    // Query Security Logs
+    let securityLogs = [];
+    if (category === 'ALL' || category === 'AUTH' || category === 'SECURITY') {
+      securityLogs = await prisma.securityLog.findMany({
+        where: { userId },
+        orderBy: { timestamp: 'desc' },
+        take: limit,
+      });
+    }
+
+    // Query Activity Logs
+    let activityLogs = [];
+    if (category === 'ALL' || category === 'VMS') {
+      activityLogs = await prisma.activityLog.findMany({
+        where: { userId },
+        include: {
+          vm: {
+            select: { vmName: true, hostname: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+    }
 
     // Format & unify events
     const unifiedEvents = [];
