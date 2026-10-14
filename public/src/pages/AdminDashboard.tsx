@@ -136,6 +136,10 @@ export default function AdminDashboard() {
   // Finance & Payments
   const [billingOverview, setBillingOverview] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [billingCustomers, setBillingCustomers] = useState<any[]>([]);
+  const [selectedBillingCustomer, setSelectedBillingCustomer] = useState<any | null>(null);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState<string>('');
+  const [billingViewMode, setBillingViewMode] = useState<'by_customer' | 'all_invoices'>('by_customer');
   const [billingLoading, setBillingLoading] = useState(false);
   const [invoiceSearch, setInvoiceSearch] = useState('');
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('ALL');
@@ -356,13 +360,15 @@ export default function AdminDashboard() {
     try {
       setBillingLoading(true);
       const queryStatus = invoiceStatusFilter !== 'ALL' ? `&status=${invoiceStatusFilter}` : '';
+      const userParam = selectedBillingCustomer ? `&userId=${selectedBillingCustomer.userId}` : '';
       const [overviewRes, invoicesRes] = await Promise.all([
         apiCall('/admin/billing/overview'),
-        apiCall(`/admin/invoices?page=${invoicePage}&limit=15&search=${encodeURIComponent(invoiceSearch)}${queryStatus}`),
+        apiCall(`/admin/billing/invoices?page=${invoicePage}&limit=50&search=${encodeURIComponent(invoiceSearch)}${queryStatus}${userParam}`),
       ]);
       if (overviewRes?.success) setBillingOverview(overviewRes.overview);
       if (invoicesRes?.success) {
         setInvoices(invoicesRes.invoices);
+        if (invoicesRes.customers) setBillingCustomers(invoicesRes.customers);
         setInvoicePagination(invoicesRes.pagination);
       }
     } catch (err: any) {
@@ -376,9 +382,10 @@ export default function AdminDashboard() {
     if (!refundModalInvoice) return;
     try {
       setRefundProcessing(true);
-      const res = await apiCall(`/admin/invoices/${refundModalInvoice.id}/refund`, {
+      const res = await apiCall(`/admin/billing/refund`, {
         method: 'POST',
         body: JSON.stringify({
+          invoiceId: refundModalInvoice.id || refundModalInvoice.invoiceId,
           amount: refundAmount ? parseFloat(refundAmount) : undefined,
           reason: refundReason,
         }),
@@ -400,9 +407,10 @@ export default function AdminDashboard() {
     if (!markPaidModalInvoice) return;
     try {
       setMarkPaidProcessing(true);
-      const res = await apiCall(`/admin/invoices/${markPaidModalInvoice.id}/mark-paid`, {
+      const res = await apiCall(`/admin/billing/mark-paid`, {
         method: 'POST',
         body: JSON.stringify({
+          invoiceId: markPaidModalInvoice.id || markPaidModalInvoice.invoiceId,
           paymentMethod: markPaidMethod,
           notes: markPaidNotes,
         }),
@@ -423,9 +431,12 @@ export default function AdminDashboard() {
     if (!voidModalInvoice) return;
     try {
       setVoidProcessing(true);
-      const res = await apiCall(`/admin/invoices/${voidModalInvoice.id}/void`, {
+      const res = await apiCall(`/admin/billing/void-invoice`, {
         method: 'POST',
-        body: JSON.stringify({ reason: voidReason }),
+        body: JSON.stringify({
+          invoiceId: voidModalInvoice.id || voidModalInvoice.invoiceId,
+          reason: voidReason,
+        }),
       });
       if (res && res.success) {
         toast.success(res.message || 'Invoice voided.');
@@ -905,7 +916,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (activeTab === 'finance') fetchFinance();
-  }, [invoiceStatusFilter, invoicePage]);
+  }, [invoiceStatusFilter, invoicePage, selectedBillingCustomer]);
 
   const navItems = [
     { id: 'overview', label: 'Host Telemetry', icon: Activity, badge: null, alert: false },
@@ -1450,213 +1461,530 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Invoices Ledger Table */}
+            {/* Invoices & Customer Accounts Manager */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden space-y-4">
               <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
                     <Receipt className="w-5 h-5 text-blue-600" />
-                    Transaction & Invoice Ledger
+                    Customer Accounts & Invoice History
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Execute real-time Stripe refunds, reconcile direct bank wires, and cancel invalid invoices.
+                    Browse customer accounts, view complete individual invoice histories, and execute payment controls.
                   </p>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Invoice # or customer..."
-                      value={invoiceSearch}
-                      onChange={(e) => setInvoiceSearch(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && fetchFinance()}
-                      className="pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600"
-                    />
-                  </div>
+                {/* View Mode Switcher */}
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
                   <button
                     type="button"
-                    onClick={fetchFinance}
-                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs"
+                    onClick={() => {
+                      setBillingViewMode('by_customer');
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      billingViewMode === 'by_customer'
+                        ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-bold'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
                   >
-                    Filter
+                    <Users className="w-3.5 h-3.5" />
+                    <span>By Customer ({billingCustomers.length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBillingViewMode('all_invoices');
+                      setSelectedBillingCustomer(null);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      billingViewMode === 'all_invoices'
+                        ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-bold'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Receipt className="w-3.5 h-3.5" />
+                    <span>All Invoices Ledger</span>
                   </button>
                 </div>
               </div>
 
-              {/* Status Filter Tabs */}
-              <div className="px-5 flex items-center gap-2 overflow-x-auto pb-1">
-                {[
-                  { id: 'ALL', label: 'All Invoices' },
-                  { id: 'PAID', label: 'Paid' },
-                  { id: 'PENDING', label: 'Pending' },
-                  { id: 'REFUNDED', label: 'Refunded' },
-                  { id: 'VOID', label: 'Void / Cancelled' },
-                  { id: 'FAILED', label: 'Failed' },
-                ].map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    onClick={() => {
-                      setInvoiceStatusFilter(st.id);
-                      setInvoicePage(1);
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                      invoiceStatusFilter === st.id
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {st.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
-                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold uppercase border-b border-slate-100 dark:border-slate-800">
-                    <tr>
-                      <th className="px-6 py-3.5">Invoice #</th>
-                      <th className="px-6 py-3.5">Customer</th>
-                      <th className="px-6 py-3.5">Plan / Description</th>
-                      <th className="px-6 py-3.5">Amount & Gateway</th>
-                      <th className="px-6 py-3.5">Status</th>
-                      <th className="px-6 py-3.5 text-right">Payment Controls</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {invoices.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-6 py-4">
-                          <p className="font-mono font-bold text-slate-900 dark:text-white text-xs">{inv.invoiceNumber}</p>
-                          <p className="text-[11px] text-slate-400">{new Date(inv.createdAt).toLocaleString()}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="font-semibold text-slate-900 dark:text-white text-xs">{inv.user?.fullName || 'Guest'}</p>
-                          <p className="text-[11px] font-mono text-slate-400">{inv.user?.email || 'N/A'}</p>
-                        </td>
-                        <td className="px-6 py-4 text-xs">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">
-                            {inv.plan?.name || inv.description || 'VPS Service Provision'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="font-mono font-bold text-slate-900 dark:text-white text-xs">
-                            ${Number(inv.amount || 0).toFixed(2)}
-                          </p>
-                          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                            {inv.paymentMethod || 'Stripe'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              inv.status === 'PAID'
-                                ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
-                                : inv.status === 'PENDING'
-                                ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400'
-                                : inv.status === 'REFUNDED'
-                                ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-400'
-                                : inv.status === 'VOID'
-                                ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
-                                : 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400'
-                            }`}
+              {/* MODE 1: BY CUSTOMER ACCOUNT */}
+              {billingViewMode === 'by_customer' && (
+                <div className="p-5 space-y-4">
+                  {!selectedBillingCustomer ? (
+                    <>
+                      {/* Customer Search Bar */}
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex-1 max-w-md">
+                          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Find customer by name or email..."
+                            value={customerSearchQuery}
+                            onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                            className="w-full pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+                        {customerSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setCustomerSearchQuery('')}
+                            className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
                           >
-                            {inv.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="inline-flex items-center gap-2">
-                            {inv.status === 'PAID' && (
+                            Clear
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Customer Cards Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+                        {billingCustomers
+                          .filter((c) => {
+                            if (!customerSearchQuery.trim()) return true;
+                            const q = customerSearchQuery.toLowerCase();
+                            return (
+                              c.fullName?.toLowerCase().includes(q) ||
+                              c.email?.toLowerCase().includes(q)
+                            );
+                          })
+                          .map((customer) => (
+                            <div
+                              key={customer.userId}
+                              onClick={() => setSelectedBillingCustomer(customer)}
+                              className="bg-slate-50 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-blue-300 dark:hover:border-blue-700 p-5 rounded-2xl shadow-xs transition-all cursor-pointer group space-y-3"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-xs shrink-0">
+                                    {customer.fullName?.charAt(0)?.toUpperCase() || 'C'}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <h4 className="font-bold text-xs text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
+                                      {customer.fullName}
+                                    </h4>
+                                    <p className="text-[11px] font-mono text-slate-400 truncate">
+                                      {customer.email}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {customer.pendingCount > 0 ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-400 border border-amber-200 dark:border-amber-800 shrink-0">
+                                    {customer.pendingCount} Pending
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-400 shrink-0">
+                                    All Paid
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-700/60 text-xs">
+                                <div>
+                                  <span className="text-[10px] text-slate-400 block">Total Spend</span>
+                                  <span className="font-mono font-bold text-slate-900 dark:text-white">
+                                    ${Number(customer.totalSpent || 0).toFixed(2)}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-400 block">Total Invoices</span>
+                                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                                    {customer.totalInvoices} Invoices
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-1">
+                                <span className="text-[10px] text-slate-400">
+                                  Last invoice: {customer.latestInvoiceNumber || 'N/A'}
+                                </span>
+                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                                  <span>View Full History</span>
+                                  <ChevronRight className="w-3.5 h-3.5" />
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        {billingCustomers.length === 0 && (
+                          <div className="col-span-3 text-center py-12 text-xs text-slate-400">
+                            No customer billing history available.
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    /* Customer Complete Invoices History View */
+                    <div className="space-y-4 animate-in fade-in duration-150">
+                      {/* Back button and Customer Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60">
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBillingCustomer(null)}
+                            className="p-2 rounded-lg bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 border border-slate-200 dark:border-slate-700 cursor-pointer shadow-xs transition-colors"
+                            title="Back to Customer Directory"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-bold text-sm text-slate-900 dark:text-white font-poppins">
+                                {selectedBillingCustomer.fullName}
+                              </h4>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                User ID #{selectedBillingCustomer.userId}
+                              </span>
+                            </div>
+                            <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                              {selectedBillingCustomer.email}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 text-xs font-mono">
+                          <div className="text-right">
+                            <span className="text-[10px] text-slate-400 font-sans block">Lifetime Paid</span>
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                              ${Number(selectedBillingCustomer.totalSpent || 0).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="text-right border-l border-slate-200 dark:border-slate-700 pl-4">
+                            <span className="text-[10px] text-slate-400 font-sans block">Total Records</span>
+                            <span className="font-bold text-blue-600 dark:text-blue-400">
+                              {invoices.length} Invoices
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Complete Invoice History Table for this User */}
+                      <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+                        <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
+                          <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold uppercase border-b border-slate-100 dark:border-slate-800">
+                            <tr>
+                              <th className="px-5 py-3.5">Invoice #</th>
+                              <th className="px-5 py-3.5">Issue Date</th>
+                              <th className="px-5 py-3.5">Plan / Service</th>
+                              <th className="px-5 py-3.5">Amount & Gateway</th>
+                              <th className="px-5 py-3.5">Payment Status</th>
+                              <th className="px-5 py-3.5 text-right">Administrative Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {invoices.map((inv) => (
+                              <tr key={inv.id || inv.invoiceId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                <td className="px-5 py-4">
+                                  <p className="font-mono font-bold text-slate-900 dark:text-white text-xs">{inv.invoiceNumber}</p>
+                                </td>
+                                <td className="px-5 py-4 text-xs">
+                                  {new Date(inv.createdAt).toLocaleString()}
+                                </td>
+                                <td className="px-5 py-4 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                  {inv.plan?.name || inv.planName || 'Cloud VPS Service'}
+                                </td>
+                                <td className="px-5 py-4">
+                                  <p className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+                                    ${Number(inv.amount || inv.total || 0).toFixed(2)}
+                                  </p>
+                                  <span className="text-[10px] font-semibold text-slate-400 uppercase">
+                                    {inv.paymentMethod || 'Stripe'}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-4">
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                      inv.status === 'PAID'
+                                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
+                                        : inv.status === 'PENDING'
+                                        ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400'
+                                        : inv.status === 'REFUNDED'
+                                        ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-400'
+                                        : inv.status === 'VOID'
+                                        ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                                        : 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400'
+                                    }`}
+                                  >
+                                    {inv.status}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-4 text-right">
+                                  <div className="inline-flex items-center gap-2">
+                                    {inv.status === 'PAID' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setRefundModalInvoice(inv);
+                                          setRefundAmount(String(inv.amount || inv.total));
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                        title="Issue Stripe refund"
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        <span>Refund</span>
+                                      </button>
+                                    )}
+
+                                    {inv.status === 'PENDING' && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => setMarkPaidModalInvoice(inv)}
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                          title="Verify payment and activate slot"
+                                        >
+                                          <Check className="w-3.5 h-3.5" />
+                                          <span>Mark Paid</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setVoidModalInvoice(inv)}
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 hover:text-rose-600 text-slate-600 dark:text-slate-400 text-xs font-bold transition-all cursor-pointer"
+                                          title="Cancel and void invoice"
+                                        >
+                                          <Ban className="w-3.5 h-3.5" />
+                                          <span>Void</span>
+                                        </button>
+                                      </>
+                                    )}
+
+                                    {inv.status === 'REFUNDED' && (
+                                      <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400">
+                                        Refunded
+                                      </span>
+                                    )}
+
+                                    {inv.status === 'VOID' && (
+                                      <span className="text-[11px] font-mono text-slate-400">
+                                        Voided
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                            {invoices.length === 0 && (
+                              <tr>
+                                <td colSpan={6} className="text-center py-8 text-xs text-slate-400">
+                                  No invoices generated for this customer yet.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* MODE 2: ALL INVOICES FLAT LEDGER */}
+              {billingViewMode === 'all_invoices' && (
+                <>
+                  <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    {/* Status Filter Tabs */}
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {[
+                        { id: 'ALL', label: 'All Invoices' },
+                        { id: 'PAID', label: 'Paid' },
+                        { id: 'PENDING', label: 'Pending' },
+                        { id: 'REFUNDED', label: 'Refunded' },
+                        { id: 'VOID', label: 'Void / Cancelled' },
+                        { id: 'FAILED', label: 'Failed' },
+                      ].map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => {
+                            setInvoiceStatusFilter(st.id);
+                            setInvoicePage(1);
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                            invoiceStatusFilter === st.id
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search invoice or customer..."
+                          value={invoiceSearch}
+                          onChange={(e) => setInvoiceSearch(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && fetchFinance()}
+                          className="pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={fetchFinance}
+                        className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs"
+                      >
+                        Filter
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
+                      <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold uppercase border-b border-slate-100 dark:border-slate-800">
+                        <tr>
+                          <th className="px-6 py-3.5">Invoice #</th>
+                          <th className="px-6 py-3.5">Customer (Click to View History)</th>
+                          <th className="px-6 py-3.5">Plan / Description</th>
+                          <th className="px-6 py-3.5">Amount & Gateway</th>
+                          <th className="px-6 py-3.5">Status</th>
+                          <th className="px-6 py-3.5 text-right">Payment Controls</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {invoices.map((inv) => (
+                          <tr key={inv.id || inv.invoiceId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <td className="px-6 py-4">
+                              <p className="font-mono font-bold text-slate-900 dark:text-white text-xs">{inv.invoiceNumber}</p>
+                              <p className="text-[11px] text-slate-400">{new Date(inv.createdAt).toLocaleString()}</p>
+                            </td>
+                            <td className="px-6 py-4">
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setRefundModalInvoice(inv);
-                                  setRefundAmount(String(inv.amount));
+                                  const c = billingCustomers.find((b) => b.userId === inv.user?.userId) || inv.user;
+                                  setSelectedBillingCustomer(c);
+                                  setBillingViewMode('by_customer');
                                 }}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
-                                title="Issue a full or partial Stripe refund"
+                                className="text-left group cursor-pointer"
                               >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                                <span>Refund</span>
+                                <p className="font-semibold text-slate-900 dark:text-white text-xs group-hover:text-blue-600 transition-colors">
+                                  {inv.user?.fullName || 'Guest'}
+                                </p>
+                                <p className="text-[11px] font-mono text-slate-400">{inv.user?.email || 'N/A'}</p>
                               </button>
-                            )}
-
-                            {inv.status === 'PENDING' && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => setMarkPaidModalInvoice(inv)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
-                                  title="Manually verify bank wire or external payment"
-                                >
-                                  <Check className="w-3.5 h-3.5" />
-                                  <span>Mark Paid</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setVoidModalInvoice(inv)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 hover:text-rose-600 text-slate-600 dark:text-slate-400 text-xs font-bold transition-all cursor-pointer"
-                                  title="Cancel and void unpaid invoice"
-                                >
-                                  <Ban className="w-3.5 h-3.5" />
-                                  <span>Void</span>
-                                </button>
-                              </>
-                            )}
-
-                            {inv.status === 'REFUNDED' && (
-                              <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400">
-                                Refund Processed
+                            </td>
+                            <td className="px-6 py-4 text-xs font-semibold text-slate-800 dark:text-slate-200">
+                              {inv.plan?.name || inv.planName || 'Cloud VPS Service'}
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+                                ${Number(inv.amount || inv.total || 0).toFixed(2)}
+                              </p>
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase">
+                                {inv.paymentMethod || 'Stripe'}
                               </span>
-                            )}
-
-                            {inv.status === 'VOID' && (
-                              <span className="text-[11px] font-mono text-slate-400">
-                                Voided
+                            </td>
+                            <td className="px-6 py-4">
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  inv.status === 'PAID'
+                                    ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
+                                    : inv.status === 'PENDING'
+                                    ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400'
+                                    : inv.status === 'REFUNDED'
+                                    ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-400'
+                                    : inv.status === 'VOID'
+                                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                                    : 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400'
+                                }`}
+                              >
+                                {inv.status}
                               </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {invoices.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="text-center py-8 text-xs text-slate-400">
-                          No invoices matching selected filters.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="inline-flex items-center gap-2">
+                                {inv.status === 'PAID' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRefundModalInvoice(inv);
+                                      setRefundAmount(String(inv.amount || inv.total));
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                  >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                    <span>Refund</span>
+                                  </button>
+                                )}
 
-              {/* Pagination */}
-              {invoicePagination.totalPages > 1 && (
-                <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
-                  <span>
-                    Page {invoicePagination.page} of {invoicePagination.totalPages} ({invoicePagination.total} total)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={invoicePage <= 1}
-                      onClick={() => setInvoicePage((p) => Math.max(1, p - 1))}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      disabled={invoicePage >= invoicePagination.totalPages}
-                      onClick={() => setInvoicePage((p) => p + 1)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
-                    >
-                      Next
-                    </button>
+                                {inv.status === 'PENDING' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => setMarkPaidModalInvoice(inv)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                      <span>Mark Paid</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setVoidModalInvoice(inv)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 hover:text-rose-600 text-slate-600 dark:text-slate-400 text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                      <Ban className="w-3.5 h-3.5" />
+                                      <span>Void</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                {inv.status === 'REFUNDED' && (
+                                  <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400">
+                                    Refunded
+                                  </span>
+                                )}
+
+                                {inv.status === 'VOID' && (
+                                  <span className="text-[11px] font-mono text-slate-400">
+                                    Voided
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {invoices.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="text-center py-8 text-xs text-slate-400">
+                              No invoices matching selected filters.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                </div>
+
+                  {/* Pagination */}
+                  {invoicePagination.totalPages > 1 && (
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+                      <span>
+                        Page {invoicePagination.page} of {invoicePagination.totalPages} ({invoicePagination.total} total)
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={invoicePage <= 1}
+                          onClick={() => setInvoicePage((p) => Math.max(1, p - 1))}
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          type="button"
+                          disabled={invoicePage >= invoicePagination.totalPages}
+                          onClick={() => setInvoicePage((p) => p + 1)}
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

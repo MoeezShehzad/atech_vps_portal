@@ -1,6 +1,11 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Global BigInt JSON serialization support for Prisma BigInt IDs (Invoices, Payments, Logs)
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 import http from 'http';
 import express from 'express';
 import cors from 'cors';

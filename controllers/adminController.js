@@ -1119,13 +1119,13 @@ export async function replyAdminTicket(req, res) {
 
 /**
  * GET /api/admin/users/:userId/profile
- * Returns 360° profile of a user: profile, roles, VMs, subscriptions, invoices, and logs
+ * Returns a 360-degree executive profile of the user
  */
 export async function getUserFullProfile(req, res) {
   try {
     const targetUserId = Number(req.params.userId);
     if (!targetUserId) {
-      return res.status(400).json({ error: 'Invalid user ID' });
+      return res.status(400).json({ error: 'Valid user ID is required' });
     }
 
     const [user, roles, vms, subscriptions, invoices, payments, activityLogs, securityLogs] = await Promise.all([
@@ -1135,8 +1135,9 @@ export async function getUserFullProfile(req, res) {
           userId: true,
           fullName: true,
           email: true,
-          phone: true,
-          address: true,
+          phoneNumber: true,
+          companyName: true,
+          addressLine1: true,
           city: true,
           country: true,
           postalCode: true,
@@ -1153,6 +1154,7 @@ export async function getUserFullProfile(req, res) {
       }),
       prisma.virtualMachine.findMany({
         where: { userId: targetUserId },
+        include: { ipPool: true, plan: true },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.subscription.findMany({
@@ -1162,7 +1164,7 @@ export async function getUserFullProfile(req, res) {
       }),
       prisma.invoice.findMany({
         where: { userId: targetUserId },
-        include: { payments: true },
+        include: { payments: true, subscription: { include: { plan: true } } },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.payment.findMany({
@@ -1172,12 +1174,12 @@ export async function getUserFullProfile(req, res) {
       prisma.activityLog.findMany({
         where: { userId: targetUserId },
         orderBy: { createdAt: 'desc' },
-        take: 10,
+        take: 15,
       }),
       prisma.securityLog.findMany({
         where: { userId: targetUserId },
         orderBy: { timestamp: 'desc' },
-        take: 10,
+        take: 15,
       }),
     ]);
 
@@ -1189,9 +1191,39 @@ export async function getUserFullProfile(req, res) {
       .filter((p) => p.status === 'COMPLETED')
       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
+    const normalizedVms = vms.map((v) => ({
+      ...v,
+      id: v.vmId,
+      name: v.vmName,
+      ip: v.ipPool?.[0]?.ipAddress || '10.0.0.x',
+      cpuCores: v.cpuCores,
+      ramGb: v.ramGb,
+      storageGb: v.storageGb,
+    }));
+
+    const normalizedSubs = subscriptions.map((s) => ({
+      ...s,
+      id: s.subscriptionId,
+      currentPeriodEnd: s.nextBillingDate || s.endDate,
+    }));
+
+    const normalizedInvoices = invoices.map((i) => ({
+      ...i,
+      id: Number(i.invoiceId),
+      amount: Number(i.total || 0),
+      paymentMethod: i.payments?.[0]?.paymentGateway || 'STRIPE',
+      planName: i.subscription?.plan?.name || 'Cloud VPS Package',
+    }));
+
     const sanitizedActivity = activityLogs.map((a) => ({
       ...a,
+      activityId: a.activityId ? String(a.activityId) : undefined,
       details: sanitizeAuditDetails(a.action, a.details),
+    }));
+
+    const sanitizedSecurity = securityLogs.map((s) => ({
+      ...s,
+      logId: s.logId ? String(s.logId) : undefined,
     }));
 
     return res.json({
@@ -1199,13 +1231,18 @@ export async function getUserFullProfile(req, res) {
       profile: {
         ...user,
         roles: roles.map((r) => r.role.roleName),
-        totalSpend,
-        vms,
-        subscriptions,
-        invoices,
+        role: roles[0]?.role?.roleName || 'Customer',
+        vms: normalizedVms,
+        subscriptions: normalizedSubs,
+        invoices: normalizedInvoices,
         payments,
         activityLogs: sanitizedActivity,
-        securityLogs,
+        securityLogs: sanitizedSecurity,
+        metrics: {
+          totalSpend,
+          activeSubscriptions: subscriptions.filter((s) => s.status === 'ACTIVE').length,
+          vmCount: vms.length,
+        },
       },
     });
   } catch (error) {
@@ -1229,10 +1266,10 @@ export async function getAdminBillingOverview(req, res) {
         select: { amount: true, paymentGateway: true, status: true },
       }),
       prisma.invoice.findMany({
-        select: { amount: true, status: true },
+        select: { total: true, status: true },
       }),
       prisma.subscription.findMany({
-        select: { status: true, plan: { select: { monthlyPrice: true } } },
+        select: { status: true, monthlyPrice: true, plan: { select: { monthlyPrice: true } } },
       }),
     ]);
 
@@ -1240,38 +1277,49 @@ export async function getAdminBillingOverview(req, res) {
     let stripeVolume = 0;
     let bankVolume = 0;
     let refundedVolume = 0;
+    let paidCount = 0;
+    let refundedCount = 0;
 
     payments.forEach((p) => {
       const amt = Number(p.amount || 0);
       if (p.status === 'COMPLETED') {
         grossRevenue += amt;
-        if (p.paymentGateway === 'STRIPE_CARD') stripeVolume += amt;
-        if (p.paymentGateway === 'DIRECT_BANK_TRANSFER') bankVolume += amt;
+        paidCount++;
+        if (p.paymentGateway === 'STRIPE_CARD' || p.paymentGateway === 'STRIPE') stripeVolume += amt;
+        if (p.paymentGateway === 'DIRECT_BANK_TRANSFER' || p.paymentGateway === 'BANK_WIRE') bankVolume += amt;
       } else if (p.status === 'REFUNDED') {
         refundedVolume += amt;
+        refundedCount++;
       }
     });
 
     const pendingInvoices = invoices.filter((i) => i.status === 'PENDING');
-    const pendingTotal = pendingInvoices.reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    const pendingTotal = pendingInvoices.reduce((sum, i) => sum + Number(i.total || 0), 0);
 
     const activeSubscriptions = subscriptions.filter((s) => s.status === 'ACTIVE');
-    const mrr = activeSubscriptions.reduce((sum, s) => sum + Number(s.plan?.monthlyPrice || 0), 0);
+    const mrr = activeSubscriptions.reduce((sum, s) => sum + Number(s.plan?.monthlyPrice || s.monthlyPrice || 0), 0);
 
     return res.json({
       success: true,
       overview: {
+        totalGrossVolume: grossRevenue,
         grossRevenue,
         stripeVolume,
         bankVolume,
+        refundVolume: refundedVolume,
         refundedVolume,
-        netRevenue: Math.max(0, grossRevenue - refundedVolume),
-        pendingInvoicesCount: pendingInvoices.length,
+        paidCount,
+        refundedCount,
+        pendingVolume: pendingTotal,
         pendingTotal,
-        activeSubscriptionsCount: activeSubscriptions.length,
+        pendingCount: pendingInvoices.length,
+        pendingInvoicesCount: pendingInvoices.length,
         mrr,
+        estimatedArr: mrr * 12,
         arr: mrr * 12,
+        totalInvoices: invoices.length,
         totalInvoicesCount: invoices.length,
+        activeSubscriptionsCount: activeSubscriptions.length,
       },
     });
   } catch (error) {
@@ -1281,18 +1329,25 @@ export async function getAdminBillingOverview(req, res) {
 }
 
 /**
- * GET /api/admin/billing/invoices
- * Paginated and searchable invoices ledger
+ * GET /api/admin/billing/invoices (and /api/admin/invoices)
+ * Paginated, searchable, and Customer-grouped invoices ledger
  */
 export async function getAdminInvoices(req, res) {
   try {
     const status = req.query.status || 'ALL';
     const search = (req.query.search || '').trim().toLowerCase();
-    const limit = Math.min(Number(req.query.limit) || 100, 200);
+    const targetUserId = req.query.userId ? Number(req.query.userId) : null;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(Number(req.query.limit) || 15, 100);
+    const skip = (page - 1) * limit;
 
     let whereClause = {};
     if (status !== 'ALL') {
       whereClause.status = status;
+    }
+
+    if (targetUserId) {
+      whereClause.userId = targetUserId;
     }
 
     if (search) {
@@ -1303,20 +1358,83 @@ export async function getAdminInvoices(req, res) {
       ];
     }
 
-    const invoices = await prisma.invoice.findMany({
-      where: whereClause,
-      include: {
-        user: { select: { userId: true, fullName: true, email: true } },
-        payments: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
+    const [totalCount, rawInvoices, allInvoicesForAggregation] = await Promise.all([
+      prisma.invoice.count({ where: whereClause }),
+      prisma.invoice.findMany({
+        where: whereClause,
+        include: {
+          user: { select: { userId: true, fullName: true, email: true } },
+          payments: true,
+          subscription: { include: { plan: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      // Aggregation for Customer-grouped ledger view
+      prisma.invoice.findMany({
+        select: {
+          invoiceId: true,
+          invoiceNumber: true,
+          total: true,
+          status: true,
+          createdAt: true,
+          userId: true,
+          user: { select: { userId: true, fullName: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    // Build customer aggregation summary map
+    const customerMap = new Map();
+    allInvoicesForAggregation.forEach((inv) => {
+      const u = inv.user;
+      if (!u) return;
+      if (!customerMap.has(u.userId)) {
+        customerMap.set(u.userId, {
+          userId: u.userId,
+          fullName: u.fullName,
+          email: u.email,
+          totalInvoices: 0,
+          totalSpent: 0,
+          pendingCount: 0,
+          latestInvoiceDate: inv.createdAt,
+          latestInvoiceNumber: inv.invoiceNumber,
+          latestStatus: inv.status,
+        });
+      }
+      const c = customerMap.get(u.userId);
+      c.totalInvoices += 1;
+      if (inv.status === 'PAID') c.totalSpent += Number(inv.total || 0);
+      if (inv.status === 'PENDING') c.pendingCount += 1;
     });
+
+    const customersWithInvoices = Array.from(customerMap.values()).sort(
+      (a, b) => new Date(b.latestInvoiceDate).getTime() - new Date(a.latestInvoiceDate).getTime()
+    );
+
+    const normalizedInvoices = rawInvoices.map((inv) => ({
+      ...inv,
+      id: Number(inv.invoiceId),
+      invoiceId: Number(inv.invoiceId),
+      amount: Number(inv.total || 0),
+      total: Number(inv.total || 0),
+      paymentMethod: inv.payments?.[0]?.paymentGateway || 'STRIPE',
+      plan: inv.subscription?.plan || { name: 'Cloud VPS Service' },
+      planName: inv.subscription?.plan?.name || 'Cloud VPS Service',
+    }));
 
     return res.json({
       success: true,
-      invoices,
-      totalCount: invoices.length,
+      invoices: normalizedInvoices,
+      customers: customersWithInvoices,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit) || 1,
+      },
     });
   } catch (error) {
     console.error('getAdminInvoices error:', error);
@@ -1325,79 +1443,88 @@ export async function getAdminInvoices(req, res) {
 }
 
 /**
- * POST /api/admin/billing/refund
+ * POST /api/admin/billing/refund (and /api/admin/invoices/:id/refund)
  * Processes 1-Click refund via Stripe API and updates ledger
  */
 export async function processAdminRefund(req, res) {
   try {
-    const { paymentId, reason = 'Administrative Refund' } = req.body;
-    if (!paymentId) {
-      return res.status(400).json({ error: 'Payment ID is required' });
+    const invoiceId = req.params.id ? Number(req.params.id) : req.body.invoiceId ? Number(req.body.invoiceId) : null;
+    const paymentId = req.body.paymentId ? Number(req.body.paymentId) : null;
+    const { amount, reason = 'Administrative Refund' } = req.body;
+
+    let targetInvoice = null;
+    let targetPayment = null;
+
+    if (invoiceId) {
+      targetInvoice = await prisma.invoice.findUnique({
+        where: { invoiceId },
+        include: { payments: true, user: true },
+      });
+      if (targetInvoice && targetInvoice.payments?.length > 0) {
+        targetPayment = targetInvoice.payments[0];
+      }
+    } else if (paymentId) {
+      targetPayment = await prisma.payment.findUnique({
+        where: { paymentId },
+        include: { invoice: true, user: true },
+      });
+      if (targetPayment) targetInvoice = targetPayment.invoice;
     }
 
-    const payment = await prisma.payment.findUnique({
-      where: { paymentId: Number(paymentId) },
-      include: {
-        invoice: true,
-        user: true,
-      },
-    });
-
-    if (!payment) {
-      return res.status(404).json({ error: 'Payment record not found' });
+    if (!targetInvoice && !targetPayment) {
+      return res.status(404).json({ error: 'Invoice or payment record not found' });
     }
 
-    if (payment.status === 'REFUNDED') {
-      return res.status(400).json({ error: 'Payment is already refunded' });
-    }
+    const refundAmount = amount ? Number(amount) : Number(targetPayment?.amount || targetInvoice?.total || 0);
 
-    // Process refund through Stripe if paid via Stripe Card
+    // Call Stripe if there is a transaction ID
     let stripeRefundResult = null;
-    if (payment.paymentGateway === 'STRIPE_CARD' && payment.transactionId) {
+    if (targetPayment?.transactionId) {
       stripeRefundResult = await createStripeRefund({
-        transactionId: payment.transactionId,
-        amount: payment.amount,
+        transactionId: targetPayment.transactionId,
+        amount: refundAmount,
         reason,
       });
     }
 
-    // Update payment and invoice status in database
     await prisma.$transaction(async (tx) => {
-      await tx.payment.update({
-        where: { paymentId: payment.paymentId },
-        data: { status: 'REFUNDED' },
-      });
-
-      if (payment.invoiceId) {
-        await tx.invoice.update({
-          where: { invoiceId: payment.invoiceId },
+      if (targetPayment) {
+        await tx.payment.update({
+          where: { paymentId: targetPayment.paymentId },
           data: { status: 'REFUNDED' },
         });
       }
 
-      // Deactivate any active subscription associated with this customer's refund
-      await tx.subscription.updateMany({
-        where: {
-          userId: payment.userId,
-          status: 'ACTIVE',
-        },
-        data: { status: 'CANCELLED' },
-      });
+      if (targetInvoice) {
+        await tx.invoice.update({
+          where: { invoiceId: targetInvoice.invoiceId },
+          data: { status: 'REFUNDED' },
+        });
+
+        // Deactivate active subscription slot tied to this customer/invoice
+        await tx.subscription.updateMany({
+          where: {
+            userId: targetInvoice.userId,
+            status: 'ACTIVE',
+          },
+          data: { status: 'CANCELLED' },
+        });
+      }
 
       await tx.activityLog.create({
         data: {
           userId: req.adminUser.userId,
           action: 'ADMIN_PAYMENT_REFUNDED',
           status: 'SUCCESS',
-          details: `Administrator refunded payment #${payment.paymentId} ($${payment.amount} USD) for user ${payment.user?.email}. Reason: ${reason}`,
+          details: `Admin refunded $${refundAmount} USD for invoice #${targetInvoice?.invoiceNumber || targetPayment?.paymentId}. Reason: ${reason}`,
         },
       });
     });
 
     return res.json({
       success: true,
-      message: `Payment of $${payment.amount} USD refunded successfully.`,
-      refundDetails: stripeRefundResult,
+      message: `Refund of $${refundAmount.toFixed(2)} USD successfully processed.`,
+      refund: stripeRefundResult,
     });
   } catch (error) {
     console.error('processAdminRefund error:', error);
@@ -1406,19 +1533,21 @@ export async function processAdminRefund(req, res) {
 }
 
 /**
- * POST /api/admin/billing/mark-paid
- * Manually marks a pending invoice as PAID (e.g. for bank wire) and activates customer slot
+ * POST /api/admin/billing/mark-paid (and /api/admin/invoices/:id/mark-paid)
+ * Manually marks a pending invoice as PAID and activates customer slot
  */
 export async function markInvoiceAsPaid(req, res) {
   try {
-    const { invoiceId, notes } = req.body;
+    const invoiceId = req.params.id ? Number(req.params.id) : req.body.invoiceId ? Number(req.body.invoiceId) : null;
+    const { paymentMethod = 'DIRECT_BANK_TRANSFER', notes = 'Direct wire confirmed' } = req.body;
+
     if (!invoiceId) {
       return res.status(400).json({ error: 'Invoice ID is required' });
     }
 
     const invoice = await prisma.invoice.findUnique({
-      where: { invoiceId: Number(invoiceId) },
-      include: { user: true },
+      where: { invoiceId },
+      include: { user: true, subscription: { include: { plan: true } } },
     });
 
     if (!invoice) {
@@ -1433,48 +1562,52 @@ export async function markInvoiceAsPaid(req, res) {
     const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     await prisma.$transaction(async (tx) => {
-      // 1. Update Invoice
+      // 1. Update Invoice status
       await tx.invoice.update({
         where: { invoiceId: invoice.invoiceId },
         data: {
           status: 'PAID',
-          paymentDate: now,
+          paidDate: now,
         },
       });
 
-      // 2. Create or Update Payment record
+      // 2. Create Payment ledger entry
       await tx.payment.create({
         data: {
           userId: invoice.userId,
           invoiceId: invoice.invoiceId,
-          paymentGateway: 'DIRECT_BANK_TRANSFER',
-          transactionId: `TXN-MANUAL-${Date.now()}`,
-          amount: invoice.amount,
+          paymentGateway: paymentMethod,
+          transactionId: `TXN-WIRE-${Date.now()}`,
+          amount: invoice.total,
           currency: 'USD',
           status: 'COMPLETED',
           paymentDate: now,
         },
       });
 
-      // 3. Deposit active subscription slot for customer
-      let defaultPlan = await tx.vPSPlan.findFirst({ orderBy: { monthlyPrice: 'asc' } });
+      // 3. Deposit active subscription slot
+      const defaultPlan = await tx.vPSPlan.findFirst({ orderBy: { monthlyPrice: 'asc' } });
+      const planPrice = invoice.subscription?.plan?.monthlyPrice || defaultPlan?.monthlyPrice || 9.99;
+
       await tx.subscription.create({
         data: {
           userId: invoice.userId,
-          planId: defaultPlan?.planId || 1,
+          planId: invoice.subscription?.planId || defaultPlan?.planId || 1,
           status: 'ACTIVE',
-          currentPeriodStart: now,
-          currentPeriodEnd: periodEnd,
+          startDate: now,
+          nextBillingDate: periodEnd,
+          monthlyPrice: planPrice,
+          currency: 'USD',
         },
       });
 
-      // 4. Log admin audit
+      // 4. Log admin audit action
       await tx.activityLog.create({
         data: {
           userId: req.adminUser.userId,
           action: 'ADMIN_MARK_INVOICE_PAID',
           status: 'SUCCESS',
-          details: `Administrator marked invoice ${invoice.invoiceNumber} as PAID. Activated 30-day VPS slot for ${invoice.user.email}.${notes ? ` Notes: ${notes}` : ''}`,
+          details: `Admin marked invoice ${invoice.invoiceNumber} as PAID. Provisioned 30-day VPS slot for ${invoice.user.email}. Method: ${paymentMethod}. Notes: ${notes}`,
         },
       });
     });
@@ -1484,35 +1617,37 @@ export async function markInvoiceAsPaid(req, res) {
       email: invoice.user.email,
       fullName: invoice.user.fullName,
       invoiceNumber: invoice.invoiceNumber,
-      amount: Number(invoice.amount),
-      planName: 'Cloud VPS Package',
+      amount: Number(invoice.total),
+      planName: invoice.subscription?.plan?.name || 'Cloud VPS Package',
       currency: 'USD',
     }).catch((err) => console.warn('[Invoice Email Notice]:', err.message));
 
     return res.json({
       success: true,
-      message: `Invoice ${invoice.invoiceNumber} marked as PAID. Active VPS slot provisioned for customer.`,
+      message: `Invoice ${invoice.invoiceNumber} marked as PAID. Active 30-day VPS runtime slot deposited.`,
     });
   } catch (error) {
     console.error('markInvoiceAsPaid error:', error);
-    res.status(500).json({ error: 'Failed to mark invoice as paid' });
+    res.status(500).json({ error: error.message || 'Failed to mark invoice as paid' });
   }
 }
 
 /**
- * POST /api/admin/billing/void-invoice
- * Voids an unpaid/pending invoice and closes provision opportunity
+ * POST /api/admin/billing/void-invoice (and /api/admin/invoices/:id/void)
+ * Voids an unpaid/pending invoice
  */
 export async function voidAdminInvoice(req, res) {
   try {
-    const { invoiceId, reason = 'Cancelled by administrator' } = req.body;
+    const invoiceId = req.params.id ? Number(req.params.id) : req.body.invoiceId ? Number(req.body.invoiceId) : null;
+    const { reason = 'Cancelled by administrator' } = req.body;
+
     if (!invoiceId) {
       return res.status(400).json({ error: 'Invoice ID is required' });
     }
 
     const updated = await prisma.invoice.update({
-      where: { invoiceId: Number(invoiceId) },
-      data: { status: 'CANCELLED' },
+      where: { invoiceId },
+      data: { status: 'VOID' },
       include: { user: true },
     });
 
@@ -1521,7 +1656,7 @@ export async function voidAdminInvoice(req, res) {
         userId: req.adminUser.userId,
         action: 'ADMIN_VOID_INVOICE',
         status: 'SUCCESS',
-        details: `Administrator voided invoice ${updated.invoiceNumber} for user ${updated.user.email}. Reason: ${reason}`,
+        details: `Admin voided invoice ${updated.invoiceNumber} for user ${updated.user.email}. Reason: ${reason}`,
       },
     });
 
@@ -1536,18 +1671,20 @@ export async function voidAdminInvoice(req, res) {
 }
 
 /**
- * POST /api/admin/billing/subscription-control
- * Controls subscription status (extend, suspend, resume, cancel)
+ * PATCH /api/admin/subscriptions/:id (and POST /api/admin/billing/subscription-control)
+ * Controls subscription status (extend 30 days, suspend, resume, cancel)
  */
 export async function adminUpdateSubscription(req, res) {
   try {
-    const { subscriptionId, action } = req.body;
+    const subscriptionId = req.params.id ? Number(req.params.id) : req.body.subscriptionId ? Number(req.body.subscriptionId) : null;
+    const { action } = req.body;
+
     if (!subscriptionId || !action) {
       return res.status(400).json({ error: 'Subscription ID and action required' });
     }
 
     const sub = await prisma.subscription.findUnique({
-      where: { subscriptionId: Number(subscriptionId) },
+      where: { subscriptionId },
       include: { user: true },
     });
 
@@ -1557,8 +1694,8 @@ export async function adminUpdateSubscription(req, res) {
 
     let updateData = {};
     if (action === 'EXTEND_30_DAYS') {
-      const currentEnd = new Date(sub.currentPeriodEnd);
-      updateData.currentPeriodEnd = new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const currentEnd = sub.nextBillingDate ? new Date(sub.nextBillingDate) : new Date();
+      updateData.nextBillingDate = new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000);
       updateData.status = 'ACTIVE';
     } else if (action === 'SUSPEND') {
       updateData.status = 'SUSPENDED';
@@ -1567,7 +1704,7 @@ export async function adminUpdateSubscription(req, res) {
     } else if (action === 'CANCEL') {
       updateData.status = 'CANCELLED';
     } else {
-      return res.status(400).json({ error: 'Invalid action' });
+      return res.status(400).json({ error: 'Invalid action specified' });
     }
 
     const updated = await prisma.subscription.update({
@@ -1580,7 +1717,7 @@ export async function adminUpdateSubscription(req, res) {
         userId: req.adminUser.userId,
         action: 'ADMIN_SUBSCRIPTION_UPDATE',
         status: 'SUCCESS',
-        details: `Administrator performed '${action}' on subscription #${sub.subscriptionId} for user ${sub.user.email}`,
+        details: `Admin performed '${action}' on subscription #${sub.subscriptionId} for user ${sub.user.email}`,
       },
     });
 
@@ -1600,21 +1737,22 @@ export async function adminUpdateSubscription(req, res) {
 // ==============================================================================
 
 /**
- * POST /api/admin/broadcasts/dispatch
- * Broadcasts notification with optional anti-spam throttled email queue
+ * POST /api/admin/broadcasts/dispatch (and /api/admin/broadcast)
  */
 export async function dispatchBroadcastNotification(req, res) {
   try {
-    const { title, message, targetAudience = 'ALL_USERS', channels = { inApp: true, email: false } } = req.body;
+    const { title, message, audience, targetAudience = 'ALL_USERS', channels = { inApp: true, email: true }, priority = 'normal' } = req.body;
     if (!title || !message) {
       return res.status(400).json({ error: 'Title and message are required' });
     }
 
+    const aud = audience || targetAudience;
     const result = await startBroadcastCampaign({
       title,
       message,
-      targetAudience,
+      targetAudience: aud,
       channels,
+      priority,
       adminEmail: req.adminUser.email,
     });
 
@@ -1623,11 +1761,15 @@ export async function dispatchBroadcastNotification(req, res) {
         userId: req.adminUser.userId,
         action: 'ADMIN_BROADCAST_DISPATCHED',
         status: 'SUCCESS',
-        details: `Administrator initiated broadcast '${title}' to ${targetAudience} via ${channels.email ? 'Email & In-App' : 'In-App'}. Total recipients: ${result.totalRecipients}`,
+        details: `Admin initiated broadcast '${title}' to ${aud}. Total recipients: ${result.totalRecipients}`,
       },
     });
 
-    return res.json(result);
+    return res.json({
+      success: true,
+      message: `Broadcast campaign queued safely (${result.totalRecipients} recipients).`,
+      job: result,
+    });
   } catch (error) {
     console.error('dispatchBroadcastNotification error:', error);
     res.status(500).json({ error: 'Failed to start broadcast campaign' });
@@ -1635,8 +1777,7 @@ export async function dispatchBroadcastNotification(req, res) {
 }
 
 /**
- * GET /api/admin/broadcasts/job/:jobId
- * Real-time queue progress monitor
+ * GET /api/admin/broadcasts/job/:jobId (and /api/admin/broadcast-status/:jobId)
  */
 export function getBroadcastJobStatus(req, res) {
   const job = getJobStatus(req.params.jobId);
@@ -1647,12 +1788,11 @@ export function getBroadcastJobStatus(req, res) {
 }
 
 /**
- * GET /api/admin/broadcasts/history
- * List of recent broadcast campaigns
+ * GET /api/admin/broadcasts/history (and /api/admin/broadcast-history)
  */
 export function getBroadcastHistory(req, res) {
   const history = listRecentBroadcasts();
-  return res.json({ success: true, broadcasts: history });
+  return res.json({ success: true, history });
 }
 
 // ==============================================================================
@@ -1661,7 +1801,6 @@ export function getBroadcastHistory(req, res) {
 
 /**
  * GET /api/admin/reports
- * Comprehensive analytics across Revenue, Fleet Capacity, Subscriptions, and SLA
  */
 export async function getAdminReports(req, res) {
   try {
@@ -1676,84 +1815,87 @@ export async function getAdminReports(req, res) {
       prisma.ticket.findMany(),
     ]);
 
-    // Financial Metrics
-    const totalGrossRevenue = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const stripeRevenue = payments
-      .filter((p) => p.paymentGateway === 'STRIPE_CARD')
+    const grossVolume = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const stripeVolume = payments
+      .filter((p) => p.paymentGateway === 'STRIPE_CARD' || p.paymentGateway === 'STRIPE')
       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const bankRevenue = payments
-      .filter((p) => p.paymentGateway === 'DIRECT_BANK_TRANSFER')
+    const bankVolume = payments
+      .filter((p) => p.paymentGateway === 'DIRECT_BANK_TRANSFER' || p.paymentGateway === 'BANK_WIRE')
       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
     const activeSubs = subscriptions.filter((s) => s.status === 'ACTIVE');
-    const mrr = activeSubs.reduce((sum, s) => sum + Number(s.plan?.monthlyPrice || 0), 0);
+    const mrr = activeSubs.reduce((sum, s) => sum + Number(s.plan?.monthlyPrice || s.monthlyPrice || 0), 0);
 
-    // Fleet & Overcommit Analytics
-    const physicalCores = os.cpus().length;
-    const physicalRamGB = Math.round(os.totalmem() / (1024 * 1024 * 1024));
+    const totalHostCores = os.cpus().length;
+    const totalHostRamGb = Math.round(os.totalmem() / (1024 * 1024 * 1024));
 
-    const activeVms = vms.filter((v) => v.status !== 'TERMINATED');
-    const allocatedCores = activeVms.reduce((sum, v) => sum + Number(v.vCPU || 0), 0);
-    const committedRamGB = activeVms.reduce((sum, v) => sum + Number(v.ramGB || 0), 0);
-    const committedDiskGB = activeVms.reduce((sum, v) => sum + Number(v.diskGB || 0), 0);
+    const activeVms = vms.filter((v) => v.status !== 'terminated');
+    const allocatedVcpus = activeVms.reduce((sum, v) => sum + Number(v.cpuCores || 0), 0);
+    const allocatedRamGb = activeVms.reduce((sum, v) => sum + Number(v.ramGb || 0), 0);
+    const allocatedDiskGb = activeVms.reduce((sum, v) => sum + Number(v.storageGb || 0), 0);
 
-    const cpuOvercommitRatio = physicalCores > 0 ? ((allocatedCores / physicalCores) * 100).toFixed(1) : 0;
-    const ramOvercommitRatio = physicalRamGB > 0 ? ((committedRamGB / physicalRamGB) * 100).toFixed(1) : 0;
+    const cpuOvercommitRatio = totalHostCores > 0 ? (allocatedVcpus / totalHostCores).toFixed(1) : '1.0';
+    const ramAllocationPercent = totalHostRamGb > 0 ? Math.round((allocatedRamGb / totalHostRamGb) * 100) : 0;
 
-    // Plan Distribution
-    const planDistribution = {};
+    const planStats = {};
     activeSubs.forEach((s) => {
-      const planName = s.plan?.name || 'Custom Plan';
-      planDistribution[planName] = (planDistribution[planName] || 0) + 1;
+      const p = s.plan;
+      if (!p) return;
+      if (!planStats[p.planId]) {
+        planStats[p.planId] = {
+          planId: p.planId,
+          name: p.name,
+          price: Number(p.monthlyPrice),
+          activeSubscriptions: 0,
+          monthlyRevenue: 0,
+        };
+      }
+      planStats[p.planId].activeSubscriptions += 1;
+      planStats[p.planId].monthlyRevenue += Number(p.monthlyPrice);
     });
 
-    // Support SLA Metrics
-    const openTickets = tickets.filter((t) => t.status === 'OPEN' || t.status === 'REOPENED').length;
-    const resolvedTickets = tickets.filter((t) => t.status === 'RESOLVED' || t.status.includes('CLOSED')).length;
+    const openTickets = tickets.filter((t) => t.status === 'OPEN' || t.status === 'AWAITING_USER_ACTION').length;
+    const resolvedTickets = tickets.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length;
 
-    // User Role Breakdown
-    const rolesBreakdown = { Customer: 0, Service_Provider: 0, Support_Staff: 0, Admin: 0 };
+    const rolesMap = { Customer: 0, Service_Provider: 0, Support_Staff: 0, Admin: 0 };
     users.forEach((u) => {
       u.userRoles.forEach((ur) => {
         const rName = ur.role.roleName;
-        rolesBreakdown[rName] = (rolesBreakdown[rName] || 0) + 1;
+        if (rolesMap[rName] !== undefined) rolesMap[rName]++;
+        else rolesMap[rName] = 1;
       });
     });
+
+    const userBreakdown = Object.entries(rolesMap).map(([role, count]) => ({ role, count }));
 
     return res.json({
       success: true,
       reports: {
         financial: {
-          totalGrossRevenue,
-          stripeRevenue,
-          bankRevenue,
+          grossVolume,
+          stripeVolume,
+          bankVolume,
           mrr,
           arr: mrr * 12,
-          arpu: activeSubs.length > 0 ? (mrr / activeSubs.length).toFixed(2) : 0,
         },
         fleetCapacity: {
-          physicalCores,
-          allocatedCores,
+          totalHostCores,
+          totalHostRamGb,
+          allocatedVcpus,
+          allocatedRamGb,
+          allocatedDiskGb,
           cpuOvercommitRatio,
-          physicalRamGB,
-          committedRamGB,
-          ramOvercommitRatio,
-          committedDiskGB,
-          totalVmsCount: vms.length,
-          activeVmsCount: activeVms.length,
-          stoppedVmsCount: activeVms.filter((v) => v.status === 'STOPPED').length,
-          runningVmsCount: activeVms.filter((v) => v.status === 'RUNNING').length,
+          ramAllocationPercent,
+          totalVms: vms.length,
+          runningVms: activeVms.filter((v) => v.status === 'running').length,
+          stoppedVms: activeVms.filter((v) => v.status === 'stopped').length,
         },
-        plans: planDistribution,
-        users: {
-          totalUsers: users.length,
-          rolesBreakdown,
-        },
-        support: {
-          totalTickets: tickets.length,
-          openTickets,
-          resolvedTickets,
-          resolutionRate: tickets.length > 0 ? ((resolvedTickets / tickets.length) * 100).toFixed(1) : 100,
+        planPopularity: Object.values(planStats),
+        userBreakdown,
+        ticketSla: {
+          total: tickets.length,
+          open: openTickets,
+          resolved: resolvedTickets,
         },
       },
     });
@@ -1765,7 +1907,6 @@ export async function getAdminReports(req, res) {
 
 /**
  * GET /api/admin/reports/export
- * Downloads CSV of selected datasets
  */
 export async function exportAdminReportCSV(req, res) {
   try {
@@ -1778,10 +1919,10 @@ export async function exportAdminReportCSV(req, res) {
       });
 
       const csvLines = [
-        'Invoice Number,Customer Name,Customer Email,Amount (USD),Status,Gateway,Date',
+        'Invoice Number,Customer Name,Customer Email,Total (USD),Status,Gateway,Date',
         ...invoices.map((i) => {
           const gw = i.payments?.[0]?.paymentGateway || 'DIRECT_BANK_TRANSFER';
-          return `"${i.invoiceNumber}","${i.user?.fullName || ''}","${i.user?.email || ''}",${i.amount},"${i.status}","${gw}","${i.createdAt.toISOString()}"`;
+          return `"${i.invoiceNumber}","${i.user?.fullName || ''}","${i.user?.email || ''}",${i.total},"${i.status}","${gw}","${i.createdAt.toISOString()}"`;
         }),
       ];
 
@@ -1792,15 +1933,15 @@ export async function exportAdminReportCSV(req, res) {
 
     if (dataset === 'fleet') {
       const vms = await prisma.virtualMachine.findMany({
-        include: { user: true },
+        include: { user: true, ipPool: true },
         orderBy: { createdAt: 'desc' },
       });
 
       const csvLines = [
-        'VM Name,Owner Email,Status,IP Address,vCPU,RAM (GB),Disk (GB),Created At',
+        'VM Name,Owner Email,Status,IP Address,vCPU Cores,RAM (GB),Storage (GB),Created At',
         ...vms.map(
           (v) =>
-            `"${v.vmName}","${v.user?.email || ''}","${v.status}","${v.ipAddress || ''}",${v.vCPU},${v.ramGB},${v.diskGB},"${v.createdAt.toISOString()}"`
+            `"${v.vmName}","${v.user?.email || ''}","${v.status}","${v.ipPool?.[0]?.ipAddress || ''}",${v.cpuCores},${v.ramGb},${v.storageGb},"${v.createdAt.toISOString()}"`
         ),
       ];
 

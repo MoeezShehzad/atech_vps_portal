@@ -79,6 +79,14 @@ router.post('/billing/mark-paid', markInvoiceAsPaid);
 router.post('/billing/void-invoice', voidAdminInvoice);
 router.post('/billing/subscription-control', adminUpdateSubscription);
 
+// Route aliases for frontend client compatibility
+router.get('/invoices', getAdminInvoices);
+router.get('/invoices/overview', getAdminBillingOverview);
+router.post('/invoices/:id/refund', processAdminRefund);
+router.post('/invoices/:id/mark-paid', markInvoiceAsPaid);
+router.post('/invoices/:id/void', voidAdminInvoice);
+router.patch('/subscriptions/:id', adminUpdateSubscription);
+
 // 6. Safe Broadcast Notifications (Mail Server IP Protected)
 router.get('/announcements', getAnnouncements);
 router.post('/announcements', createAnnouncement);
@@ -86,6 +94,11 @@ router.delete('/announcements/:id', deleteAnnouncement);
 router.post('/broadcasts/dispatch', dispatchBroadcastNotification);
 router.get('/broadcasts/job/:jobId', getBroadcastJobStatus);
 router.get('/broadcasts/history', getBroadcastHistory);
+
+// Broadcast aliases
+router.post('/broadcast', dispatchBroadcastNotification);
+router.get('/broadcast-status/:jobId', getBroadcastJobStatus);
+router.get('/broadcast-history', getBroadcastHistory);
 
 // 7. Executive Reports & Intelligence Engine
 router.get('/reports', getAdminReports);
