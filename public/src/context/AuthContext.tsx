@@ -23,6 +23,7 @@ export interface User {
   role?: string;
   roles?: string[];
   avatarUrl?: string;
+  emailVerified?: boolean;
   hasPassword?: boolean;
   isImpersonated?: boolean;
   impersonatedBy?: string;

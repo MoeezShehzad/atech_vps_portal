@@ -44,6 +44,9 @@ import {
   Lock,
   CheckCircle2,
   ShieldAlert,
+  CreditCard,
+  Building2,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
@@ -235,6 +238,21 @@ export default function Dashboard() {
   const [deletingInstance, setDeletingInstance] = useState<Instance | null>(null);
   const [resizingInstance, setResizingInstance] = useState<Instance | null>(null);
   const [copiedSSH, setCopiedSSH] = useState(false);
+
+  // Trial Activation Modal state
+  const [isTrialModalOpen, setIsTrialModalOpen] = useState(false);
+  const [trialPaymentType, setTrialPaymentType] = useState<'card' | 'bank'>('card');
+  const [trialCardholder, setTrialCardholder] = useState('');
+  const [trialCardNumber, setTrialCardNumber] = useState('');
+  const [trialCardExpiry, setTrialCardExpiry] = useState('');
+  const [trialCardCvc, setTrialCardCvc] = useState('');
+  const [trialCardBrand, setTrialCardBrand] = useState('Visa');
+  const [trialBankName, setTrialBankName] = useState('');
+  const [trialRoutingNumber, setTrialRoutingNumber] = useState('');
+  const [trialAccountNumber, setTrialAccountNumber] = useState('');
+  const [trialLoading, setTrialLoading] = useState(false);
+  const [trialError, setTrialError] = useState('');
+  const [resendingVerification, setResendingVerification] = useState(false);
 
   // Real-time telemetry monitoring for selected instance
   const [liveMetrics, setLiveMetrics] = useState<VMMetrics | null>(null);
@@ -980,9 +998,111 @@ export default function Dashboard() {
   const pausedCount = instances.filter((i) => i.status === 'paused').length;
   const activeSlot = activeSubscriptions.find((s) => s.hasAvailableSlot);
 
+  const handleTrialCardChange = (val: string) => {
+    const raw = val.replace(/\D/g, '').slice(0, 19);
+    if (raw.startsWith('4')) setTrialCardBrand('Visa');
+    else if (/^5[1-5]/.test(raw) || /^2[2-7]/.test(raw)) setTrialCardBrand('Mastercard');
+    else if (/^3[47]/.test(raw)) setTrialCardBrand('American Express');
+    else if (/^6(?:011|5)/.test(raw)) setTrialCardBrand('Discover');
+    else setTrialCardBrand('Credit Card');
+
+    const parts = raw.match(/.{1,4}/g);
+    setTrialCardNumber(parts ? parts.join(' ') : raw);
+  };
+
+  const handleTrialExpiryChange = (val: string) => {
+    const raw = val.replace(/\D/g, '').slice(0, 4);
+    if (raw.length > 2) {
+      setTrialCardExpiry(`${raw.slice(0, 2)}/${raw.slice(2)}`);
+    } else {
+      setTrialCardExpiry(raw);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (resendingVerification) return;
+    setResendingVerification(true);
+    try {
+      await apiCall('/auth/resend-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: user?.email }),
+      });
+      toast.success('Verification email sent! Please check your inbox.');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to resend verification email.');
+    } finally {
+      setResendingVerification(false);
+    }
+  };
+
+  const handleActivateTrial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTrialError('');
+
+    if (trialPaymentType === 'card') {
+      const cleanCard = trialCardNumber.replace(/\s/g, '');
+      if (cleanCard.length < 13 || cleanCard.length > 19) {
+        setTrialError('Please enter a valid credit or debit card number.');
+        return;
+      }
+      if (!trialCardExpiry || trialCardExpiry.length < 5) {
+        setTrialError('Please enter card expiration date (MM/YY).');
+        return;
+      }
+      if (!trialCardCvc || trialCardCvc.length < 3) {
+        setTrialError('Please enter card security CVC/CVV.');
+        return;
+      }
+    } else {
+      const cleanAcc = trialAccountNumber.replace(/\D/g, '');
+      if (cleanAcc.length < 4) {
+        setTrialError('Please enter a valid bank account number.');
+        return;
+      }
+      if (!trialRoutingNumber.trim()) {
+        setTrialError('Please enter a valid bank routing number.');
+        return;
+      }
+    }
+
+    setTrialLoading(true);
+
+    try {
+      const payload = {
+        paymentType: trialPaymentType,
+        cardholderName: trialCardholder.trim() || user?.fullName || 'Authorized User',
+        cardNumber: trialCardNumber.replace(/\s/g, ''),
+        cardExpiry: trialCardExpiry,
+        cardCvc: trialCardCvc,
+        cardBrand: trialCardBrand,
+        bankName: trialBankName.trim(),
+        routingNumber: trialRoutingNumber.trim(),
+        accountNumber: trialAccountNumber.trim(),
+      };
+
+      await apiCall('/billing/activate-trial', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      toast.success('🎉 30-Day Free Trial activated! Your Ubuntu VPS has been provisioned and is now running.');
+      setIsTrialModalOpen(false);
+      await fetchVMs();
+    } catch (err: any) {
+      setTrialError(err.message || 'Failed to activate free trial.');
+    } finally {
+      setTrialLoading(false);
+    }
+  };
+
   const handleOpenDeployModal = () => {
     const targetPlan = (activeSlot ? catalogPlans.find((p) => p.planId === activeSlot.planId) : null) || catalogPlans[0];
     if (!activeSlot) {
+      if (instances.length === 0) {
+        setTrialCardholder(user?.fullName || '');
+        setIsTrialModalOpen(true);
+        return;
+      }
       toast.info('Please configure and order a VPS package to deploy your instance.');
       navigate('/configure', { state: { selectedPlan: targetPlan } });
       return;
@@ -1103,6 +1223,26 @@ export default function Dashboard() {
         {activeTab === 'dashboard' && (
           <div className="max-w-7xl mx-auto space-y-8">
             
+            {/* UNVERIFIED EMAIL ALERT BANNER */}
+            {user && user.emailVerified === false && (
+              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 shadow-xs animate-fadeIn">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                  <span className="text-xs leading-relaxed">
+                    Your email is not verified yet. We sent a verification link to <strong>{user?.email}</strong>. Please check your inbox.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resendingVerification}
+                  className="text-xs font-semibold px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors shrink-0 disabled:opacity-60 cursor-pointer"
+                >
+                  {resendingVerification ? 'Sending Link...' : 'Resend Verification Email'}
+                </button>
+              </div>
+            )}
+
             {/* MINIMALIST COMPACT HEADER */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-4">
               <div className="flex items-center gap-3">
@@ -1134,10 +1274,19 @@ export default function Dashboard() {
                   <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
                 </button>
                 <button 
-                  onClick={handleOpenDeployModal}
-                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 shadow-sm shadow-blue-500/20"
+                  onClick={() => {
+                    if (activeSlot) {
+                      handleOpenDeployModal();
+                    } else if (instances.length === 0) {
+                      setTrialCardholder(user?.fullName || '');
+                      setIsTrialModalOpen(true);
+                    } else {
+                      navigate('/configure');
+                    }
+                  }}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 shadow-sm shadow-blue-500/20 cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" /> {activeSlot ? 'Deploy Instance' : 'Order New VPS'}
+                  <Plus className="w-4 h-4" /> {activeSlot ? 'Deploy Instance' : (instances.length === 0 ? 'Claim Free Trial' : 'Order New VPS')}
                 </button>
               </div>
             </div>
@@ -1169,7 +1318,7 @@ export default function Dashboard() {
                   <div className="shrink-0">
                     <button
                       onClick={handleOpenDeployModal}
-                      className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2"
+                      className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer"
                     >
                       <Zap className="w-4 h-4" /> Set Up VPS ($0.00)
                     </button>
@@ -1192,29 +1341,38 @@ export default function Dashboard() {
                         </>
                       ) : (
                         <>
-                          <Sparkles className="w-3.5 h-3.5" /> High-Performance Cloud Infrastructure
+                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          <span className="text-amber-300 font-bold">30-Day Free VPS Trial</span>
                         </>
                       )}
                     </div>
                     <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight font-poppins">
-                      {activeSlot ? `Deploy Your Reserved ${activeSlot.planName} Server` : 'Launch Your First Virtual Private Server'}
+                      {activeSlot ? `Deploy Your Reserved ${activeSlot.planName} Server` : 'Start Your 30-Day Free VPS Trial'}
                     </h2>
                     <p className="text-slate-300 text-sm md:text-base leading-relaxed">
                       {activeSlot
                         ? `Your ${activeSlot.planName} package is active and your dedicated cloud resources are reserved on our cluster. Whenever you're ready, click below to pick your OS, set admin credentials, or choose 1-Click Apps.`
-                        : `You don't have any active virtual servers yet. Select a certified package below to provision dedicated vCPUs, enterprise NVMe storage, and static IPv4 in seconds.`}
+                        : `Deploy high-performance virtual cloud infrastructure at zero cost today. You get 2 vCPU Cores, 2 GB RAM, and 50 GB NVMe Storage completely free for 30 days.`}
                     </p>
                     <div className="pt-2 flex flex-wrap gap-4">
-                      <button
-                        onClick={handleOpenDeployModal}
-                        className={`px-6 py-3 rounded-xl font-bold text-sm shadow-lg transition-all flex items-center gap-2 ${
-                          activeSlot
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/30 ring-2 ring-emerald-400/30'
-                            : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/30'
-                        }`}
-                      >
-                        <Zap className="w-4 h-4" /> {activeSlot ? '⚡ Deploy Reserved Server Now' : 'Configure & Order VPS'}
-                      </button>
+                      {activeSlot ? (
+                        <button
+                          onClick={handleOpenDeployModal}
+                          className="px-6 py-3 rounded-xl font-bold text-sm shadow-lg transition-all flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/30 ring-2 ring-emerald-400/30 cursor-pointer"
+                        >
+                          <Zap className="w-4 h-4" /> ⚡ Deploy Reserved Server Now
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setTrialCardholder(user?.fullName || '');
+                            setIsTrialModalOpen(true);
+                          }}
+                          className="px-6 py-3 rounded-xl font-bold text-sm shadow-lg transition-all flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/30 ring-2 ring-blue-400/30 cursor-pointer"
+                        >
+                          <Sparkles className="w-4 h-4 text-amber-300" /> Claim 30-Day Free Trial ($0.00)
+                        </button>
+                      )}
                       <a
                         href="/pricing"
                         className="px-6 py-3 bg-slate-800/80 hover:bg-slate-800 text-slate-200 rounded-xl font-semibold text-sm border border-slate-700 transition-all flex items-center gap-2"
@@ -1978,6 +2136,280 @@ export default function Dashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 30-DAY FREE TRIAL ACTIVATION MODAL */}
+      {isTrialModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-8 relative animate-in fade-in zoom-in-95 duration-200 max-h-[94vh] overflow-y-auto">
+            <button 
+              onClick={() => setIsTrialModalOpen(false)}
+              className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* HEADER */}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white font-poppins">
+                  Claim 30-Day Free VPS Trial
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Provision your cloud instance immediately with zero charges ($0.00).
+                </p>
+              </div>
+            </div>
+
+            {/* SPECS HIGHLIGHT */}
+            <div className="my-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-900 dark:text-white mb-2">
+                <span className="flex items-center gap-1.5 font-bold">
+                  <Server className="w-4 h-4 text-blue-600" /> VPS Basic Package
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-bold text-[11px]">
+                  $0.00 for 30 Days
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px] text-slate-600 dark:text-slate-300">
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center">
+                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Compute</span>
+                  <span className="font-bold text-slate-900 dark:text-white">2 vCPU</span>
+                </div>
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center">
+                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Memory</span>
+                  <span className="font-bold text-slate-900 dark:text-white">2 GB RAM</span>
+                </div>
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center">
+                  <span className="block text-[10px] text-slate-400 uppercase font-bold">Storage</span>
+                  <span className="font-bold text-slate-900 dark:text-white">50 GB NVMe</span>
+                </div>
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center">
+                  <span className="block text-[10px] text-slate-400 uppercase font-bold">OS Image</span>
+                  <span className="font-bold text-slate-900 dark:text-white">Ubuntu 24.04</span>
+                </div>
+              </div>
+            </div>
+
+            {/* PAYMENT METHOD SELECTOR */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Select Verification Method
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTrialPaymentType('card')}
+                    className={`p-3 rounded-2xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      trialPaymentType === 'card'
+                        ? 'border-blue-600 bg-blue-50/60 text-blue-900 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-500 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    }`}
+                  >
+                    <CreditCard className="w-4 h-4 text-blue-600" />
+                    Credit / Debit Card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTrialPaymentType('bank')}
+                    className={`p-3 rounded-2xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      trialPaymentType === 'bank'
+                        ? 'border-blue-600 bg-blue-50/60 text-blue-900 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-500 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    }`}
+                  >
+                    <Building2 className="w-4 h-4 text-blue-600" />
+                    Direct Bank Account
+                  </button>
+                </div>
+              </div>
+
+              {trialError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{trialError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleActivateTrial} className="space-y-3.5">
+                {trialPaymentType === 'card' ? (
+                  <>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                        Name on Card <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={trialCardholder}
+                        onChange={(e) => setTrialCardholder(e.target.value)}
+                        placeholder="John Doe"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                          Card Number (Visa, Mastercard, Amex, Discover) <span className="text-rose-500">*</span>
+                        </label>
+                        <span className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400">
+                          {trialCardBrand}
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          required
+                          value={trialCardNumber}
+                          onChange={(e) => handleTrialCardChange(e.target.value)}
+                          placeholder="4111 2222 3333 4444"
+                          maxLength={19}
+                          className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono tracking-wider focus:outline-none focus:border-blue-600"
+                        />
+                        <CreditCard className="w-4 h-4 text-slate-400 absolute right-3.5 top-3 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Expiration (MM/YY) <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={trialCardExpiry}
+                          onChange={(e) => handleTrialExpiryChange(e.target.value)}
+                          placeholder="12/28"
+                          maxLength={5}
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600 text-center"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Security Code (CVC) <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          value={trialCardCvc}
+                          onChange={(e) => setTrialCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          placeholder="123"
+                          maxLength={4}
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600 text-center"
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                        Account Holder Legal Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={trialCardholder}
+                        onChange={(e) => setTrialCardholder(e.target.value)}
+                        placeholder="John Doe"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                        Bank Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={trialBankName}
+                        onChange={(e) => setTrialBankName(e.target.value)}
+                        placeholder="Chase, Bank of America, Wells Fargo..."
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Routing Number (9 Digits) <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={trialRoutingNumber}
+                          onChange={(e) => setTrialRoutingNumber(e.target.value.replace(/\D/g, '').slice(0, 9))}
+                          placeholder="123456789"
+                          maxLength={9}
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                          Account Number <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={trialAccountNumber}
+                          onChange={(e) => setTrialAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 17))}
+                          placeholder="000123456789"
+                          maxLength={17}
+                          className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-600"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ZERO CHARGE BADGE */}
+                <div className="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200 text-xs space-y-1">
+                  <div className="flex items-center justify-between font-bold">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" /> Total Charged Today
+                    </span>
+                    <span className="text-base text-emerald-600 dark:text-emerald-400 font-mono">$0.00 USD</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 leading-snug">
+                    Your card or account is encrypted via AES-256-GCM. 30 days of full VPS access. Cancel anytime with 1-click in the Billing tab before the trial ends.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsTrialModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={trialLoading}
+                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {trialLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Provisioning Server...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-300" /> Activate Free Trial & Deploy VPS
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

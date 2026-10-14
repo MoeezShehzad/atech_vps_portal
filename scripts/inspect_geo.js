@@ -13,14 +13,15 @@ async function main() {
   console.log('Existing tables count:', tables.length);
   tables.forEach(t => console.log('  ' + t.TABLE_SCHEMA + '.' + t.TABLE_NAME));
 
-  await prisma.$executeRawUnsafe(`
-    IF OBJECT_ID(N'[dbo].[UM_Countries]', N'SN') IS NOT NULL
-      DROP SYNONYM [dbo].[UM_Countries];
-    CREATE SYNONYM [dbo].[UM_Countries] FOR [UM].[UM_Countries];
-  `);
-  console.log('Synonym [dbo].[UM_Countries] created.');
-  const count = await prisma.$queryRawUnsafe('SELECT COUNT(*) AS total FROM [dbo].[UM_Countries]');
-  console.log('Total rows through [dbo].[UM_Countries]:', count[0]?.total);
+  const query = 'SELECT CountryID AS id, RTRIM(CountryName) AS name, RTRIM(CountryCode) AS dialCode, UPPER(RTRIM(CountryISO)) AS code FROM [UM].[UM_Countries] WHERE (IsDeleted = 0 OR IsDeleted IS NULL) ORDER BY CountryName ASC';
+  const rawRows = await prisma.$queryRawUnsafe(query);
+  const q = 'india'.toLowerCase();
+  const matched = rawRows.filter(c => 
+    c.name.toLowerCase().includes(q) || 
+    c.code.toLowerCase().includes(q) || 
+    (c.dialCode && c.dialCode.includes(q))
+  );
+  console.log('Matched for india:', matched);
   process.exit(0);
 }
 

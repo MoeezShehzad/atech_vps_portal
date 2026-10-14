@@ -10,6 +10,7 @@ import {
   getInvoiceDetails,
   cancelTrialSubscription,
   getRevealedPaymentMethod,
+  activateTrialSubscription,
 } from '../controllers/billingController.js';
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.use(authenticateToken);
 router.get('/overview', getBillingOverview);
 router.get('/invoices/:id', getInvoiceDetails);
 router.post('/cancel-trial', cancelTrialSubscription);
+router.post('/activate-trial', activateTrialSubscription);
 router.get('/payment-method/reveal', getRevealedPaymentMethod);
 
 export default router;

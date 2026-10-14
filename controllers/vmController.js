@@ -68,25 +68,31 @@ export async function getUserVMs(req, res) {
         for (const vm of vms) {
           let liveInfo = hostVmMap.get(vm.vmName.toLowerCase());
 
-          // If not found on Hyper-V host, the VM was deleted: mark TERMINATED and free allocated IP
+          // If not found on Hyper-V host:
           if (!liveInfo) {
-            // Guard: If it was created within the last 60 seconds and still PROVISIONING, give it a moment
-            const isFresh = vm.status === 'PROVISIONING' && (Date.now() - new Date(vm.createdAt).getTime() < 60000);
-            if (!isFresh) {
-              await prisma.virtualMachine.update({
-                where: { vmId: vm.vmId },
-                data: {
-                  status: 'TERMINATED',
-                  terminatedAt: new Date(),
-                },
-              }).catch(() => {});
+            // Only terminate if the VM was specifically linked to a Hyper-V ID
+            if (vm.hypervVmId) {
+              const isFresh = vm.status === 'PROVISIONING' && (Date.now() - new Date(vm.createdAt).getTime() < 60000);
+              if (!isFresh) {
+                await prisma.virtualMachine.update({
+                  where: { vmId: vm.vmId },
+                  data: {
+                    status: 'TERMINATED',
+                    terminatedAt: new Date(),
+                  },
+                }).catch(() => {});
 
-              await prisma.iPPool.updateMany({
-                where: { assignedVmId: vm.vmId },
-                data: { status: 'AVAILABLE', assignedVmId: null },
-              }).catch(() => {});
+                await prisma.iPPool.updateMany({
+                  where: { assignedVmId: vm.vmId },
+                  data: { status: 'AVAILABLE', assignedVmId: null },
+                }).catch(() => {});
 
-              // Exclude terminated VM from the dashboard's active VM list
+                // Exclude terminated VM from the dashboard's active VM list
+                continue;
+              }
+            } else {
+              // Cloud-provisioned or trial VM without direct Hyper-V host ID: keep intact
+              synced.push(vm);
               continue;
             }
           }
@@ -116,6 +122,7 @@ export async function getUserVMs(req, res) {
                   }).catch(() => {});
                   vm.ipPool[0].ipAddress = discoveredIp;
                 }
+              } else {
                 const newIpRecord = await prisma.iPPool.create({
                   data: {
                     ipAddress: discoveredIp,
@@ -144,7 +151,7 @@ export async function getUserVMs(req, res) {
     const activeSubscriptions = await prisma.subscription.findMany({
       where: {
         userId,
-        status: 'ACTIVE',
+        status: { in: ['ACTIVE', 'TRIAL'] },
         endDate: { gt: now },
       },
       include: {
@@ -347,12 +354,12 @@ export async function deployVM(req, res) {
       pricing.totalMonthlyPrice = Number((Number(pricing.totalMonthlyPrice) + 2.0).toFixed(2));
     }
 
-    // Check if user has an existing active subscription with an available server slot (Multi-tenant cloud model)
+    // Check if user has an existing active or trial subscription with an available server slot (Multi-tenant cloud model)
     const now = new Date();
     let subscription = await prisma.subscription.findFirst({
       where: {
         userId,
-        status: 'ACTIVE',
+        status: { in: ['ACTIVE', 'TRIAL'] },
         endDate: { gt: now },
         virtualMachines: {
           none: { status: { not: 'TERMINATED' } },

@@ -13,26 +13,19 @@ import {
   Lock, 
   User, 
   ArrowRight, 
-  ArrowLeft,
-  ShieldCheck, 
   Eye, 
   EyeOff, 
   Check, 
   X,
   AlertCircle,
   CheckCircle2,
-  CreditCard,
-  Sparkles,
-  Server,
-  Calendar,
-  LockKeyhole
+  ShieldCheck,
+  Send,
+  Loader2
 } from 'lucide-react';
 
 export default function Signup() {
   const navigate = useNavigate();
-
-  // Wizard Step: 1 = Account, Country & Password, 2 = 30-Day Free Trial & Card Verification
-  const [step, setStep] = useState<1 | 2>(1);
 
   // Live Geo API States (Querying MS SQL Server [UM].[UM_Countries])
   const [countriesList, setCountriesList] = useState<CountryOption[]>([]);
@@ -49,18 +42,12 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Credit Card Details for 30-Day Free Trial Verification
-  const [cardholderName, setCardholderName] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [cardBrand, setCardBrand] = useState('Visa');
-
   // Terms & Submission States
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   // 1. Fetch live countries directly from MS SQL Server table [UM].[UM_Countries] on mount
   useEffect(() => {
@@ -71,7 +58,6 @@ export default function Signup() {
         const res = await apiCall('/geo/countries');
         if (res && res.countries && res.countries.length > 0 && isMounted) {
           setCountriesList(res.countries);
-          // Set default to US or first country in list
           const defaultC = res.countries.find((c: CountryOption) => c.code === 'US') || res.countries[0];
           setSelectedCountryCode(defaultC.code);
         }
@@ -85,46 +71,22 @@ export default function Signup() {
     return () => { isMounted = false; };
   }, []);
 
+  // Cooldown timer for resend verification
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => setResendCooldown((prev) => prev - 1), 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
   // Current Country Object
   const currentCountry = useMemo(() => {
-    return countriesList.find((c) => c.code === selectedCountryCode) || countriesList[0] || {
+    return countriesList.find((c) => c.code.toLowerCase() === selectedCountryCode.toLowerCase()) || countriesList[0] || {
       code: 'US',
       name: 'United States',
       flag: '🇺🇸',
       dialCode: '+1',
     };
   }, [countriesList, selectedCountryCode]);
-
-  // Handle Card Number Formatting (Groups of 4) & Brand Detection
-  const handleCardNumberChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 19);
-    // Detect brand
-    if (raw.startsWith('4')) setCardBrand('Visa');
-    else if (/^5[1-5]/.test(raw) || /^2[2-7]/.test(raw)) setCardBrand('Mastercard');
-    else if (/^3[47]/.test(raw)) setCardBrand('American Express');
-    else if (/^6(?:011|5)/.test(raw)) setCardBrand('Discover');
-    else setCardBrand('Credit Card');
-
-    // Format with spaces
-    const parts = raw.match(/.{1,4}/g);
-    setCardNumber(parts ? parts.join(' ') : raw);
-  };
-
-  // Handle Expiration Date Formatting (MM/YY)
-  const handleCardExpiryChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 4);
-    if (raw.length > 2) {
-      setCardExpiry(`${raw.slice(0, 2)}/${raw.slice(2)}`);
-    } else {
-      setCardExpiry(raw);
-    }
-  };
-
-  // Handle CVC Formatting
-  const handleCardCvcChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 4);
-    setCardCvc(raw);
-  };
 
   // Strict 5-point password validation criteria
   const hasMinLength = password.length >= 8;
@@ -138,8 +100,8 @@ export default function Signup() {
   const strengthScore = [hasMinLength, hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar].filter(Boolean).length;
   const isPasswordValid = strengthScore === 5;
 
-  // Validate Step 1 and proceed to Step 2
-  const handleProceedToPayment = (e: React.FormEvent) => {
+  // Handle Signup Submission
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -163,39 +125,8 @@ export default function Signup() {
       return;
     }
 
-    // Auto-fill cardholder name with fullName if empty
-    if (!cardholderName.trim()) {
-      setCardholderName(fullName.trim());
-    }
-
-    setStep(2);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // Final Registration Submission with Card Verification & 30-Day Free Trial
-  const handleFinalSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    const cleanCard = cardNumber.replace(/\s/g, '');
-    if (cleanCard.length < 13 || cleanCard.length > 19) {
-      setErrorMsg('Please enter a valid 13-19 digit credit or debit card number.');
-      return;
-    }
-
-    if (!cardExpiry || cardExpiry.length < 5) {
-      setErrorMsg('Please enter a valid card expiration date (MM/YY).');
-      return;
-    }
-
-    if (!cardCvc || cardCvc.length < 3) {
-      setErrorMsg('Please enter a valid 3 or 4 digit security CVC/CVV.');
-      return;
-    }
-
     if (!agreeTerms) {
-      setErrorMsg('You must agree to the Terms of Service and Free Trial Policy.');
+      setErrorMsg('Please agree to the Terms of Service & Privacy Policy.');
       return;
     }
 
@@ -207,13 +138,6 @@ export default function Signup() {
         email: email.trim().toLowerCase(),
         password,
         country: currentCountry.name,
-        cardData: {
-          cardNumber: cleanCard,
-          cardExpiry,
-          cardCvc,
-          cardholderName: cardholderName.trim() || fullName.trim(),
-          cardBrand,
-        },
       };
 
       const data = await apiCall('/auth/register', {
@@ -221,24 +145,18 @@ export default function Signup() {
         body: JSON.stringify(payload),
       });
 
-      // Save tokens and session if returned
-      const token = data.accessToken || data.token;
-      if (token) {
-        localStorage.setItem('token', token);
-      }
-      if (data.user) {
-        localStorage.setItem('user', JSON.stringify(data.user));
-      }
-
-      setSuccessMsg(
-        data.message || 
-        '🎉 30-Day Free Trial Activated! You will now be redirected to your Cloud Dashboard...'
-      );
-
-      // Redirect after brief celebration
-      setTimeout(() => {
+      // If user is already verified or auto-verified
+      if (data.user?.emailVerified) {
+        const token = data.accessToken || data.token;
+        if (token) localStorage.setItem('token', token);
+        if (data.user) localStorage.setItem('user', JSON.stringify(data.user));
         navigate('/dashboard');
-      }, 1600);
+        return;
+      }
+
+      // Display clean verification sent state
+      setVerificationSent(true);
+      setResendCooldown(60);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setErrorMsg(err.message);
@@ -250,6 +168,20 @@ export default function Signup() {
     }
   };
 
+  // Handle Resend Verification Email
+  const handleResendEmail = async () => {
+    if (resendCooldown > 0) return;
+    try {
+      await apiCall('/auth/resend-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      setResendCooldown(60);
+    } catch (e: unknown) {
+      console.warn('Resend error:', e);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex flex-col justify-center py-10 sm:px-6 lg:px-8 font-sans">
       {/* BRAND HEADER */}
@@ -258,7 +190,7 @@ export default function Signup() {
           <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
         </Link>
         <h2 className="mt-4 text-3xl font-extrabold text-blue-950 font-poppins tracking-tight">
-          Create Your Account & Start 30-Day Free Trial
+          Create your account
         </h2>
         
         <p className="mt-2 text-sm text-slate-600">
@@ -267,62 +199,71 @@ export default function Signup() {
             Sign in
           </Link>
         </p>
-
-        {/* STEPPER PROGRESS */}
-        <div className="mt-6 flex items-center justify-center gap-3 max-w-sm mx-auto">
-          <div className="flex items-center gap-2">
-            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-              step === 1 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30' : 'bg-emerald-600 text-white'
-            }`}>
-              {step > 1 ? <Check className="w-4 h-4" /> : '1'}
-            </span>
-            <span className={`text-xs font-semibold ${step === 1 ? 'text-blue-900' : 'text-slate-600'}`}>
-              Account & Country
-            </span>
-          </div>
-
-          <div className="w-12 h-0.5 bg-slate-300" />
-
-          <div className="flex items-center gap-2">
-            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-              step === 2 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30' : 'bg-slate-200 text-slate-600'
-            }`}>
-              2
-            </span>
-            <span className={`text-xs font-semibold ${step === 2 ? 'text-blue-900' : 'text-slate-500'}`}>
-              30-Day Free Trial
-            </span>
-          </div>
-        </div>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
         <div className="bg-white py-8 px-6 shadow-2xl shadow-blue-950/5 border border-slate-200 rounded-3xl sm:px-10">
           
-          {/* ERROR ALERT */}
-          {errorMsg && (
-            <div className="mb-6 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs flex items-center gap-2.5 animate-shake">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span className="font-medium">{errorMsg}</span>
-            </div>
-          )}
+          {/* VERIFICATION SENT SCREEN */}
+          {verificationSent ? (
+            <div className="text-center py-4 space-y-6 animate-fadeIn">
+              <div className="w-16 h-16 bg-blue-50 text-blue-600 border border-blue-200 rounded-3xl mx-auto flex items-center justify-center shadow-inner">
+                <Mail className="w-8 h-8 animate-pulse" />
+              </div>
 
-          {/* SUCCESS ALERT */}
-          {successMsg && (
-            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs flex items-start gap-3 shadow-xs">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-bold text-sm">Welcome aboard!</p>
-                <p className="text-emerald-700 leading-relaxed">{successMsg}</p>
+              <div className="space-y-2">
+                <h3 className="text-xl font-extrabold text-slate-900 font-poppins">
+                  Verify your email
+                </h3>
+                <p className="text-sm text-slate-600 leading-relaxed max-w-sm mx-auto">
+                  We sent a verification link to <span className="font-bold text-slate-900">{email}</span>. Click the link in that email to confirm your account.
+                </p>
+              </div>
+
+              <div className="p-4 bg-blue-50/70 border border-blue-100 rounded-2xl text-xs text-blue-900 text-left space-y-1.5">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" /> Next Step: Claim Your Free Trial
+                </p>
+                <p className="text-blue-700 leading-relaxed">
+                  Once verified and logged into your dashboard, you can claim your <strong>30-Day Free VPS (2 vCPU, 2 GB RAM, 50 GB NVMe)</strong> immediately.
+                </p>
+              </div>
+
+              <div className="pt-2 space-y-3">
+                <Link
+                  to="/login"
+                  className="w-full py-3.5 px-4 rounded-2xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2"
+                >
+                  Proceed to Login <ArrowRight className="w-4 h-4" />
+                </Link>
+
+                <div className="text-xs text-slate-500">
+                  Didn't receive the email?{' '}
+                  <button
+                    type="button"
+                    onClick={handleResendEmail}
+                    disabled={resendCooldown > 0}
+                    className={`font-semibold ${
+                      resendCooldown > 0
+                        ? 'text-slate-400 cursor-not-allowed'
+                        : 'text-blue-600 hover:text-blue-700 underline cursor-pointer'
+                    }`}
+                  >
+                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Click here to resend'}
+                  </button>
+                </div>
               </div>
             </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* STEP 1: ACCOUNT & COUNTRY (FETCHED LIVE FROM MS SQL SERVER)              */}
-          {/* ========================================================================= */}
-          {step === 1 && (
+          ) : (
             <div>
+              {/* ERROR ALERT */}
+              {errorMsg && (
+                <div className="mb-6 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs flex items-center gap-2.5 animate-shake">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span className="font-medium">{errorMsg}</span>
+                </div>
+              )}
+
               {/* GOOGLE SIGN UP OPTION */}
               <a
                 href={`${API_BASE_URL}/auth/google`}
@@ -346,7 +287,7 @@ export default function Signup() {
                 </div>
               </div>
 
-              <form className="space-y-4" onSubmit={handleProceedToPayment}>
+              <form className="space-y-4" onSubmit={handleSignup}>
                 {/* FULL LEGAL NAME */}
                 <ModernFloatingInput
                   label="Full Legal Name"
@@ -387,7 +328,7 @@ export default function Signup() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                      className="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none cursor-pointer"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -407,7 +348,7 @@ export default function Signup() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                      className="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none cursor-pointer"
                     >
                       {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -461,177 +402,49 @@ export default function Signup() {
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 mt-4 cursor-pointer"
-                >
-                  Continue to 30-Day Free Trial <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* STEP 2: 30-DAY FREE TRIAL & SECURE CARD ON FILE VERIFICATION              */}
-          {/* ========================================================================= */}
-          {step === 2 && (
-            <form className="space-y-6" onSubmit={handleFinalSignup}>
-              {/* BACK BUTTON */}
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="text-xs font-semibold text-slate-500 hover:text-blue-600 flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" /> Back to Account Details
-              </button>
-
-              {/* 30-DAY FREE TRIAL HERO CARD */}
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-white shadow-xl shadow-blue-950/20 relative overflow-hidden">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="p-1.5 bg-blue-500/20 rounded-lg border border-blue-400/30">
-                      <Sparkles className="w-4 h-4 text-amber-300" />
+                {/* TERMS CHECKBOX */}
+                <div className="pt-2">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={agreeTerms}
+                      onChange={(e) => setAgreeTerms(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span className="text-xs text-slate-600 leading-snug">
+                      I agree to the{' '}
+                      <Link to="/terms" className="text-blue-600 hover:underline font-medium">Terms of Service</Link>
+                      {' '}and{' '}
+                      <Link to="/privacy" className="text-blue-600 hover:underline font-medium">Privacy Policy</Link>.
                     </span>
-                    <span className="text-xs font-bold uppercase tracking-wider text-blue-200">
-                      30-Day Free Trial Package
-                    </span>
-                  </div>
-                  <span className="text-2xl font-black text-emerald-400 font-mono tracking-tight">$0.00</span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <h3 className="text-lg font-bold flex items-center gap-2">
-                    <Server className="w-5 h-5 text-blue-300" />
-                    VPS Basic Cloud Instance
-                  </h3>
-                  <p className="text-xs text-blue-200">
-                    Included with your trial: <strong>2 vCPU Cores</strong>, <strong>2 GB RAM</strong>, and <strong>50 GB NVMe Storage</strong>.
-                  </p>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-blue-800/80 flex flex-wrap items-center justify-between text-[11px] text-blue-300 gap-2">
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-amber-300" />
-                    Trial ends in 30 days
-                  </span>
-                  <span>Cancel anytime in 1-click • Zero charge today</span>
-                </div>
-              </div>
-
-              {/* NOTICE ABOUT EMAIL COUNTDOWN & RENEWAL */}
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed flex items-start gap-2.5">
-                <Calendar className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                <p>
-                  We keep track of your 30-day countdown. <strong>7 days before your trial ends</strong>, we will email you to rate our service and notify you. If you cancel prior to the end date, your card will never be charged.
-                </p>
-              </div>
-
-              {/* MODERN FLOATING CARD INPUTS */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-800">
-                    Credit / Debit Card Details
                   </label>
-                  <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                    <LockKeyhole className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>AES-256-GCM Encrypted</span>
-                  </div>
                 </div>
-
-                {/* CARDHOLDER NAME */}
-                <ModernFloatingInput
-                  label="Cardholder Name"
-                  required
-                  value={cardholderName}
-                  onChange={(e) => setCardholderName(e.target.value)}
-                  icon={<User className="h-4 w-4" />}
-                />
-
-                {/* CARD NUMBER */}
-                <ModernFloatingInput
-                  label="Card Number"
-                  required
-                  value={cardNumber}
-                  onChange={(e) => handleCardNumberChange(e.target.value)}
-                  icon={<CreditCard className="h-4 w-4" />}
-                  rightElement={
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700">
-                      {cardBrand}
-                    </span>
-                  }
-                />
-
-                {/* EXPIRY & CVC */}
-                <div className="grid grid-cols-2 gap-4">
-                  <ModernFloatingInput
-                    label="Expiration Date (MM/YY)"
-                    required
-                    value={cardExpiry}
-                    onChange={(e) => handleCardExpiryChange(e.target.value)}
-                    className="font-mono text-center"
-                  />
-
-                  <ModernFloatingInput
-                    label="Security CVC / CVV"
-                    type="password"
-                    maxLength={4}
-                    required
-                    value={cardCvc}
-                    onChange={(e) => handleCardCvcChange(e.target.value)}
-                    className="font-mono text-center"
-                  />
-                </div>
-              </div>
-
-              {/* TERMS CHECKBOX */}
-              <div className="flex items-start gap-2.5 pt-2">
-                <input
-                  id="trial-terms"
-                  type="checkbox"
-                  required
-                  checked={agreeTerms}
-                  onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="h-4 w-4 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <label htmlFor="trial-terms" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
-                  I understand that I am receiving a <strong>30-day free trial ($0.00 today)</strong>. After 30 days, the standard monthly rate ($4.99) will be charged to the card above unless cancelled in the portal. I agree to the{' '}
-                  <a href="#" className="text-blue-600 hover:underline">Terms of Service</a> and{' '}
-                  <a href="#" className="text-blue-600 hover:underline">Trial Policy</a>.
-                </label>
-              </div>
-
-              {/* SUBMIT BUTTON */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="px-5 py-3.5 rounded-2xl border border-slate-200 text-slate-700 font-semibold text-sm hover:bg-slate-50 transition-all cursor-pointer"
-                >
-                  Back
-                </button>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-3.5 rounded-2xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 mt-4 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {loading ? (
-                    'Activating Free Trial...'
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Creating Account...
+                    </>
                   ) : (
                     <>
-                      Start 30-Day Free Trial ($0.00) <ArrowRight className="w-4 h-4" />
+                      Create Account <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
-              </div>
-            </form>
-          )}
+              </form>
 
-          {/* MILITARY GRADE ENCRYPTION BADGE */}
-          <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-2 text-xs text-slate-500">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Military-Grade AES-256-GCM Encrypted Storage • Zero Plain Text Retention</span>
-          </div>
+              {/* SECURITY BADGE */}
+              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-500">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Enterprise AES-256 Cloud Infrastructure • GDPR Compliant</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

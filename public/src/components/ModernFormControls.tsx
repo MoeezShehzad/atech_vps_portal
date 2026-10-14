@@ -127,6 +127,29 @@ interface ModernCountrySelectProps {
   loading?: boolean;
 }
 
+// Flag rendering helper with fallback to emoji
+export function CountryFlag({ code, flag, name, className = "w-5 h-3.5" }: { code: string; flag?: string; name?: string; className?: string }) {
+  const [imgError, setImgError] = useState(false);
+  const cleanCode = (code || '').trim().toLowerCase();
+
+  if (cleanCode && cleanCode.length === 2 && !imgError) {
+    return (
+      <img
+        src={`https://flagcdn.com/w40/${cleanCode}.png`}
+        alt={name || code}
+        className={`${className} object-cover rounded-sm inline-block shadow-xs shrink-0`}
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  return (
+    <span className="text-base shrink-0 leading-none" role="img" aria-label={name || code}>
+      {flag || code}
+    </span>
+  );
+}
+
 export function ModernCountrySelect({
   label,
   countries,
@@ -140,19 +163,44 @@ export function ModernCountrySelect({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const selectedCountry = useMemo(() => {
-    return countries.find((c) => c.code === selectedCode) || countries[0];
+    return countries.find((c) => c.code.toLowerCase() === selectedCode.toLowerCase()) || countries[0];
   }, [countries, selectedCode]);
 
-  // Filter countries by name, code or dial code
+  // Filter and rank countries by relevance
   const filteredCountries = useMemo(() => {
-    if (!searchTerm.trim()) return countries;
-    const q = searchTerm.toLowerCase();
-    return countries.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.code.toLowerCase().includes(q) ||
-        c.dialCode.includes(q)
-    );
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return countries;
+
+    const qDigits = q.replace(/[^0-9]/g, '');
+
+    return countries
+      .filter((c) => {
+        const name = (c.name || '').toLowerCase();
+        const code = (c.code || '').toLowerCase();
+        const dialDigits = (c.dialCode || '').replace(/[^0-9]/g, '');
+
+        if (name.includes(q)) return true;
+        if (code === q) return true;
+        if (qDigits.length >= 2 && dialDigits.startsWith(qDigits)) return true;
+        return false;
+      })
+      .sort((a, b) => {
+        const aName = (a.name || '').toLowerCase();
+        const bName = (b.name || '').toLowerCase();
+
+        // 1. Exact match comes first
+        if (aName === q && bName !== q) return -1;
+        if (bName === q && aName !== q) return 1;
+
+        // 2. Starts with query comes second
+        const aStarts = aName.startsWith(q);
+        const bStarts = bName.startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+
+        // 3. Alphabetical order
+        return aName.localeCompare(bName);
+      });
   }, [countries, searchTerm]);
 
   // Close when clicked outside
@@ -197,9 +245,7 @@ export function ModernCountrySelect({
         <div className="flex items-center gap-2.5 min-w-0 pr-2">
           {selectedCountry ? (
             <>
-              <span className="text-xl shrink-0 leading-none" role="img" aria-label={selectedCountry.name}>
-                {selectedCountry.flag}
-              </span>
+              <CountryFlag code={selectedCountry.code} flag={selectedCountry.flag} name={selectedCountry.name} />
               <span className="text-sm font-medium text-slate-900 truncate">
                 {selectedCountry.name}
               </span>
@@ -245,11 +291,11 @@ export function ModernCountrySelect({
           {/* Scrollable Countries List */}
           <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
             {filteredCountries.length > 0 ? (
-              filteredCountries.map((c) => {
-                const isSelected = c.code === selectedCode;
+              filteredCountries.map((c, index) => {
+                const isSelected = c.code.toLowerCase() === selectedCode.toLowerCase();
                 return (
                   <div
-                    key={c.code}
+                    key={`${c.code}-${c.name}-${index}`}
                     onClick={() => {
                       onSelect(c);
                       setIsOpen(false);
@@ -261,9 +307,7 @@ export function ModernCountrySelect({
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xl shrink-0 leading-none" role="img" aria-label={c.name}>
-                        {c.flag}
-                      </span>
+                      <CountryFlag code={c.code} flag={c.flag} name={c.name} />
                       <span className="truncate">{c.name}</span>
                     </div>
 

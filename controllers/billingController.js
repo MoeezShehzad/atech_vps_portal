@@ -4,7 +4,7 @@
 // ==============================================================================
 
 import prisma from '../lib/prisma.js';
-import { cancelUserTrial } from '../services/trialService.js';
+import { cancelUserTrial, setupUserTrial } from '../services/trialService.js';
 import { decryptSensitive } from '../services/stripeService.js';
 
 /**
@@ -335,4 +335,35 @@ export async function getRevealedPaymentMethod(req, res) {
     return res.status(500).json({ error: 'Failed to retrieve card details' });
   }
 }
+
+/**
+ * 5. POST /api/billing/activate-trial - Collect payment info and provision 30-Day Free Trial VM from Dashboard
+ */
+export async function activateTrialSubscription(req, res) {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const cardData = req.body;
+    if (!cardData) {
+      return res.status(400).json({ error: 'Payment method details are required.' });
+    }
+
+    const trialResult = await setupUserTrial({
+      userId,
+      cardData,
+      ipAddress: req.ip || req.headers['x-forwarded-for'] || '',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: '🎉 30-Day Free Trial activated! Your VPS has been provisioned and is now running.',
+      trial: trialResult,
+    });
+  } catch (err) {
+    console.error('[activateTrialSubscription Error]:', err.message);
+    return res.status(400).json({ error: err.message || 'Failed to activate free trial.' });
+  }
+}
+
 

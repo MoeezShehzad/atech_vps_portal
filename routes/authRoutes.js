@@ -8,6 +8,7 @@ import {
   googleAuth,
   googleAuthCallback,
   verifyEmailHandler,
+  resendVerificationHandler,
   forgotPasswordHandler,
   resetPasswordHandler,
 } from '../controllers/authController.js';
@@ -18,6 +19,7 @@ const router = express.Router();
 // --- PUBLIC AUTHENTICATION ROUTES ---
 router.post('/register', register);
 router.post('/login', login);
+router.post('/resend-verification', resendVerificationHandler);
 router.post('/forgot-password', forgotPasswordHandler);
 router.post('/reset-password', resetPasswordHandler);
 

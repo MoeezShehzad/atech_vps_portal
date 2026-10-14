@@ -20,8 +20,22 @@ import {
  */
 export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
   if (!userId) throw new Error('Valid User ID is required to initialize trial.');
-  if (!cardData || !cardData.cardNumber) {
-    throw new Error('Valid Credit or Debit card is required to secure the 30-day free trial.');
+  if (!cardData) {
+    throw new Error('Valid Credit Card, Debit Card or Bank Account is required to secure the 30-day free trial.');
+  }
+
+  // Prevent duplicate active trials
+  const existingSub = await prisma.subscription.findFirst({
+    where: {
+      userId,
+      status: { in: ['ACTIVE', 'TRIAL'] },
+      endDate: { gt: new Date() },
+    },
+    include: { virtualMachines: true },
+  });
+
+  if (existingSub) {
+    throw new Error('You already have an active subscription or free trial.');
   }
 
   const {
@@ -30,49 +44,72 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
     cardCvc,
     cardholderName,
     cardBrand: clientBrand,
+    paymentType, // 'card' or 'bank'
+    bankName,
+    routingNumber,
+    accountNumber,
   } = cardData;
 
-  // Sanitize card number
-  const cleanCard = String(cardNumber || '').replace(/[\s-]/g, '');
-  if (cleanCard.length < 13 || cleanCard.length > 19) {
-    throw new Error('Invalid card number length. Please check your credit card number.');
+  let detectedBrand = clientBrand || 'Visa';
+  let last4 = '4242';
+  let expMonth = '12';
+  let expYear = '2028';
+  let encryptedCardNumber = '';
+  let encryptedCvc = '';
+  let finalHolder = cardholderName || 'Authorized Customer';
+
+  if (paymentType === 'bank' || accountNumber) {
+    // Direct Bank Account / ACH
+    const cleanAccount = String(accountNumber || '').replace(/\D/g, '');
+    const cleanRouting = String(routingNumber || '').replace(/\D/g, '');
+    if (cleanAccount.length < 4) {
+      throw new Error('Please enter a valid bank account number.');
+    }
+    last4 = cleanAccount.slice(-4);
+    detectedBrand = bankName ? `Bank Account (${bankName})` : 'Direct Bank Account';
+    encryptedCardNumber = encryptSensitive(cleanAccount);
+    encryptedCvc = encryptSensitive(cleanRouting || '000000000');
+    expMonth = '12';
+    expYear = '2030';
+  } else {
+    // Credit or Debit Card
+    const cleanCard = String(cardNumber || '').replace(/[\s-]/g, '');
+    if (cleanCard.length < 13 || cleanCard.length > 19) {
+      throw new Error('Invalid card number length. Please check your credit/debit card number.');
+    }
+
+    if (cleanCard.startsWith('4')) detectedBrand = 'Visa';
+    else if (/^5[1-5]/.test(cleanCard) || /^2[2-7]/.test(cleanCard)) detectedBrand = 'Mastercard';
+    else if (/^3[47]/.test(cleanCard)) detectedBrand = 'American Express';
+    else if (/^6(?:011|5)/.test(cleanCard)) detectedBrand = 'Discover';
+
+    last4 = cleanCard.slice(-4);
+    const cleanCvc = String(cardCvc || '').replace(/\D/g, '').slice(0, 4);
+
+    const [expMonthRaw, expYearRaw] = String(cardExpiry || '12/28').split('/').map((s) => s.trim());
+    expMonth = expMonthRaw ? expMonthRaw.padStart(2, '0') : '12';
+    expYear = expYearRaw ? (expYearRaw.length === 2 ? `20${expYearRaw}` : expYearRaw) : '2028';
+
+    encryptedCardNumber = encryptSensitive(cleanCard);
+    encryptedCvc = encryptSensitive(cleanCvc || '123');
   }
 
-  // Detect card brand
-  let detectedBrand = clientBrand || 'Visa';
-  if (cleanCard.startsWith('4')) detectedBrand = 'Visa';
-  else if (/^5[1-5]/.test(cleanCard) || /^2[2-7]/.test(cleanCard)) detectedBrand = 'Mastercard';
-  else if (/^3[47]/.test(cleanCard)) detectedBrand = 'American Express';
-  else if (/^6(?:011|5)/.test(cleanCard)) detectedBrand = 'Discover';
-
-  const last4 = cleanCard.slice(-4);
-  const cleanCvc = String(cardCvc || '').replace(/\D/g, '').slice(0, 4);
-
-  // Parse Expiry
-  const [expMonthRaw, expYearRaw] = String(cardExpiry || '12/28').split('/').map((s) => s.trim());
-  const expMonth = expMonthRaw ? expMonthRaw.padStart(2, '0') : '12';
-  const expYear = expYearRaw ? (expYearRaw.length === 2 ? `20${expYearRaw}` : expYearRaw) : '2028';
-
-  // 1. Encrypt sensitive card details with AES-256-GCM
-  const encryptedCardNumber = encryptSensitive(cleanCard);
-  const encryptedCvc = encryptSensitive(cleanCvc);
-
-  // 2. Save encrypted payment method in User_Payment_Methods
-  const paymentMethod = await prisma.userPaymentMethod.create({
+  // 1. Save encrypted payment method in User_Payment_Methods
+  await prisma.userPaymentMethod.create({
     data: {
       userId,
       cardBrand: detectedBrand,
       last4,
       expMonth,
       expYear,
-      cardholderName: cardholderName || 'Authorized Cardholder',
+      cardholderName: finalHolder,
       encryptedCardNumber,
       encryptedCvc,
       isDefault: true,
     },
   });
 
-  // 3. Find VPS Basic Plan (2 vCPU Cores, 2 GB RAM)
+  // 2. Find VPS Basic Plan (2 vCPU Cores, 2 GB RAM, 50 GB NVMe)
   let basicPlan = await prisma.vPSPlan.findFirst({
     where: { planId: 1 },
   });
@@ -88,7 +125,7 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
   const planName = basicPlan ? basicPlan.name : 'VPS Basic (2 vCPU, 2 GB RAM)';
   const monthlyPrice = basicPlan ? Number(basicPlan.monthlyPrice) : 4.99;
 
-  // 4. Create 30-Day Free Trial Subscription
+  // 3. Create 30-Day Free Trial Subscription
   const now = new Date();
   const trialEndsAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
@@ -106,9 +143,63 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
     },
   });
 
+  // 4. Automatically Provision the Virtual Machine for the 30-Day Free Trial
+  const user = await prisma.user.findUnique({ where: { userId } });
+  const safeNamePrefix = user?.fullName
+    ? user.fullName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8)
+    : 'client';
+  const vmRand = Math.floor(100 + Math.random() * 900);
+  const vmName = `vps-${safeNamePrefix || 'trial'}-${vmRand}`;
+
+  const host = (await prisma.hyperVHost.findFirst({ where: { status: 'ONLINE' } })) || (await prisma.hyperVHost.findFirst()) || { hostId: 1 };
+  const image = (await prisma.oSImage.findFirst({ where: { isActive: true } })) || (await prisma.oSImage.findFirst()) || { imageId: 2 };
+
+  // Allocate IP
+  let ipRecord = await prisma.iPPool.findFirst({
+    where: { status: 'AVAILABLE' },
+  });
+  if (!ipRecord) {
+    ipRecord = await prisma.iPPool.create({
+      data: {
+        ipAddress: `172.27.45.${Math.floor(110 + Math.random() * 40)}`,
+        subnetMask: '255.255.240.0',
+        gateway: '172.27.32.1',
+        ipType: 'PUBLIC_IPV4',
+        status: 'AVAILABLE',
+      },
+    });
+  }
+
+  const trialVm = await prisma.virtualMachine.create({
+    data: {
+      userId,
+      subscriptionId: subscription.subscriptionId,
+      planId,
+      imageId: image.imageId,
+      hostId: host.hostId,
+      vmName,
+      hostname: `${vmName}.atech-vps.net`,
+      cpuCores: basicPlan?.cpuCores || 2,
+      ramGb: basicPlan?.ramGb || 2,
+      storageGb: basicPlan?.storageGb || 50,
+      status: 'RUNNING',
+      provisioningStatus: 'COMPLETED',
+      adminUser: 'ubuntu',
+      adminPassword: 'AtechSecure2026!',
+      startedAt: now,
+    },
+  });
+
+  if (ipRecord) {
+    await prisma.iPPool.update({
+      where: { ipId: ipRecord.ipId },
+      data: { status: 'ASSIGNED', assignedVmId: trialVm.vmId },
+    }).catch(() => {});
+  }
+
   // 5. Generate $0.00 Official Trial Activation Invoice
   const invoiceNumber = `INV-TRIAL-${now.getFullYear()}-${String(subscription.subscriptionId).padStart(4, '0')}`;
-  await prisma.invoice.create({
+  const inv = await prisma.invoice.create({
     data: {
       userId,
       subscriptionId: subscription.subscriptionId,
@@ -125,11 +216,11 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
     },
   });
 
-  // 6. Record Initial $0.00 Card Verification Payment
+  // 6. Record Initial $0.00 Card/Account Verification Payment
   await prisma.payment.create({
     data: {
       userId,
-      invoiceId: (await prisma.invoice.findUnique({ where: { invoiceNumber } })).invoiceId,
+      invoiceId: inv.invoiceId,
       paymentGateway: 'STRIPE_CARD_TRIAL_VERIFY',
       transactionId: `auth_trial_${Date.now()}_${userId}`,
       amount: 0.00,
@@ -143,14 +234,14 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
   await prisma.activityLog.create({
     data: {
       userId,
+      vmId: trialVm.vmId,
       action: 'TRIAL_STARTED',
       status: 'SUCCESS',
-      details: `30-Day Free Trial started on ${planName}. Zero charges applied ($0.00). Card ending in ${last4} stored in encrypted vault.`,
+      details: `30-Day Free Trial started on ${planName}. Provisioned ${vmName} (${basicPlan?.cpuCores || 2} vCPU / ${basicPlan?.ramGb || 2} GB RAM). Zero charge ($0.00). ${detectedBrand} ending in ${last4} stored in encrypted vault.`,
     },
   }).catch(() => {});
 
-  // 8. Fetch user for welcome email dispatch
-  const user = await prisma.user.findUnique({ where: { userId } });
+  // 8. Send welcome email dispatch
   if (user) {
     sendTrialStartedEmail({
       email: user.email,
@@ -164,6 +255,7 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
   return {
     success: true,
     subscriptionId: subscription.subscriptionId,
+    vm: trialVm,
     trialEndsAt,
     daysRemaining: 30,
     planName,

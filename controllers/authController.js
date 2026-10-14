@@ -458,6 +458,40 @@ export const verifyEmailHandler = async (req, res) => {
   }
 };
 
+// --- RESEND EMAIL VERIFICATION HANDLER ---
+export const resendVerificationHandler = async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required.' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase().trim() },
+    });
+
+    if (!user) {
+      return res.json({ success: true, message: 'If an account exists, a verification email has been sent.' });
+    }
+
+    if (user.emailVerified) {
+      return res.json({ success: true, message: 'Account is already verified.' });
+    }
+
+    const verificationToken = jwt.sign(
+      { userId: user.userId, email: user.email },
+      JWT_VERIFY_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    await sendVerificationEmail(user.email, user.fullName, verificationToken);
+    return res.json({ success: true, message: 'Verification email sent successfully.' });
+  } catch (error) {
+    console.error('[resendVerificationHandler Error]:', error);
+    return res.status(500).json({ error: 'Failed to resend verification email.' });
+  }
+};
+
 // --- LOGIN USER ---
 export const login = async (req, res) => {
   const { email, password } = req.body;
