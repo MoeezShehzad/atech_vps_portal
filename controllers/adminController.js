@@ -12,6 +12,7 @@ import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
 import { sendTicketReplyNotification } from '../services/emailService.js';
 import { calculateTicketMetrics } from '../services/ticketAutomationService.js';
+import { sanitizeAuditDetails } from './securityController.js';
 
 /**
  * 1. GET /api/admin/overview
@@ -411,7 +412,7 @@ export async function getAdminAuditLogs(req, res) {
         type: 'ACTIVITY',
         action: l.action,
         status: l.status,
-        details: l.details || '',
+        details: sanitizeAuditDetails(l.action, l.details),
         actor: l.user ? { userId: l.user.userId, name: l.user.fullName, email: l.user.email } : { email: 'System' },
         targetVm: l.vm ? l.vm.vmName : null,
         timestamp: l.createdAt,
@@ -421,7 +422,7 @@ export async function getAdminAuditLogs(req, res) {
         type: 'SECURITY',
         action: s.action,
         status: s.result,
-        details: s.details || '',
+        details: sanitizeAuditDetails(s.action, s.details),
         actor: s.user ? { userId: s.user.userId, name: s.user.fullName, email: s.user.email } : { email: 'System' },
         ipAddress: s.ipAddress,
         timestamp: s.timestamp,

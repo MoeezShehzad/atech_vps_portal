@@ -184,14 +184,7 @@ export async function processCardPayment(req, res) {
         userId,
         action: 'PAYMENT_RECEIVED',
         status: 'SUCCESS',
-        details: JSON.stringify({
-          gateway: 'STRIPE',
-          brand: cardBrand,
-          maskedCard: `•••• •••• •••• ${last4}`,
-          amount: `$${Number(amount).toFixed(2)} USD`,
-          transactionId: stripeResult.transactionId,
-          invoiceNumber,
-        }),
+        details: `Payment of $${Number(amount).toFixed(2)} USD processed via ${cardBrand} (•••• ${last4}) for ${invoiceNumber}`,
       },
     }).catch(() => {});
 
@@ -322,16 +315,7 @@ export async function processBankPayment(req, res) {
         userId,
         action: 'INVOICE_GENERATED',
         status: 'PENDING',
-        details: JSON.stringify({
-          gateway: 'DIRECT_BANK_TRANSFER',
-          bank: bankResult.bankName,
-          sortCode: bankResult.sortCode,
-          maskedAccount: bankResult.maskedAccount,
-          dueDate: bankResult.dueDate.toISOString().split('T')[0],
-          amount: `$${Number(amount).toFixed(2)} USD`,
-          transactionId: bankResult.transactionId,
-          invoiceNumber,
-        }),
+        details: `Invoice ${invoiceNumber} generated for Direct Bank Transfer of $${Number(amount).toFixed(2)} USD`,
       },
     }).catch(() => {});
 

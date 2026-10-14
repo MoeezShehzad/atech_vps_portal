@@ -115,6 +115,48 @@ export async function getAuditLogs(req, res) {
       });
     }
 
+/**
+ * Sanitizes and formats audit log details into human-friendly text,
+ * preventing any raw JSON, gateway internals, or transaction ID leakage.
+ */
+export function sanitizeAuditDetails(action, rawDetails) {
+  if (!rawDetails) return '—';
+  let clean = String(rawDetails).trim();
+
+  if (clean.startsWith('{') && clean.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(clean);
+      if (action === 'PAYMENT_RECEIVED') {
+        const amt = parsed.amount || '';
+        const brand = parsed.brand || 'Card';
+        const card = parsed.maskedCard || (parsed.last4 ? `•••• ${parsed.last4}` : '');
+        const inv = parsed.invoiceNumber ? ` • ${parsed.invoiceNumber}` : '';
+        return `Payment of ${amt} processed via ${brand} ${card ? `(${card})` : ''}${inv}`.trim();
+      }
+      if (action === 'INVOICE_GENERATED') {
+        const inv = parsed.invoiceNumber || 'Invoice';
+        const amt = parsed.amount ? ` for ${parsed.amount}` : '';
+        return `${inv} generated${amt}`;
+      }
+      // General JSON sanitizer: strip sensitive keys
+      const sensitiveKeys = ['transactionid', 'secret', 'token', 'key', 'password', 'gateway', 'sortcode', 'bankaccount', 'accountnumber', 'clientsecret'];
+      const safeEntries = Object.entries(parsed)
+        .filter(([k]) => !sensitiveKeys.some((sk) => k.toLowerCase().includes(sk)))
+        .map(([k, v]) => `${k}: ${v}`);
+      return safeEntries.join(' • ') || 'Operation completed successfully';
+    } catch {
+      // not JSON, fallback
+    }
+  }
+
+  // Scrub any transaction IDs or keys in raw text
+  clean = clean.replace(/pi_[a-zA-Z0-9]{15,}/g, '[REDACTED_TX]');
+  clean = clean.replace(/ch_[a-zA-Z0-9]{15,}/g, '[REDACTED_TX]');
+  clean = clean.replace(/sk_[a-zA-Z0-9]{15,}/g, '[REDACTED_KEY]');
+
+  return clean;
+}
+
     // Format & unify events
     const unifiedEvents = [];
 
@@ -124,7 +166,7 @@ export async function getAuditLogs(req, res) {
         type: 'SECURITY',
         action: log.action,
         status: log.result, // SUCCESS or FAILED
-        details: log.details || '',
+        details: sanitizeAuditDetails(log.action, log.details),
         ipAddress: log.ipAddress || 'Internal Network',
         vmName: null,
         timestamp: log.timestamp,
@@ -137,7 +179,7 @@ export async function getAuditLogs(req, res) {
         type: 'VM_OPERATION',
         action: act.action,
         status: act.status, // SUCCESS, PENDING, FAILED
-        details: act.details || '',
+        details: sanitizeAuditDetails(act.action, act.details),
         ipAddress: 'Hyper-V Host Agent',
         vmName: act.vm?.vmName || (act.vmId ? `VM #${act.vmId}` : null),
         timestamp: act.createdAt,

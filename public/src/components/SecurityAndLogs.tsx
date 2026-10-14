@@ -135,7 +135,7 @@ export default function SecurityAndLogs() {
       l.status,
       l.vmName || 'N/A',
       l.ipAddress || 'Internal',
-      `"${(l.details || '').replace(/"/g, '""')}"`,
+      `"${formatLogDetails(l.details || '', l.action).replace(/"/g, '""')}"`,
     ]);
 
     const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -182,6 +182,43 @@ export default function SecurityAndLogs() {
         <Clock className="w-3 h-3" /> {s || 'PENDING'}
       </span>
     );
+  };
+
+  // Format log details to prevent raw JSON and sensitive IDs from leaking
+  const formatLogDetails = (details: string, action: string) => {
+    if (!details) return '—';
+    const clean = details.trim();
+
+    if (clean.startsWith('{') && clean.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(clean);
+        if (action === 'PAYMENT_RECEIVED') {
+          const amt = parsed.amount || '';
+          const brand = parsed.brand || 'Card';
+          const card = parsed.maskedCard || (parsed.last4 ? `•••• ${parsed.last4}` : '');
+          const inv = parsed.invoiceNumber ? ` • ${parsed.invoiceNumber}` : '';
+          return `Payment of ${amt} received via ${brand} ${card ? `(${card})` : ''}${inv}`.trim();
+        }
+        if (action === 'INVOICE_GENERATED') {
+          const inv = parsed.invoiceNumber || 'Invoice';
+          const amt = parsed.amount ? ` for ${parsed.amount}` : '';
+          return `${inv} generated${amt}`;
+        }
+        // General JSON sanitizer: strip sensitive keys
+        const sensitiveKeys = ['transactionid', 'secret', 'token', 'key', 'password', 'gateway', 'sortcode', 'bankaccount', 'accountnumber', 'clientsecret'];
+        const safeEntries = Object.entries(parsed)
+          .filter(([k]) => !sensitiveKeys.some((sk) => k.toLowerCase().includes(sk)))
+          .map(([k, v]) => `${k}: ${v}`);
+        return safeEntries.join(' • ') || 'Completed';
+      } catch {
+        // fallback to regex scrub
+      }
+    }
+
+    return clean
+      .replace(/pi_[a-zA-Z0-9]{15,}/g, '[REDACTED_TX]')
+      .replace(/ch_[a-zA-Z0-9]{15,}/g, '[REDACTED_TX]')
+      .replace(/sk_[a-zA-Z0-9]{15,}/g, '[REDACTED_KEY]');
   };
 
   const score = overview?.securityScore ?? 85;
@@ -462,8 +499,8 @@ export default function SecurityAndLogs() {
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-5 text-xs text-slate-600 dark:text-slate-300 max-w-xs truncate" title={log.details}>
-                      {log.details || '—'}
+                    <td className="py-3.5 px-5 text-xs text-slate-600 dark:text-slate-300 max-w-sm truncate" title={formatLogDetails(log.details, log.action)}>
+                      {formatLogDetails(log.details, log.action)}
                     </td>
                   </tr>
                 ))
