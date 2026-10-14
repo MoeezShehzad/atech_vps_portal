@@ -7,10 +7,73 @@
     <meta name="theme-color" content="#0f172a" />
     <meta name="description" content="ATECH High Performance Cloud Virtual Private Servers powered by Hyper-V" />
     <title>ATECH Cloud VPS Portal</title>
-    <!-- Google Fonts: Poppins -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
+    <!-- Preload core Poppins font weights for instant zero-latency rendering -->
+    <link rel="preload" href="/fonts/poppins-400.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/poppins-600.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/fonts/poppins-700.woff2" as="font" type="font/woff2" crossorigin>
+
+    <!-- Local Self-Hosted Poppins Font Definitions -->
+    <style>
+      @font-face {
+        font-family: 'Poppins';
+        font-style: normal;
+        font-weight: 300;
+        font-display: swap;
+        src: url('/fonts/poppins-300.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Poppins';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/poppins-400.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Poppins';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/poppins-500.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Poppins';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url('/fonts/poppins-600.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Poppins';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/fonts/poppins-700.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Poppins';
+        font-style: normal;
+        font-weight: 800;
+        font-display: swap;
+        src: url('/fonts/poppins-800.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Poppins';
+        font-style: normal;
+        font-weight: 900;
+        font-display: swap;
+        src: url('/fonts/poppins-900.woff2') format('woff2');
+      }
+
+      /* Universal Poppins Enforcement */
+      html, body, #root, input, select, textarea, button, p, span, h1, h2, h3, h4, h5, h6, a, div, label {
+        font-family: 'Poppins', sans-serif !important;
+      }
+
+      /* Explicitly preserve Monospace for terminals and code elements */
+      .font-mono, code, pre, kbd, samp, .xterm, .xterm * {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+      }
+    </style>
   </head>
   <body class="bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 antialiased font-poppins selection:bg-blue-600 selection:text-white">
     <div id="root"></div>
