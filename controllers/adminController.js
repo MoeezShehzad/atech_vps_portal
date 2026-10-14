@@ -10,9 +10,11 @@ import os from 'os';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
-import { sendTicketReplyNotification } from '../services/emailService.js';
+import { sendTicketReplyNotification, sendInvoiceReceiptEmail } from '../services/emailService.js';
 import { calculateTicketMetrics } from '../services/ticketAutomationService.js';
 import { sanitizeAuditDetails } from './securityController.js';
+import { createStripeRefund } from '../services/stripeService.js';
+import { startBroadcastCampaign, getBroadcastJobStatus as getJobStatus, listRecentBroadcasts } from '../services/safeBroadcastService.js';
 
 /**
  * 1. GET /api/admin/overview
@@ -99,50 +101,68 @@ export async function getAdminUsers(req, res) {
       ],
     };
 
-    const users = await prisma.user.findMany({
-      where: whereClause,
-      include: {
-        userRoles: {
-          include: { role: true },
-        },
-        _count: {
-          select: {
-            virtualMachines: true,
-            subscriptions: true,
+    const [users, availableRoles] = await Promise.all([
+      prisma.user.findMany({
+        where: whereClause,
+        include: {
+          userRoles: {
+            include: { role: true },
+          },
+          virtualMachines: {
+            select: { vmId: true, status: true },
+          },
+          subscriptions: {
+            select: { subscriptionId: true, status: true },
+          },
+          payments: {
+            where: { status: 'COMPLETED' },
+            select: { amount: true },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+        orderBy: { createdAt: 'desc' },
+        take: 150,
+      }),
+      prisma.role.findMany({ select: { roleName: true, description: true } }),
+    ]);
 
     const formattedUsers = users.map((u) => {
       const primaryRole = u.userRoles?.[0]?.role?.roleName || 'Customer';
+      const allUserRoles = u.userRoles.map((ur) => ur.role.roleName);
+      const activeVms = u.virtualMachines.filter((v) => v.status !== 'TERMINATED').length;
+      const activeSubs = u.subscriptions.filter((s) => s.status === 'ACTIVE').length;
+      const totalSpend = u.payments.reduce((acc, p) => acc + Number(p.amount || 0), 0);
+
       return {
         userId: u.userId,
         fullName: u.fullName,
         email: u.email,
         phone: u.phone,
+        city: u.city,
+        country: u.country,
         isActive: u.isActive,
         emailVerified: u.emailVerified,
         authProvider: u.provider,
         role: primaryRole,
-        vmCount: u._count.virtualMachines,
-        subscriptionCount: u._count.subscriptions,
+        roles: allUserRoles,
+        vmCount: activeVms,
+        totalVmCount: u.virtualMachines.length,
+        subscriptionCount: activeSubs,
+        totalSpend,
         lastLoginAt: u.lastLoginAt,
         createdAt: u.createdAt,
       };
     });
 
     // Optional client-side role filtering if specified
-    const filtered = roleFilter
-      ? formattedUsers.filter((u) => u.role.toLowerCase() === roleFilter.toLowerCase())
+    const filtered = roleFilter && roleFilter !== 'ALL'
+      ? formattedUsers.filter((u) => u.roles.some((r) => r.toLowerCase() === roleFilter.toLowerCase()))
       : formattedUsers;
 
     res.json({
       success: true,
       users: filtered,
       totalCount: filtered.length,
+      availableRoles: availableRoles.map((r) => r.roleName),
     });
   } catch (error) {
     console.error('getAdminUsers error:', error);
@@ -1092,4 +1112,708 @@ export async function replyAdminTicket(req, res) {
     res.status(500).json({ error: 'Failed to update ticket response' });
   }
 }
+
+// ==============================================================================
+// 1. ADVANCED USER & SERVICE PROVIDER PROFILE (360° DRAWER)
+// ==============================================================================
+
+/**
+ * GET /api/admin/users/:userId/profile
+ * Returns 360° profile of a user: profile, roles, VMs, subscriptions, invoices, and logs
+ */
+export async function getUserFullProfile(req, res) {
+  try {
+    const targetUserId = Number(req.params.userId);
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const [user, roles, vms, subscriptions, invoices, payments, activityLogs, securityLogs] = await Promise.all([
+      prisma.user.findUnique({
+        where: { userId: targetUserId },
+        select: {
+          userId: true,
+          fullName: true,
+          email: true,
+          phone: true,
+          address: true,
+          city: true,
+          country: true,
+          postalCode: true,
+          provider: true,
+          isActive: true,
+          emailVerified: true,
+          lastLoginAt: true,
+          createdAt: true,
+        },
+      }),
+      prisma.userRole.findMany({
+        where: { userId: targetUserId },
+        include: { role: true },
+      }),
+      prisma.virtualMachine.findMany({
+        where: { userId: targetUserId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.subscription.findMany({
+        where: { userId: targetUserId },
+        include: { plan: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.invoice.findMany({
+        where: { userId: targetUserId },
+        include: { payments: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.payment.findMany({
+        where: { userId: targetUserId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.activityLog.findMany({
+        where: { userId: targetUserId },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+      prisma.securityLog.findMany({
+        where: { userId: targetUserId },
+        orderBy: { timestamp: 'desc' },
+        take: 10,
+      }),
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const totalSpend = payments
+      .filter((p) => p.status === 'COMPLETED')
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    const sanitizedActivity = activityLogs.map((a) => ({
+      ...a,
+      details: sanitizeAuditDetails(a.action, a.details),
+    }));
+
+    return res.json({
+      success: true,
+      profile: {
+        ...user,
+        roles: roles.map((r) => r.role.roleName),
+        totalSpend,
+        vms,
+        subscriptions,
+        invoices,
+        payments,
+        activityLogs: sanitizedActivity,
+        securityLogs,
+      },
+    });
+  } catch (error) {
+    console.error('getUserFullProfile error:', error);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+}
+
+// ==============================================================================
+// 2. COMPLETE PAYMENTS & FINANCIAL MANAGEMENT SUITE
+// ==============================================================================
+
+/**
+ * GET /api/admin/billing/overview
+ * Real-time financial indicators and transactional summary
+ */
+export async function getAdminBillingOverview(req, res) {
+  try {
+    const [payments, invoices, subscriptions] = await Promise.all([
+      prisma.payment.findMany({
+        select: { amount: true, paymentGateway: true, status: true },
+      }),
+      prisma.invoice.findMany({
+        select: { amount: true, status: true },
+      }),
+      prisma.subscription.findMany({
+        select: { status: true, plan: { select: { monthlyPrice: true } } },
+      }),
+    ]);
+
+    let grossRevenue = 0;
+    let stripeVolume = 0;
+    let bankVolume = 0;
+    let refundedVolume = 0;
+
+    payments.forEach((p) => {
+      const amt = Number(p.amount || 0);
+      if (p.status === 'COMPLETED') {
+        grossRevenue += amt;
+        if (p.paymentGateway === 'STRIPE_CARD') stripeVolume += amt;
+        if (p.paymentGateway === 'DIRECT_BANK_TRANSFER') bankVolume += amt;
+      } else if (p.status === 'REFUNDED') {
+        refundedVolume += amt;
+      }
+    });
+
+    const pendingInvoices = invoices.filter((i) => i.status === 'PENDING');
+    const pendingTotal = pendingInvoices.reduce((sum, i) => sum + Number(i.amount || 0), 0);
+
+    const activeSubscriptions = subscriptions.filter((s) => s.status === 'ACTIVE');
+    const mrr = activeSubscriptions.reduce((sum, s) => sum + Number(s.plan?.monthlyPrice || 0), 0);
+
+    return res.json({
+      success: true,
+      overview: {
+        grossRevenue,
+        stripeVolume,
+        bankVolume,
+        refundedVolume,
+        netRevenue: Math.max(0, grossRevenue - refundedVolume),
+        pendingInvoicesCount: pendingInvoices.length,
+        pendingTotal,
+        activeSubscriptionsCount: activeSubscriptions.length,
+        mrr,
+        arr: mrr * 12,
+        totalInvoicesCount: invoices.length,
+      },
+    });
+  } catch (error) {
+    console.error('getAdminBillingOverview error:', error);
+    res.status(500).json({ error: 'Failed to calculate billing overview' });
+  }
+}
+
+/**
+ * GET /api/admin/billing/invoices
+ * Paginated and searchable invoices ledger
+ */
+export async function getAdminInvoices(req, res) {
+  try {
+    const status = req.query.status || 'ALL';
+    const search = (req.query.search || '').trim().toLowerCase();
+    const limit = Math.min(Number(req.query.limit) || 100, 200);
+
+    let whereClause = {};
+    if (status !== 'ALL') {
+      whereClause.status = status;
+    }
+
+    if (search) {
+      whereClause.OR = [
+        { invoiceNumber: { contains: search } },
+        { user: { email: { contains: search } } },
+        { user: { fullName: { contains: search } } },
+      ];
+    }
+
+    const invoices = await prisma.invoice.findMany({
+      where: whereClause,
+      include: {
+        user: { select: { userId: true, fullName: true, email: true } },
+        payments: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+
+    return res.json({
+      success: true,
+      invoices,
+      totalCount: invoices.length,
+    });
+  } catch (error) {
+    console.error('getAdminInvoices error:', error);
+    res.status(500).json({ error: 'Failed to retrieve invoices' });
+  }
+}
+
+/**
+ * POST /api/admin/billing/refund
+ * Processes 1-Click refund via Stripe API and updates ledger
+ */
+export async function processAdminRefund(req, res) {
+  try {
+    const { paymentId, reason = 'Administrative Refund' } = req.body;
+    if (!paymentId) {
+      return res.status(400).json({ error: 'Payment ID is required' });
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { paymentId: Number(paymentId) },
+      include: {
+        invoice: true,
+        user: true,
+      },
+    });
+
+    if (!payment) {
+      return res.status(404).json({ error: 'Payment record not found' });
+    }
+
+    if (payment.status === 'REFUNDED') {
+      return res.status(400).json({ error: 'Payment is already refunded' });
+    }
+
+    // Process refund through Stripe if paid via Stripe Card
+    let stripeRefundResult = null;
+    if (payment.paymentGateway === 'STRIPE_CARD' && payment.transactionId) {
+      stripeRefundResult = await createStripeRefund({
+        transactionId: payment.transactionId,
+        amount: payment.amount,
+        reason,
+      });
+    }
+
+    // Update payment and invoice status in database
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { paymentId: payment.paymentId },
+        data: { status: 'REFUNDED' },
+      });
+
+      if (payment.invoiceId) {
+        await tx.invoice.update({
+          where: { invoiceId: payment.invoiceId },
+          data: { status: 'REFUNDED' },
+        });
+      }
+
+      // Deactivate any active subscription associated with this customer's refund
+      await tx.subscription.updateMany({
+        where: {
+          userId: payment.userId,
+          status: 'ACTIVE',
+        },
+        data: { status: 'CANCELLED' },
+      });
+
+      await tx.activityLog.create({
+        data: {
+          userId: req.adminUser.userId,
+          action: 'ADMIN_PAYMENT_REFUNDED',
+          status: 'SUCCESS',
+          details: `Administrator refunded payment #${payment.paymentId} ($${payment.amount} USD) for user ${payment.user?.email}. Reason: ${reason}`,
+        },
+      });
+    });
+
+    return res.json({
+      success: true,
+      message: `Payment of $${payment.amount} USD refunded successfully.`,
+      refundDetails: stripeRefundResult,
+    });
+  } catch (error) {
+    console.error('processAdminRefund error:', error);
+    res.status(500).json({ error: error.message || 'Failed to process refund' });
+  }
+}
+
+/**
+ * POST /api/admin/billing/mark-paid
+ * Manually marks a pending invoice as PAID (e.g. for bank wire) and activates customer slot
+ */
+export async function markInvoiceAsPaid(req, res) {
+  try {
+    const { invoiceId, notes } = req.body;
+    if (!invoiceId) {
+      return res.status(400).json({ error: 'Invoice ID is required' });
+    }
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { invoiceId: Number(invoiceId) },
+      include: { user: true },
+    });
+
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    if (invoice.status === 'PAID') {
+      return res.status(400).json({ error: 'Invoice is already marked as PAID' });
+    }
+
+    const now = new Date();
+    const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Update Invoice
+      await tx.invoice.update({
+        where: { invoiceId: invoice.invoiceId },
+        data: {
+          status: 'PAID',
+          paymentDate: now,
+        },
+      });
+
+      // 2. Create or Update Payment record
+      await tx.payment.create({
+        data: {
+          userId: invoice.userId,
+          invoiceId: invoice.invoiceId,
+          paymentGateway: 'DIRECT_BANK_TRANSFER',
+          transactionId: `TXN-MANUAL-${Date.now()}`,
+          amount: invoice.amount,
+          currency: 'USD',
+          status: 'COMPLETED',
+          paymentDate: now,
+        },
+      });
+
+      // 3. Deposit active subscription slot for customer
+      let defaultPlan = await tx.vPSPlan.findFirst({ orderBy: { monthlyPrice: 'asc' } });
+      await tx.subscription.create({
+        data: {
+          userId: invoice.userId,
+          planId: defaultPlan?.planId || 1,
+          status: 'ACTIVE',
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+        },
+      });
+
+      // 4. Log admin audit
+      await tx.activityLog.create({
+        data: {
+          userId: req.adminUser.userId,
+          action: 'ADMIN_MARK_INVOICE_PAID',
+          status: 'SUCCESS',
+          details: `Administrator marked invoice ${invoice.invoiceNumber} as PAID. Activated 30-day VPS slot for ${invoice.user.email}.${notes ? ` Notes: ${notes}` : ''}`,
+        },
+      });
+    });
+
+    // Send receipt email in background
+    sendInvoiceReceiptEmail({
+      email: invoice.user.email,
+      fullName: invoice.user.fullName,
+      invoiceNumber: invoice.invoiceNumber,
+      amount: Number(invoice.amount),
+      planName: 'Cloud VPS Package',
+      currency: 'USD',
+    }).catch((err) => console.warn('[Invoice Email Notice]:', err.message));
+
+    return res.json({
+      success: true,
+      message: `Invoice ${invoice.invoiceNumber} marked as PAID. Active VPS slot provisioned for customer.`,
+    });
+  } catch (error) {
+    console.error('markInvoiceAsPaid error:', error);
+    res.status(500).json({ error: 'Failed to mark invoice as paid' });
+  }
+}
+
+/**
+ * POST /api/admin/billing/void-invoice
+ * Voids an unpaid/pending invoice and closes provision opportunity
+ */
+export async function voidAdminInvoice(req, res) {
+  try {
+    const { invoiceId, reason = 'Cancelled by administrator' } = req.body;
+    if (!invoiceId) {
+      return res.status(400).json({ error: 'Invoice ID is required' });
+    }
+
+    const updated = await prisma.invoice.update({
+      where: { invoiceId: Number(invoiceId) },
+      data: { status: 'CANCELLED' },
+      include: { user: true },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.adminUser.userId,
+        action: 'ADMIN_VOID_INVOICE',
+        status: 'SUCCESS',
+        details: `Administrator voided invoice ${updated.invoiceNumber} for user ${updated.user.email}. Reason: ${reason}`,
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: `Invoice ${updated.invoiceNumber} has been successfully voided.`,
+    });
+  } catch (error) {
+    console.error('voidAdminInvoice error:', error);
+    res.status(500).json({ error: 'Failed to void invoice' });
+  }
+}
+
+/**
+ * POST /api/admin/billing/subscription-control
+ * Controls subscription status (extend, suspend, resume, cancel)
+ */
+export async function adminUpdateSubscription(req, res) {
+  try {
+    const { subscriptionId, action } = req.body;
+    if (!subscriptionId || !action) {
+      return res.status(400).json({ error: 'Subscription ID and action required' });
+    }
+
+    const sub = await prisma.subscription.findUnique({
+      where: { subscriptionId: Number(subscriptionId) },
+      include: { user: true },
+    });
+
+    if (!sub) {
+      return res.status(404).json({ error: 'Subscription not found' });
+    }
+
+    let updateData = {};
+    if (action === 'EXTEND_30_DAYS') {
+      const currentEnd = new Date(sub.currentPeriodEnd);
+      updateData.currentPeriodEnd = new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000);
+      updateData.status = 'ACTIVE';
+    } else if (action === 'SUSPEND') {
+      updateData.status = 'SUSPENDED';
+    } else if (action === 'RESUME') {
+      updateData.status = 'ACTIVE';
+    } else if (action === 'CANCEL') {
+      updateData.status = 'CANCELLED';
+    } else {
+      return res.status(400).json({ error: 'Invalid action' });
+    }
+
+    const updated = await prisma.subscription.update({
+      where: { subscriptionId: sub.subscriptionId },
+      data: updateData,
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.adminUser.userId,
+        action: 'ADMIN_SUBSCRIPTION_UPDATE',
+        status: 'SUCCESS',
+        details: `Administrator performed '${action}' on subscription #${sub.subscriptionId} for user ${sub.user.email}`,
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: `Subscription #${sub.subscriptionId} updated successfully (${action}).`,
+      subscription: updated,
+    });
+  } catch (error) {
+    console.error('adminUpdateSubscription error:', error);
+    res.status(500).json({ error: 'Failed to update subscription' });
+  }
+}
+
+// ==============================================================================
+// 3. SAFE BROADCAST NOTIFICATIONS (MAIL IP REPUTATION PROTECTED)
+// ==============================================================================
+
+/**
+ * POST /api/admin/broadcasts/dispatch
+ * Broadcasts notification with optional anti-spam throttled email queue
+ */
+export async function dispatchBroadcastNotification(req, res) {
+  try {
+    const { title, message, targetAudience = 'ALL_USERS', channels = { inApp: true, email: false } } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
+
+    const result = await startBroadcastCampaign({
+      title,
+      message,
+      targetAudience,
+      channels,
+      adminEmail: req.adminUser.email,
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        userId: req.adminUser.userId,
+        action: 'ADMIN_BROADCAST_DISPATCHED',
+        status: 'SUCCESS',
+        details: `Administrator initiated broadcast '${title}' to ${targetAudience} via ${channels.email ? 'Email & In-App' : 'In-App'}. Total recipients: ${result.totalRecipients}`,
+      },
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error('dispatchBroadcastNotification error:', error);
+    res.status(500).json({ error: 'Failed to start broadcast campaign' });
+  }
+}
+
+/**
+ * GET /api/admin/broadcasts/job/:jobId
+ * Real-time queue progress monitor
+ */
+export function getBroadcastJobStatus(req, res) {
+  const job = getJobStatus(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ error: 'Broadcast job not found' });
+  }
+  return res.json({ success: true, job });
+}
+
+/**
+ * GET /api/admin/broadcasts/history
+ * List of recent broadcast campaigns
+ */
+export function getBroadcastHistory(req, res) {
+  const history = listRecentBroadcasts();
+  return res.json({ success: true, broadcasts: history });
+}
+
+// ==============================================================================
+// 4. ENTERPRISE EXECUTIVE REPORTS & CAPACITY PLANNING
+// ==============================================================================
+
+/**
+ * GET /api/admin/reports
+ * Comprehensive analytics across Revenue, Fleet Capacity, Subscriptions, and SLA
+ */
+export async function getAdminReports(req, res) {
+  try {
+    const [payments, vms, subscriptions, users, tickets] = await Promise.all([
+      prisma.payment.findMany({
+        where: { status: 'COMPLETED' },
+        include: { invoice: true },
+      }),
+      prisma.virtualMachine.findMany(),
+      prisma.subscription.findMany({ include: { plan: true } }),
+      prisma.user.findMany({ include: { userRoles: { include: { role: true } } } }),
+      prisma.ticket.findMany(),
+    ]);
+
+    // Financial Metrics
+    const totalGrossRevenue = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const stripeRevenue = payments
+      .filter((p) => p.paymentGateway === 'STRIPE_CARD')
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    const bankRevenue = payments
+      .filter((p) => p.paymentGateway === 'DIRECT_BANK_TRANSFER')
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    const activeSubs = subscriptions.filter((s) => s.status === 'ACTIVE');
+    const mrr = activeSubs.reduce((sum, s) => sum + Number(s.plan?.monthlyPrice || 0), 0);
+
+    // Fleet & Overcommit Analytics
+    const physicalCores = os.cpus().length;
+    const physicalRamGB = Math.round(os.totalmem() / (1024 * 1024 * 1024));
+
+    const activeVms = vms.filter((v) => v.status !== 'TERMINATED');
+    const allocatedCores = activeVms.reduce((sum, v) => sum + Number(v.vCPU || 0), 0);
+    const committedRamGB = activeVms.reduce((sum, v) => sum + Number(v.ramGB || 0), 0);
+    const committedDiskGB = activeVms.reduce((sum, v) => sum + Number(v.diskGB || 0), 0);
+
+    const cpuOvercommitRatio = physicalCores > 0 ? ((allocatedCores / physicalCores) * 100).toFixed(1) : 0;
+    const ramOvercommitRatio = physicalRamGB > 0 ? ((committedRamGB / physicalRamGB) * 100).toFixed(1) : 0;
+
+    // Plan Distribution
+    const planDistribution = {};
+    activeSubs.forEach((s) => {
+      const planName = s.plan?.name || 'Custom Plan';
+      planDistribution[planName] = (planDistribution[planName] || 0) + 1;
+    });
+
+    // Support SLA Metrics
+    const openTickets = tickets.filter((t) => t.status === 'OPEN' || t.status === 'REOPENED').length;
+    const resolvedTickets = tickets.filter((t) => t.status === 'RESOLVED' || t.status.includes('CLOSED')).length;
+
+    // User Role Breakdown
+    const rolesBreakdown = { Customer: 0, Service_Provider: 0, Support_Staff: 0, Admin: 0 };
+    users.forEach((u) => {
+      u.userRoles.forEach((ur) => {
+        const rName = ur.role.roleName;
+        rolesBreakdown[rName] = (rolesBreakdown[rName] || 0) + 1;
+      });
+    });
+
+    return res.json({
+      success: true,
+      reports: {
+        financial: {
+          totalGrossRevenue,
+          stripeRevenue,
+          bankRevenue,
+          mrr,
+          arr: mrr * 12,
+          arpu: activeSubs.length > 0 ? (mrr / activeSubs.length).toFixed(2) : 0,
+        },
+        fleetCapacity: {
+          physicalCores,
+          allocatedCores,
+          cpuOvercommitRatio,
+          physicalRamGB,
+          committedRamGB,
+          ramOvercommitRatio,
+          committedDiskGB,
+          totalVmsCount: vms.length,
+          activeVmsCount: activeVms.length,
+          stoppedVmsCount: activeVms.filter((v) => v.status === 'STOPPED').length,
+          runningVmsCount: activeVms.filter((v) => v.status === 'RUNNING').length,
+        },
+        plans: planDistribution,
+        users: {
+          totalUsers: users.length,
+          rolesBreakdown,
+        },
+        support: {
+          totalTickets: tickets.length,
+          openTickets,
+          resolvedTickets,
+          resolutionRate: tickets.length > 0 ? ((resolvedTickets / tickets.length) * 100).toFixed(1) : 100,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('getAdminReports error:', error);
+    res.status(500).json({ error: 'Failed to generate executive report' });
+  }
+}
+
+/**
+ * GET /api/admin/reports/export
+ * Downloads CSV of selected datasets
+ */
+export async function exportAdminReportCSV(req, res) {
+  try {
+    const dataset = req.query.dataset || 'finance';
+
+    if (dataset === 'finance') {
+      const invoices = await prisma.invoice.findMany({
+        include: { user: true, payments: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const csvLines = [
+        'Invoice Number,Customer Name,Customer Email,Amount (USD),Status,Gateway,Date',
+        ...invoices.map((i) => {
+          const gw = i.payments?.[0]?.paymentGateway || 'DIRECT_BANK_TRANSFER';
+          return `"${i.invoiceNumber}","${i.user?.fullName || ''}","${i.user?.email || ''}",${i.amount},"${i.status}","${gw}","${i.createdAt.toISOString()}"`;
+        }),
+      ];
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=financial_report_${Date.now()}.csv`);
+      return res.send(csvLines.join('\n'));
+    }
+
+    if (dataset === 'fleet') {
+      const vms = await prisma.virtualMachine.findMany({
+        include: { user: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const csvLines = [
+        'VM Name,Owner Email,Status,IP Address,vCPU,RAM (GB),Disk (GB),Created At',
+        ...vms.map(
+          (v) =>
+            `"${v.vmName}","${v.user?.email || ''}","${v.status}","${v.ipAddress || ''}",${v.vCPU},${v.ramGB},${v.diskGB},"${v.createdAt.toISOString()}"`
+        ),
+      ];
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=fleet_report_${Date.now()}.csv`);
+      return res.send(csvLines.join('\n'));
+    }
+
+    return res.status(400).json({ error: 'Invalid dataset specified' });
+  } catch (error) {
+    console.error('exportAdminReportCSV error:', error);
+    res.status(500).json({ error: 'Failed to export CSV report' });
+  }
+}
+
 

@@ -32,6 +32,18 @@ import {
   getAdminTickets,
   getAdminTicketDetails,
   replyAdminTicket,
+  getUserFullProfile,
+  getAdminBillingOverview,
+  getAdminInvoices,
+  processAdminRefund,
+  markInvoiceAsPaid,
+  voidAdminInvoice,
+  adminUpdateSubscription,
+  dispatchBroadcastNotification,
+  getBroadcastJobStatus,
+  getBroadcastHistory,
+  getAdminReports,
+  exportAdminReportCSV,
 } from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -45,6 +57,7 @@ router.get('/overview', getAdminOverview);
 
 // 2. User & Account Management
 router.get('/users', getAdminUsers);
+router.get('/users/:userId/profile', getUserFullProfile);
 router.patch('/users/:userId/status', toggleUserStatus);
 router.patch('/users/:userId/role', updateUserRole);
 
@@ -58,10 +71,25 @@ router.post('/fleet/vms/:vmId/power', adminPowerControl);
 // 4. Cluster Audit Trail
 router.get('/audit-logs', getAdminAuditLogs);
 
-// Option 4: System Announcements & Broadcast Banners
+// 5. Complete Financial & Payments Management
+router.get('/billing/overview', getAdminBillingOverview);
+router.get('/billing/invoices', getAdminInvoices);
+router.post('/billing/refund', processAdminRefund);
+router.post('/billing/mark-paid', markInvoiceAsPaid);
+router.post('/billing/void-invoice', voidAdminInvoice);
+router.post('/billing/subscription-control', adminUpdateSubscription);
+
+// 6. Safe Broadcast Notifications (Mail Server IP Protected)
 router.get('/announcements', getAnnouncements);
 router.post('/announcements', createAnnouncement);
 router.delete('/announcements/:id', deleteAnnouncement);
+router.post('/broadcasts/dispatch', dispatchBroadcastNotification);
+router.get('/broadcasts/job/:jobId', getBroadcastJobStatus);
+router.get('/broadcasts/history', getBroadcastHistory);
+
+// 7. Executive Reports & Intelligence Engine
+router.get('/reports', getAdminReports);
+router.get('/reports/export', exportAdminReportCSV);
 
 // Option 2: Dynamic VPS Plans & Coupons
 router.get('/plans', getAdminPlans);

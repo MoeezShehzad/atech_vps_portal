@@ -54,8 +54,24 @@ import {
   Edit,
   Pencil,
   X,
+  CreditCard,
+  DollarSign,
+  Receipt,
+  RotateCcw,
+  FileText,
+  BarChart3,
+  PieChart,
+  Mail,
+  Radio,
+  Download,
+  TrendingUp,
+  Ban,
+  FileSpreadsheet,
+  Layers,
+  HelpCircle,
+  ExternalLink,
 } from 'lucide-react';
-import { apiCall, setAccessToken } from '../services/api';
+import { apiCall, setAccessToken, getAccessToken } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import ThemeToggle from '../components/ThemeToggle';
@@ -67,7 +83,18 @@ export default function AdminDashboard() {
   const { login: authLogin } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'users' | 'fleet' | 'plans' | 'ipam' | 'announcements' | 'threats' | 'tickets' | 'audit'
+    | 'overview'
+    | 'users'
+    | 'finance'
+    | 'fleet'
+    | 'broadcasts'
+    | 'reports'
+    | 'plans'
+    | 'ipam'
+    | 'announcements'
+    | 'threats'
+    | 'tickets'
+    | 'audit'
   >('overview');
 
   // Sidebar compression & expansion states
@@ -95,10 +122,52 @@ export default function AdminDashboard() {
   const [hostStats, setHostStats] = useState<any>(null);
   const [platformStats, setPlatformStats] = useState<any>(null);
 
-  // Users & Impersonation
+  // Users & Roles & Ghost Mode
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState('');
   const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
+  const [userRoleFilter, setUserRoleFilter] = useState<string>('ALL');
+  const [availableRoles, setAvailableRoles] = useState<string[]>(['Customer', 'Service_Provider', 'Support_Staff', 'Admin']);
+  const [selectedUserForDrawer, setSelectedUserForDrawer] = useState<any | null>(null);
+  const [userProfileData, setUserProfileData] = useState<any | null>(null);
+  const [userProfileLoading, setUserProfileLoading] = useState<boolean>(false);
+  const [changingRoleUserId, setChangingRoleUserId] = useState<number | null>(null);
+
+  // Finance & Payments
+  const [billingOverview, setBillingOverview] = useState<any>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('ALL');
+  const [invoicePage, setInvoicePage] = useState(1);
+  const [invoicePagination, setInvoicePagination] = useState<any>({ total: 0, page: 1, limit: 15, totalPages: 1 });
+  const [refundModalInvoice, setRefundModalInvoice] = useState<any | null>(null);
+  const [refundAmount, setRefundAmount] = useState<string>('');
+  const [refundReason, setRefundReason] = useState<string>('requested_by_customer');
+  const [refundProcessing, setRefundProcessing] = useState(false);
+  const [markPaidModalInvoice, setMarkPaidModalInvoice] = useState<any | null>(null);
+  const [markPaidMethod, setMarkPaidMethod] = useState<string>('BANK_WIRE');
+  const [markPaidNotes, setMarkPaidNotes] = useState<string>('Direct Wire / Manual Bank Transfer confirmed');
+  const [markPaidProcessing, setMarkPaidProcessing] = useState(false);
+  const [voidModalInvoice, setVoidModalInvoice] = useState<any | null>(null);
+  const [voidReason, setVoidReason] = useState<string>('Unpaid order / Order cancellation');
+  const [voidProcessing, setVoidProcessing] = useState(false);
+
+  // Safe Broadcasts
+  const [broadcastAudience, setBroadcastAudience] = useState<'all' | 'vps_owners' | 'service_providers' | 'unpaid'>('all');
+  const [broadcastInApp, setBroadcastInApp] = useState(true);
+  const [broadcastEmail, setBroadcastEmail] = useState(true);
+  const [broadcastPriority, setBroadcastPriority] = useState<'normal' | 'high' | 'urgent'>('normal');
+  const [broadcastSubject, setBroadcastSubject] = useState('');
+  const [broadcastBody, setBroadcastBody] = useState('');
+  const [broadcastSending, setBroadcastSending] = useState(false);
+  const [broadcastHistory, setBroadcastHistory] = useState<any[]>([]);
+  const [activeBroadcastJob, setActiveBroadcastJob] = useState<any | null>(null);
+
+  // Executive Reports & Analytics
+  const [reportsData, setReportsData] = useState<any | null>(null);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [exportingReport, setExportingReport] = useState<string | null>(null);
 
   // Fleet
   const [fleetVMs, setFleetVMs] = useState<any[]>([]);
@@ -170,13 +239,92 @@ export default function AdminDashboard() {
     }
   };
 
-  // 2. Users
+  // 2. Users & Roles
   const fetchUsers = async () => {
     try {
-      const res = await apiCall(`/admin/users?search=${encodeURIComponent(userSearch)}`);
-      if (res && res.success) setUsers(res.users);
+      let query = `?search=${encodeURIComponent(userSearch)}`;
+      if (userRoleFilter && userRoleFilter !== 'ALL') {
+        query += `&role=${encodeURIComponent(userRoleFilter)}`;
+      }
+      const res = await apiCall(`/admin/users${query}`);
+      if (res && res.success) {
+        setUsers(res.users);
+        if (res.availableRoles) setAvailableRoles(res.availableRoles);
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to load users');
+    }
+  };
+
+  const handleUpdateRole = async (userId: number, newRoleName: string) => {
+    try {
+      setChangingRoleUserId(userId);
+      const res = await apiCall(`/admin/users/${userId}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role: newRoleName }),
+      });
+      if (res && res.success) {
+        toast.success(res.message || 'User role updated.');
+        setUsers((prev) =>
+          prev.map((u) => (u.userId === userId ? { ...u, role: newRoleName } : u))
+        );
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update user role');
+    } finally {
+      setChangingRoleUserId(null);
+    }
+  };
+
+  const handleToggleUserStatus = async (userId: number, currentStatus: boolean) => {
+    try {
+      const nextStatus = !currentStatus;
+      const res = await apiCall(`/admin/users/${userId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive: nextStatus }),
+      });
+      if (res && res.success) {
+        toast.success(res.message || `User account ${nextStatus ? 'activated' : 'suspended'}`);
+        setUsers((prev) =>
+          prev.map((u) => (u.userId === userId ? { ...u, isActive: nextStatus, isSuspended: !nextStatus } : u))
+        );
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update user status');
+    }
+  };
+
+  const handleOpenUserDrawer = async (user: any) => {
+    setSelectedUserForDrawer(user);
+    setUserProfileLoading(true);
+    setUserProfileData(null);
+    try {
+      const res = await apiCall(`/admin/users/${user.userId}/profile`);
+      if (res && res.success) {
+        setUserProfileData(res.profile);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load user 360 profile');
+    } finally {
+      setUserProfileLoading(false);
+    }
+  };
+
+  const handleAdminSubscriptionAction = async (subscriptionId: number, action: 'EXTEND_30_DAYS' | 'SUSPEND' | 'RESUME' | 'CANCEL') => {
+    try {
+      const res = await apiCall(`/admin/subscriptions/${subscriptionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action }),
+      });
+      if (res && res.success) {
+        toast.success(res.message || 'Subscription updated.');
+        if (selectedUserForDrawer) {
+          const profRes = await apiCall(`/admin/users/${selectedUserForDrawer.userId}/profile`);
+          if (profRes?.success) setUserProfileData(profRes.profile);
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update subscription');
     }
   };
 
@@ -189,7 +337,6 @@ export default function AdminDashboard() {
       setImpersonatingId(user.userId);
       const res = await apiCall(`/admin/impersonate/${user.userId}`, { method: 'POST' });
       if (res && res.success) {
-        // Save current admin token backup in session storage for safe return
         const currentToken = localStorage.getItem('accessToken');
         if (currentToken) sessionStorage.setItem('originalAdminToken', currentToken);
 
@@ -204,7 +351,197 @@ export default function AdminDashboard() {
     }
   };
 
-  // 3. Fleet
+  // 3. Billing & Payments
+  const fetchFinance = async () => {
+    try {
+      setBillingLoading(true);
+      const queryStatus = invoiceStatusFilter !== 'ALL' ? `&status=${invoiceStatusFilter}` : '';
+      const [overviewRes, invoicesRes] = await Promise.all([
+        apiCall('/admin/billing/overview'),
+        apiCall(`/admin/invoices?page=${invoicePage}&limit=15&search=${encodeURIComponent(invoiceSearch)}${queryStatus}`),
+      ]);
+      if (overviewRes?.success) setBillingOverview(overviewRes.overview);
+      if (invoicesRes?.success) {
+        setInvoices(invoicesRes.invoices);
+        setInvoicePagination(invoicesRes.pagination);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load billing ledger');
+    } finally {
+      setBillingLoading(false);
+    }
+  };
+
+  const handleProcessRefund = async () => {
+    if (!refundModalInvoice) return;
+    try {
+      setRefundProcessing(true);
+      const res = await apiCall(`/admin/invoices/${refundModalInvoice.id}/refund`, {
+        method: 'POST',
+        body: JSON.stringify({
+          amount: refundAmount ? parseFloat(refundAmount) : undefined,
+          reason: refundReason,
+        }),
+      });
+      if (res && res.success) {
+        toast.success(res.message || 'Refund successfully executed.');
+        setRefundModalInvoice(null);
+        setRefundAmount('');
+        fetchFinance();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Refund execution failed');
+    } finally {
+      setRefundProcessing(false);
+    }
+  };
+
+  const handleMarkAsPaid = async () => {
+    if (!markPaidModalInvoice) return;
+    try {
+      setMarkPaidProcessing(true);
+      const res = await apiCall(`/admin/invoices/${markPaidModalInvoice.id}/mark-paid`, {
+        method: 'POST',
+        body: JSON.stringify({
+          paymentMethod: markPaidMethod,
+          notes: markPaidNotes,
+        }),
+      });
+      if (res && res.success) {
+        toast.success(res.message || 'Invoice marked as paid and VPS slot deposited.');
+        setMarkPaidModalInvoice(null);
+        fetchFinance();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to mark invoice as paid');
+    } finally {
+      setMarkPaidProcessing(false);
+    }
+  };
+
+  const handleVoidInvoice = async () => {
+    if (!voidModalInvoice) return;
+    try {
+      setVoidProcessing(true);
+      const res = await apiCall(`/admin/invoices/${voidModalInvoice.id}/void`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: voidReason }),
+      });
+      if (res && res.success) {
+        toast.success(res.message || 'Invoice voided.');
+        setVoidModalInvoice(null);
+        fetchFinance();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to void invoice');
+    } finally {
+      setVoidProcessing(false);
+    }
+  };
+
+  // 4. Safe Broadcasts
+  const fetchBroadcasts = async () => {
+    try {
+      const res = await apiCall('/admin/broadcast-history');
+      if (res?.success) setBroadcastHistory(res.history || []);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (!activeBroadcastJob || activeBroadcastJob.status === 'COMPLETED' || activeBroadcastJob.status === 'FAILED') return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await apiCall(`/admin/broadcast-status/${activeBroadcastJob.jobId}`);
+        if (res && res.success && res.job) {
+          setActiveBroadcastJob(res.job);
+          if (res.job.status === 'COMPLETED') {
+            toast.success(`Broadcast campaign finished! Delivered to ${res.job.sentCount} recipients.`);
+            fetchBroadcasts();
+          }
+        }
+      } catch (e) {}
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [activeBroadcastJob?.jobId, activeBroadcastJob?.status]);
+
+  const handleDispatchBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!broadcastSubject.trim() || !broadcastBody.trim()) {
+      toast.error('Please specify both subject and message body.');
+      return;
+    }
+    if (!broadcastInApp && !broadcastEmail) {
+      toast.error('Select at least one broadcast channel (In-App or Email).');
+      return;
+    }
+    try {
+      setBroadcastSending(true);
+      const res = await apiCall('/admin/broadcast', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: broadcastSubject,
+          message: broadcastBody,
+          audience: broadcastAudience,
+          channels: { inApp: broadcastInApp, email: broadcastEmail },
+          priority: broadcastPriority,
+        }),
+      });
+      if (res && res.success) {
+        toast.success(res.message || 'Broadcast campaign queued safely.');
+        setActiveBroadcastJob(res.job);
+        setBroadcastSubject('');
+        setBroadcastBody('');
+        fetchBroadcasts();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Broadcast launch failed');
+    } finally {
+      setBroadcastSending(false);
+    }
+  };
+
+  // 5. Executive Reports & Analytics
+  const fetchReports = async () => {
+    try {
+      setReportsLoading(true);
+      const res = await apiCall('/admin/reports');
+      if (res && res.success) {
+        setReportsData(res.reports);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to load executive reports');
+    } finally {
+      setReportsLoading(false);
+    }
+  };
+
+  const handleExportCsv = async (dataset: 'finance' | 'fleet') => {
+    try {
+      setExportingReport(dataset);
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/reports/export?dataset=${dataset}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Export request failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `atech-${dataset}-report-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`${dataset === 'finance' ? 'Financial Ledger' : 'Fleet Capacity'} CSV successfully downloaded.`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to export CSV');
+    } finally {
+      setExportingReport(null);
+    }
+  };
+
+  // 6. Fleet
   const fetchFleet = async () => {
     try {
       const res = await apiCall('/admin/fleet/vms');
@@ -550,6 +887,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     if (activeTab === 'users') fetchUsers();
+    if (activeTab === 'finance') fetchFinance();
+    if (activeTab === 'broadcasts') fetchBroadcasts();
+    if (activeTab === 'reports') fetchReports();
     if (activeTab === 'fleet') fetchFleet();
     if (activeTab === 'plans') fetchPlansAndCoupons();
     if (activeTab === 'ipam') fetchIpam();
@@ -559,10 +899,21 @@ export default function AdminDashboard() {
     if (activeTab === 'audit') fetchAudit();
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab === 'users') fetchUsers();
+  }, [userRoleFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'finance') fetchFinance();
+  }, [invoiceStatusFilter, invoicePage]);
+
   const navItems = [
     { id: 'overview', label: 'Host Telemetry', icon: Activity, badge: null, alert: false },
-    { id: 'users', label: 'Users & Impersonation', icon: Users, badge: users.length || null, alert: false },
+    { id: 'users', label: 'Users & Roles', icon: Users, badge: users.length || null, alert: false },
+    { id: 'finance', label: 'Billing & Payments', icon: CreditCard, badge: null, alert: false },
     { id: 'fleet', label: 'Global Fleet', icon: Server, badge: fleetVMs.length || null, alert: false },
+    { id: 'broadcasts', label: 'Safe Broadcasts', icon: Mail, badge: null, alert: false },
+    { id: 'reports', label: 'Executive Reports', icon: BarChart3, badge: null, alert: false },
     { id: 'plans', label: 'Plans & Coupons', icon: Tag, badge: null, alert: false },
     { id: 'ipam', label: 'IPAM Pool', icon: Network, badge: null, alert: false },
     { id: 'announcements', label: 'Announcements', icon: Megaphone, badge: announcements.length || null, alert: false },
@@ -727,8 +1078,11 @@ export default function AdminDashboard() {
                 </span>
                 <h1 className="text-lg md:text-xl font-bold font-poppins text-slate-900 dark:text-white truncate">
                   {activeTab === 'overview' && 'Host Telemetry & Cluster Oversight'}
-                  {activeTab === 'users' && 'Directory of Users & Ghost Mode'}
+                  {activeTab === 'users' && 'Directory of Users, Roles & Ghost Mode'}
+                  {activeTab === 'finance' && 'Billing, Invoices & Stripe Payments'}
                   {activeTab === 'fleet' && 'Global Virtual Machine Fleet'}
+                  {activeTab === 'broadcasts' && 'Safe Multi-Channel Broadcast Center'}
+                  {activeTab === 'reports' && 'Executive Reports & Capacity Intelligence'}
                   {activeTab === 'plans' && 'Cloud Plans & Promo Engine'}
                   {activeTab === 'ipam' && 'IP Address Pool & Subnet Management'}
                   {activeTab === 'announcements' && 'Broadcast Maintenance & Notices'}
@@ -746,6 +1100,9 @@ export default function AdminDashboard() {
               onClick={() => {
                 fetchOverview();
                 if (activeTab === 'users') fetchUsers();
+                if (activeTab === 'finance') fetchFinance();
+                if (activeTab === 'broadcasts') fetchBroadcasts();
+                if (activeTab === 'reports') fetchReports();
                 if (activeTab === 'fleet') fetchFleet();
                 if (activeTab === 'plans') fetchPlansAndCoupons();
                 if (activeTab === 'ipam') fetchIpam();
@@ -845,78 +1202,946 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* TAB 2: USERS & IMPERSONATION (OPTION 1) */}
+        {/* TAB 2: USERS & SERVICE PROVIDERS MANAGEMENT */}
         {activeTab === 'users' && (
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden space-y-4">
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins">
-                  User Governance & Ghost Mode Impersonation
+                <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  User & Service Provider Directory ({users.length})
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  View tenant accounts and login directly as any customer for instant debugging.
+                  Granular role permissions, tenant suspension controls, 360° account profiling, and ghost impersonation.
                 </p>
               </div>
 
               <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  placeholder="Search user email or name..."
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && fetchUsers()}
-                  className="pl-4 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600"
-                />
-                <button onClick={fetchUsers} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search name, email..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && fetchUsers()}
+                    className="pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchUsers}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs"
+                >
                   Search
                 </button>
               </div>
+            </div>
+
+            {/* Role Filter Pills */}
+            <div className="px-5 flex items-center gap-2 overflow-x-auto pb-1">
+              {[
+                { id: 'ALL', label: 'All Users' },
+                { id: 'Customer', label: 'Customers' },
+                { id: 'Service_Provider', label: 'Service Providers / Resellers' },
+                { id: 'Support_Staff', label: 'Support Staff' },
+                { id: 'Admin', label: 'Administrators' },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => setUserRoleFilter(pill.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    userRoleFilter === pill.id
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
                 <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold uppercase border-b border-slate-100 dark:border-slate-800">
                   <tr>
-                    <th className="px-6 py-3.5">User</th>
-                    <th className="px-6 py-3.5">Role</th>
+                    <th className="px-6 py-3.5">User Identity</th>
+                    <th className="px-6 py-3.5">Assigned Role</th>
                     <th className="px-6 py-3.5">Status</th>
-                    <th className="px-6 py-3.5">VMs</th>
-                    <th className="px-6 py-3.5 text-right">Ghost Mode & Controls</th>
+                    <th className="px-6 py-3.5">Infrastructure</th>
+                    <th className="px-6 py-3.5">Total Spend</th>
+                    <th className="px-6 py-3.5 text-right">Controls & 360° Profile</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {users.map((u) => (
-                    <tr key={u.userId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <tr key={u.userId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="px-6 py-4">
                         <p className="font-semibold text-slate-900 dark:text-white text-xs">{u.fullName}</p>
                         <p className="text-[11px] font-mono text-slate-400">{u.email}</p>
+                        <span className="text-[10px] text-slate-400">Joined {new Date(u.createdAt).toLocaleDateString()}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800">
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${u.isActive ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                          {u.isActive ? 'Active' : 'Suspended'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-xs font-mono">{u.vmCount} VMs</td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => handleImpersonate(u)}
-                          disabled={impersonatingId === u.userId}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold transition-all shadow-xs"
-                          title="Login as Customer (Ghost Mode)"
+                        <select
+                          value={u.role || 'Customer'}
+                          onChange={(e) => handleUpdateRole(u.userId, e.target.value)}
+                          disabled={changingRoleUserId === u.userId}
+                          className="text-xs font-bold py-1 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-600 cursor-pointer"
                         >
-                          <LogIn className="w-3.5 h-3.5" />
-                          <span>Login As User</span>
-                        </button>
+                          <option value="Customer">Customer</option>
+                          <option value="Service_Provider">Service Provider</option>
+                          <option value="Support_Staff">Support Staff</option>
+                          <option value="Admin">Administrator</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              u.isActive
+                                ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
+                                : 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400'
+                            }`}
+                          >
+                            {u.isActive ? 'Active' : 'Suspended'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserStatus(u.userId, u.isActive)}
+                            title={u.isActive ? 'Suspend User Access' : 'Activate User Access'}
+                            className={`p-1 rounded-md text-[10px] font-semibold transition-colors cursor-pointer ${
+                              u.isActive
+                                ? 'text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60'
+                                : 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60'
+                            }`}
+                          >
+                            {u.isActive ? 'Suspend' : 'Activate'}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-mono">
+                        <span className="font-semibold text-slate-900 dark:text-white">{u.vmCount || 0} VMs</span>
+                        <span className="text-slate-400"> • {u.activeSubscriptions || 0} Plans</span>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-mono font-bold text-slate-900 dark:text-white">
+                        ${Number(u.totalSpend || 0).toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenUserDrawer(u)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                            title="Inspect complete 360° customer profile, VMs, and billing history"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>360° Profile</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleImpersonate(u)}
+                            disabled={impersonatingId === u.userId}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                            title="Login as Customer (Ghost Mode)"
+                          >
+                            <LogIn className="w-3.5 h-3.5" />
+                            <span>Ghost Mode</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
+                  {users.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="text-center py-8 text-xs text-slate-400">
+                        No users found matching the filter criteria.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: BILLING & FULL PAYMENTS MANAGEMENT */}
+        {activeTab === 'finance' && (
+          <div className="space-y-6">
+            {/* Financial Overview KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                  <span>Gross Processed</span>
+                  <div className="p-2 bg-blue-50 dark:bg-blue-950/60 text-blue-600 rounded-xl">
+                    <DollarSign className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-2">
+                  ${Number(billingOverview?.totalGrossVolume || 0).toFixed(2)}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">{billingOverview?.paidCount || 0} Paid Invoices</p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                  <span>Stripe Volume</span>
+                  <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-xl">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-2">
+                  ${Number(billingOverview?.stripeVolume || 0).toFixed(2)}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Direct Credit/Debit Cards</p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                  <span>Bank Wire / Direct</span>
+                  <div className="p-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 rounded-xl">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-2">
+                  ${Number(billingOverview?.bankVolume || 0).toFixed(2)}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Direct Bank Transfers</p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                  <span>Refunds Issued</span>
+                  <div className="p-2 bg-purple-50 dark:bg-purple-950/60 text-purple-600 rounded-xl">
+                    <RotateCcw className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-xl font-bold font-mono text-purple-600 dark:text-purple-400 mt-2">
+                  -${Number(billingOverview?.refundVolume || 0).toFixed(2)}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">{billingOverview?.refundedCount || 0} Transactions</p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                  <span>Monthly Recurring</span>
+                  <div className="p-2 bg-amber-50 dark:bg-amber-950/60 text-amber-600 rounded-xl">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400 mt-2">
+                  ${Number(billingOverview?.mrr || 0).toFixed(2)}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Est. ARR: ${Number(billingOverview?.estimatedArr || 0).toFixed(2)}</p>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
+                  <span>Pending / Due</span>
+                  <div className="p-2 bg-rose-50 dark:bg-rose-950/60 text-rose-600 rounded-xl">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                </div>
+                <div className="text-xl font-bold font-mono text-rose-600 dark:text-rose-400 mt-2">
+                  ${Number(billingOverview?.pendingVolume || 0).toFixed(2)}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">{billingOverview?.pendingCount || 0} Unpaid Orders</p>
+              </div>
+            </div>
+
+            {/* Invoices Ledger Table */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden space-y-4">
+              <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
+                    <Receipt className="w-5 h-5 text-blue-600" />
+                    Transaction & Invoice Ledger
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Execute real-time Stripe refunds, reconcile direct bank wires, and cancel invalid invoices.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Invoice # or customer..."
+                      value={invoiceSearch}
+                      onChange={(e) => setInvoiceSearch(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && fetchFinance()}
+                      className="pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchFinance}
+                    className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs"
+                  >
+                    Filter
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="px-5 flex items-center gap-2 overflow-x-auto pb-1">
+                {[
+                  { id: 'ALL', label: 'All Invoices' },
+                  { id: 'PAID', label: 'Paid' },
+                  { id: 'PENDING', label: 'Pending' },
+                  { id: 'REFUNDED', label: 'Refunded' },
+                  { id: 'VOID', label: 'Void / Cancelled' },
+                  { id: 'FAILED', label: 'Failed' },
+                ].map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => {
+                      setInvoiceStatusFilter(st.id);
+                      setInvoicePage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      invoiceStatusFilter === st.id
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-600 dark:text-slate-400">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold uppercase border-b border-slate-100 dark:border-slate-800">
+                    <tr>
+                      <th className="px-6 py-3.5">Invoice #</th>
+                      <th className="px-6 py-3.5">Customer</th>
+                      <th className="px-6 py-3.5">Plan / Description</th>
+                      <th className="px-6 py-3.5">Amount & Gateway</th>
+                      <th className="px-6 py-3.5">Status</th>
+                      <th className="px-6 py-3.5 text-right">Payment Controls</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {invoices.map((inv) => (
+                      <tr key={inv.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="font-mono font-bold text-slate-900 dark:text-white text-xs">{inv.invoiceNumber}</p>
+                          <p className="text-[11px] text-slate-400">{new Date(inv.createdAt).toLocaleString()}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-slate-900 dark:text-white text-xs">{inv.user?.fullName || 'Guest'}</p>
+                          <p className="text-[11px] font-mono text-slate-400">{inv.user?.email || 'N/A'}</p>
+                        </td>
+                        <td className="px-6 py-4 text-xs">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">
+                            {inv.plan?.name || inv.description || 'VPS Service Provision'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="font-mono font-bold text-slate-900 dark:text-white text-xs">
+                            ${Number(inv.amount || 0).toFixed(2)}
+                          </p>
+                          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                            {inv.paymentMethod || 'Stripe'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              inv.status === 'PAID'
+                                ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400'
+                                : inv.status === 'PENDING'
+                                ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400'
+                                : inv.status === 'REFUNDED'
+                                ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-400'
+                                : inv.status === 'VOID'
+                                ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                                : 'bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-400'
+                            }`}
+                          >
+                            {inv.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            {inv.status === 'PAID' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRefundModalInvoice(inv);
+                                  setRefundAmount(String(inv.amount));
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                title="Issue a full or partial Stripe refund"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>Refund</span>
+                              </button>
+                            )}
+
+                            {inv.status === 'PENDING' && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setMarkPaidModalInvoice(inv)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                                  title="Manually verify bank wire or external payment"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Mark Paid</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setVoidModalInvoice(inv)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 hover:text-rose-600 text-slate-600 dark:text-slate-400 text-xs font-bold transition-all cursor-pointer"
+                                  title="Cancel and void unpaid invoice"
+                                >
+                                  <Ban className="w-3.5 h-3.5" />
+                                  <span>Void</span>
+                                </button>
+                              </>
+                            )}
+
+                            {inv.status === 'REFUNDED' && (
+                              <span className="text-[11px] font-mono text-purple-600 dark:text-purple-400">
+                                Refund Processed
+                              </span>
+                            )}
+
+                            {inv.status === 'VOID' && (
+                              <span className="text-[11px] font-mono text-slate-400">
+                                Voided
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {invoices.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-center py-8 text-xs text-slate-400">
+                          No invoices matching selected filters.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              {invoicePagination.totalPages > 1 && (
+                <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+                  <span>
+                    Page {invoicePagination.page} of {invoicePagination.totalPages} ({invoicePagination.total} total)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={invoicePage <= 1}
+                      onClick={() => setInvoicePage((p) => Math.max(1, p - 1))}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      disabled={invoicePage >= invoicePagination.totalPages}
+                      onClick={() => setInvoicePage((p) => p + 1)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 cursor-pointer"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB: SAFE MULTI-CHANNEL BROADCAST CENTER */}
+        {activeTab === 'broadcasts' && (
+          <div className="space-y-6">
+            {/* IP Reputation Protection Banner */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border border-blue-200 dark:border-blue-800/80 rounded-2xl p-5 shadow-xs">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white font-poppins">
+                    Enterprise Safe Mail Server Rate-Limiting Protection
+                  </h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                    Broadcast dispatches are throttled to <strong>20 emails per batch with a 2.5s pause</strong>. Automated RFC 2369 bulk headers, list unsubscribe tags, and spam suppression directives are embedded into every outbound message to safeguard your mail server IP from blacklisting by Google, Microsoft, and Yahoo.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Broadcast Campaign Composer */}
+              <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
+                <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-blue-600" /> Dispatch New Mass Announcement
+                </h3>
+
+                <form onSubmit={handleDispatchBroadcast} className="space-y-4">
+                  {/* Audience Selector */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Target Customer Audience
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {[
+                        { id: 'all', title: 'All Users', desc: 'Global platform broadcast' },
+                        { id: 'vps_owners', title: 'Active VPS Owners', desc: 'Tenants with deployed VMs' },
+                        { id: 'service_providers', title: 'Service Providers', desc: 'Resellers and B2B partners' },
+                        { id: 'unpaid', title: 'Pending Invoices', desc: 'Customers awaiting checkout' },
+                      ].map((aud) => (
+                        <label
+                          key={aud.id}
+                          className={`flex items-start gap-3 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                            broadcastAudience === aud.id
+                              ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-100 font-semibold'
+                              : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-600 dark:text-slate-400'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="broadcastAudience"
+                            value={aud.id}
+                            checked={broadcastAudience === aud.id}
+                            onChange={() => setBroadcastAudience(aud.id as any)}
+                            className="mt-0.5 text-blue-600"
+                          />
+                          <div>
+                            <span className="font-bold block text-slate-900 dark:text-white">{aud.title}</span>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400">{aud.desc}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Delivery Channels */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Delivery Channels
+                    </label>
+                    <div className="flex items-center gap-6 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={broadcastInApp}
+                          onChange={(e) => setBroadcastInApp(e.target.checked)}
+                          className="rounded text-blue-600"
+                        />
+                        <span>In-App Announcement Center</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={broadcastEmail}
+                          onChange={(e) => setBroadcastEmail(e.target.checked)}
+                          className="rounded text-blue-600"
+                        />
+                        <span>Safe Throttled Email Queue</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Priority */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Campaign Priority
+                    </label>
+                    <select
+                      value={broadcastPriority}
+                      onChange={(e) => setBroadcastPriority(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200"
+                    >
+                      <option value="normal">Normal Broadcast (Standard notification)</option>
+                      <option value="high">High Priority (Urgent maintenance notice)</option>
+                      <option value="urgent">Critical Security Warning (Immediate banner)</option>
+                    </select>
+                  </div>
+
+                  {/* Subject */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Broadcast Title / Subject
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Scheduled Network Maintenance on Hyper-V Host..."
+                      value={broadcastSubject}
+                      onChange={(e) => setBroadcastSubject(e.target.value)}
+                      required
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white"
+                    />
+                  </div>
+
+                  {/* Message Body */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Message Body (Supports multi-line text)
+                    </label>
+                    <textarea
+                      rows={5}
+                      placeholder="Enter the complete bulletin details, impacted services, schedule, and customer action items..."
+                      value={broadcastBody}
+                      onChange={(e) => setBroadcastBody(e.target.value)}
+                      required
+                      className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white leading-relaxed resize-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={broadcastSending}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Send className={`w-4 h-4 ${broadcastSending ? 'animate-spin' : ''}`} />
+                    <span>{broadcastSending ? 'Queuing Campaign...' : 'Launch Safe Broadcast Campaign'}</span>
+                  </button>
+                </form>
+              </div>
+
+              {/* Right Column: Live Progress & History */}
+              <div className="lg:col-span-5 space-y-6">
+                {/* Active Broadcast Job Monitor */}
+                {activeBroadcastJob && (
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl border border-blue-300 dark:border-blue-800 p-5 shadow-md space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                        Live Broadcast Tracker
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          activeBroadcastJob.status === 'COMPLETED'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-blue-100 text-blue-700 animate-pulse'
+                        }`}
+                      >
+                        {activeBroadcastJob.status}
+                      </span>
+                    </div>
+
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                      {activeBroadcastJob.title}
+                    </h4>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-1">
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                        <div
+                          className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+                          style={{
+                            width: `${
+                              activeBroadcastJob.totalRecipients > 0
+                                ? Math.round((activeBroadcastJob.sentCount / activeBroadcastJob.totalRecipients) * 100)
+                                : 100
+                            }%`,
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <span>
+                          Delivered {activeBroadcastJob.sentCount} of {activeBroadcastJob.totalRecipients} emails
+                        </span>
+                        <span className="font-mono font-bold">
+                          {activeBroadcastJob.totalRecipients > 0
+                            ? Math.round((activeBroadcastJob.sentCount / activeBroadcastJob.totalRecipients) * 100)
+                            : 100}
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Past Broadcast History */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm font-poppins flex items-center justify-between">
+                    <span>Recent Broadcast Dispatches</span>
+                    <button
+                      type="button"
+                      onClick={fetchBroadcasts}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Refresh
+                    </button>
+                  </h4>
+
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {broadcastHistory.map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-900 dark:text-white line-clamp-1">
+                            {item.title}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 font-mono text-slate-700 dark:text-slate-300">
+                            {item.audience}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                          {item.message}
+                        </p>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                          <span>{new Date(item.createdAt).toLocaleString()}</span>
+                          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                            ✓ {item.sentCount || 'All'} Delivered
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {broadcastHistory.length === 0 && (
+                      <p className="text-center py-6 text-xs text-slate-400">
+                        No previous broadcast campaigns dispatched yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: EXECUTIVE REPORTS & CAPACITY INTELLIGENCE */}
+        {activeTab === 'reports' && (
+          <div className="space-y-6">
+            {/* Top Action Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-blue-600" />
+                  Cluster Intelligence & Executive Reports
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Complete fleet overcommit metrics, financial ledger analysis, plan distribution, and 1-click exports.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={exportingReport === 'finance'}
+                  onClick={() => handleExportCsv('finance')}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className={`w-3.5 h-3.5 ${exportingReport === 'finance' ? 'animate-spin' : ''}`} />
+                  <span>Export Financial Ledger (.CSV)</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={exportingReport === 'fleet'}
+                  onClick={() => handleExportCsv('fleet')}
+                  className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <FileSpreadsheet className={`w-3.5 h-3.5 ${exportingReport === 'fleet' ? 'animate-spin' : ''}`} />
+                  <span>Export Fleet Capacity (.CSV)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Hyper-V Fleet Overcommit & Capacity Gauge */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
+              <h4 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
+                <Cpu className="w-5 h-5 text-indigo-600" />
+                Physical Host Compute & Virtualization Overcommit Ratios
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* vCPU Ratio Gauge */}
+                <div className="p-5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                        vCPU Allocation vs Physical Cores
+                      </span>
+                      <p className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+                        {reportsData?.fleetCapacity?.cpuOvercommitRatio || '1.0'}:1 Overcommit Ratio
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                      Safe Tier
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-indigo-600 h-3 rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          ((reportsData?.fleetCapacity?.allocatedVcpus || 1) /
+                            (reportsData?.fleetCapacity?.totalHostCores * 4 || 1)) *
+                            100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>{reportsData?.fleetCapacity?.allocatedVcpus || 0} vCPUs Provisioned</span>
+                    <span>{reportsData?.fleetCapacity?.totalHostCores || 0} Physical Cores Available</span>
+                  </div>
+                </div>
+
+                {/* RAM Allocation Gauge */}
+                <div className="p-5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                        Host RAM Capacity Committed
+                      </span>
+                      <p className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+                        {reportsData?.fleetCapacity?.ramAllocationPercent || 0}% Allocation
+                      </p>
+                    </div>
+                    <span
+                      className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                        Number(reportsData?.fleetCapacity?.ramAllocationPercent || 0) < 85
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}
+                    >
+                      {Number(reportsData?.fleetCapacity?.ramAllocationPercent || 0) < 85 ? 'Healthy' : 'High Load'}
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
+                    <div
+                      className="bg-blue-600 h-3 rounded-full transition-all"
+                      style={{
+                        width: `${Math.min(100, reportsData?.fleetCapacity?.ramAllocationPercent || 0)}%`,
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>{reportsData?.fleetCapacity?.allocatedRamGb || 0} GB RAM Provisioned</span>
+                    <span>{reportsData?.fleetCapacity?.totalHostRamGb || 0} GB Host Physical RAM</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* VM Status Counter Chips */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                <div className="p-4 bg-blue-50/60 dark:bg-blue-950/40 rounded-xl border border-blue-100 dark:border-blue-900/40 text-center">
+                  <span className="text-xs text-slate-500">Total Virtual Instances</span>
+                  <p className="text-2xl font-bold font-mono text-blue-600 dark:text-blue-400 mt-1">
+                    {reportsData?.fleetCapacity?.totalVms || 0}
+                  </p>
+                </div>
+                <div className="p-4 bg-emerald-50/60 dark:bg-emerald-950/40 rounded-xl border border-emerald-100 dark:border-emerald-900/40 text-center">
+                  <span className="text-xs text-slate-500">Online & Running</span>
+                  <p className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+                    {reportsData?.fleetCapacity?.runningVms || 0}
+                  </p>
+                </div>
+                <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-xl text-center">
+                  <span className="text-xs text-slate-500">Powered Off / Suspended</span>
+                  <p className="text-2xl font-bold font-mono text-slate-700 dark:text-slate-300 mt-1">
+                    {reportsData?.fleetCapacity?.stoppedVms || 0}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Plan Distribution & Popularity */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
+                <h4 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-blue-600" />
+                  VPS Plan Popularity & Revenue Distribution
+                </h4>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs text-slate-600 dark:text-slate-400">
+                    <thead className="bg-slate-50 dark:bg-slate-800 text-[11px] font-semibold uppercase border-b border-slate-100 dark:border-slate-800">
+                      <tr>
+                        <th className="px-4 py-3">Plan Name</th>
+                        <th className="px-4 py-3">Monthly Rate</th>
+                        <th className="px-4 py-3">Active Subscriptions</th>
+                        <th className="px-4 py-3 text-right">Est. Monthly Volume</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                      {reportsData?.planPopularity?.map((plan: any) => (
+                        <tr key={plan.planId} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td className="px-4 py-3 font-sans font-bold text-slate-900 dark:text-white">
+                            {plan.name}
+                          </td>
+                          <td className="px-4 py-3">${Number(plan.price || 0).toFixed(2)}/mo</td>
+                          <td className="px-4 py-3 font-bold text-blue-600">{plan.activeSubscriptions} subscribers</td>
+                          <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                            ${Number(plan.monthlyRevenue || 0).toFixed(2)}/mo
+                          </td>
+                        </tr>
+                      ))}
+                      {(!reportsData?.planPopularity || reportsData.planPopularity.length === 0) && (
+                        <tr>
+                          <td colSpan={4} className="text-center py-6 text-slate-400">
+                            No subscription plan metrics available yet.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* User Roles & SLA Card */}
+              <div className="lg:col-span-4 space-y-6">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm font-poppins flex items-center gap-2">
+                    <Users className="w-4 h-4 text-purple-600" />
+                    Tenant Demographics
+                  </h4>
+                  <div className="space-y-2.5">
+                    {reportsData?.userBreakdown?.map((rb: any) => (
+                      <div
+                        key={rb.role}
+                        className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl text-xs"
+                      >
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{rb.role}</span>
+                        <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{rb.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-3">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm font-poppins flex items-center gap-2">
+                    <LifeBuoy className="w-4 h-4 text-amber-600" />
+                    Support Helpdesk SLA Performance
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-center pt-1">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                      <span className="text-[11px] text-slate-500">Open Tickets</span>
+                      <p className="text-lg font-bold font-mono text-amber-600 mt-0.5">
+                        {reportsData?.ticketSla?.open || 0}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                      <span className="text-[11px] text-slate-500">Resolved</span>
+                      <p className="text-lg font-bold font-mono text-emerald-600 mt-0.5">
+                        {reportsData?.ticketSla?.resolved || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1985,6 +3210,434 @@ export default function AdminDashboard() {
 
         </main>
       </div>
+
+      {/* 360° CUSTOMER PROFILE DRAWER / MODAL */}
+      {selectedUserForDrawer && (
+        <div className="fixed inset-0 z-[110] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-blue-500/20">
+                  {selectedUserForDrawer.fullName?.charAt(0)?.toUpperCase() || 'U'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-lg text-slate-900 dark:text-white font-poppins">
+                      {selectedUserForDrawer.fullName}
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                      {selectedUserForDrawer.role}
+                    </span>
+                  </div>
+                  <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                    {selectedUserForDrawer.email} • User ID #{selectedUserForDrawer.userId}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedUserForDrawer(null);
+                  setUserProfileData(null);
+                }}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {userProfileLoading ? (
+                <div className="py-16 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+                  <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+                  <p className="text-xs">Loading complete 360° telemetry profile...</p>
+                </div>
+              ) : userProfileData ? (
+                <>
+                  {/* Metric Chips */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40">
+                      <span className="text-xs text-slate-500">Lifetime Gross Spend</span>
+                      <p className="text-xl font-bold font-mono text-blue-600 dark:text-blue-400 mt-1">
+                        ${Number(userProfileData.metrics?.totalSpend || 0).toFixed(2)}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/40">
+                      <span className="text-xs text-slate-500">Active Subscriptions</span>
+                      <p className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1">
+                        {userProfileData.metrics?.activeSubscriptions || 0} Paid Plans
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-purple-50/60 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/40">
+                      <span className="text-xs text-slate-500">Deployed Virtual Machines</span>
+                      <p className="text-xl font-bold font-mono text-purple-600 dark:text-purple-400 mt-1">
+                        {userProfileData.metrics?.vmCount || 0} Fleet Instances
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Section: Virtual Machines */}
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                      <Server className="w-4 h-4 text-blue-600" />
+                      Provisioned Virtual Machines ({userProfileData.vms?.length || 0})
+                    </h4>
+                    <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+                      <table className="w-full text-left text-xs text-slate-600 dark:text-slate-400">
+                        <thead className="bg-slate-50 dark:bg-slate-800 text-[11px] uppercase font-semibold">
+                          <tr>
+                            <th className="px-4 py-2.5">VM Name</th>
+                            <th className="px-4 py-2.5">IP Address</th>
+                            <th className="px-4 py-2.5">Specs</th>
+                            <th className="px-4 py-2.5">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                          {userProfileData.vms?.map((vm: any) => (
+                            <tr key={vm.vmId}>
+                              <td className="px-4 py-3 font-sans font-bold text-slate-900 dark:text-white">{vm.name}</td>
+                              <td className="px-4 py-3">{vm.ip}</td>
+                              <td className="px-4 py-3">{vm.cpuCores} vCPU • {vm.ramGb} GB RAM</td>
+                              <td className="px-4 py-3 font-sans">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  vm.status === 'running' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {vm.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                          {(!userProfileData.vms || userProfileData.vms.length === 0) && (
+                            <tr>
+                              <td colSpan={4} className="text-center py-4 text-slate-400">No VMs currently deployed.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Section: Subscriptions & Entitlements */}
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                      <Tag className="w-4 h-4 text-emerald-600" />
+                      Recurring Subscriptions & Plan Slots ({userProfileData.subscriptions?.length || 0})
+                    </h4>
+                    <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+                      <table className="w-full text-left text-xs text-slate-600 dark:text-slate-400">
+                        <thead className="bg-slate-50 dark:bg-slate-800 text-[11px] uppercase font-semibold">
+                          <tr>
+                            <th className="px-4 py-2.5">Plan Name</th>
+                            <th className="px-4 py-2.5">Monthly Price</th>
+                            <th className="px-4 py-2.5">Next Expiry / Renewal</th>
+                            <th className="px-4 py-2.5">Status</th>
+                            <th className="px-4 py-2.5 text-right">Quick Management</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                          {userProfileData.subscriptions?.map((sub: any) => (
+                            <tr key={sub.id}>
+                              <td className="px-4 py-3 font-sans font-bold text-slate-900 dark:text-white">{sub.plan?.name}</td>
+                              <td className="px-4 py-3">${Number(sub.plan?.monthlyPrice || 0).toFixed(2)}/mo</td>
+                              <td className="px-4 py-3">{sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString() : 'N/A'}</td>
+                              <td className="px-4 py-3 font-sans">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  sub.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {sub.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right font-sans">
+                                <button
+                                  type="button"
+                                  onClick={() => handleAdminSubscriptionAction(sub.id, 'EXTEND_30_DAYS')}
+                                  className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-300 rounded-lg text-[11px] font-bold cursor-pointer"
+                                  title="Add 30 free days to this subscription period"
+                                >
+                                  +30 Days Free
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {(!userProfileData.subscriptions || userProfileData.subscriptions.length === 0) && (
+                            <tr>
+                              <td colSpan={5} className="text-center py-4 text-slate-400">No active subscriptions.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Section: Invoices */}
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-xs uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                      <Receipt className="w-4 h-4 text-purple-600" />
+                      Invoice Ledger & Billing History ({userProfileData.invoices?.length || 0})
+                    </h4>
+                    <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl">
+                      <table className="w-full text-left text-xs text-slate-600 dark:text-slate-400">
+                        <thead className="bg-slate-50 dark:bg-slate-800 text-[11px] uppercase font-semibold">
+                          <tr>
+                            <th className="px-4 py-2.5">Invoice #</th>
+                            <th className="px-4 py-2.5">Date</th>
+                            <th className="px-4 py-2.5">Amount</th>
+                            <th className="px-4 py-2.5">Gateway</th>
+                            <th className="px-4 py-2.5">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
+                          {userProfileData.invoices?.map((inv: any) => (
+                            <tr key={inv.id}>
+                              <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">{inv.invoiceNumber}</td>
+                              <td className="px-4 py-3 font-sans">{new Date(inv.createdAt).toLocaleDateString()}</td>
+                              <td className="px-4 py-3">${Number(inv.amount || 0).toFixed(2)}</td>
+                              <td className="px-4 py-3 font-sans uppercase text-[10px]">{inv.paymentMethod}</td>
+                              <td className="px-4 py-3 font-sans">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  inv.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {inv.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                          {(!userProfileData.invoices || userProfileData.invoices.length === 0) && (
+                            <tr>
+                              <td colSpan={5} className="text-center py-4 text-slate-400">No invoices generated yet.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedUserForDrawer(null);
+                  setUserProfileData(null);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-bold transition-all cursor-pointer"
+              >
+                Close Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* STRIPE REFUND MODAL */}
+      {refundModalInvoice && (
+        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-900/60 flex items-center justify-center text-purple-600 dark:text-purple-400 shrink-0">
+                <RotateCcw className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Process Stripe Refund</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Reversal of funds back to cardholder</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl space-y-1 text-xs">
+              <p className="text-slate-500">Invoice: <strong className="text-slate-900 dark:text-white">{refundModalInvoice.invoiceNumber}</strong></p>
+              <p className="text-slate-500">Customer: <strong className="text-slate-900 dark:text-white">{refundModalInvoice.user?.fullName} ({refundModalInvoice.user?.email})</strong></p>
+              <p className="text-slate-500">Original Amount: <strong className="text-emerald-600">${Number(refundModalInvoice.amount || 0).toFixed(2)}</strong></p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Refund Amount ($)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                max={refundModalInvoice.amount}
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono font-bold"
+              />
+              <span className="text-[11px] text-slate-400">Leave as default for 100% full refund</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Reason for Refund
+              </label>
+              <select
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold"
+              >
+                <option value="requested_by_customer">Customer Requested Refund</option>
+                <option value="duplicate">Duplicate Charge</option>
+                <option value="fraudulent">Fraudulent / Unauthorized Transaction</option>
+                <option value="service_unsatisfactory">Service Technical Issue</option>
+              </select>
+            </div>
+
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-lg border border-amber-200 dark:border-amber-900/40">
+              Note: Issuing this refund will contact Stripe API, reverse the charge, mark the invoice as REFUNDED, and deactivate the associated VPS subscription slot.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setRefundModalInvoice(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={refundProcessing}
+                onClick={handleProcessRefund}
+                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-purple-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${refundProcessing ? 'animate-spin' : ''}`} />
+                <span>{refundProcessing ? 'Refunding...' : 'Confirm & Issue Refund'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MARK INVOICE AS PAID MODAL */}
+      {markPaidModalInvoice && (
+        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-900/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Check className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Mark Invoice as Paid</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Reconcile wire transfer and deposit VPS runtime</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl space-y-1 text-xs">
+              <p className="text-slate-500">Invoice: <strong className="text-slate-900 dark:text-white">{markPaidModalInvoice.invoiceNumber}</strong></p>
+              <p className="text-slate-500">Customer: <strong className="text-slate-900 dark:text-white">{markPaidModalInvoice.user?.fullName} ({markPaidModalInvoice.user?.email})</strong></p>
+              <p className="text-slate-500">Amount Due: <strong className="text-emerald-600">${Number(markPaidModalInvoice.amount || 0).toFixed(2)}</strong></p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Settlement Payment Channel
+              </label>
+              <select
+                value={markPaidMethod}
+                onChange={(e) => setMarkPaidMethod(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold"
+              >
+                <option value="BANK_WIRE">Bank Wire / ACH Direct Transfer</option>
+                <option value="CRYPTO">Cryptocurrency (BTC / USDT / ETH)</option>
+                <option value="MANUAL_CREDIT">Admin Courtesy / Corporate Credit</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Audit Notes / Wire Reference ID
+              </label>
+              <input
+                type="text"
+                value={markPaidNotes}
+                onChange={(e) => setMarkPaidNotes(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+              />
+            </div>
+
+            <p className="text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-200 dark:border-emerald-900/40">
+              Marking this invoice as PAID will immediately credit the customer's account with 30 days of active VPS runtime slot and transmit a confirmation receipt.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setMarkPaidModalInvoice(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={markPaidProcessing}
+                onClick={handleMarkAsPaid}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Check className={`w-3.5 h-3.5 ${markPaidProcessing ? 'animate-spin' : ''}`} />
+                <span>{markPaidProcessing ? 'Marking Paid...' : 'Confirm & Deposit Slot'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VOID INVOICE MODAL */}
+      {voidModalInvoice && (
+        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-400 shrink-0">
+                <Ban className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Void Invoice</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Cancel unpaid transaction record</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Are you sure you want to void invoice <strong className="text-slate-900 dark:text-white">{voidModalInvoice.invoiceNumber}</strong> for <strong className="text-slate-900 dark:text-white">${Number(voidModalInvoice.amount || 0).toFixed(2)}</strong>?
+            </p>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Void Reason
+              </label>
+              <input
+                type="text"
+                value={voidReason}
+                onChange={(e) => setVoidReason(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setVoidModalInvoice(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={voidProcessing}
+                onClick={handleVoidInvoice}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-rose-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Ban className={`w-3.5 h-3.5 ${voidProcessing ? 'animate-spin' : ''}`} />
+                <span>{voidProcessing ? 'Voiding...' : 'Confirm Void'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ADMIN POWER OFF CONFIRMATION MODAL */}
       {adminPowerConfirmVm && (
