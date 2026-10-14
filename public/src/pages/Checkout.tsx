@@ -91,12 +91,14 @@ export default function Checkout() {
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
+  const [deployPreference, setDeployPreference] = useState<'immediate' | 'later'>('immediate');
   const [paymentSuccessData, setPaymentSuccessData] = useState<{
     transactionId: string;
     invoiceNumber: string;
     amount: string;
     method: string;
     dueDate?: string;
+    isDeployLater?: boolean;
   } | null>(null);
 
   const stepOrder: StepId[] = ['details', 'review', 'payment'];
@@ -246,11 +248,35 @@ export default function Checkout() {
         });
 
         if (res.success) {
+          if (deployPreference === 'immediate') {
+            try {
+              const deployPayload = {
+                vmName: `srv-vps-${Math.floor(1000 + Math.random() * 9000)}`,
+                planId: orderData.plan?.planId || 1,
+                imageId: orderData.os?.imageId || 1,
+                customCpu: orderData.plan?.cpuCores,
+                customRam: orderData.plan?.ramGb,
+                customStorage: orderData.plan?.storageGb,
+                username: 'ubuntu',
+                password: 'root',
+                authMethod: 'password',
+                enableBackups: orderData.addons?.some((a: any) => a.name?.toLowerCase().includes('backup')),
+              };
+              await apiCall('/vms/deploy', {
+                method: 'POST',
+                body: JSON.stringify(deployPayload),
+              });
+            } catch (deployErr) {
+              console.warn('[Auto-deploy during checkout notice]:', deployErr);
+            }
+          }
+
           setPaymentSuccessData({
             transactionId: res.transactionId,
             invoiceNumber: res.invoiceNumber,
             amount: res.amount,
             method: `${res.cardBrand} •••• ${res.last4}`,
+            isDeployLater: deployPreference === 'later',
           });
         }
       } else if (paymentMethod === 'bank_transfer') {
@@ -275,6 +301,7 @@ export default function Checkout() {
             amount: res.amount,
             method: `Bank Wire (Sort: ${res.sortCode} / A/C: ${res.maskedAccount})`,
             dueDate: res.dueDate,
+            isDeployLater: true,
           });
         }
       } else {
@@ -785,35 +812,9 @@ export default function Checkout() {
                   </button>
                 </div>
 
-                {/* 1. CREDIT / DEBIT CARD PANEL */}
+                {/* 1. CREDIT / DEBIT CARD PANEL (Matches Stripe Elements in Image 1) */}
                 {paymentMethod === 'card' && (
-                  <div className="space-y-5 text-xs pt-2">
-                    {/* Select Card Brand */}
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-2">Supported Card Networks</label>
-                      <div className="grid grid-cols-3 gap-2.5">
-                        {[
-                          { brand: 'Visa', label: 'VISA', icon: '💳', bg: 'hover:border-blue-400' },
-                          { brand: 'Mastercard', label: 'Mastercard', icon: '🔴🟠', bg: 'hover:border-amber-400' },
-                          { brand: 'American Express', label: 'AMEX', icon: '🛡️', bg: 'hover:border-sky-400' },
-                        ].map((item) => (
-                          <button
-                            key={item.brand}
-                            type="button"
-                            onClick={() => setSelectedCardBrand(item.brand as any)}
-                            className={`py-2.5 px-3 rounded-lg border font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-                              selectedCardBrand === item.brand
-                                ? 'border-blue-600 bg-blue-50 text-blue-700 font-black shadow-sm ring-1 ring-blue-500'
-                                : 'border-slate-200 bg-slate-50/50 text-slate-600 ' + item.bg
-                            }`}
-                          >
-                            <span>{item.icon}</span>
-                            <span>{item.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
+                  <div className="space-y-4 text-xs pt-2">
                     <div>
                       <label className="block font-bold text-slate-700 mb-1.5">Cardholder Name *</label>
                       <input
@@ -823,34 +824,61 @@ export default function Checkout() {
                         className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
                           errors.cardName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
                         }`}
-                        placeholder="e.g. John Doe"
+                        placeholder="Cardholder Name"
                       />
                       {errors.cardName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardName}</p>}
                     </div>
 
-                    <div>
-                      <div className="flex justify-between items-center mb-1.5">
-                        <label className="font-bold text-slate-700">Card Number *</label>
-                        <span className="text-[11px] font-bold text-blue-600">
-                          Detected: {selectedCardBrand}
-                        </span>
+                    {/* Row 1: Card number (6 cols), Expiration (3 cols), Security code (3 cols) */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                      {/* Card Number */}
+                      <div className="md:col-span-6">
+                        <label className="block font-bold text-slate-700 mb-1.5">Card number *</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={cardDetails.number}
+                            onChange={(e) => handleCardNumberChange(e.target.value)}
+                            maxLength={19}
+                            className={`w-full p-3 pr-28 rounded-xl bg-slate-50 border text-slate-900 font-mono tracking-wider focus:outline-none focus:bg-white transition-colors font-medium ${
+                              errors.cardNumber ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                            }`}
+                            placeholder="1234 1234 1234 1234"
+                          />
+                          {/* Embedded Brand Badges */}
+                          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 select-none pointer-events-none">
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                              selectedCardBrand === 'Visa'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+                            }`}>
+                              VISA
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                              selectedCardBrand === 'Mastercard'
+                                ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                                : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+                            }`}>
+                              MC
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                              selectedCardBrand === 'American Express'
+                                ? 'bg-sky-500 text-white border-sky-500 shadow-xs'
+                                : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+                            }`}>
+                              AMEX
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border bg-slate-100 text-slate-400 border-slate-200 opacity-60">
+                              DISC
+                            </span>
+                          </div>
+                        </div>
+                        {errors.cardNumber && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardNumber}</p>}
                       </div>
-                      <input
-                        type="text"
-                        value={cardDetails.number}
-                        onChange={(e) => handleCardNumberChange(e.target.value)}
-                        maxLength={19}
-                        className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono tracking-wider focus:outline-none focus:bg-white transition-colors font-medium ${
-                          errors.cardNumber ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                        }`}
-                        placeholder="4242 4242 4242 4242"
-                      />
-                      {errors.cardNumber && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardNumber}</p>}
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Expiration Date (MM/YY) *</label>
+                      {/* Expiration Date */}
+                      <div className="md:col-span-3">
+                        <label className="block font-bold text-slate-700 mb-1.5">Expiration date *</label>
                         <input
                           type="text"
                           value={cardDetails.expiry}
@@ -859,31 +887,72 @@ export default function Checkout() {
                           className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
                             errors.cardExpiry ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
                           }`}
-                          placeholder="12/28"
+                          placeholder="MM / YY"
                         />
                         {errors.cardExpiry && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardExpiry}</p>}
                       </div>
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">CVC / CVV Code *</label>
-                        <input
-                          type="password"
-                          value={cardDetails.cvc}
-                          onChange={(e) => setCardDetails({ ...cardDetails, cvc: e.target.value.replace(/[^0-9]/g, '').slice(0, 4) })}
-                          maxLength={4}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.cardCvc ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="312"
-                        />
+
+                      {/* Security code */}
+                      <div className="md:col-span-3">
+                        <label className="block font-bold text-slate-700 mb-1.5">Security code *</label>
+                        <div className="relative">
+                          <input
+                            type="password"
+                            value={cardDetails.cvc}
+                            onChange={(e) => setCardDetails({ ...cardDetails, cvc: e.target.value.replace(/[^0-9]/g, '').slice(0, 4) })}
+                            maxLength={4}
+                            className={`w-full p-3 pr-10 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
+                              errors.cardCvc ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                            }`}
+                            placeholder="CVC"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none select-none flex items-center gap-0.5">
+                            💳<span className="text-[9px] font-mono font-bold">123</span>
+                          </span>
+                        </div>
                         {errors.cardCvc && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardCvc}</p>}
                       </div>
                     </div>
 
-                    {/* Security Badge */}
-                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center gap-3 text-slate-600">
-                      <span className="text-xl">🔒</span>
-                      <div className="text-[11px] leading-relaxed">
-                        <strong className="text-slate-900">PCI-DSS Level 1 & AES-256-GCM Encrypted:</strong> Your card data is processed directly via Stripe secure tokenization. Card numbers are never stored in plaintext on our servers.
+                    {/* Row 2: Country & ZIP Code */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                      {/* Country */}
+                      <div className="md:col-span-6">
+                        <label className="block font-bold text-slate-700 mb-1.5">Country *</label>
+                        <div className="relative">
+                          <select
+                            value={customerInfo.country || 'United States'}
+                            onChange={(e) => setCustomerInfo({ ...customerInfo, country: e.target.value })}
+                            className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-medium appearance-none focus:outline-none focus:bg-white focus:border-blue-600 transition-colors"
+                          >
+                            <option value="United States">United States</option>
+                            <option value="United Kingdom">United Kingdom</option>
+                            <option value="Canada">Canada</option>
+                            <option value="Germany">Germany</option>
+                            <option value="France">France</option>
+                            <option value="Australia">Australia</option>
+                            <option value="Pakistan">Pakistan</option>
+                            <option value="United Arab Emirates">United Arab Emirates</option>
+                            <option value="Saudi Arabia">Saudi Arabia</option>
+                            <option value="Singapore">Singapore</option>
+                            <option value="Other">Other Country</option>
+                          </select>
+                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">
+                            ▼
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* ZIP Code */}
+                      <div className="md:col-span-6">
+                        <label className="block font-bold text-slate-700 mb-1.5">ZIP code *</label>
+                        <input
+                          type="text"
+                          value={customerInfo.zip}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, zip: e.target.value })}
+                          className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs font-medium focus:outline-none focus:bg-white focus:border-blue-600 transition-colors"
+                          placeholder="12345"
+                        />
                       </div>
                     </div>
                   </div>
@@ -987,6 +1056,53 @@ export default function Checkout() {
                   </div>
                 )}
 
+                {/* DEPLOYMENT TIMING / SCHEDULE PREFERENCE */}
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>⏱️</span> When would you like to deploy your server?
+                    </span>
+                    <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                      User Flexibility
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setDeployPreference('immediate')}
+                      className={`p-3.5 rounded-xl border text-left transition-all ${
+                        deployPreference === 'immediate'
+                          ? 'border-blue-600 bg-white text-blue-900 font-bold shadow-xs ring-2 ring-blue-500/20'
+                          : 'border-slate-200 bg-white/60 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="font-extrabold flex items-center gap-1.5 text-slate-900">
+                        <span>⚡ Deploy Immediately</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-normal mt-1 leading-relaxed">
+                        Spin up your VM instance automatically on the cluster right after payment confirmation.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDeployPreference('later')}
+                      className={`p-3.5 rounded-xl border text-left transition-all ${
+                        deployPreference === 'later'
+                          ? 'border-blue-600 bg-white text-blue-900 font-bold shadow-xs ring-2 ring-blue-500/20'
+                          : 'border-slate-200 bg-white/60 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="font-extrabold flex items-center gap-1.5 text-slate-900">
+                        <span>⏳ Purchase Now & Deploy Later</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-normal mt-1 leading-relaxed">
+                        Reserve your package slot now. Configure your OS and spin up anytime from your dashboard when you get free.
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="pt-6 flex justify-between items-center border-t border-slate-100">
                   <button
                     type="button"
@@ -1006,11 +1122,13 @@ export default function Checkout() {
                     {isProcessingPayment ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Processing Payment & Deploying...</span>
+                        <span>{deployPreference === 'later' ? 'Processing Order...' : 'Processing & Deploying...'}</span>
                       </>
                     ) : (
                       <span>
-                        Complete & Deploy (${orderData.monthlyTotal.toFixed(2)}/mo)
+                        {deployPreference === 'later'
+                          ? `Purchase & Reserve Slot ($${orderData.monthlyTotal.toFixed(2)}/mo)`
+                          : `Complete & Deploy ($${orderData.monthlyTotal.toFixed(2)}/mo)`}
                       </span>
                     )}
                   </button>
@@ -1028,10 +1146,14 @@ export default function Checkout() {
 
                   <div className="text-center space-y-2">
                     <h3 className="text-2xl font-black text-slate-950 tracking-tight">
-                      Order Confirmed & Provisioning Initialized!
+                      {paymentSuccessData.isDeployLater
+                        ? 'Package Purchased & Slot Reserved!'
+                        : 'Order Confirmed & Provisioning Initialized!'}
                     </h3>
-                    <p className="text-xs text-slate-500">
-                      Your payment has been successfully recorded and your cloud VPS is now spinning up.
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      {paymentSuccessData.isDeployLater
+                        ? 'Your subscription is now active! Your VPS package slot has been reserved. Whenever you get free, you can configure your OS, credentials, or 1-click apps and launch your machine from your dashboard.'
+                        : 'Your payment has been successfully recorded and your cloud VPS is now spinning up.'}
                     </p>
                   </div>
 
@@ -1052,8 +1174,14 @@ export default function Checkout() {
                       <span className="text-slate-500">Payment Channel</span>
                       <span className="font-bold text-slate-900">{paymentSuccessData.method}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Status</span>
+                      <span className="font-bold text-emerald-600">
+                        {paymentSuccessData.isDeployLater ? 'Subscription Active (Ready to Deploy)' : 'Active & Provisioning'}
+                      </span>
+                    </div>
                     {paymentSuccessData.dueDate && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between pt-1 border-t border-slate-200/40">
                         <span className="text-slate-500">Payment Last End Date</span>
                         <span className="font-bold text-amber-600">{paymentSuccessData.dueDate}</span>
                       </div>
@@ -1061,7 +1189,7 @@ export default function Checkout() {
                   </div>
 
                   <div className="p-3 bg-blue-50 border border-blue-200/70 rounded-xl text-blue-900 text-[11px] leading-relaxed">
-                    📧 An official VAT invoice and payment confirmation has been dispatched to your email address with full cloud instance access credentials.
+                    📧 An official VAT invoice and payment confirmation has been dispatched to your email address.
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-2">
@@ -1075,7 +1203,7 @@ export default function Checkout() {
                       onClick={() => navigate('/dashboard')}
                       className="py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-lg shadow-blue-500/20 transition-all"
                     >
-                      Go to VPS Dashboard →
+                      {paymentSuccessData.isDeployLater ? 'Go to Dashboard (Deploy Later) →' : 'Go to VPS Dashboard →'}
                     </button>
                   </div>
                 </div>

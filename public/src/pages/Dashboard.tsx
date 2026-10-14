@@ -1184,20 +1184,35 @@ export default function Dashboard() {
                 <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-950 via-slate-900 to-indigo-950 p-8 md:p-12 text-white shadow-xl border border-slate-800">
                   <div className="relative z-10 max-w-2xl space-y-4">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold">
-                      <Sparkles className="w-3.5 h-3.5" /> High-Performance Cloud Infrastructure
+                      {activeSlot ? (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-300 font-bold">Active VPS Subscription Slot Reserved</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3.5 h-3.5" /> High-Performance Cloud Infrastructure
+                        </>
+                      )}
                     </div>
                     <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight font-poppins">
-                      Launch Your First Virtual Private Server
+                      {activeSlot ? `Deploy Your Reserved ${activeSlot.planName} Server` : 'Launch Your First Virtual Private Server'}
                     </h2>
                     <p className="text-slate-300 text-sm md:text-base leading-relaxed">
-                      You don't have any active virtual servers yet. Select a certified package below to provision dedicated vCPUs, enterprise NVMe storage, and static IPv4 in seconds.
+                      {activeSlot
+                        ? `Your ${activeSlot.planName} package is active and your dedicated cloud resources are reserved on our cluster. Whenever you're ready, click below to pick your OS, set admin credentials, or choose 1-Click Apps.`
+                        : `You don't have any active virtual servers yet. Select a certified package below to provision dedicated vCPUs, enterprise NVMe storage, and static IPv4 in seconds.`}
                     </p>
                     <div className="pt-2 flex flex-wrap gap-4">
                       <button
                         onClick={handleOpenDeployModal}
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
+                        className={`px-6 py-3 rounded-xl font-bold text-sm shadow-lg transition-all flex items-center gap-2 ${
+                          activeSlot
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/30 ring-2 ring-emerald-400/30'
+                            : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/30'
+                        }`}
                       >
-                        <Zap className="w-4 h-4" /> {activeSlot ? 'Deploy Available Server' : 'Configure & Order VPS'}
+                        <Zap className="w-4 h-4" /> {activeSlot ? '⚡ Deploy Reserved Server Now' : 'Configure & Order VPS'}
                       </button>
                       <a
                         href="/pricing"
@@ -1296,6 +1311,31 @@ export default function Dashboard() {
                     })}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* UNUSED ACTIVE SUBSCRIPTION SLOT BANNER */}
+            {instances.length > 0 && activeSubscriptions.some((s) => s.hasAvailableSlot) && (
+              <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+                <div className="flex items-center gap-3 text-xs">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-xs">
+                    ⚡
+                  </div>
+                  <div>
+                    <p className="font-extrabold text-sm text-slate-900 dark:text-white">
+                      You have {activeSubscriptions.filter((s) => s.hasAvailableSlot).length} unused VPS slot(s) ready for deployment!
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-400 mt-0.5">
+                      Your package is active. Whenever you are ready, configure and launch your virtual server.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleOpenDeployModal}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md shadow-emerald-500/20 transition-all shrink-0 cursor-pointer"
+                >
+                  Deploy Available Slot Now →
+                </button>
               </div>
             )}
 
