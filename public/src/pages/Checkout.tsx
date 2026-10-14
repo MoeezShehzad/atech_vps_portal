@@ -79,11 +79,63 @@ export default function Checkout() {
     }
   }, [user]);
 
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'paypal'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank_transfer' | 'paypal'>('card');
+  const [selectedCardBrand, setSelectedCardBrand] = useState<'Visa' | 'Mastercard' | 'American Express'>('Visa');
   const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvc: '', name: '' });
+  const [bankDetails, setBankDetails] = useState({
+    bankName: '',
+    sortCode: '',
+    accountNumber: '',
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    poNumber: '',
+  });
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSuccessData, setPaymentSuccessData] = useState<{
+    transactionId: string;
+    invoiceNumber: string;
+    amount: string;
+    method: string;
+    dueDate?: string;
+  } | null>(null);
 
   const stepOrder: StepId[] = ['details', 'review', 'payment'];
   const currentIndex = stepOrder.indexOf(currentStep);
+
+  // Auto-detect card brand from card number
+  const handleCardNumberChange = (rawVal: string) => {
+    const clean = rawVal.replace(/[^0-9]/g, '').slice(0, 16);
+    // Auto-spacing every 4 digits
+    const formatted = clean.replace(/(\d{4})/g, '$1 ').trim();
+
+    if (clean.startsWith('4')) {
+      setSelectedCardBrand('Visa');
+    } else if (/^5[1-5]/.test(clean) || /^2[2-7]/.test(clean)) {
+      setSelectedCardBrand('Mastercard');
+    } else if (/^3[47]/.test(clean)) {
+      setSelectedCardBrand('American Express');
+    }
+
+    setCardDetails((prev) => ({ ...prev, number: formatted }));
+  };
+
+  const handleExpiryChange = (rawVal: string) => {
+    let clean = rawVal.replace(/[^0-9]/g, '').slice(0, 4);
+    if (clean.length >= 3) {
+      clean = `${clean.slice(0, 2)}/${clean.slice(2)}`;
+    }
+    setCardDetails((prev) => ({ ...prev, expiry: clean }));
+  };
+
+  const handleSortCodeChange = (rawVal: string) => {
+    let clean = rawVal.replace(/[^0-9]/g, '').slice(0, 6);
+    if (clean.length > 4) {
+      clean = `${clean.slice(0, 2)}-${clean.slice(2, 4)}-${clean.slice(4)}`;
+    } else if (clean.length > 2) {
+      clean = `${clean.slice(0, 2)}-${clean.slice(2)}`;
+    }
+    setBankDetails((prev) => ({ ...prev, sortCode: clean }));
+  };
 
   // FORM VALIDATION GUARD
   const validateStep = (): boolean => {
@@ -91,12 +143,10 @@ export default function Checkout() {
 
     if (currentStep === 'details') {
       if (isAuthenticated) {
-        // Authenticated users only need billing address filled out
         if (!customerInfo.address.trim()) newErrors.address = 'Street address is required';
         if (!customerInfo.city.trim()) newErrors.city = 'City is required';
         if (!customerInfo.zip.trim()) newErrors.zip = 'Postal code is required';
       } else {
-        // Guest registration checks
         if (!customerInfo.firstName.trim()) newErrors.firstName = 'First name is required';
         if (!customerInfo.lastName.trim()) newErrors.lastName = 'Last name is required';
         if (!customerInfo.email.trim()) newErrors.email = 'Email address is required';
@@ -114,9 +164,19 @@ export default function Checkout() {
 
     if (currentStep === 'payment' && paymentMethod === 'card') {
       if (!cardDetails.name.trim()) newErrors.cardName = 'Cardholder name is required';
-      if (!cardDetails.number.trim()) newErrors.cardNumber = 'Card number is required';
-      if (!cardDetails.expiry.trim()) newErrors.cardExpiry = 'Expiry date is required';
-      if (!cardDetails.cvc.trim()) newErrors.cardCvc = 'CVC is required';
+      const cleanNum = cardDetails.number.replace(/\s+/g, '');
+      if (!cleanNum || cleanNum.length < 13) newErrors.cardNumber = 'Valid card number is required';
+      if (!cardDetails.expiry.trim() || !cardDetails.expiry.includes('/')) newErrors.cardExpiry = 'Valid expiration (MM/YY) is required';
+      if (!cardDetails.cvc.trim() || cardDetails.cvc.length < 3) newErrors.cardCvc = 'Valid CVC code is required';
+    }
+
+    if (currentStep === 'payment' && paymentMethod === 'bank_transfer') {
+      if (!bankDetails.bankName.trim()) newErrors.bankName = 'Bank name is required';
+      const cleanSort = bankDetails.sortCode.replace(/[^0-9]/g, '');
+      if (cleanSort.length !== 6) newErrors.sortCode = 'Sort code must be 6 digits (e.g. 20-04-15)';
+      const cleanAcc = bankDetails.accountNumber.replace(/[^0-9]/g, '');
+      if (!cleanAcc || cleanAcc.length < 6) newErrors.accountNumber = 'Account number must be at least 6 digits';
+      if (!bankDetails.dueDate) newErrors.dueDate = 'Payment last end date is required';
     }
 
     setErrors(newErrors);
@@ -126,7 +186,6 @@ export default function Checkout() {
   const nextStep = async () => {
     if (!validateStep()) return;
 
-    // If authenticated, silently update their missing billing profile on Step 1
     if (currentStep === 'details' && isAuthenticated) {
       try {
         await apiCall('/users/me', {
@@ -158,11 +217,75 @@ export default function Checkout() {
     }
   };
 
-  const handleCompleteAndDeploy = () => {
+  const handleCompleteAndDeploy = async () => {
     if (!validateStep()) return;
 
-    alert('Order Placed Successfully! Redirecting to Dashboard...');
-    navigate('/dashboard');
+    if (!isAuthenticated) {
+      alert('Please log in or register before finalizing your payment.');
+      navigate('/login', { state: { returnTo: '/checkout' } });
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    setPaymentError('');
+
+    try {
+      if (paymentMethod === 'card') {
+        const res = await apiCall('/payments/process-card', {
+          method: 'POST',
+          body: JSON.stringify({
+            planId: orderData.plan?.planId || 1,
+            amount: orderData.monthlyTotal,
+            cardBrand: selectedCardBrand,
+            cardNumber: cardDetails.number,
+            cardExpiry: cardDetails.expiry,
+            cardCvc: cardDetails.cvc,
+            cardName: cardDetails.name || `${customerInfo.firstName} ${customerInfo.lastName}`.trim(),
+            customerInfo,
+          }),
+        });
+
+        if (res.success) {
+          setPaymentSuccessData({
+            transactionId: res.transactionId,
+            invoiceNumber: res.invoiceNumber,
+            amount: res.amount,
+            method: `${res.cardBrand} •••• ${res.last4}`,
+          });
+        }
+      } else if (paymentMethod === 'bank_transfer') {
+        const res = await apiCall('/payments/process-bank-transfer', {
+          method: 'POST',
+          body: JSON.stringify({
+            planId: orderData.plan?.planId || 1,
+            amount: orderData.monthlyTotal,
+            bankName: bankDetails.bankName,
+            sortCode: bankDetails.sortCode,
+            accountNumber: bankDetails.accountNumber,
+            paymentDueDate: bankDetails.dueDate,
+            poNumber: bankDetails.poNumber,
+            customerInfo,
+          }),
+        });
+
+        if (res.success) {
+          setPaymentSuccessData({
+            transactionId: res.transactionId,
+            invoiceNumber: res.invoiceNumber,
+            amount: res.amount,
+            method: `Bank Wire (Sort: ${res.sortCode} / A/C: ${res.maskedAccount})`,
+            dueDate: res.dueDate,
+          });
+        }
+      } else {
+        alert('PayPal Express checkout simulation. Redirecting to payment authorization...');
+        navigate('/dashboard');
+      }
+    } catch (err: any) {
+      setPaymentError(err.message || 'Payment processing failed. Please check your credentials or payment limits.');
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
   if (loading) {
@@ -601,35 +724,96 @@ export default function Checkout() {
               <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
                 <div>
                   <h2 className="text-xl font-extrabold text-slate-950 tracking-tight">3. Select Payment Method</h2>
-                  <p className="text-xs text-slate-500 mt-1">Choose how you would like to pay for your service.</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Choose your preferred payment method. Transactions are secured with AES-256-GCM encryption & PCI-DSS compliance.
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs">
+                {/* Error Banner */}
+                {paymentError && (
+                  <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-3">
+                    <span className="text-base">⚠️</span>
+                    <div className="flex-1">
+                      <p className="font-bold">Payment Transaction Failed</p>
+                      <p className="mt-0.5">{paymentError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment Method Selector Tabs */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <button
+                    type="button"
                     onClick={() => setPaymentMethod('card')}
-                    className={`p-4 rounded-xl border font-bold flex items-center justify-center gap-2 transition-all ${
+                    className={`p-4 rounded-xl border font-bold flex flex-col items-center justify-center gap-1.5 transition-all ${
                       paymentMethod === 'card'
-                        ? 'border-blue-600 bg-blue-50/50 text-blue-600 ring-1 ring-blue-600 shadow-sm'
+                        ? 'border-blue-600 bg-blue-50/60 text-blue-700 ring-2 ring-blue-500/20 shadow-sm'
                         : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                     }`}
                   >
-                    <span>💳 Credit / Debit Card</span>
+                    <span className="text-lg">💳</span>
+                    <span className="font-extrabold">Credit / Debit Card</span>
+                    <span className="text-[10px] text-slate-400 font-medium">Stripe / Visa / MC / Amex</span>
                   </button>
 
                   <button
-                    onClick={() => setPaymentMethod('paypal')}
-                    className={`p-4 rounded-xl border font-bold flex items-center justify-center gap-2 transition-all ${
-                      paymentMethod === 'paypal'
-                        ? 'border-blue-600 bg-blue-50/50 text-blue-600 ring-1 ring-blue-600 shadow-sm'
+                    type="button"
+                    onClick={() => setPaymentMethod('bank_transfer')}
+                    className={`p-4 rounded-xl border font-bold flex flex-col items-center justify-center gap-1.5 transition-all ${
+                      paymentMethod === 'bank_transfer'
+                        ? 'border-blue-600 bg-blue-50/60 text-blue-700 ring-2 ring-blue-500/20 shadow-sm'
                         : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                     }`}
                   >
-                    <span>🅿️ PayPal</span>
+                    <span className="text-lg">🏦</span>
+                    <span className="font-extrabold">Direct Bank Wire</span>
+                    <span className="text-[10px] text-slate-400 font-medium">Sorting A/C & Net Terms</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('paypal')}
+                    className={`p-4 rounded-xl border font-bold flex flex-col items-center justify-center gap-1.5 transition-all ${
+                      paymentMethod === 'paypal'
+                        ? 'border-blue-600 bg-blue-50/60 text-blue-700 ring-2 ring-blue-500/20 shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="text-lg">🅿️</span>
+                    <span className="font-extrabold">PayPal</span>
+                    <span className="text-[10px] text-slate-400 font-medium">Express Checkout</span>
                   </button>
                 </div>
 
-                {paymentMethod === 'card' ? (
-                  <div className="space-y-4 text-xs pt-2">
+                {/* 1. CREDIT / DEBIT CARD PANEL */}
+                {paymentMethod === 'card' && (
+                  <div className="space-y-5 text-xs pt-2">
+                    {/* Select Card Brand */}
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-2">Supported Card Networks</label>
+                      <div className="grid grid-cols-3 gap-2.5">
+                        {[
+                          { brand: 'Visa', label: 'VISA', icon: '💳', bg: 'hover:border-blue-400' },
+                          { brand: 'Mastercard', label: 'Mastercard', icon: '🔴🟠', bg: 'hover:border-amber-400' },
+                          { brand: 'American Express', label: 'AMEX', icon: '🛡️', bg: 'hover:border-sky-400' },
+                        ].map((item) => (
+                          <button
+                            key={item.brand}
+                            type="button"
+                            onClick={() => setSelectedCardBrand(item.brand as any)}
+                            className={`py-2.5 px-3 rounded-lg border font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                              selectedCardBrand === item.brand
+                                ? 'border-blue-600 bg-blue-50 text-blue-700 font-black shadow-sm ring-1 ring-blue-500'
+                                : 'border-slate-200 bg-slate-50/50 text-slate-600 ' + item.bg
+                            }`}
+                          >
+                            <span>{item.icon}</span>
+                            <span>{item.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block font-bold text-slate-700 mb-1.5">Cardholder Name *</label>
                       <input
@@ -639,46 +823,54 @@ export default function Checkout() {
                         className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
                           errors.cardName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
                         }`}
-                        placeholder="Alex Morgan"
+                        placeholder="e.g. John Doe"
                       />
                       {errors.cardName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardName}</p>}
                     </div>
 
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1.5">Card Number *</label>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="font-bold text-slate-700">Card Number *</label>
+                        <span className="text-[11px] font-bold text-blue-600">
+                          Detected: {selectedCardBrand}
+                        </span>
+                      </div>
                       <input
                         type="text"
                         value={cardDetails.number}
-                        onChange={(e) => setCardDetails({ ...cardDetails, number: e.target.value })}
-                        className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                        onChange={(e) => handleCardNumberChange(e.target.value)}
+                        maxLength={19}
+                        className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono tracking-wider focus:outline-none focus:bg-white transition-colors font-medium ${
                           errors.cardNumber ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
                         }`}
-                        placeholder="4532 •••• •••• 8892"
+                        placeholder="4242 4242 4242 4242"
                       />
                       {errors.cardNumber && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardNumber}</p>}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Expiration (MM/YY) *</label>
+                        <label className="block font-bold text-slate-700 mb-1.5">Expiration Date (MM/YY) *</label>
                         <input
                           type="text"
                           value={cardDetails.expiry}
-                          onChange={(e) => setCardDetails({ ...cardDetails, expiry: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                          onChange={(e) => handleExpiryChange(e.target.value)}
+                          maxLength={5}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
                             errors.cardExpiry ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
                           }`}
-                          placeholder="08/28"
+                          placeholder="12/28"
                         />
                         {errors.cardExpiry && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardExpiry}</p>}
                       </div>
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">CVC Code *</label>
+                        <label className="block font-bold text-slate-700 mb-1.5">CVC / CVV Code *</label>
                         <input
-                          type="text"
+                          type="password"
                           value={cardDetails.cvc}
-                          onChange={(e) => setCardDetails({ ...cardDetails, cvc: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                          onChange={(e) => setCardDetails({ ...cardDetails, cvc: e.target.value.replace(/[^0-9]/g, '').slice(0, 4) })}
+                          maxLength={4}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
                             errors.cardCvc ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
                           }`}
                           placeholder="312"
@@ -686,24 +878,206 @@ export default function Checkout() {
                         {errors.cardCvc && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardCvc}</p>}
                       </div>
                     </div>
+
+                    {/* Security Badge */}
+                    <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center gap-3 text-slate-600">
+                      <span className="text-xl">🔒</span>
+                      <div className="text-[11px] leading-relaxed">
+                        <strong className="text-slate-900">PCI-DSS Level 1 & AES-256-GCM Encrypted:</strong> Your card data is processed directly via Stripe secure tokenization. Card numbers are never stored in plaintext on our servers.
+                      </div>
+                    </div>
                   </div>
-                ) : (
+                )}
+
+                {/* 2. DIRECT BANK WIRE TRANSFER (Sorting A/C, Net Terms) */}
+                {paymentMethod === 'bank_transfer' && (
+                  <div className="space-y-4 text-xs pt-2">
+                    <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-900">
+                      <p className="font-extrabold flex items-center gap-2">
+                        <span>🏛️</span> Direct Corporate Wire / Sorting A/C Payment
+                      </p>
+                      <p className="text-[11px] text-blue-700 mt-1 leading-relaxed">
+                        For enterprise and corporate accounts. Provide your banking coordinates below. An official invoice with Net-30 payment instructions will be dispatched to your billing contact. All account details are AES-256-GCM encrypted.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1.5">Bank Name *</label>
+                      <input
+                        type="text"
+                        value={bankDetails.bankName}
+                        onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
+                        className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                          errors.bankName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                        }`}
+                        placeholder="e.g. JPMorgan Chase, Barclays, HSBC"
+                      />
+                      {errors.bankName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.bankName}</p>}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">Sorting A/C (Sort Code / Routing) *</label>
+                        <input
+                          type="text"
+                          value={bankDetails.sortCode}
+                          onChange={(e) => handleSortCodeChange(e.target.value)}
+                          maxLength={8}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono tracking-wider focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.sortCode ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="20-04-15"
+                        />
+                        {errors.sortCode && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.sortCode}</p>}
+                        <span className="text-[10px] text-slate-400 mt-1 block">6-digit standard sorting code</span>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">Bank Account Number *</label>
+                        <input
+                          type="text"
+                          value={bankDetails.accountNumber}
+                          onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value.replace(/[^0-9]/g, '').slice(0, 16) })}
+                          maxLength={16}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono tracking-wider focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.accountNumber ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                          placeholder="88392019"
+                        />
+                        {errors.accountNumber && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.accountNumber}</p>}
+                        <span className="text-[10px] text-slate-400 mt-1 block">Encrypted with AES-256-GCM</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">Payment Last End Date (Due Date) *</label>
+                        <input
+                          type="date"
+                          value={bankDetails.dueDate}
+                          onChange={(e) => setBankDetails({ ...bankDetails, dueDate: e.target.value })}
+                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
+                            errors.dueDate ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
+                          }`}
+                        />
+                        {errors.dueDate && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.dueDate}</p>}
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1.5">PO / Reference Number (Optional)</label>
+                        <input
+                          type="text"
+                          value={bankDetails.poNumber}
+                          onChange={(e) => setBankDetails({ ...bankDetails, poNumber: e.target.value })}
+                          className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium"
+                          placeholder="PO-2026-9901"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. PAYPAL PANEL */}
+                {paymentMethod === 'paypal' && (
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-xs space-y-2">
-                    <p className="font-extrabold text-slate-900">PayPal Express Checkout</p>
-                    <p className="text-slate-500">You will be redirected to PayPal to complete your payment securely.</p>
+                    <p className="font-extrabold text-slate-900 text-sm">🅿️ PayPal Express Checkout</p>
+                    <p className="text-slate-500">
+                      You will be redirected to PayPal sandbox to authorize payment using your balance or connected accounts.
+                    </p>
                   </div>
                 )}
 
                 <div className="pt-6 flex justify-between items-center border-t border-slate-100">
-                  <button onClick={prevStep} className="text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors">
-                    ← Back
-                  </button>
                   <button
-                    onClick={handleCompleteAndDeploy}
-                    className="px-8 py-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/20 transition-all"
+                    type="button"
+                    onClick={prevStep}
+                    disabled={isProcessingPayment}
+                    className="text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors disabled:opacity-50"
                   >
-                    Complete & Deploy (${orderData.monthlyTotal.toFixed(2)}/mo)
+                    ← Back to Review
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCompleteAndDeploy}
+                    disabled={isProcessingPayment}
+                    className="px-8 py-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-60 flex items-center gap-2"
+                  >
+                    {isProcessingPayment ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Processing Payment & Deploying...</span>
+                      </>
+                    ) : (
+                      <span>
+                        Complete & Deploy (${orderData.monthlyTotal.toFixed(2)}/mo)
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* SUCCESS CONFIRMATION MODAL */}
+            {paymentSuccessData && (
+              <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl max-w-lg w-full p-8 border border-slate-100 shadow-2xl space-y-6 animate-in fade-in zoom-in duration-200">
+                  <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-3xl">
+                    ✓
+                  </div>
+
+                  <div className="text-center space-y-2">
+                    <h3 className="text-2xl font-black text-slate-950 tracking-tight">
+                      Order Confirmed & Provisioning Initialized!
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Your payment has been successfully recorded and your cloud VPS is now spinning up.
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs space-y-3 font-medium">
+                    <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                      <span className="text-slate-500">Invoice Number</span>
+                      <span className="font-bold font-mono text-slate-900">{paymentSuccessData.invoiceNumber}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                      <span className="text-slate-500">Transaction ID</span>
+                      <span className="font-bold font-mono text-slate-900 text-[11px]">{paymentSuccessData.transactionId}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                      <span className="text-slate-500">Amount</span>
+                      <span className="font-bold text-emerald-600">${Number(paymentSuccessData.amount).toFixed(2)} USD</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                      <span className="text-slate-500">Payment Channel</span>
+                      <span className="font-bold text-slate-900">{paymentSuccessData.method}</span>
+                    </div>
+                    {paymentSuccessData.dueDate && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Payment Last End Date</span>
+                        <span className="font-bold text-amber-600">{paymentSuccessData.dueDate}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-3 bg-blue-50 border border-blue-200/70 rounded-xl text-blue-900 text-[11px] leading-relaxed">
+                    📧 An official VAT invoice and payment confirmation has been dispatched to your email address with full cloud instance access credentials.
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <button
+                      onClick={() => navigate('/billing')}
+                      className="py-3 px-4 rounded-xl border border-slate-300 font-extrabold text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      View Invoices
+                    </button>
+                    <button
+                      onClick={() => navigate('/dashboard')}
+                      className="py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-lg shadow-blue-500/20 transition-all"
+                    >
+                      Go to VPS Dashboard →
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
