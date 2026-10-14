@@ -440,4 +440,17 @@ model UserPaymentMethod {
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("User_Payment_Methods")
+}
+
+model UMCountry {
+  countryId       Int      @id @default(autoincrement()) @map("CountryID")
+  countryName     String   @map("CountryName") @db.NVarChar(100)
+  countryCode     String   @map("CountryCode") @db.NVarChar(10)
+  countryISO      String   @map("CountryISO") @db.NVarChar(10)
+  countryLaborAge Int?     @map("CountryLaborAge")
+  isActive        Boolean? @default(true) @map("IsActive")
+  isDeleted       Boolean? @default(false) @map("IsDeleted")
+  countryCurrency String?  @map("CountryCurrency") @db.NVarChar(20)
+
+  @@map("UM_Countries")
 }

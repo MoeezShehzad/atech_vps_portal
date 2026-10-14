@@ -1,18 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiCall, API_BASE_URL } from '../services/api';
 import atcLogo from '../assets/ATC_Logo.png';
 import {
-  COUNTRIES_DATA,
-  getCountryByCode,
-  formatPhoneNumber,
-} from '../data/countriesData';
+  ModernFloatingInput,
+  ModernCountrySelect,
+  type CountryOption,
+} from '../components/ModernFormControls';
 
 import { 
   Mail, 
   Lock, 
   User, 
-  Phone, 
   ArrowRight, 
   ArrowLeft,
   ShieldCheck, 
@@ -26,29 +25,23 @@ import {
   Sparkles,
   Server,
   Calendar,
-  MapPin,
-  Globe,
   LockKeyhole
 } from 'lucide-react';
 
 export default function Signup() {
   const navigate = useNavigate();
 
-  // Step indicator: 1 = Personal & Location, 2 = 30-Day Trial & Card Verification
+  // Wizard Step: 1 = Account, Country & Password, 2 = 30-Day Free Trial & Card Verification
   const [step, setStep] = useState<1 | 2>(1);
 
-  // Personal & Location Details
+  // Live Geo API States (Querying MS SQL Server [UM].[UM_Countries])
+  const [countriesList, setCountriesList] = useState<CountryOption[]>([]);
+  const [selectedCountryCode, setSelectedCountryCode] = useState('US');
+  const [loadingGeo, setLoadingGeo] = useState<boolean>(true);
+
+  // User Credentials & Country
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [selectedCountryCode, setSelectedCountryCode] = useState('US');
-  const [state, setState] = useState('California');
-  const [city, setCity] = useState('');
-  const [address, setAddress] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  
-  // Phone with dynamic dial code & formatting
-  const [dialCode, setDialCode] = useState('+1');
-  const [phone, setPhone] = useState('');
 
   // Password & Security
   const [password, setPassword] = useState('');
@@ -69,32 +62,38 @@ export default function Signup() {
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // 1. Fetch live countries directly from MS SQL Server table [UM].[UM_Countries] on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLiveCountries() {
+      try {
+        setLoadingGeo(true);
+        const res = await apiCall('/geo/countries');
+        if (res && res.countries && res.countries.length > 0 && isMounted) {
+          setCountriesList(res.countries);
+          // Set default to US or first country in list
+          const defaultC = res.countries.find((c: CountryOption) => c.code === 'US') || res.countries[0];
+          setSelectedCountryCode(defaultC.code);
+        }
+      } catch (err) {
+        console.warn('[Live Geo Error] Failed to load countries from database:', err);
+      } finally {
+        if (isMounted) setLoadingGeo(false);
+      }
+    }
+    loadLiveCountries();
+    return () => { isMounted = false; };
+  }, []);
+
   // Current Country Object
   const currentCountry = useMemo(() => {
-    return getCountryByCode(selectedCountryCode);
-  }, [selectedCountryCode]);
-
-  // Handle Country Selection
-  const handleCountryChange = (code: string) => {
-    setSelectedCountryCode(code);
-    const country = getCountryByCode(code);
-    setDialCode(country.dialCode);
-    if (country.states.length > 0) {
-      setState(country.states[0]);
-    } else {
-      setState('');
-    }
-    // Reformat existing phone with new country pattern
-    if (phone) {
-      setPhone(formatPhoneNumber(country.dialCode, phone));
-    }
-  };
-
-  // Handle Phone Input with live masking
-  const handlePhoneChange = (val: string) => {
-    const formatted = formatPhoneNumber(dialCode, val);
-    setPhone(formatted);
-  };
+    return countriesList.find((c) => c.code === selectedCountryCode) || countriesList[0] || {
+      code: 'US',
+      name: 'United States',
+      flag: '🇺🇸',
+      dialCode: '+1',
+    };
+  }, [countriesList, selectedCountryCode]);
 
   // Handle Card Number Formatting (Groups of 4) & Brand Detection
   const handleCardNumberChange = (val: string) => {
@@ -127,12 +126,17 @@ export default function Signup() {
     setCardCvc(raw);
   };
 
-  // Password validation criteria
+  // Strict 5-point password validation criteria
   const hasMinLength = password.length >= 8;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
   const hasNumber = /\d/.test(password);
-  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>_+\-=[\]\\/]/.test(password);
   const passwordsMatch = password.length > 0 && password === confirmPassword;
-  const strengthScore = [hasMinLength, hasNumber, hasSpecialChar].filter(Boolean).length;
+
+  // Calculate password strength score (0 to 5)
+  const strengthScore = [hasMinLength, hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar].filter(Boolean).length;
+  const isPasswordValid = strengthScore === 5;
 
   // Validate Step 1 and proceed to Step 2
   const handleProceedToPayment = (e: React.FormEvent) => {
@@ -149,18 +153,8 @@ export default function Signup() {
       return;
     }
 
-    if (!phone.trim()) {
-      setErrorMsg('Please enter your international contact phone number.');
-      return;
-    }
-
-    if (!city.trim() || !address.trim() || !postalCode.trim()) {
-      setErrorMsg('Please complete your full billing address details.');
-      return;
-    }
-
-    if (strengthScore < 3) {
-      setErrorMsg('Please ensure your password meets all security requirements.');
+    if (!isPasswordValid) {
+      setErrorMsg('Please ensure your password meets all 5 security requirements (8+ characters, uppercase, lowercase, number, symbol).');
       return;
     }
 
@@ -208,17 +202,10 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      const fullPhoneNumber = `${dialCode} ${phone.trim()}`;
-      
       const payload = {
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
         password,
-        phone: fullPhoneNumber,
-        address: address.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        postalCode: postalCode.trim(),
         country: currentCountry.name,
         cardData: {
           cardNumber: cleanCard,
@@ -290,7 +277,7 @@ export default function Signup() {
               {step > 1 ? <Check className="w-4 h-4" /> : '1'}
             </span>
             <span className={`text-xs font-semibold ${step === 1 ? 'text-blue-900' : 'text-slate-600'}`}>
-              Account & Location
+              Account & Country
             </span>
           </div>
 
@@ -302,44 +289,44 @@ export default function Signup() {
             }`}>
               2
             </span>
-            <span className={`text-xs font-semibold ${step === 2 ? 'text-blue-900' : 'text-slate-400'}`}>
-              30-Day Free Trial ($0)
+            <span className={`text-xs font-semibold ${step === 2 ? 'text-blue-900' : 'text-slate-500'}`}>
+              30-Day Free Trial
             </span>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-2xl">
-        <div className="bg-white py-8 px-6 shadow-xl shadow-blue-950/5 border border-slate-200 rounded-3xl sm:px-10">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
+        <div className="bg-white py-8 px-6 shadow-2xl shadow-blue-950/5 border border-slate-200 rounded-3xl sm:px-10">
           
           {/* ERROR ALERT */}
           {errorMsg && (
-            <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs flex items-center gap-3 shadow-sm">
-              <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
+            <div className="mb-6 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs flex items-center gap-2.5 animate-shake">
+              <AlertCircle className="w-4 h-4 shrink-0" />
               <span className="font-medium">{errorMsg}</span>
             </div>
           )}
 
           {/* SUCCESS ALERT */}
           {successMsg && (
-            <div className="mb-6 p-5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-sm flex items-start gap-3 shadow-sm">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs flex items-start gap-3 shadow-xs">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="font-bold text-emerald-900">Success!</p>
-                <p className="text-emerald-700 leading-relaxed text-xs">{successMsg}</p>
+                <p className="font-bold text-sm">Welcome aboard!</p>
+                <p className="text-emerald-700 leading-relaxed">{successMsg}</p>
               </div>
             </div>
           )}
 
           {/* ========================================================================= */}
-          {/* STEP 1: USER PROFILE & ADDRESS */}
+          {/* STEP 1: ACCOUNT & COUNTRY (FETCHED LIVE FROM MS SQL SERVER)              */}
           {/* ========================================================================= */}
           {step === 1 && (
             <div>
               {/* GOOGLE SIGN UP OPTION */}
               <a
                 href={`${API_BASE_URL}/auth/google`}
-                className="w-full py-3 px-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-all font-medium text-slate-700 text-sm flex items-center justify-center gap-3 shadow-sm mb-6"
+                className="w-full py-3 px-4 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all font-medium text-slate-700 text-sm flex items-center justify-center gap-3 shadow-xs mb-6"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -360,270 +347,115 @@ export default function Signup() {
               </div>
 
               <form className="space-y-4" onSubmit={handleProceedToPayment}>
-                {/* FULL NAME & EMAIL */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Full Legal Name <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        <User className="h-4 w-4" />
-                      </div>
-                      <input
-                        type="text"
-                        required
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        className="w-full pl-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                        placeholder="John Doe"
-                      />
-                    </div>
-                  </div>
+                {/* FULL LEGAL NAME */}
+                <ModernFloatingInput
+                  label="Full Legal Name"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  icon={<User className="h-4 w-4" />}
+                />
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Email Address <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        <Mail className="h-4 w-4" />
-                      </div>
-                      <input
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                        placeholder="name@company.com"
-                      />
-                    </div>
-                  </div>
-                </div>
+                {/* EMAIL ADDRESS */}
+                <ModernFloatingInput
+                  label="Email Address"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  icon={<Mail className="h-4 w-4" />}
+                />
 
-                {/* COUNTRY & STATE SELECTION */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* COUNTRY SELECTOR */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Country <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        <Globe className="h-4 w-4" />
-                      </div>
-                      <select
-                        value={selectedCountryCode}
-                        onChange={(e) => handleCountryChange(e.target.value)}
-                        className="w-full pl-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-xs focus:outline-none focus:border-blue-600 focus:bg-white transition-all appearance-none cursor-pointer"
-                      >
-                        {COUNTRIES_DATA.map((c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.flag} {c.name} ({c.dialCode})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                {/* COUNTRY (SEARCHABLE COMBOBOX WITH RECTANGULAR FLAGS LIVE FROM MS SQL SERVER) */}
+                <ModernCountrySelect
+                  label="Country"
+                  countries={countriesList}
+                  selectedCode={selectedCountryCode}
+                  onSelect={(c) => setSelectedCountryCode(c.code)}
+                  loading={loadingGeo}
+                />
 
-                  {/* DYNAMIC STATE / PROVINCE SELECTOR */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      State / Province / County <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        <MapPin className="h-4 w-4" />
-                      </div>
-                      {currentCountry.states && currentCountry.states.length > 0 ? (
-                        <select
-                          value={state}
-                          onChange={(e) => setState(e.target.value)}
-                          className="w-full pl-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-xs focus:outline-none focus:border-blue-600 focus:bg-white transition-all appearance-none cursor-pointer"
-                        >
-                          {currentCountry.states.map((st) => (
-                            <option key={st} value={st}>
-                              {st}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          required
-                          value={state}
-                          onChange={(e) => setState(e.target.value)}
-                          className="w-full pl-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                          placeholder="Region / Province"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
+                {/* PASSWORD */}
+                <ModernFloatingInput
+                  label="Password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  icon={<Lock className="h-4 w-4" />}
+                  rightElement={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  }
+                />
 
-                {/* STREET ADDRESS */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Street Address <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                    placeholder="123 Cloud Way, Suite 400"
-                  />
-                </div>
+                {/* CONFIRM PASSWORD */}
+                <ModernFloatingInput
+                  label="Confirm Password"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  icon={<Lock className="h-4 w-4" />}
+                  error={confirmPassword.length > 0 && !passwordsMatch ? 'Passwords do not match' : undefined}
+                  rightElement={
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  }
+                />
 
-                {/* CITY & POSTAL CODE */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      City <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                      placeholder="e.g. San Francisco"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Postal / ZIP Code <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={postalCode}
-                      onChange={(e) => setPostalCode(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                      placeholder="e.g. 94107"
-                    />
-                  </div>
-                </div>
-
-                {/* INTERNATIONAL PHONE NUMBER WITH LIVE MASKING */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Phone Number (with Country Code) <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 shrink-0">
-                      <span>{currentCountry.flag}</span>
-                      <span>{dialCode}</span>
-                    </div>
-                    <div className="relative flex-1">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        <Phone className="h-4 w-4" />
-                      </div>
-                      <input
-                        type="tel"
-                        required
-                        value={phone}
-                        onChange={(e) => handlePhoneChange(e.target.value)}
-                        className="w-full pl-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                        placeholder={currentCountry.phoneFormat || 'Phone Number'}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* PASSWORD & CONFIRM PASSWORD */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Password <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        <Lock className="h-4 w-4" />
-                      </div>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full pl-10 pr-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                        placeholder="••••••••"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Confirm Password <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                        <Lock className="h-4 w-4" />
-                      </div>
-                      <input
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        required
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className={`w-full pl-10 pr-10 bg-slate-50 border rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none transition-all ${
-                          confirmPassword.length > 0 
-                            ? passwordsMatch 
-                              ? 'border-emerald-500 focus:border-emerald-600' 
-                              : 'border-rose-400 focus:border-rose-500' 
-                            : 'border-slate-200 focus:border-blue-600'
-                        }`}
-                        placeholder="••••••••"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* PASSWORD STRENGTH METRICS */}
+                {/* PASSWORD STRENGTH METRICS (5-POINT CRITERIA) */}
                 {password.length > 0 && (
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600">
                       <span>Password Strength</span>
                       <span className={
-                        strengthScore === 3 ? 'text-emerald-600' : strengthScore === 2 ? 'text-amber-600' : 'text-rose-500'
+                        strengthScore === 5 ? 'text-emerald-600 font-bold' : strengthScore >= 3 ? 'text-amber-600' : 'text-rose-500'
                       }>
-                        {strengthScore === 3 ? 'Strong' : strengthScore === 2 ? 'Medium' : 'Weak'}
+                        {strengthScore === 5 ? 'Strong (Ready)' : strengthScore >= 3 ? 'Medium' : 'Weak'}
                       </span>
                     </div>
                     
+                    {/* 5-segment Progress Bar */}
                     <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden flex gap-1">
-                      <div className={`h-full flex-1 transition-all ${strengthScore >= 1 ? (strengthScore === 1 ? 'bg-rose-500' : strengthScore === 2 ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-200'}`} />
-                      <div className={`h-full flex-1 transition-all ${strengthScore >= 2 ? (strengthScore === 2 ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-200'}`} />
-                      <div className={`h-full flex-1 transition-all ${strengthScore === 3 ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                      <div className={`h-full flex-1 transition-all ${strengthScore >= 1 ? (strengthScore <= 2 ? 'bg-rose-500' : strengthScore <= 4 ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-200'}`} />
+                      <div className={`h-full flex-1 transition-all ${strengthScore >= 2 ? (strengthScore <= 2 ? 'bg-rose-500' : strengthScore <= 4 ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-200'}`} />
+                      <div className={`h-full flex-1 transition-all ${strengthScore >= 3 ? (strengthScore <= 4 ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-200'}`} />
+                      <div className={`h-full flex-1 transition-all ${strengthScore >= 4 ? (strengthScore <= 4 ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-slate-200'}`} />
+                      <div className={`h-full flex-1 transition-all ${strengthScore === 5 ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-1 pt-1 text-[10px]">
-                      <div className={`flex items-center gap-1 ${hasMinLength ? 'text-emerald-600' : 'text-slate-400'}`}>
-                        {hasMinLength ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        8+ Chars
+                    {/* 5-point Checklist */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1 text-[10px]">
+                      <div className={`flex items-center gap-1 ${hasMinLength ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
+                        {hasMinLength ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <X className="w-3 h-3 text-rose-400 shrink-0" />}
+                        <span>8+ Characters</span>
                       </div>
-                      <div className={`flex items-center gap-1 ${hasNumber ? 'text-emerald-600' : 'text-slate-400'}`}>
-                        {hasNumber ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        1+ Number
+                      <div className={`flex items-center gap-1 ${hasUpperCase ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
+                        {hasUpperCase ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <X className="w-3 h-3 text-rose-400 shrink-0" />}
+                        <span>1+ Capital (A-Z)</span>
                       </div>
-                      <div className={`flex items-center gap-1 ${hasSpecialChar ? 'text-emerald-600' : 'text-slate-400'}`}>
-                        {hasSpecialChar ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        1+ Symbol
+                      <div className={`flex items-center gap-1 ${hasLowerCase ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
+                        {hasLowerCase ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <X className="w-3 h-3 text-rose-400 shrink-0" />}
+                        <span>1+ Lowercase (a-z)</span>
+                      </div>
+                      <div className={`flex items-center gap-1 ${hasNumber ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
+                        {hasNumber ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <X className="w-3 h-3 text-rose-400 shrink-0" />}
+                        <span>1+ Number (0-9)</span>
+                      </div>
+                      <div className={`flex items-center gap-1 ${hasSpecialChar ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
+                        {hasSpecialChar ? <Check className="w-3 h-3 text-emerald-600 shrink-0" /> : <X className="w-3 h-3 text-rose-400 shrink-0" />}
+                        <span>1+ Symbol (!@#$)</span>
                       </div>
                     </div>
                   </div>
@@ -631,7 +463,7 @@ export default function Signup() {
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 mt-4"
+                  className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 mt-4 cursor-pointer"
                 >
                   Continue to 30-Day Free Trial <ArrowRight className="w-4 h-4" />
                 </button>
@@ -640,18 +472,29 @@ export default function Signup() {
           )}
 
           {/* ========================================================================= */}
-          {/* STEP 2: 30-DAY FREE TRIAL & ENCRYPTED CARD VERIFICATION */}
+          {/* STEP 2: 30-DAY FREE TRIAL & SECURE CARD ON FILE VERIFICATION              */}
           {/* ========================================================================= */}
           {step === 2 && (
             <form className="space-y-6" onSubmit={handleFinalSignup}>
-              {/* TRIAL PROMOTION BANNER */}
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-white relative overflow-hidden shadow-lg border border-blue-800">
-                <div className="absolute top-0 right-0 transform translate-x-4 -translate-y-4 w-32 h-32 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
-                
+              {/* BACK BUTTON */}
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="text-xs font-semibold text-slate-500 hover:text-blue-600 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to Account Details
+              </button>
+
+              {/* 30-DAY FREE TRIAL HERO CARD */}
+              <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-white shadow-xl shadow-blue-950/20 relative overflow-hidden">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/30 text-blue-200 text-xs font-semibold border border-blue-400/30">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                    <span>30-Day Free Trial Package</span>
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 bg-blue-500/20 rounded-lg border border-blue-400/30">
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                    </span>
+                    <span className="text-xs font-bold uppercase tracking-wider text-blue-200">
+                      30-Day Free Trial Package
+                    </span>
                   </div>
                   <span className="text-2xl font-black text-emerald-400 font-mono tracking-tight">$0.00</span>
                 </div>
@@ -676,14 +519,14 @@ export default function Signup() {
               </div>
 
               {/* NOTICE ABOUT EMAIL COUNTDOWN & RENEWAL */}
-              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed flex items-start gap-2.5">
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs leading-relaxed flex items-start gap-2.5">
                 <Calendar className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                 <p>
                   We keep track of your 30-day countdown. <strong>7 days before your trial ends</strong>, we will email you to rate our service and notify you. If you cancel prior to the end date, your card will never be charged.
                 </p>
               </div>
 
-              {/* CARD INPUTS */}
+              {/* MODERN FLOATING CARD INPUTS */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-semibold text-slate-800">
@@ -696,119 +539,84 @@ export default function Signup() {
                 </div>
 
                 {/* CARDHOLDER NAME */}
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                    Cardholder Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={cardholderName}
-                    onChange={(e) => setCardholderName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                    placeholder="Full name as printed on card"
-                  />
-                </div>
+                <ModernFloatingInput
+                  label="Cardholder Name"
+                  required
+                  value={cardholderName}
+                  onChange={(e) => setCardholderName(e.target.value)}
+                  icon={<User className="h-4 w-4" />}
+                />
 
                 {/* CARD NUMBER */}
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                    Card Number
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <CreditCard className="h-4 w-4" />
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      value={cardNumber}
-                      onChange={(e) => handleCardNumberChange(e.target.value)}
-                      className="w-full pl-10 pr-24 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm font-mono focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                      placeholder="4000 1234 5678 9010"
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
-                        {cardBrand}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                <ModernFloatingInput
+                  label="Card Number"
+                  required
+                  value={cardNumber}
+                  onChange={(e) => handleCardNumberChange(e.target.value)}
+                  icon={<CreditCard className="h-4 w-4" />}
+                  rightElement={
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700">
+                      {cardBrand}
+                    </span>
+                  }
+                />
 
                 {/* EXPIRY & CVC */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                      Expiration Date
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={cardExpiry}
-                      onChange={(e) => handleCardExpiryChange(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm font-mono text-center focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                      placeholder="MM/YY"
-                    />
-                  </div>
+                  <ModernFloatingInput
+                    label="Expiration Date (MM/YY)"
+                    required
+                    value={cardExpiry}
+                    onChange={(e) => handleCardExpiryChange(e.target.value)}
+                    className="font-mono text-center"
+                  />
 
-                  <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                      Security Code (CVC)
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      maxLength={4}
-                      value={cardCvc}
-                      onChange={(e) => handleCardCvcChange(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-900 text-sm font-mono text-center focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                      placeholder="•••"
-                    />
-                  </div>
+                  <ModernFloatingInput
+                    label="Security CVC / CVV"
+                    type="password"
+                    maxLength={4}
+                    required
+                    value={cardCvc}
+                    onChange={(e) => handleCardCvcChange(e.target.value)}
+                    className="font-mono text-center"
+                  />
                 </div>
               </div>
 
               {/* TERMS CHECKBOX */}
               <div className="flex items-start gap-2.5 pt-2">
                 <input
-                  id="terms"
+                  id="trial-terms"
                   type="checkbox"
                   required
                   checked={agreeTerms}
                   onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  className="h-4 w-4 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
-                <label htmlFor="terms" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
-                  I authorize ATECH Cloud to verify my card for my 30-day free trial ($0.00 charged today). I agree to the{' '}
-                  <a href="#" className="text-blue-600 hover:underline">Terms of Service</a>,{' '}
-                  <a href="#" className="text-blue-600 hover:underline">Privacy Policy</a>, and understand my VPS Basic will renew at $4.99/month unless cancelled before day 30.
+                <label htmlFor="trial-terms" className="text-xs text-slate-600 leading-relaxed cursor-pointer">
+                  I understand that I am receiving a <strong>30-day free trial ($0.00 today)</strong>. After 30 days, the standard monthly rate ($4.99) will be charged to the card above unless cancelled in the portal. I agree to the{' '}
+                  <a href="#" className="text-blue-600 hover:underline">Terms of Service</a> and{' '}
+                  <a href="#" className="text-blue-600 hover:underline">Trial Policy</a>.
                 </label>
               </div>
 
-              {/* BUTTONS */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              {/* SUBMIT BUTTON */}
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  disabled={loading}
-                  className="py-3 px-4 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
+                  className="px-5 py-3.5 rounded-2xl border border-slate-200 text-slate-700 font-semibold text-sm hover:bg-slate-50 transition-all cursor-pointer"
                 >
-                  <ArrowLeft className="w-4 h-4" /> Back
+                  Back
                 </button>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-3.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-1 py-3.5 rounded-2xl bg-emerald-600 text-white font-bold text-sm hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {loading ? (
-                    <span className="flex items-center gap-2">
-                      <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                      </svg>
-                      Securing & Provisioning Trial...
-                    </span>
+                    'Activating Free Trial...'
                   ) : (
                     <>
                       Start 30-Day Free Trial ($0.00) <ArrowRight className="w-4 h-4" />

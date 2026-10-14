@@ -27,6 +27,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import ticketRoutes from './routes/ticketRoutes.js';
 import appStoreRoutes from './routes/appStoreRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import geoRoutes from './routes/geoRoutes.js';
 import { setupTerminalWebSocket } from './services/terminalService.js';
 import { startTicketAutomationWorker } from './services/ticketAutomationService.js';
 import { startTrialAutomationWorker } from './services/trialService.js';
@@ -132,6 +133,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/apps', appStoreRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/geo', geoRoutes);
 
 // Public announcements route for website navbar ticker
 app.get('/api/announcements', async (req, res) => {

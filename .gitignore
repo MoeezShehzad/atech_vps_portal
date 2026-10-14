@@ -27,6 +27,10 @@ test_*.js
 update_*.js
 windows_proxy.js
 
+# Database dumps & bundles
+*.sql
+*.bundle
+
 # OS metadata
 .DS_Store
 Thumbs.db

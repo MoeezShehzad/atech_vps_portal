@@ -267,6 +267,14 @@ export const register = async (req, res) => {
     });
   }
 
+  // Server-side Password Strength Guard (Min 8 characters, 1 uppercase, 1 lowercase, 1 number, 1 special character)
+  const passwordComplexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_+\-=[\]\\/]).{8,}$/;
+  if (!passwordComplexityRegex.test(password)) {
+    return res.status(400).json({
+      error: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
+    });
+  }
+
   const normalizedEmail = email.toLowerCase().trim();
 
   try {
