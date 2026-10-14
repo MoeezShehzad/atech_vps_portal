@@ -271,6 +271,8 @@ export async function getPlansAndImages(req, res) {
  * 3. POST /api/vms/deploy - Provision a new VM
  */
 export async function deployVM(req, res) {
+  let newVm = null;
+  let ipRecord = null;
   try {
     const userId = req.user?.userId;
     if (!userId) {
@@ -310,7 +312,7 @@ export async function deployVM(req, res) {
     const existingDbVm = await prisma.virtualMachine.findFirst({
       where: {
         vmName: cleanVmName,
-        status: { not: 'TERMINATED' },
+        status: { notIn: ['TERMINATED', 'FAILED'] },
       },
     });
     if (existingDbVm) {
@@ -394,10 +396,11 @@ export async function deployVM(req, res) {
       });
     }
 
+    const isSlotReused = Boolean(subscription);
     console.log(`[Deploy VM] Reusing active subscription slot #${subscription.subscriptionId} (${subscription.plan.name}) for user #${userId}`);
 
     // 2. Assign IP from pool (or allocate dynamic DHCP lease)
-    let ipRecord = await prisma.iPPool.findFirst({
+    ipRecord = await prisma.iPPool.findFirst({
       where: { status: 'AVAILABLE' },
     });
     if (!ipRecord) {
@@ -413,7 +416,7 @@ export async function deployVM(req, res) {
     }
 
     // 3. Create VM in MS SQL Server
-    const newVm = await prisma.virtualMachine.create({
+    newVm = await prisma.virtualMachine.create({
       data: {
         userId,
         subscriptionId: subscription.subscriptionId,
@@ -549,6 +552,22 @@ export async function deployVM(req, res) {
     }
   } catch (error) {
     console.error('[VM Controller] Error deploying VM:', error);
+    if (newVm?.vmId) {
+      await prisma.virtualMachine.update({
+        where: { vmId: newVm.vmId },
+        data: {
+          status: 'FAILED',
+          provisioningStatus: 'FAILED',
+          provisioningError: error.message,
+        },
+      }).catch(() => {});
+    }
+    if (ipRecord?.ipId) {
+      await prisma.iPPool.update({
+        where: { ipId: ipRecord.ipId },
+        data: { status: 'AVAILABLE', assignedVmId: null },
+      }).catch(() => {});
+    }
     return res.status(500).json({ error: error.message || 'Failed to deploy virtual machine.' });
   }
 }
