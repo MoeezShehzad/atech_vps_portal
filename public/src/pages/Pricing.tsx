@@ -139,16 +139,25 @@ export default function Pricing() {
   };
 
   const handleSelectCustom = () => {
-    const customConfig = {
+    const customPlan: ExtendedPlan = {
+      planId: 99,
+      name: 'Custom Cloud VPS',
       cpuCores: cpu,
       ramGb: ram,
       storageGb: storage,
-      bandwidthTb: bandwidth,
+      storageType: 'NVMe',
+      bandwidthMbps: bandwidth * 1000,
+      ipv4Addresses: 1,
       backupEnabled: includeBackup,
+      snapshotEnabled: true,
       monthlyPrice: calculateCustomMonthly(),
-      billingCycle,
+      regularPriceMonthly: calculateCustomMonthly(),
+      promoPriceMonthly: Number((calculateCustomMonthly() * 0.85).toFixed(2)),
+      currency: 'USD',
+      isActive: true,
+      tag: 'CUSTOM',
     };
-    navigate('/dashboard', { state: { customConfig } });
+    navigate('/configure', { state: { selectedPlan: customPlan } });
   };
 
   if (loading) {

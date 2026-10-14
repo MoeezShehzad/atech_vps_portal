@@ -91,7 +91,9 @@ export default function Checkout() {
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState('');
-  const [deployPreference, setDeployPreference] = useState<'immediate' | 'later'>('immediate');
+  const [deployPreference, setDeployPreference] = useState<'immediate' | 'later'>(
+    orderData?.deployPreference || 'immediate'
+  );
   const [paymentSuccessData, setPaymentSuccessData] = useState<{
     transactionId: string;
     invoiceNumber: string;
@@ -251,14 +253,14 @@ export default function Checkout() {
           if (deployPreference === 'immediate') {
             try {
               const deployPayload = {
-                vmName: `srv-vps-${Math.floor(1000 + Math.random() * 9000)}`,
+                vmName: orderData.hostname?.trim() || `srv-vps-${Math.floor(1000 + Math.random() * 9000)}`,
                 planId: orderData.plan?.planId || 1,
-                imageId: orderData.os?.imageId || 1,
+                imageId: orderData.os?.imageId || 2,
                 customCpu: orderData.plan?.cpuCores,
                 customRam: orderData.plan?.ramGb,
                 customStorage: orderData.plan?.storageGb,
-                username: 'ubuntu',
-                password: 'root',
+                username: orderData.adminUsername || 'ubuntu',
+                password: orderData.rootPassword || 'root',
                 authMethod: 'password',
                 enableBackups: orderData.addons?.some((a: any) => a.name?.toLowerCase().includes('backup')),
               };
