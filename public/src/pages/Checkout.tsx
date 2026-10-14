@@ -1284,15 +1284,7 @@ export default function Checkout() {
                 <p className="text-[10px] text-slate-400">Includes full root access & automated provisioning</p>
               </div>
 
-              {/* Features Guarantee */}
-              <ul className="space-y-2 pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-                <li className="flex items-center gap-2">
-                  <span className="text-emerald-500 font-bold">✓</span> 30-day money-back guarantee
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="text-emerald-500 font-bold">✓</span> Instant server deployment (~60 sec)
-                </li>
-              </ul>
+
             </div>
           </div>
 
