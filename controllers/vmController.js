@@ -362,68 +362,15 @@ export async function deployVM(req, res) {
       orderBy: { endDate: 'desc' },
     });
 
-    let isSlotReused = false;
-    if (subscription) {
-      isSlotReused = true;
-      console.log(`[Deploy VM] Reusing active subscription slot #${subscription.subscriptionId} (${subscription.plan.name}) for user #${userId}`);
-    } else {
-      // 1. Create new 30-day Subscription
-      subscription = await prisma.subscription.create({
-        data: {
-          userId,
-          planId: plan.planId,
-          status: 'ACTIVE',
-          startDate: now,
-          endDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30-day cycle
-          monthlyPrice: pricing.totalMonthlyPrice,
-          currency: 'USD',
-        },
+    if (!subscription) {
+      return res.status(402).json({
+        error: 'Active subscription required. You must purchase a VPS package through checkout before deploying a virtual machine.',
+        code: 'PAYMENT_REQUIRED',
+        planId: plan.planId,
       });
-
-      // Auto-generate invoice & dispatch payment receipt via billing@atechconsult.com
-      try {
-        const invNum = `INV-${new Date().getFullYear()}-${String(subscription.subscriptionId).padStart(4, '0')}`;
-        const inv = await prisma.invoice.create({
-          data: {
-            userId,
-            subscriptionId: subscription.subscriptionId,
-            invoiceNumber: invNum,
-            subtotal: pricing.totalMonthlyPrice,
-            tax: 0.00,
-            discount: 0.00,
-            total: pricing.totalMonthlyPrice,
-            currency: 'USD',
-            status: 'PAID',
-            issueDate: now,
-            dueDate: now,
-            paidDate: now,
-          },
-        });
-
-        await prisma.payment.create({
-          data: {
-            userId,
-            invoiceId: inv.invoiceId,
-            paymentGateway: 'STRIPE_CARD',
-            transactionId: `txn_${Date.now()}_${subscription.subscriptionId}`,
-            amount: pricing.totalMonthlyPrice,
-            currency: 'USD',
-            status: 'COMPLETED',
-            paymentDate: now,
-          },
-        });
-
-        sendInvoiceReceiptEmail({
-          email: req.user?.email,
-          fullName: req.user?.fullName,
-          invoiceNumber: invNum,
-          amount: pricing.totalMonthlyPrice,
-          planName: plan.name,
-        }).catch((err) => console.warn('[Billing Receipt Email Warning]:', err.message));
-      } catch (invErr) {
-        console.warn('[Auto Invoice Generation Notice]:', invErr.message);
-      }
     }
+
+    console.log(`[Deploy VM] Reusing active subscription slot #${subscription.subscriptionId} (${subscription.plan.name}) for user #${userId}`);
 
     // 2. Assign IP from pool (or allocate dynamic DHCP lease)
     let ipRecord = await prisma.iPPool.findFirst({
