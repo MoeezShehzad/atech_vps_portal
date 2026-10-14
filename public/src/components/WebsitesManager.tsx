@@ -40,6 +40,7 @@ import {
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
 import WebConsoleModal from './WebConsoleModal';
+import { formatDateTime } from '../utils/dateFormatter';
 
 interface ManagedWebsite {
   id: number;
@@ -677,7 +678,7 @@ export default function WebsitesManager() {
                           {item.isDirectory ? '-' : `${(item.size / 1024).toFixed(1)} KB`}
                         </td>
                         <td className="py-3 px-5 text-slate-400 text-[11px]">
-                          {new Date(item.modifiedAt).toLocaleString()}
+                          {formatDateTime(item.modifiedAt)}
                         </td>
                         <td className="py-3 px-5 text-right">
                           <div className="flex items-center justify-end gap-2">

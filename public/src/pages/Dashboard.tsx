@@ -54,6 +54,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import { apiCall } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import WindowsResourceGraph from '../components/WindowsResourceGraph';
+import { formatDate, formatDateTime } from '../utils/dateFormatter';
 
 const WebConsoleModal = React.lazy(() => import('../components/WebConsoleModal'));
 const SecurityAndLogs = React.lazy(() => import('../components/SecurityAndLogs'));
@@ -805,7 +806,7 @@ export default function Dashboard() {
       setBackupActionLoading(true);
       await apiCall(`/vms/${selectedInstance.vmId}/backups`, {
         method: 'POST',
-        body: JSON.stringify({ label: `Manual Point - ${new Date().toLocaleDateString()}` }),
+        body: JSON.stringify({ label: `Manual Point - ${formatDate(new Date())}` }),
       });
       toast.success('Disaster recovery backup snapshot created.');
       fetchBackups(selectedInstance.vmId);
@@ -2979,7 +2980,7 @@ export default function Dashboard() {
                             </span>
                           </div>
                           <div className="text-[10px] text-slate-400 mt-0.5">
-                            {new Date(b.createdAt).toLocaleString()} • {b.backupSizeGb ? `${b.backupSizeGb} GB` : '4.2 GB'}
+                            {formatDateTime(b.createdAt)} • {b.backupSizeGb ? `${b.backupSizeGb} GB` : '4.2 GB'}
                           </div>
                         </div>
 
@@ -3242,7 +3243,7 @@ export default function Dashboard() {
                       <div key={snap.snapshotId || snap.id} className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between text-xs">
                         <div>
                           <strong className="text-slate-800 dark:text-slate-200 font-mono text-[11px]">{snap.name || snap.snapshotName}</strong>
-                          <div className="text-[10px] text-slate-400">{new Date(snap.createdAt).toLocaleString()}</div>
+                          <div className="text-[10px] text-slate-400">{formatDateTime(snap.createdAt)}</div>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <button

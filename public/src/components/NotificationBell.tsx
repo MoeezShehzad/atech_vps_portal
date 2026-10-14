@@ -17,6 +17,7 @@ import {
   X
 } from 'lucide-react';
 import { apiCall } from '../services/api';
+import { formatDate } from '../utils/dateFormatter';
 
 interface NotificationItem {
   id: string;
@@ -96,7 +97,7 @@ export default function NotificationBell() {
     if (diffSec < 60) return 'Just now';
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
     if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-    return new Date(isoString).toLocaleDateString();
+    return formatDate(isoString);
   };
 
   return (

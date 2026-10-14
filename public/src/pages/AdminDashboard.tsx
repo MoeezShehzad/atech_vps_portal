@@ -78,6 +78,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
+import { formatDate, formatDateTime } from '../utils/dateFormatter';
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -633,7 +634,7 @@ export default function AdminDashboard() {
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-      const issueDateStr = new Date(receiptData.issueDate || receiptData.createdAt || inv.createdAt).toLocaleDateString();
+      const issueDateStr = formatDate(receiptData.issueDate || receiptData.createdAt || inv.createdAt);
       doc.text(`Issue Date: ${issueDateStr}`, 114, 62);
       const gw = receiptData.paymentMethod || inv.paymentMethod || 'Stripe';
       doc.text(`Gateway / Method: ${gw}`, 114, 67);
@@ -1570,7 +1571,7 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4">
                         <p className="font-semibold text-slate-900 dark:text-white text-xs">{u.fullName}</p>
                         <p className="text-[11px] font-mono text-slate-400">{u.email}</p>
-                        <span className="text-[10px] text-slate-400">Joined {new Date(u.createdAt).toLocaleDateString()}</span>
+                        <span className="text-[10px] text-slate-400">Joined {formatDate(u.createdAt)}</span>
                       </td>
                       <td className="px-6 py-4">
                         <select
@@ -1956,8 +1957,8 @@ export default function AdminDashboard() {
                                 <td className="px-5 py-4">
                                   <p className="font-mono font-bold text-slate-900 dark:text-white text-xs">{inv.invoiceNumber}</p>
                                 </td>
-                                <td className="px-5 py-4 text-xs">
-                                  {new Date(inv.createdAt).toLocaleString()}
+                                <td className="px-5 py-4 text-xs font-mono">
+                                  {formatDateTime(inv.createdAt)}
                                 </td>
                                 <td className="px-5 py-4 text-xs font-semibold text-slate-800 dark:text-slate-200">
                                   {inv.plan?.name || inv.planName || 'Cloud VPS Service'}
@@ -2148,7 +2149,7 @@ export default function AdminDashboard() {
                           <tr key={inv.id || inv.invoiceId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                             <td className="px-6 py-4">
                               <p className="font-mono font-bold text-slate-900 dark:text-white text-xs">{inv.invoiceNumber}</p>
-                              <p className="text-[11px] text-slate-400">{new Date(inv.createdAt).toLocaleString()}</p>
+                              <p className="text-[11px] font-mono text-slate-400">{formatDateTime(inv.createdAt)}</p>
                             </td>
                             <td className="px-6 py-4">
                               <button
@@ -2543,7 +2544,7 @@ export default function AdminDashboard() {
                           {item.message}
                         </p>
                         <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-                          <span>{new Date(item.createdAt).toLocaleString()}</span>
+                          <span>{formatDateTime(item.createdAt)}</span>
                           <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                             ✓ {item.sentCount || 'All'} Delivered
                           </span>
@@ -3462,7 +3463,7 @@ export default function AdminDashboard() {
                   <div>
                     <span className="font-bold text-slate-900 dark:text-white text-xs">{a.title}</span>
                     <p className="text-xs text-slate-500 mt-0.5">{a.message}</p>
-                    <span className="text-[10px] text-slate-400 font-mono">By {a.createdBy} • {new Date(a.createdAt).toLocaleDateString()}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">By {a.createdBy} • {formatDate(a.createdAt)}</span>
                   </div>
                   <button onClick={() => handleDeleteAnnouncement(a.id)} className="p-1.5 text-slate-400 hover:text-rose-600">
                     <Trash2 className="w-4 h-4" />
@@ -3567,7 +3568,7 @@ export default function AdminDashboard() {
                         <h4 className="font-bold text-slate-900 dark:text-white text-base">{selectedTicket.subject}</h4>
                       </div>
                       <p className="text-xs text-slate-500 mt-1">
-                        Submitted by: <strong className="text-slate-700 dark:text-slate-300">{selectedTicket.user?.fullName || 'Customer'}</strong> ({selectedTicket.user?.email || 'N/A'}) • {new Date(selectedTicket.createdAt).toLocaleString()}
+                        Submitted by: <strong className="text-slate-700 dark:text-slate-300">{selectedTicket.user?.fullName || 'Customer'}</strong> ({selectedTicket.user?.email || 'N/A'}) • {formatDateTime(selectedTicket.createdAt)}
                       </p>
                     </div>
                   </div>
@@ -3615,7 +3616,7 @@ export default function AdminDashboard() {
                                 {isCustomer ? `Customer (${msg.senderName})` : `Admin Response (${msg.senderName})`}
                               </span>
                               <span className="font-mono text-[10px] text-slate-400">
-                                {new Date(msg.timestamp).toLocaleString()}
+                                {formatDateTime(msg.timestamp)}
                               </span>
                             </div>
                             <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
@@ -3982,7 +3983,7 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {auditLogs.map((log) => (
                     <tr key={log.id}>
-                      <td className="px-4 py-3 text-xs font-mono">{new Date(log.timestamp).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-xs font-mono">{formatDateTime(log.timestamp)}</td>
                       <td className="px-4 py-3 text-xs font-bold text-slate-900 dark:text-white">{log.action}</td>
                       <td className="px-4 py-3 text-xs">{log.actor?.email || 'System'}</td>
                       <td className="px-4 py-3">
@@ -4135,7 +4136,7 @@ export default function AdminDashboard() {
                             <tr key={sub.id}>
                               <td className="px-4 py-3 font-sans font-bold text-slate-900 dark:text-white">{sub.plan?.name}</td>
                               <td className="px-4 py-3">${Number(sub.plan?.monthlyPrice || 0).toFixed(2)}/mo</td>
-                              <td className="px-4 py-3">{sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString() : 'N/A'}</td>
+                              <td className="px-4 py-3">{sub.currentPeriodEnd ? formatDate(sub.currentPeriodEnd) : 'N/A'}</td>
                               <td className="px-4 py-3 font-sans">
                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                   sub.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
@@ -4186,7 +4187,7 @@ export default function AdminDashboard() {
                           {userProfileData.invoices?.map((inv: any) => (
                             <tr key={inv.id}>
                               <td className="px-4 py-3 font-bold text-slate-900 dark:text-white">{inv.invoiceNumber}</td>
-                              <td className="px-4 py-3 font-sans">{new Date(inv.createdAt).toLocaleDateString()}</td>
+                              <td className="px-4 py-3 font-sans">{formatDate(inv.createdAt)}</td>
                               <td className="px-4 py-3">${Number(inv.amount || 0).toFixed(2)}</td>
                               <td className="px-4 py-3 font-sans uppercase text-[10px]">{inv.paymentMethod}</td>
                               <td className="px-4 py-3 font-sans">
@@ -4553,7 +4554,7 @@ export default function AdminDashboard() {
                 <div className="flex justify-between">
                   <span className="text-slate-500">Issue Date:</span>
                   <span className="font-mono text-slate-800 dark:text-slate-200">
-                    {new Date(selectedInvoiceReceipt.issueDate || selectedInvoiceReceipt.createdAt).toLocaleDateString()}
+                    {formatDate(selectedInvoiceReceipt.issueDate || selectedInvoiceReceipt.createdAt)}
                   </span>
                 </div>
                 <div className="flex justify-between">

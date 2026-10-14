@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Phone, Lock, CheckCircle, AlertCircle, Loader2, Camera, MapPin, ShieldCheck, Key, Plus, Trash2, Copy, Check, Download, Terminal } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { formatDate } from '../utils/dateFormatter';
 
 interface SSHKeyItem {
   keyId: number;
@@ -621,7 +622,7 @@ export default function AccountSettings() {
                       {k.keyType}
                     </span>
                     <span className="text-[10px] text-slate-400 dark:text-slate-500">
-                      Added {new Date(k.createdAt).toLocaleDateString()}
+                      Added {formatDate(k.createdAt)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">

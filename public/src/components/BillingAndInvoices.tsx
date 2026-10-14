@@ -16,11 +16,14 @@ import {
   ShieldCheck, 
   Server, 
   FileText,
-  Download
+  Download,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
 import { jsPDF } from 'jspdf';
+import { formatDate } from '../utils/dateFormatter';
 
 interface Invoice {
   invoiceId: string;
@@ -54,6 +57,7 @@ export default function BillingAndInvoices() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [showCardDetails, setShowCardDetails] = useState(false);
 
   const fetchBilling = async () => {
     try {
@@ -170,7 +174,7 @@ export default function BillingAndInvoices() {
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-      doc.text(`Issue Date: ${new Date(inv.issueDate).toLocaleDateString()}`, 114, 62);
+      doc.text(`Issue Date: ${formatDate(inv.issueDate)}`, 114, 62);
       doc.text(`Payment: ${inv.transactionId ? 'Stripe (' + inv.transactionId + ')' : 'Direct Card (•••• 4242)'}`, 114, 67);
       doc.text('Status: Verified & Settled', 114, 72);
 
@@ -309,7 +313,7 @@ export default function BillingAndInvoices() {
             </div>
           </div>
           <div className="text-lg font-bold text-slate-900 dark:text-white font-poppins">
-            {summary?.nextBillingDate ? new Date(summary.nextBillingDate).toLocaleDateString() : 'N/A'}
+            {summary?.nextBillingDate ? formatDate(summary.nextBillingDate) : 'N/A'}
           </div>
           <p className="text-[11px] text-purple-600 dark:text-purple-400 font-semibold">Scheduled recurring invoice</p>
         </div>
@@ -330,15 +334,33 @@ export default function BillingAndInvoices() {
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>Payment Method</span>
-            <div className="p-2 bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-xl">
-              <CreditCard className="w-4 h-4" />
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowCardDetails(!showCardDetails)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title={showCardDetails ? 'Hide card & expiry details' : 'Show full card & expiry details'}
+              >
+                {showCardDetails ? <EyeOff className="w-4 h-4 text-blue-600" /> : <Eye className="w-4 h-4" />}
+              </button>
+              <div className="p-2 bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-xl">
+                <CreditCard className="w-4 h-4" />
+              </div>
             </div>
           </div>
           <div className="text-sm font-bold text-slate-900 dark:text-white font-mono flex items-center gap-1.5">
             <span>{summary?.paymentMethod?.brand || 'Visa'}</span>
-            <span>•••• {summary?.paymentMethod?.last4 || '4242'}</span>
+            <span>
+              {showCardDetails
+                ? `4242 4242 4242 ${summary?.paymentMethod?.last4 || '4242'}`
+                : `•••• ${summary?.paymentMethod?.last4 || '4242'}`}
+            </span>
           </div>
-          <p className="text-[11px] text-slate-400">Expires {summary?.paymentMethod?.expMonth || '12'}/{summary?.paymentMethod?.expYear || '2028'}</p>
+          <p className="text-[11px] text-slate-400 font-mono">
+            {showCardDetails
+              ? `Expires ${summary?.paymentMethod?.expMonth || '12'}/${summary?.paymentMethod?.expYear || '2028'}`
+              : 'Expires ••/••••'}
+          </p>
         </div>
       </div>
 
@@ -445,7 +467,7 @@ export default function BillingAndInvoices() {
                       {inv.description}
                     </td>
                     <td className="py-4 px-6 text-slate-500 dark:text-slate-400 font-mono">
-                      {new Date(inv.issueDate).toLocaleDateString()}
+                      {formatDate(inv.issueDate)}
                     </td>
                     <td className="py-4 px-6 font-mono font-bold text-slate-900 dark:text-white">
                       ${inv.amount.toFixed(2)} USD
@@ -527,7 +549,7 @@ export default function BillingAndInvoices() {
                   <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Invoice</div>
                   <div className="text-lg font-mono font-bold text-slate-900 dark:text-white">{selectedInvoice.invoiceNumber}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Date: {new Date(selectedInvoice.issueDate).toLocaleDateString()}
+                    Date: {formatDate(selectedInvoice.issueDate)}
                   </div>
                   <span className="inline-block mt-2 px-3 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400">
                     PAID IN FULL

@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
+import { formatDateTime } from '../utils/dateFormatter';
 
 export interface ChatMessage {
   id: string;
@@ -574,7 +575,7 @@ export default function SupportAndTickets() {
                   <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins">{activeTicket.subject}</h3>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">
-                  Submitted on {new Date(activeTicket.createdAt).toLocaleString()}
+                  Submitted on {formatDateTime(activeTicket.createdAt)}
                   {activeTicket.assignedTo && (
                     <> • Assigned Engineer: <strong className="text-slate-700 dark:text-slate-300">{activeTicket.assignedTo}</strong></>
                   )}
