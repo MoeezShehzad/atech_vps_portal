@@ -248,11 +248,11 @@ export function setupTerminalWebSocket(server) {
 
             shellStream = stream;
 
-            // If we connected via fallback user 'ubuntu', heal targetUser
-            if (isFallback && targetUser !== 'ubuntu' && targetUser !== 'root') {
-              const safeUser = targetUser.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-              const safePass = targetPassword.replace(/"/g, '\\"');
-              const healCmd = `echo "root" | sudo -S id -u ${safeUser} 2>/dev/null || (echo "root" | sudo -S useradd -m -s /bin/bash -G sudo ${safeUser} && echo "${safeUser}:${safePass}" | sudo chpasswd) ; exec su - ${safeUser}\n`;
+            // If we connected via fallback, heal targetUser and targetPassword so future logins work seamlessly
+            if (isFallback) {
+              const safeUser = (targetUser || 'ubuntu').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+              const safePass = (targetPassword || 'root').replace(/"/g, '\\"');
+              const healCmd = `echo "root" | sudo -S bash -c "echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-ubuntu-nopasswd && chmod 0440 /etc/sudoers.d/99-ubuntu-nopasswd && echo 'ubuntu:${safePass}' | chpasswd && echo 'root:${safePass}' | chpasswd" 2>/dev/null ; id -u ${safeUser} 2>/dev/null || (sudo useradd -m -s /bin/bash -G sudo ${safeUser} 2>/dev/null && echo "${safeUser}:${safePass}" | sudo chpasswd) ; exec su - ${safeUser}\n`;
               stream.write(healCmd);
             }
 
@@ -288,11 +288,19 @@ export function setupTerminalWebSocket(server) {
 
       sshConn.on('error', (err) => {
         console.warn(`[SSH2 Connection Attempt on ${targetIp} for ${user}]:`, err.message);
-        // If authentication failed on custom user, attempt fallback to default ubuntu user
-        if (!isFallback && targetUser !== 'ubuntu' && (err.level === 'client-authentication' || err.message?.toLowerCase().includes('auth'))) {
-          console.log(`[SSH2 Fallback] Retrying with default account 'ubuntu' to self-heal guest session...`);
-          try { sshConn.end(); } catch (e) {}
-          return connectSSH('ubuntu', 'root', true);
+        
+        // Multi-tier credential fallback for newly provisioned or template instances
+        const isAuthErr = err.level === 'client-authentication' || err.message?.toLowerCase().includes('auth');
+        if (!isFallback && isAuthErr) {
+          if (pass !== 'root') {
+            console.log(`[SSH2 Fallback] Retrying with template password 'root' for user '${user}'...`);
+            try { sshConn.end(); } catch (e) {}
+            return connectSSH(user, 'root', true);
+          } else if (user !== 'ubuntu') {
+            console.log(`[SSH2 Fallback] Retrying with default account 'ubuntu:root' to self-heal guest session...`);
+            try { sshConn.end(); } catch (e) {}
+            return connectSSH('ubuntu', 'root', true);
+          }
         }
 
         const isNetworkErr = err.code === 'ECONNREFUSED' || err.code === 'EHOSTUNREACH' || err.code === 'ETIMEDOUT' || err.level === 'client-timeout';

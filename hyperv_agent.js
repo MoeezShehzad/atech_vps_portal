@@ -84,35 +84,37 @@ async function provisionGuestVM({ vmName, adminUsername, adminPassword, sshPubli
       const formattedHostname = targetIp.replace(/\./g, '-');
 
       let script = `
-echo "${defaultPass}" | sudo -S growpart /dev/sda 3 2>/dev/null || true
-echo "${defaultPass}" | sudo -S pvresize /dev/sda3 2>/dev/null || true
-echo "${defaultPass}" | sudo -S lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
-echo "${defaultPass}" | sudo -S resize2fs /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
-echo "${defaultPass}" | sudo -S resize2fs /dev/sda3 2>/dev/null || true
+# 1. First establish passwordless sudo so subsequent operations never fail
+echo "${defaultPass}" | sudo -S bash -c "echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-ubuntu-nopasswd && chmod 0440 /etc/sudoers.d/99-ubuntu-nopasswd" 2>/dev/null || true
 
-# Professional IP-formatted hostname (e.g. ubuntu@172-27-46-60)
-echo "${defaultPass}" | sudo -S hostnamectl set-hostname "${formattedHostname}"
-echo "${defaultPass}" | sudo -S bash -c "echo '${formattedHostname}' > /etc/hostname"
-echo "${defaultPass}" | sudo -S sed -i 's/127.0.1.1.*/127.0.1.1 ${formattedHostname}/g' /etc/hosts 2>/dev/null || true
-echo "127.0.0.1 ${formattedHostname}" | sudo -S tee -a /etc/hosts >/dev/null || true
+# 2. Disk and partition expansion
+sudo growpart /dev/sda 3 2>/dev/null || true
+sudo pvresize /dev/sda3 2>/dev/null || true
+sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
+sudo resize2fs /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
 
-# Configure passwordless sudo for cloud automation (standard cloud-init behavior)
-echo "${defaultPass}" | sudo -S bash -c "echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-ubuntu-nopasswd && chmod 0440 /etc/sudoers.d/99-ubuntu-nopasswd"
+# 3. Hostname setup
+sudo hostnamectl set-hostname "${formattedHostname}" 2>/dev/null || true
+echo "${formattedHostname}" | sudo tee /etc/hostname >/dev/null 2>&1 || true
+sudo sed -i 's/127.0.1.1.*/127.0.1.1 ${formattedHostname}/g' /etc/hosts 2>/dev/null || true
+echo "127.0.0.1 ${formattedHostname}" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
 
-# Apply selected password to root and ubuntu safely via base64 decode
-echo "${defaultPass}" | sudo -S bash -c "P=\$(echo '${b64Pass}' | base64 -d); echo \"root:\$P\" | chpasswd && echo \"ubuntu:\$P\" | chpasswd"
+# 4. User and password synchronization
+P=\$(echo '${b64Pass}' | base64 -d)
+echo "ubuntu:\$P" | sudo chpasswd
+echo "root:\$P" | sudo chpasswd
 
-# Ensure PasswordAuthentication is enabled in OpenSSH
-echo "${defaultPass}" | sudo -S sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-echo "${defaultPass}" | sudo -S sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config.d/*.conf 2>/dev/null || true
-echo "${defaultPass}" | sudo -S systemctl reload ssh 2>/dev/null || sudo -S systemctl restart ssh 2>/dev/null || true
+# 5. Ensure SSH password authentication is enabled
+sudo sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null || true
+sudo sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config.d/*.conf 2>/dev/null || true
+sudo systemctl reload ssh 2>/dev/null || sudo systemctl restart ssh 2>/dev/null || true
 `;
 
       if (safeUser !== 'ubuntu' && safeUser !== 'root') {
         script += `
-id -u ${safeUser} 2>/dev/null || echo "${defaultPass}" | sudo -S useradd -m -s /bin/bash -G sudo ${safeUser}
-echo "${defaultPass}" | sudo -S bash -c "P=\$(echo '${b64Pass}' | base64 -d); echo \"${safeUser}:\$P\" | chpasswd"
-echo "${defaultPass}" | sudo -S bash -c "echo '${safeUser} ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-${safeUser}-nopasswd && chmod 0440 /etc/sudoers.d/99-${safeUser}-nopasswd"
+id -u ${safeUser} 2>/dev/null || sudo useradd -m -s /bin/bash -G sudo ${safeUser}
+echo "${safeUser}:\$P" | sudo chpasswd
+echo "${safeUser} ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/99-${safeUser}-nopasswd >/dev/null && sudo chmod 0440 /etc/sudoers.d/99-${safeUser}-nopasswd
 `;
       }
 
