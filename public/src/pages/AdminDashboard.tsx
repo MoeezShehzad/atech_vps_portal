@@ -46,6 +46,7 @@ import {
   Network,
   ShieldAlert,
   LifeBuoy,
+  MessageSquare,
   Plus,
   Trash2,
   Send,
@@ -79,6 +80,11 @@ import { useToast } from '../components/Toast';
 import ThemeToggle from '../components/ThemeToggle';
 import NotificationBell from '../components/NotificationBell';
 import { formatDate, formatDateTime } from '../utils/dateFormatter';
+import {
+  ModernFloatingInput,
+  ModernFloatingTextarea,
+  ModernFloatingSelect,
+} from '../components/ModernFormControls';
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -3628,32 +3634,34 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                <div className="space-y-4 pt-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      <MessageSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       Post Support Message / Diagnostic Resolution:
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">Update Status:</span>
-                      <select
+                    </span>
+
+                    <div className="w-full sm:w-80">
+                      <ModernFloatingSelect
+                        label="Update Ticket Status"
                         value={replyStatus}
                         onChange={(e) => setReplyStatus(e.target.value as any)}
-                        className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-200 cursor-pointer"
-                      >
-                        <option value="AWAITING_USER_ACTION">Awaiting User Action (Start 10d SLA Clock)</option>
-                        <option value="IN_PROGRESS">IN_PROGRESS (Investigating)</option>
-                        <option value="RESOLVED">RESOLVED (Completed)</option>
-                        <option value="CLOSED">CLOSED (Dismissed)</option>
-                      </select>
+                        options={[
+                          { value: 'AWAITING_USER_ACTION', label: 'Awaiting User Action (Start 10d SLA Clock)' },
+                          { value: 'IN_PROGRESS', label: 'IN_PROGRESS (Investigating)' },
+                          { value: 'RESOLVED', label: 'RESOLVED (Completed)' },
+                          { value: 'CLOSED', label: 'CLOSED (Dismissed)' },
+                        ]}
+                      />
                     </div>
                   </div>
 
-                  <textarea
+                  <ModernFloatingTextarea
+                    label="Diagnostic Output / Resolution Steps"
                     rows={4}
-                    placeholder="Provide diagnostic output, resolution steps, or status explanation..."
+                    placeholder="Provide diagnostic output, resolution steps, root cause analysis, or status explanation..."
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
-                    className="w-full px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 resize-none leading-relaxed"
                   />
 
                   <div className="flex justify-end">
@@ -3697,14 +3705,13 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Search Input */}
-                    <div className="relative w-full lg:w-72">
-                      <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="Search ID, customer, subject..."
+                    <div className="w-full lg:w-80">
+                      <ModernFloatingInput
+                        label="Search Support Tickets"
+                        icon={<Search className="w-4 h-4" />}
+                        placeholder="Search ID, customer email, subject..."
                         value={adminTicketSearch}
                         onChange={(e) => setAdminTicketSearch(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-blue-600"
                       />
                     </div>
                   </div>

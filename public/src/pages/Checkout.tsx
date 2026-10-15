@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Lock, Eye, EyeOff } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Lock, Eye, EyeOff, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../services/api';
 import { ModernFloatingInput } from '../components/ModernFormControls';
@@ -865,102 +865,95 @@ export default function Checkout() {
                             </button>
                           </div>
                         )}
-                        <div>
-                          <label className="block font-bold text-slate-700 mb-1.5">Cardholder Name *</label>
-                          <input
-                            type="text"
+                        <div className="space-y-4">
+                          <ModernFloatingInput
+                            label="Cardholder Name"
+                            required
                             value={cardDetails.name}
                             onChange={(e) => setCardDetails({ ...cardDetails, name: e.target.value })}
-                            className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                              errors.cardName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                            }`}
-                            placeholder="Cardholder Name"
+                            icon={<User className="w-4 h-4" />}
+                            error={errors.cardName}
+                            placeholder="e.g. Alex Morgan"
                           />
-                          {errors.cardName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardName}</p>}
-                        </div>
 
-                        {/* Row 1: Card number (6 cols), Expiration (3 cols), Security code (3 cols) */}
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                          {/* Card Number */}
-                          <div className="md:col-span-6">
-                            <label className="block font-bold text-slate-700 mb-1.5">Card number *</label>
-                            <div className="relative">
-                              <input
-                                type="text"
+                          {/* Row 1: Card number (6 cols), Expiration (3 cols), Security code (3 cols) */}
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                            {/* Card Number */}
+                            <div className="md:col-span-6">
+                              <ModernFloatingInput
+                                label="Card Number"
+                                required
                                 value={cardDetails.number}
                                 onChange={(e) => handleCardNumberChange(e.target.value)}
                                 maxLength={19}
-                                className={`w-full p-3 pr-28 rounded-xl bg-slate-50 border text-slate-900 font-mono tracking-wider focus:outline-none focus:bg-white transition-colors font-medium ${
-                                  errors.cardNumber ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                                }`}
-                                placeholder="1234 1234 1234 1234"
+                                icon={<CreditCard className="w-4 h-4" />}
+                                error={errors.cardNumber}
+                                placeholder="4242 •••• •••• 4242"
+                                className="font-mono tracking-wider pr-28"
+                                rightElement={
+                                  <div className="flex items-center gap-1 select-none pointer-events-none">
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                                      selectedCardBrand === 'Visa'
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60'
+                                    }`}>
+                                      VISA
+                                    </span>
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                                      selectedCardBrand === 'Mastercard'
+                                        ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60'
+                                    }`}>
+                                      MC
+                                    </span>
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                                      selectedCardBrand === 'American Express'
+                                        ? 'bg-sky-500 text-white border-sky-500 shadow-xs'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60'
+                                    }`}>
+                                      AMEX
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60">
+                                      DISC
+                                    </span>
+                                  </div>
+                                }
                               />
-                              {/* Embedded Brand Badges */}
-                              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 select-none pointer-events-none">
-                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
-                                  selectedCardBrand === 'Visa'
-                                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
-                                }`}>
-                                  VISA
-                                </span>
-                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
-                                  selectedCardBrand === 'Mastercard'
-                                    ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
-                                }`}>
-                                  MC
-                                </span>
-                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
-                                  selectedCardBrand === 'American Express'
-                                    ? 'bg-sky-500 text-white border-sky-500 shadow-xs'
-                                    : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
-                                }`}>
-                                  AMEX
-                                </span>
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border bg-slate-100 text-slate-400 border-slate-200 opacity-60">
-                                  DISC
-                                </span>
-                              </div>
                             </div>
-                            {errors.cardNumber && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardNumber}</p>}
-                          </div>
 
-                          {/* Expiration Date */}
-                          <div className="md:col-span-3">
-                            <label className="block font-bold text-slate-700 mb-1.5">Expiration date *</label>
-                            <input
-                              type="text"
-                              value={cardDetails.expiry}
-                              onChange={(e) => handleExpiryChange(e.target.value)}
-                              maxLength={5}
-                              className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
-                                errors.cardExpiry ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                              }`}
-                              placeholder="MM / YY"
-                            />
-                            {errors.cardExpiry && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardExpiry}</p>}
-                          </div>
+                            {/* Expiration Date */}
+                            <div className="md:col-span-3">
+                              <ModernFloatingInput
+                                label="Expiration Date"
+                                required
+                                value={cardDetails.expiry}
+                                onChange={(e) => handleExpiryChange(e.target.value)}
+                                maxLength={5}
+                                error={errors.cardExpiry}
+                                placeholder="MM / YY"
+                                className="font-mono"
+                              />
+                            </div>
 
-                          {/* Security code */}
-                          <div className="md:col-span-3">
-                            <label className="block font-bold text-slate-700 mb-1.5">Security code *</label>
-                            <div className="relative">
-                              <input
+                            {/* Security code */}
+                            <div className="md:col-span-3">
+                              <ModernFloatingInput
+                                label="Security Code"
                                 type="password"
+                                required
                                 value={cardDetails.cvc}
                                 onChange={(e) => setCardDetails({ ...cardDetails, cvc: e.target.value.replace(/[^0-9]/g, '').slice(0, 4) })}
                                 maxLength={4}
-                                className={`w-full p-3 pr-10 rounded-xl bg-slate-50 border text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors font-medium ${
-                                  errors.cardCvc ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                                }`}
+                                error={errors.cardCvc}
                                 placeholder="CVC"
+                                className="font-mono pr-12"
+                                rightElement={
+                                  <span className="text-slate-400 text-xs pointer-events-none select-none flex items-center gap-0.5 font-mono font-bold">
+                                    💳123
+                                  </span>
+                                }
                               />
-                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none select-none flex items-center gap-0.5">
-                                💳<span className="text-[9px] font-mono font-bold">123</span>
-                              </span>
                             </div>
-                            {errors.cardCvc && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardCvc}</p>}
                           </div>
                         </div>
                       </>
@@ -980,76 +973,55 @@ export default function Checkout() {
                       </p>
                     </div>
 
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1.5">Bank Name *</label>
-                      <input
-                        type="text"
+                    <div className="space-y-4">
+                      <ModernFloatingInput
+                        label="Bank Name"
+                        required
                         value={bankDetails.bankName}
                         onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
-                        className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                          errors.bankName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                        }`}
+                        error={errors.bankName}
                         placeholder="e.g. JPMorgan Chase, Barclays, HSBC"
                       />
-                      {errors.bankName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.bankName}</p>}
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Sorting A/C (Sort Code / Routing) *</label>
-                        <input
-                          type="text"
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <ModernFloatingInput
+                          label="Sorting A/C (Sort Code / Routing)"
+                          required
                           value={bankDetails.sortCode}
                           onChange={(e) => handleSortCodeChange(e.target.value)}
                           maxLength={8}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono tracking-wider focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.sortCode ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="20-04-15"
+                          error={errors.sortCode}
+                          placeholder="e.g. 20-04-15"
+                          className="font-mono"
                         />
-                        {errors.sortCode && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.sortCode}</p>}
-                        <span className="text-[10px] text-slate-400 mt-1 block">6-digit standard sorting code</span>
-                      </div>
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Bank Account Number *</label>
-                        <input
-                          type="text"
+                        <ModernFloatingInput
+                          label="Bank Account Number"
+                          required
                           value={bankDetails.accountNumber}
                           onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value.replace(/[^0-9]/g, '').slice(0, 16) })}
                           maxLength={16}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 font-mono tracking-wider focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.accountNumber ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="88392019"
+                          error={errors.accountNumber}
+                          placeholder="e.g. 88392019"
+                          className="font-mono"
                         />
-                        {errors.accountNumber && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.accountNumber}</p>}
-                        <span className="text-[10px] text-slate-400 mt-1 block">Encrypted with AES-256-GCM</span>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Payment Last End Date (Due Date) *</label>
-                        <input
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <ModernFloatingInput
+                          label="Payment Due Date"
                           type="date"
+                          required
                           value={bankDetails.dueDate}
                           onChange={(e) => setBankDetails({ ...bankDetails, dueDate: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.dueDate ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
+                          error={errors.dueDate}
                         />
-                        {errors.dueDate && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.dueDate}</p>}
-                      </div>
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">PO / Reference Number (Optional)</label>
-                        <input
-                          type="text"
+                        <ModernFloatingInput
+                          label="PO / Reference Number (Optional)"
                           value={bankDetails.poNumber}
                           onChange={(e) => setBankDetails({ ...bankDetails, poNumber: e.target.value })}
-                          className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium"
-                          placeholder="PO-2026-9901"
+                          placeholder="e.g. PO-2026-9901"
                         />
                       </div>
                     </div>
