@@ -363,6 +363,7 @@ model PromoCode {
   maxUses          Int       @default(100)
   timesUsed        Int       @default(0)
   isActive         Boolean   @default(true)
+  validFrom        DateTime?
   expiresAt        DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @default(now()) @updatedAt

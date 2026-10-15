@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Tag, Check, X } from 'lucide-react';
+import { Tag, Check, X, ShieldAlert, AlertCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 // Data Structures for IONOS-Style Options
 const OS_OPTIONS = [
@@ -16,9 +17,9 @@ const DATACENTER_LOCATIONS = [
 ];
 
 const BILLING_TERMS = [
-  { id: '1m', label: '1 Month', desc: 'Maximum flexibility, cancel anytime', monthlyPriceRatio: 1.0, discountText: '' },
-  { id: '12m', label: '12 Months', desc: '3 months promo pricing + standard rate', monthlyPriceRatio: 0.85, discountText: 'Save up to 18%' },
-  { id: '24m', label: '24 Months', desc: 'Best long-term value guaranteed', monthlyPriceRatio: 0.75, discountText: 'Save up to 25%' },
+  { id: '1m', label: '1 Month', desc: 'Maximum flexibility, cancel anytime', monthlyPriceRatio: 1.0, discountText: '', nonRefundable: false },
+  { id: '12m', label: '12 Months (1 Year)', desc: 'Billed full year upfront. Strictly non-refundable.', monthlyPriceRatio: 0.85, discountText: 'Save 15%', nonRefundable: true },
+  { id: '24m', label: '24 Months (2 Years)', desc: 'Best multi-year value. Strictly non-refundable.', monthlyPriceRatio: 0.75, discountText: 'Save 25%', nonRefundable: true },
 ];
 
 const ADDONS = [
@@ -30,6 +31,7 @@ const ADDONS = [
 export default function ServerConfigure() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
 
   // Get passed plan from Pricing.tsx or use default
   const selectedPlan = location.state?.selectedPlan || {
@@ -42,6 +44,8 @@ export default function ServerConfigure() {
     monthlyPrice: 21,
     promoPriceMonthly: 6,
   };
+
+  const isUpgrade = Boolean(location.state?.isUpgrade);
 
   // State Management
   const [selectedOs, setSelectedOs] = useState('ubuntu-22');
@@ -66,7 +70,12 @@ export default function ServerConfigure() {
   const activeOsObj = OS_OPTIONS.find((os) => os.id === selectedOs);
   const activeTermObj = BILLING_TERMS.find((t) => t.id === selectedTerm);
 
-  const basePrice =
+  const isYearly = selectedTerm === '12m';
+  const isMultiYear = selectedTerm === '24m';
+  const termMonths = isYearly ? 12 : (isMultiYear ? 24 : 1);
+  const isNonRefundable = isYearly || isMultiYear;
+
+  const basePriceMonthly =
     Number(
       selectedTerm === '1m'
         ? (selectedPlan.monthlyPrice ?? selectedPlan.price ?? 6)
@@ -82,20 +91,32 @@ export default function ServerConfigure() {
     return sum + (item ? item.price : 0);
   }, 0);
 
-  const subtotalMonthly = basePrice + osPrice + addonsPriceTotal;
+  // Effective monthly subtotal (plan + OS + addons)
+  const monthlySubtotal = basePriceMonthly + osPrice + addonsPriceTotal;
 
-  // Calculate discount if coupon is applied
-  let discountAmount = 0;
+  // Full contract term standard subtotal (12 months upfront for yearly)
+  const fullTermSubtotal = Number((monthlySubtotal * termMonths).toFixed(2));
+
+  // Calculate discount:
+  // "the coupon code only applies for only one month not on complete year and then prices go back to normal after completing the period one month."
+  let month1Discount = 0;
   if (appliedCoupon) {
     if (appliedCoupon.discountType === 'PERCENT') {
-      discountAmount = Number(((subtotalMonthly * appliedCoupon.discountValue) / 100).toFixed(2));
+      month1Discount = Number(((monthlySubtotal * Number(appliedCoupon.discountValue)) / 100).toFixed(2));
     } else {
-      discountAmount = Number(appliedCoupon.discountValue);
+      month1Discount = Number(appliedCoupon.discountValue);
     }
-    if (discountAmount > subtotalMonthly) discountAmount = subtotalMonthly;
+    if (month1Discount > monthlySubtotal) month1Discount = monthlySubtotal;
   }
 
-  const monthlyTotal = Math.max(0, Number((subtotalMonthly - discountAmount).toFixed(2)));
+  // Total discount applied to this order is Month 1 discount only!
+  const totalDiscount = month1Discount;
+
+  // Total Due Today: Full year upfront minus the 1st month coupon discount
+  const totalDueToday = Math.max(0, Number((fullTermSubtotal - totalDiscount).toFixed(2)));
+
+  // Next recurring price (full regular price after completing introductory period)
+  const recurringPrice = fullTermSubtotal;
 
   const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,13 +124,21 @@ export default function ServerConfigure() {
     setCouponLoading(true);
     setCouponError('');
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/pricing/validate-coupon', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           code: couponCode.trim(),
           planId: selectedPlan.planId,
-          amount: subtotalMonthly,
+          amount: fullTermSubtotal,
+          monthlyBaseRate: monthlySubtotal,
+          term: selectedTerm,
+          userId: (user as any)?.userId,
+          isUpgrade,
         }),
       });
 
@@ -142,8 +171,17 @@ export default function ServerConfigure() {
       term: activeTermObj,
       addons: selectedAddons.map((id) => ADDONS.find((a) => a.id === id)),
       appliedCoupon,
-      discountAmount,
-      monthlyTotal,
+      month1Discount,
+      discountAmount: totalDiscount,
+      monthlySubtotal,
+      fullTermSubtotal,
+      totalDueToday,
+      monthlyTotal: totalDueToday, // Legacy compatibility
+      termMonths,
+      isYearly,
+      isNonRefundable,
+      recurringPrice,
+      isUpgrade,
     };
     navigate('/checkout', { state: { configurationOrder } });
   };
@@ -343,14 +381,14 @@ export default function ServerConfigure() {
               {/* Item Breakdown */}
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between text-slate-600">
-                  <span>{selectedPlan.name} ({selectedTerm})</span>
-                  <span className="font-bold text-slate-900">${basePrice.toFixed(2)}</span>
+                  <span>{selectedPlan.name} ({activeTermObj?.label})</span>
+                  <span className="font-bold text-slate-900">${basePriceMonthly.toFixed(2)}/mo</span>
                 </div>
 
                 <div className="flex justify-between text-slate-600">
                   <span>OS: {activeOsObj?.name}</span>
                   <span className="font-bold text-slate-900">
-                    {osPrice === 0 ? 'Included' : `$${osPrice.toFixed(2)}`}
+                    {osPrice === 0 ? 'Included' : `+$${osPrice.toFixed(2)}/mo`}
                   </span>
                 </div>
 
@@ -362,21 +400,39 @@ export default function ServerConfigure() {
                       return item ? (
                         <div key={id} className="flex justify-between text-slate-600">
                           <span>{item.name}</span>
-                          <span className="font-bold text-slate-900">${item.price.toFixed(2)}</span>
+                          <span className="font-bold text-slate-900">+${item.price.toFixed(2)}/mo</span>
                         </div>
                       ) : null;
                     })}
                   </div>
                 )}
 
+                {/* Subtotal line before coupon */}
+                <div className="pt-2 border-t border-slate-100 flex justify-between text-slate-600 font-medium">
+                  <span>{isYearly ? '12 Months Full Year Subtotal' : (isMultiYear ? '24 Months Subtotal' : '1 Month Subtotal')}</span>
+                  <span className="font-bold text-slate-900">${fullTermSubtotal.toFixed(2)}</span>
+                </div>
+
                 {/* Promo Code Discount if Applied */}
                 {appliedCoupon && (
-                  <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs text-emerald-600 font-bold">
-                    <div className="flex items-center gap-1.5">
-                      <Tag className="w-3.5 h-3.5" />
-                      <span>Coupon: {appliedCoupon.code} ({appliedCoupon.discountType === 'PERCENT' ? `${appliedCoupon.discountValue}%` : `$${appliedCoupon.discountValue}`} off)</span>
+                  <div className="pt-2 border-t border-slate-100 space-y-1">
+                    <div className="flex justify-between items-center text-xs text-emerald-600 font-bold">
+                      <div className="flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5" />
+                        <span>Promo: {appliedCoupon.code}</span>
+                      </div>
+                      <span>-${totalDiscount.toFixed(2)}</span>
                     </div>
-                    <span>-${discountAmount.toFixed(2)}</span>
+                    <p className="text-[10px] text-emerald-700 font-medium">
+                      {isYearly || isMultiYear
+                        ? '★ Discount applies to Month 1 only. Months 2+ billed at standard rate.'
+                        : '★ Discount applies to Month 1. Normal rate resumes on next renewal.'}
+                    </p>
+                    {appliedCoupon.offerPeriodText && (
+                      <p className="text-[10px] text-slate-500 italic">
+                        {appliedCoupon.offerPeriodText}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -387,11 +443,16 @@ export default function ServerConfigure() {
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <Check className="w-4 h-4 text-emerald-600" />
-                      <span className="font-bold text-emerald-800">{appliedCoupon.code} applied!</span>
+                      <div>
+                        <span className="font-bold text-emerald-800">{appliedCoupon.code} applied!</span>
+                        <span className="block text-[10px] text-emerald-600">
+                          {appliedCoupon.discountType === 'PERCENT' ? `${appliedCoupon.discountValue}% off 1st month` : `$${appliedCoupon.discountValue} off 1st month`}
+                        </span>
+                      </div>
                     </div>
                     <button
                       onClick={handleRemoveCoupon}
-                      className="text-slate-400 hover:text-rose-600 p-1 rounded-md"
+                      className="text-slate-400 hover:text-rose-600 p-1 rounded-md transition-colors"
                       title="Remove coupon"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -425,20 +486,46 @@ export default function ServerConfigure() {
                 )}
               </div>
 
+              {/* NON-REFUNDABLE NOTICE FOR ANNUAL / MULTI-YEAR PLANS */}
+              {isNonRefundable && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>Annual Plan • Non-Refundable</span>
+                  </div>
+                  <p className="text-amber-700 leading-relaxed">
+                    Full payment for {termMonths} months is collected upfront today. Annual contract terms are strictly non-refundable once activated.
+                  </p>
+                </div>
+              )}
+
               {/* Total Calculation */}
               <div className="pt-4 border-t border-slate-200 space-y-1">
                 <div className="flex justify-between items-baseline">
-                  <span className="text-xs font-bold text-slate-500">Total Due Monthly</span>
+                  <div>
+                    <span className="text-xs font-bold text-slate-700 block">
+                      {isYearly ? 'Total Charged Today (Full Year)' : (isMultiYear ? 'Total Charged Today (2 Years)' : 'Total Due Today (1 Month)')}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {isYearly ? '12 months billed upfront' : (isMultiYear ? '24 months billed upfront' : 'Monthly billing cycle')}
+                    </span>
+                  </div>
                   <div className="text-right">
-                    {discountAmount > 0 && (
+                    {totalDiscount > 0 && (
                       <span className="text-xs line-through text-slate-400 font-semibold mr-2 block">
-                        ${subtotalMonthly.toFixed(2)}
+                        ${fullTermSubtotal.toFixed(2)}
                       </span>
                     )}
-                    <span className="text-3xl font-black text-slate-950">${monthlyTotal.toFixed(2)}</span>
+                    <span className="text-3xl font-black text-slate-950">${totalDueToday.toFixed(2)}</span>
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400">Excl. applicable local taxes</p>
+                <div className="pt-1 text-[11px] text-slate-500">
+                  {isYearly ? (
+                    <p>Renews annually at standard rate (${fullTermSubtotal.toFixed(2)}/yr). Non-refundable.</p>
+                  ) : (
+                    <p>Renews monthly at ${monthlySubtotal.toFixed(2)}/mo after Month 1.</p>
+                  )}
+                </div>
               </div>
 
               {/* Action Button */}
@@ -446,7 +533,7 @@ export default function ServerConfigure() {
                 onClick={handleCheckout}
                 className="w-full py-3.5 px-6 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
               >
-                <span>Continue to Checkout</span>
+                <span>Continue to Checkout (${totalDueToday.toFixed(2)})</span>
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>

@@ -70,10 +70,22 @@ router.get('/plans', async (req, res) => {
   }
 });
 
+import jwt from 'jsonwebtoken';
+
+function formatDate(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 // POST /api/pricing/validate-coupon
 router.post('/validate-coupon', async (req, res) => {
   try {
-    const { code, planId, amount } = req.body;
+    const { code, planId, amount, monthlyBaseRate, term = '1m', isUpgrade = false, userId } = req.body;
     if (!code) {
       return res.status(400).json({ error: 'Promo code is required' });
     }
@@ -86,47 +98,120 @@ router.post('/validate-coupon', async (req, res) => {
       return res.status(404).json({ error: 'Invalid or inactive promo code' });
     }
 
-    if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {
-      return res.status(400).json({ error: 'This promo code has expired' });
+    const now = new Date();
+
+    // 1. Automatic Timing: Check Start Date (validFrom)
+    if (promo.validFrom && new Date(promo.validFrom) > now) {
+      return res.status(400).json({
+        error: `This promo code offer is not active yet. Offer starts on ${formatDate(promo.validFrom)}.`,
+        validFrom: promo.validFrom,
+        expiresAt: promo.expiresAt,
+      });
     }
 
-    if (promo.usedCount >= promo.maxUses) {
+    // 2. Automatic Timing: Check End Date (expiresAt)
+    // "The offer was from this date to this date"
+    if (promo.expiresAt && new Date(promo.expiresAt) < now) {
+      const fromStr = promo.validFrom ? formatDate(promo.validFrom) : formatDate(promo.createdAt);
+      const toStr = formatDate(promo.expiresAt);
+      return res.status(400).json({
+        error: `This promo code has expired. The offer was from ${fromStr} to ${toStr}.`,
+        validFrom: promo.validFrom,
+        expiresAt: promo.expiresAt,
+      });
+    }
+
+    // 3. Usage limit check (timesUsed vs maxUses)
+    if (promo.timesUsed >= promo.maxUses) {
       return res.status(400).json({ error: 'This promo code has reached its maximum usage limit' });
     }
 
-    // Check plan restriction if applicable
+    // 4. Existing User vs Upgrade Restriction:
+    // "no coupon on the existing user but if upgrading the package then he/she can apply the coupon."
+    let targetUserId = userId ? Number(userId) : null;
+    if (!targetUserId && req.headers['authorization']) {
+      try {
+        const token = req.headers['authorization'].split(' ')[1];
+        const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
+        const decoded = jwt.verify(token, secret);
+        targetUserId = Number(decoded.userId || decoded.id);
+      } catch (_) {}
+    }
+
+    if (targetUserId) {
+      const [vmCount, subCount] = await Promise.all([
+        prisma.virtualMachine.count({ where: { userId: targetUserId } }),
+        prisma.subscription.count({ where: { userId: targetUserId, status: { not: 'CANCELLED' } } }),
+      ]);
+      const isExistingUser = vmCount > 0 || subCount > 0;
+      if (isExistingUser && !Boolean(isUpgrade)) {
+        return res.status(400).json({
+          error: 'Coupon codes are exclusively valid for new customers or package upgrades. Existing users cannot apply this coupon unless upgrading an existing package.',
+          isExistingUser: true,
+        });
+      }
+    }
+
+    // 5. Check plan restriction if applicable
     if (promo.applicablePlanId && planId && Number(promo.applicablePlanId) !== Number(planId)) {
       return res.status(400).json({
         error: `This coupon is only valid for plan #${promo.applicablePlanId}`,
       });
     }
 
-    const originalPrice = Number(amount) || 0;
-    let discountAmount = 0;
+    // 6. Pricing & Duration Calculation:
+    // "take yearly payment full for year"
+    // "the coupon code only applies for only one month not on complete year and then prices go back to normal after completing the period one month."
+    // "Yearly Pricing logic -> non refundable"
+    const isYearly = term === '12m' || term === 'yearly';
+    const termMonths = isYearly ? 12 : (term === '24m' ? 24 : 1);
 
+    const baseMonthly = Number(monthlyBaseRate || (isYearly ? (Number(amount) / 12) : Number(amount))) || 0;
+    const fullTermSubtotal = Number((baseMonthly * termMonths).toFixed(2));
+
+    // Calculate month 1 discount ONLY
+    let month1Discount = 0;
     if (promo.discountType === 'PERCENT') {
-      discountAmount = Number(((originalPrice * promo.discountValue) / 100).toFixed(2));
+      month1Discount = Number(((baseMonthly * Number(promo.discountValue)) / 100).toFixed(2));
     } else {
-      // FIXED discount in USD
-      discountAmount = Number(promo.discountValue);
+      month1Discount = Number(promo.discountValue);
+    }
+    if (month1Discount > baseMonthly) {
+      month1Discount = baseMonthly;
     }
 
-    if (discountAmount > originalPrice) {
-      discountAmount = originalPrice;
-    }
+    // The discount applies ONLY to one month, even on 12-month or multi-month plans!
+    const totalDiscount = month1Discount;
+    const finalPrice = Math.max(0, Number((fullTermSubtotal - totalDiscount).toFixed(2)));
 
-    const finalPrice = Math.max(0, Number((originalPrice - discountAmount).toFixed(2)));
+    const offerPeriodText = promo.validFrom && promo.expiresAt
+      ? `The offer is valid from ${formatDate(promo.validFrom)} to ${formatDate(promo.expiresAt)}`
+      : promo.expiresAt
+        ? `The offer expires on ${formatDate(promo.expiresAt)}`
+        : null;
 
     return res.json({
       success: true,
       code: promo.code,
       discountType: promo.discountType,
-      discountValue: promo.discountValue,
+      discountValue: Number(promo.discountValue),
       applicablePlanId: promo.applicablePlanId,
-      originalPrice,
-      discountAmount,
+      validFrom: promo.validFrom,
+      expiresAt: promo.expiresAt,
+      offerPeriodText,
+      term,
+      termMonths,
+      isYearly,
+      isNonRefundable: isYearly,
+      monthlyRate: baseMonthly,
+      month1Discount,
+      discountAmount: totalDiscount,
+      originalPrice: fullTermSubtotal,
       finalPrice,
-      message: `Promo code ${promo.code} applied successfully!`,
+      renewalPrice: fullTermSubtotal,
+      message: isYearly
+        ? `Promo code ${promo.code} applied! 1-month introductory discount of $${totalDiscount.toFixed(2)} applied. Full annual payment charged upfront (non-refundable). Regular price resumes thereafter.`
+        : `Promo code ${promo.code} applied! 1-month discount of $${totalDiscount.toFixed(2)} applied. Price returns to normal ($${baseMonthly.toFixed(2)}/mo) after 1 month.`,
     });
   } catch (error) {
     console.error('Validate coupon error:', error);

@@ -742,7 +742,7 @@ export async function getAdminCoupons(req, res) {
 
 export async function createAdminCoupon(req, res) {
   try {
-    const { code, discountType, discountValue, maxUses, applicablePlanId } = req.body;
+    const { code, discountType, discountValue, maxUses, applicablePlanId, validFrom, expiresAt } = req.body;
     if (!code || !discountValue) {
       return res.status(400).json({ error: 'Code and discount value required' });
     }
@@ -754,13 +754,16 @@ export async function createAdminCoupon(req, res) {
         discountValue: Number(discountValue),
         maxUses: Number(maxUses) || 100,
         applicablePlanId: applicablePlanId ? Number(applicablePlanId) : null,
+        validFrom: validFrom ? new Date(validFrom) : null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
         isActive: true,
       },
     });
 
     res.json({ success: true, coupon: created });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create promo code' });
+    console.error('createAdminCoupon error:', error);
+    res.status(500).json({ error: error.message || 'Failed to create promo code' });
   }
 }
 

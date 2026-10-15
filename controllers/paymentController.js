@@ -79,6 +79,8 @@ export async function processCardPayment(req, res) {
       cardName,
       customerInfo,
       useSavedMethod,
+      term = '1m',
+      couponCode,
     } = req.body;
 
     if (!amount || Number(amount) <= 0) {
@@ -167,7 +169,9 @@ export async function processCardPayment(req, res) {
       });
     }
 
-    // 3. Create or reuse active Subscription in MS SQL
+    // 3. Create active Subscription in MS SQL with term awareness (Yearly = 365 days, non-refundable)
+    const isYearly = term === '12m' || term === 'yearly';
+    const durationDays = isYearly ? 365 : (term === '24m' ? 730 : 30);
     const now = new Date();
     const subscription = await prisma.subscription.create({
       data: {
@@ -175,11 +179,21 @@ export async function processCardPayment(req, res) {
         planId: plan.planId,
         status: 'ACTIVE',
         startDate: now,
-        endDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30-day billing cycle
-        monthlyPrice: Number(amount),
+        endDate: new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000),
+        monthlyPrice: isYearly ? Number((Number(amount) / 12).toFixed(2)) : Number(amount),
         currency: 'USD',
       },
     });
+
+    // Increment coupon usage if used
+    if (couponCode) {
+      try {
+        await prisma.promoCode.update({
+          where: { code: String(couponCode).trim().toUpperCase() },
+          data: { timesUsed: { increment: 1 } },
+        });
+      } catch (_) {}
+    }
 
     // 4. Create Official Invoice in Database
     const invoiceNumber = `INV-${now.getFullYear()}-${String(subscription.subscriptionId).padStart(4, '0')}`;
@@ -281,6 +295,8 @@ export async function processBankPayment(req, res) {
       paymentDueDate,
       poNumber,
       customerInfo,
+      term = '1m',
+      couponCode,
     } = req.body;
 
     if (!amount || Number(amount) <= 0) {
@@ -309,6 +325,8 @@ export async function processBankPayment(req, res) {
     }
 
     const now = new Date();
+    const isYearly = term === '12m' || term === 'yearly';
+    const durationDays = isYearly ? 365 : (term === '24m' ? 730 : 30);
 
     // 3. Create Subscription (Pending Bank Remittance Confirmation)
     const subscription = await prisma.subscription.create({
@@ -317,11 +335,21 @@ export async function processBankPayment(req, res) {
         planId: plan.planId,
         status: 'PENDING',
         startDate: now,
-        endDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-        monthlyPrice: Number(amount),
+        endDate: new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000),
+        monthlyPrice: isYearly ? Number((Number(amount) / 12).toFixed(2)) : Number(amount),
         currency: 'USD',
       },
     });
+
+    // Increment coupon usage if used
+    if (couponCode) {
+      try {
+        await prisma.promoCode.update({
+          where: { code: String(couponCode).trim().toUpperCase() },
+          data: { timesUsed: { increment: 1 } },
+        });
+      } catch (_) {}
+    }
 
     // 4. Create Corporate Invoice with Net 30 Due Date ("Payment Last End Date")
     const invoiceNumber = `INV-${now.getFullYear()}-B${String(subscription.subscriptionId).padStart(4, '0')}`;

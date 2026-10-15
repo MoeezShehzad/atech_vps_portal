@@ -43,6 +43,11 @@ export default function Checkout() {
     monthlyTotal: 11.00,
   };
 
+  const isYearly = orderData.isYearly || orderData.term?.id === '12m';
+  const isMultiYear = orderData.term?.id === '24m';
+  const isNonRefundable = orderData.isNonRefundable || isYearly || isMultiYear;
+  const effectiveAmount = Number(orderData.totalDueToday ?? orderData.monthlyTotal ?? 11);
+
   // State Management
   const [currentStep, setCurrentStep] = useState<StepId>('details');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -267,7 +272,9 @@ export default function Checkout() {
       if (paymentMethod === 'card') {
         const payload: any = {
           planId: orderData.plan?.planId || 1,
-          amount: orderData.monthlyTotal,
+          amount: effectiveAmount,
+          term: orderData.term?.id || '1m',
+          couponCode: orderData.appliedCoupon?.code,
           customerInfo,
         };
 
@@ -323,7 +330,9 @@ export default function Checkout() {
           method: 'POST',
           body: JSON.stringify({
             planId: orderData.plan?.planId || 1,
-            amount: orderData.monthlyTotal,
+            amount: effectiveAmount,
+            term: orderData.term?.id || '1m',
+            couponCode: orderData.appliedCoupon?.code,
             bankName: bankDetails.bankName,
             sortCode: bankDetails.sortCode,
             accountNumber: bankDetails.accountNumber,
@@ -657,6 +666,11 @@ export default function Checkout() {
                           />
                           <span className="text-slate-600 text-xs font-medium">
                             I agree to the <a href="/terms" className="text-blue-600 underline">Terms of Service</a> & <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>
+                            {isNonRefundable && (
+                              <span className="text-amber-800 font-bold block mt-0.5">
+                                • I acknowledge that annual plans are billed upfront for the full 12-month period and are strictly non-refundable.
+                              </span>
+                            )}
                           </span>
                         </label>
                         {errors.termsAccepted && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.termsAccepted}</p>}
@@ -714,7 +728,14 @@ export default function Checkout() {
                     </div>
                     <div className="flex justify-between border-b border-slate-100 pb-2">
                       <span className="text-slate-500">Billing Term</span>
-                      <span className="font-bold text-slate-900">{orderData.term?.label || '1 Month'}</span>
+                      <div className="text-right">
+                        <span className="font-bold text-slate-900 block">{orderData.term?.label || '1 Month'}</span>
+                        {isNonRefundable && (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 inline-block mt-0.5">
+                            Non-refundable / Paid annually upfront
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1109,8 +1130,8 @@ export default function Checkout() {
                     ) : (
                       <span>
                         {deployPreference === 'later'
-                          ? `Purchase & Reserve Slot ($${orderData.monthlyTotal.toFixed(2)}/mo)`
-                          : `Complete & Deploy ($${orderData.monthlyTotal.toFixed(2)}/mo)`}
+                          ? `Purchase & Reserve Slot ($${effectiveAmount.toFixed(2)}${isYearly ? ' Full Year Upfront' : '/mo'})`
+                          : `Complete & Deploy ($${effectiveAmount.toFixed(2)}${isYearly ? ' Full Year Upfront' : '/mo'})`}
                       </span>
                     )}
                   </button>
@@ -1239,29 +1260,56 @@ export default function Checkout() {
                 )}
 
                 {orderData.appliedCoupon && (
-                  <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs text-emerald-600 font-bold">
-                    <span>Coupon ({orderData.appliedCoupon.code}):</span>
-                    <span>-${Number(orderData.discountAmount || 0).toFixed(2)}</span>
+                  <div className="pt-2 border-t border-slate-100 space-y-1">
+                    <div className="flex justify-between items-center text-xs text-emerald-600 font-bold">
+                      <span>Promo ({orderData.appliedCoupon.code}):</span>
+                      <span>-${Number(orderData.discountAmount || 0).toFixed(2)}</span>
+                    </div>
+                    <p className="text-[10px] text-emerald-700">
+                      {isYearly || isMultiYear ? '★ Promo discount applied to Month 1 only.' : '★ Promo discount applied to Month 1.'}
+                    </p>
                   </div>
                 )}
               </div>
 
+              {/* NON-REFUNDABLE BADGE */}
+              {isNonRefundable && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] space-y-1">
+                  <div className="font-bold flex items-center gap-1.5 text-amber-800">
+                    <span>⚠️</span>
+                    <span>Annual Plan • Non-Refundable</span>
+                  </div>
+                  <p className="text-amber-700 text-[10px] leading-relaxed">
+                    Billed upfront for full 12-month period. Once provisioned, annual contracts are strictly non-refundable.
+                  </p>
+                </div>
+              )}
+
               {/* Total Calculation */}
               <div className="pt-4 border-t border-slate-200 space-y-1">
                 <div className="flex justify-between items-baseline">
-                  <span className="text-xs font-bold text-slate-500">Total Due Monthly</span>
+                  <div>
+                    <span className="text-xs font-bold text-slate-700 block">
+                      {isYearly ? 'Total Charged Today' : (isMultiYear ? 'Total Charged Today' : 'Total Due Monthly')}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {isYearly ? 'Full 1-year payment upfront' : (isMultiYear ? 'Full 2-year payment upfront' : 'Monthly billing cycle')}
+                    </span>
+                  </div>
                   <div className="text-right">
                     {orderData.discountAmount > 0 && (
                       <span className="text-xs line-through text-slate-400 font-semibold mr-2 block">
-                        ${(Number(orderData.monthlyTotal) + Number(orderData.discountAmount)).toFixed(2)}
+                        ${(Number(orderData.fullTermSubtotal || effectiveAmount) + Number(orderData.discountAmount)).toFixed(2)}
                       </span>
                     )}
                     <span className="text-3xl font-black text-slate-950 tracking-tight">
-                      ${Number(orderData.monthlyTotal).toFixed(2)}
+                      ${effectiveAmount.toFixed(2)}
                     </span>
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-400">Includes full root access & automated provisioning</p>
+                <p className="text-[10px] text-slate-400">
+                  {isYearly ? 'Renews annually at standard rate. Non-refundable.' : 'Includes full root access & automated provisioning'}
+                </p>
               </div>
 
 

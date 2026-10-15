@@ -194,7 +194,10 @@ export default function AdminDashboard() {
   const [coupons, setCoupons] = useState<any[]>([]);
   const [newCouponCode, setNewCouponCode] = useState('');
   const [newCouponVal, setNewCouponVal] = useState(20);
+  const [newCouponType, setNewCouponType] = useState<'PERCENT' | 'FIXED'>('PERCENT');
   const [newCouponPlanId, setNewCouponPlanId] = useState<string>('');
+  const [newCouponValidFrom, setNewCouponValidFrom] = useState<string>('');
+  const [newCouponExpiresAt, setNewCouponExpiresAt] = useState<string>('');
   
   // Create Plan Form States
   const [newPlanName, setNewPlanName] = useState('');
@@ -898,14 +901,18 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           code: newCouponCode,
           discountValue: newCouponVal,
-          discountType: 'PERCENT',
+          discountType: newCouponType,
           applicablePlanId: newCouponPlanId ? Number(newCouponPlanId) : undefined,
+          validFrom: newCouponValidFrom ? new Date(newCouponValidFrom).toISOString() : undefined,
+          expiresAt: newCouponExpiresAt ? new Date(newCouponExpiresAt).toISOString() : undefined,
         }),
       });
       if (res?.success) {
         toast.success(`Coupon ${res.coupon.code} created.`);
         setNewCouponCode('');
         setNewCouponPlanId('');
+        setNewCouponValidFrom('');
+        setNewCouponExpiresAt('');
         fetchPlansAndCoupons();
       }
     } catch (err: any) {
@@ -3083,60 +3090,159 @@ export default function AdminDashboard() {
               <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
                 <Tag className="w-4 h-4 text-emerald-600" /> Promo Code & Discount Manager
               </h3>
-              <form onSubmit={handleCreateCoupon} className="flex flex-wrap items-center gap-3">
-                <input
-                  type="text"
-                  placeholder="CODE (e.g. FLASH50)"
-                  value={newCouponCode}
-                  onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
-                  className="px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono uppercase"
-                  required
-                />
-                <input
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={newCouponVal}
-                  onChange={(e) => setNewCouponVal(Number(e.target.value))}
-                  className="w-24 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
-                />
-                <span className="text-xs text-slate-500 font-semibold">% OFF</span>
+              <form onSubmit={handleCreateCoupon} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Coupon Code</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. FLASH50"
+                    value={newCouponCode}
+                    onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono uppercase"
+                    required
+                  />
+                </div>
 
-                <select
-                  value={newCouponPlanId}
-                  onChange={(e) => setNewCouponPlanId(e.target.value)}
-                  className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200"
-                >
-                  <option value="">Apply to Any Plan</option>
-                  {plans.map((p) => (
-                    <option key={p.planId} value={p.planId}>
-                      Specific Plan: {p.name} (${p.monthlyPrice}/mo)
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Discount</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={newCouponType === 'PERCENT' ? 100 : 10000}
+                      value={newCouponVal}
+                      onChange={(e) => setNewCouponVal(Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="w-20">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Type</label>
+                    <select
+                      value={newCouponType}
+                      onChange={(e) => setNewCouponType(e.target.value as any)}
+                      className="w-full px-2 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold"
+                    >
+                      <option value="PERCENT">% OFF</option>
+                      <option value="FIXED">$ OFF</option>
+                    </select>
+                  </div>
+                </div>
 
-                <button type="submit" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs">
-                  <Plus className="w-3.5 h-3.5" /> Create Coupon
-                </button>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Applicable Plan</label>
+                  <select
+                    value={newCouponPlanId}
+                    onChange={(e) => setNewCouponPlanId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200"
+                  >
+                    <option value="">Any VPS Plan</option>
+                    {plans.map((p) => (
+                      <option key={p.planId} value={p.planId}>
+                        {p.name} (${p.monthlyPrice}/mo)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Start Date (From)</label>
+                  <input
+                    type="date"
+                    value={newCouponValidFrom}
+                    onChange={(e) => setNewCouponValidFrom(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-700 dark:text-slate-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">End Date (To)</label>
+                  <input
+                    type="date"
+                    value={newCouponExpiresAt}
+                    onChange={(e) => setNewCouponExpiresAt(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-700 dark:text-slate-200"
+                  />
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Create Coupon
+                  </button>
+                </div>
               </form>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                {coupons.map((c) => (
-                  <div key={c.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between">
-                    <div>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">{c.code}</span>
-                      <p className="text-xs text-emerald-600 font-bold">{c.discountValue}% Discount</p>
-                      {c.applicablePlanId && (
-                        <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
-                          Target Plan ID: #{c.applicablePlanId}
+                {coupons.map((c) => {
+                  const now = new Date();
+                  const isExpired = c.expiresAt && new Date(c.expiresAt) < now;
+                  const isUpcoming = c.validFrom && new Date(c.validFrom) > now;
+
+                  return (
+                    <div
+                      key={c.id}
+                      className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
+                        isExpired
+                          ? 'border-rose-200 dark:border-rose-900/40 bg-rose-50/30 dark:bg-rose-950/20'
+                          : isUpcoming
+                            ? 'border-blue-200 dark:border-blue-900/40 bg-blue-50/30 dark:bg-blue-950/20'
+                            : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">{c.code}</span>
+                            <span
+                              className={`ml-2 text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                                isExpired
+                                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
+                                  : isUpcoming
+                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300'
+                                    : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300'
+                              }`}
+                            >
+                              {isExpired ? 'Expired' : isUpcoming ? 'Scheduled' : 'Active'}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteCoupon(c.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                            title="Delete coupon"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold mt-1">
+                          {c.discountType === 'FIXED' ? `$${c.discountValue} OFF (1st Month)` : `${c.discountValue}% OFF (1st Month)`}
                         </p>
-                      )}
+
+                        {/* Timing details */}
+                        <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
+                          {c.validFrom || c.expiresAt ? (
+                            <p className="font-medium">
+                              📅 Offer Period: {c.validFrom ? new Date(c.validFrom).toLocaleDateString() : 'Start'} – {c.expiresAt ? new Date(c.expiresAt).toLocaleDateString() : 'No expiry'}
+                            </p>
+                          ) : (
+                            <p className="italic text-[10px]">No date restrictions</p>
+                          )}
+                          {c.applicablePlanId && (
+                            <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
+                              Target Plan: #{c.applicablePlanId}
+                            </p>
+                          )}
+                          <p className="text-[10px] text-slate-400">
+                            Used: {c.timesUsed || 0} / {c.maxUses || 100}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <button onClick={() => handleDeleteCoupon(c.id)} className="p-1.5 text-slate-400 hover:text-rose-600">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
