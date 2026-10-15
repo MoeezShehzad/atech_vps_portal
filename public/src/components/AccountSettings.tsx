@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Lock, CheckCircle, AlertCircle, Loader2, Camera, MapPin, ShieldCheck, Key, Plus, Trash2, Copy, Check, Download, Terminal } from 'lucide-react';
+import { User, Phone, Lock, CheckCircle, AlertCircle, Loader2, Camera, MapPin, ShieldCheck, Key, Plus, Trash2, Copy, Check, Download, Terminal, Mail, Eye, EyeOff } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { formatDate } from '../utils/dateFormatter';
+import {
+  ModernFloatingInput,
+  ModernFloatingTextarea,
+  ModernCountrySelect,
+  ModernStateSelect,
+  ModernCitySelect,
+  type CountryOption,
+  type GeoItem,
+} from './ModernFormControls';
 
 interface SSHKeyItem {
   keyId: number;
@@ -22,6 +31,7 @@ interface UserProfile {
   phone?: string;
   address?: string;
   city?: string;
+  state?: string;
   postalCode?: string;
   postal_code?: string;
   zip?: string;
@@ -46,14 +56,27 @@ export default function AccountSettings() {
   const [phone, setPhone] = useState<string>('');
   const [address, setAddress] = useState<string>('');
   const [city, setCity] = useState<string>('');
+  const [stateName, setStateName] = useState<string>('');
   const [postalCode, setPostalCode] = useState<string>('');
   const [country, setCountry] = useState<string>('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
-  // Password state
+  // Geo SQL Tables State
+  const [countriesList, setCountriesList] = useState<CountryOption[]>([]);
+  const [loadingCountries, setLoadingCountries] = useState<boolean>(false);
+  const [selectedCountryCode, setSelectedCountryCode] = useState<string>('PK');
+  const [provincesList, setProvincesList] = useState<GeoItem[]>([]);
+  const [loadingProvinces, setLoadingProvinces] = useState<boolean>(false);
+  const [citiesList, setCitiesList] = useState<GeoItem[]>([]);
+  const [loadingCities, setLoadingCities] = useState<boolean>(false);
+
+  // Password state & visibility toggles
   const [currentPassword, setCurrentPassword] = useState<string>('');
   const [newPassword, setNewPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState<boolean>(false);
+  const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
   // SSH Key management state
   const [sshKeys, setSshKeys] = useState<SSHKeyItem[]>([]);
@@ -74,14 +97,66 @@ export default function AccountSettings() {
   const [savingPassword, setSavingPassword] = useState<boolean>(false);
   const [message, setMessage] = useState<FeedbackMessage | null>(null);
 
+  const fetchCountries = async () => {
+    try {
+      setLoadingCountries(true);
+      const res = await apiCall('/geo/countries');
+      if (res && res.countries) {
+        setCountriesList(res.countries);
+      }
+    } catch (err) {
+      console.warn('Failed to load countries:', err);
+    } finally {
+      setLoadingCountries(false);
+    }
+  };
+
+  const fetchProvinces = async (codeOrId: string | number) => {
+    try {
+      setLoadingProvinces(true);
+      const param = typeof codeOrId === 'number' ? `countryId=${codeOrId}` : `countryCode=${codeOrId}`;
+      const res = await apiCall(`/geo/provinces?${param}`);
+      if (res && res.provinces) {
+        setProvincesList(res.provinces);
+      } else {
+        setProvincesList([]);
+      }
+    } catch (err) {
+      console.warn('Failed to load provinces:', err);
+      setProvincesList([]);
+    } finally {
+      setLoadingProvinces(false);
+    }
+  };
+
+  const fetchCities = async (provinceId: number) => {
+    try {
+      setLoadingCities(true);
+      const res = await apiCall(`/geo/cities?provinceId=${provinceId}`);
+      if (res && res.cities) {
+        setCitiesList(res.cities);
+      } else {
+        setCitiesList([]);
+      }
+    } catch (err) {
+      console.warn('Failed to load cities:', err);
+      setCitiesList([]);
+    } finally {
+      setLoadingCities(false);
+    }
+  };
+
   const populateUserData = (data: UserProfile) => {
     setProfile(data);
     setFullName(data.fullName || data.name || '');
     setPhone(data.phone ?? '');
     setAddress(data.address || '');
     setCity(data.city || '');
+    const userState = (data as any).state || '';
+    setStateName(userState);
     setPostalCode(data.postalCode || (data as any).postal_code || (data as any).zip || '');
-    setCountry(data.country || '');
+    const userCountry = data.country || 'Pakistan';
+    setCountry(userCountry);
     setAvatarPreview(data.avatarUrl || null);
   };
 
@@ -138,7 +213,35 @@ export default function AccountSettings() {
   useEffect(() => {
     fetchProfile();
     fetchSSHKeys();
+    fetchCountries();
   }, [isAuthenticated]);
+
+  // When country or countries list updates, find matching country code and load provinces
+  useEffect(() => {
+    if (countriesList.length > 0 && country) {
+      const match = countriesList.find(
+        (c) => c.name.toLowerCase() === country.toLowerCase() || c.code.toLowerCase() === country.toLowerCase()
+      );
+      if (match) {
+        setSelectedCountryCode(match.code);
+        fetchProvinces(match.code);
+      } else {
+        fetchProvinces(selectedCountryCode);
+      }
+    }
+  }, [country, countriesList.length]);
+
+  // When province list is loaded, if stateName exists, fetch its cities
+  useEffect(() => {
+    if (provincesList.length > 0 && stateName) {
+      const match = provincesList.find(
+        (p) => p.name.toLowerCase() === stateName.toLowerCase() || (p.code && p.code.toLowerCase() === stateName.toLowerCase())
+      );
+      if (match && match.id) {
+        fetchCities(match.id);
+      }
+    }
+  }, [stateName, provincesList.length]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -167,6 +270,7 @@ export default function AccountSettings() {
         phone,
         address,
         city,
+        state: stateName,
         postalCode,
         postal_code: postalCode,
         country,
@@ -407,88 +511,93 @@ export default function AccountSettings() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
-            <input
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Your full name"
-              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
+          <ModernFloatingInput
+            label="Full Legal Name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            icon={<User className="w-4 h-4" />}
+            placeholder="e.g. Alex Morgan"
+          />
+
+          <ModernFloatingInput
+            label="Email Address (Read-only)"
+            type="email"
+            value={profile?.email || ''}
+            disabled
+            icon={<Mail className="w-4 h-4" />}
+            placeholder="name@company.com"
+          />
+
+          <div className="sm:col-span-2">
+            <ModernFloatingInput
+              label="Phone Number (Optional)"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              icon={<Phone className="w-4 h-4" />}
+              placeholder="+1 (555) 000-0000"
             />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address (Read-only)</label>
-            <input
-              type="email"
-              value={profile?.email || ''}
-              disabled
-              className="w-full px-4 py-2.5 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-500 dark:text-slate-400 cursor-not-allowed"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Phone Number (Optional)</label>
-            <div className="relative">
-              <Phone className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
-              <input
-                type="text"
-                placeholder="+1 234 567 890"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
-              />
-            </div>
           </div>
         </div>
 
         {/* Location Section */}
         <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-4">
           <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Location Details (Optional)
+            <MapPin className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Location Details (Live SQL Geo Data)
           </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-3">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Street Address</label>
-              <input
-                type="text"
-                placeholder="123 Main St, Suite 100"
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <ModernFloatingInput
+                label="Street Address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">City</label>
-              <input
-                type="text"
-                placeholder="City"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
+                icon={<MapPin className="w-4 h-4" />}
+                placeholder="123 Cloud Avenue, Suite 400"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Postal / ZIP Code</label>
-              <input
-                type="text"
-                placeholder="60000"
-                value={postalCode}
-                onChange={(e) => setPostalCode(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
-              />
-            </div>
+            <ModernCountrySelect
+              label="Country / Region"
+              countries={countriesList}
+              selectedCode={selectedCountryCode}
+              loading={loadingCountries}
+              onSelect={(c) => {
+                setSelectedCountryCode(c.code);
+                setCountry(c.name);
+                fetchProvinces(c.code);
+              }}
+            />
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Country / Region</label>
-              <input
-                type="text"
-                placeholder="Country"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
-              />
-            </div>
+            <ModernStateSelect
+              label="State / Province"
+              states={provincesList}
+              selectedState={stateName}
+              loading={loadingProvinces}
+              placeholder="Select State / Province..."
+              onSelect={(name, obj) => {
+                setStateName(name);
+                if (obj?.id) {
+                  fetchCities(obj.id);
+                }
+              }}
+            />
+
+            <ModernCitySelect
+              label="City"
+              cities={citiesList}
+              selectedCity={city}
+              loading={loadingCities}
+              placeholder="Select or enter city..."
+              onSelect={(name) => setCity(name)}
+            />
+
+            <ModernFloatingInput
+              label="Postal / ZIP Code"
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              icon={<MapPin className="w-4 h-4" />}
+              placeholder="e.g. 10001 or 60490"
+            />
           </div>
         </div>
 
@@ -517,41 +626,60 @@ export default function AccountSettings() {
 
         <form onSubmit={handleSavePassword} className="space-y-4 max-w-md">
           {userHasPassword && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Current Password</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
-              />
-            </div>
+            <ModernFloatingInput
+              label="Current Password"
+              type={showCurrentPassword ? "text" : "password"}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              icon={<Lock className="w-4 h-4" />}
+              placeholder="••••••••••••"
+              rightElement={
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
+                >
+                  {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              }
+            />
           )}
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              {userHasPassword ? 'New Password' : 'Create Account Password'}
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
-            />
-          </div>
+          <ModernFloatingInput
+            label={userHasPassword ? 'New Password' : 'Create Account Password'}
+            type={showNewPassword ? "text" : "password"}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            icon={<Lock className="w-4 h-4" />}
+            placeholder="••••••••••••"
+            rightElement={
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
+              >
+                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            }
+          />
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Confirm Password</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
-            />
-          </div>
+          <ModernFloatingInput
+            label="Confirm Password"
+            type={showConfirmPassword ? "text" : "password"}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            icon={<Lock className="w-4 h-4" />}
+            placeholder="••••••••••••"
+            rightElement={
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            }
+          />
 
           <button
             type="submit"
@@ -673,30 +801,25 @@ export default function AccountSettings() {
               Paste your OpenSSH public key (typically found in <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-slate-700 dark:text-slate-300">~/.ssh/id_rsa.pub</code> or <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-slate-700 dark:text-slate-300">~/.ssh/id_ed25519.pub</code>).
             </p>
 
-            <form onSubmit={handleAddSSHKey} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Key Name / Identifier</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Work MacBook Pro, Office Desktop"
-                  value={newKeyName}
-                  onChange={(e) => setNewKeyName(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
-                />
-              </div>
+            <form onSubmit={handleAddSSHKey} className="space-y-4 pt-1">
+              <ModernFloatingInput
+                label="Key Name / Identifier"
+                required
+                placeholder="e.g. Work MacBook Pro, Office Desktop"
+                value={newKeyName}
+                onChange={(e) => setNewKeyName(e.target.value)}
+                icon={<Key className="w-4 h-4" />}
+              />
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Public Key Content</label>
-                <textarea
-                  required
-                  rows={4}
-                  placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... user@example.com"
-                  value={newPublicKey}
-                  onChange={(e) => setNewPublicKey(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
-                />
-              </div>
+              <ModernFloatingTextarea
+                label="Public Key Content"
+                required
+                rows={4}
+                placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... user@example.com"
+                value={newPublicKey}
+                onChange={(e) => setNewPublicKey(e.target.value)}
+                className="font-mono text-xs"
+              />
 
               <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
@@ -730,18 +853,15 @@ export default function AccountSettings() {
             </p>
 
             {!generatedKey ? (
-              <form onSubmit={handleGenerateSSHKey} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Key Label</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. My Laptop Key Pair"
-                    value={genKeyName}
-                    onChange={(e) => setGenKeyName(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-900 transition-all text-slate-900 dark:text-white"
-                  />
-                </div>
+              <form onSubmit={handleGenerateSSHKey} className="space-y-4 pt-1">
+                <ModernFloatingInput
+                  label="Key Label"
+                  required
+                  placeholder="e.g. My Laptop Key Pair"
+                  value={genKeyName}
+                  onChange={(e) => setGenKeyName(e.target.value)}
+                  icon={<Key className="w-4 h-4" />}
+                />
 
                 <div className="p-3 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs text-blue-800 dark:text-blue-300 space-y-1">
                   <span className="font-bold flex items-center gap-1.5">

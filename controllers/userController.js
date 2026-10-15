@@ -30,6 +30,7 @@ export const getMe = async (req, res) => {
       phone: user.phone || '',
       address: user.address || '',
       city: user.city || '',
+      state: user.state || '',
       postalCode: user.postalCode || '',
       country: user.country || '',
       role: primaryRole,
@@ -47,7 +48,7 @@ export const getMe = async (req, res) => {
 export const updateMe = async (req, res) => {
   try {
     const userId = Number(req.user.id || req.user.userId);
-    const { fullName, phone, address, city, postalCode, postal_code, country, avatarUrl } = req.body;
+    const { fullName, phone, address, city, state, postalCode, postal_code, country, avatarUrl } = req.body;
     const valueForPostalCode = postalCode ?? postal_code ?? null;
 
     // Validate avatar string length if present to prevent MySQL @db.Text overflow (64KB max)
@@ -62,6 +63,7 @@ export const updateMe = async (req, res) => {
         ...(phone !== undefined && { phone: String(phone).trim().slice(0, 30) }),
         ...(address !== undefined && { address: String(address).trim().slice(0, 255) }),
         ...(city !== undefined && { city: String(city).trim().slice(0, 100) }),
+        ...(state !== undefined && { state: String(state).trim().slice(0, 100) }),
         ...(valueForPostalCode !== undefined && { postalCode: String(valueForPostalCode).trim().slice(0, 20) }),
         ...(country !== undefined && { country: String(country).trim().slice(0, 100) }),
         ...(avatarUrl !== undefined && { avatar_url: avatarUrl }),
@@ -86,6 +88,7 @@ export const updateMe = async (req, res) => {
         phone: updatedUser.phone,
         address: updatedUser.address,
         city: updatedUser.city,
+        state: updatedUser.state || '',
         postalCode: updatedUser.postalCode || '',
         country: updatedUser.country,
         role: primaryRole,

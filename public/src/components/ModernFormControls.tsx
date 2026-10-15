@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, ChevronDown, ChevronUp, Check, Loader2 } from 'lucide-react';
 
 export interface CountryOption {
+  id?: number;
   code: string;
   name: string;
   flag: string;
@@ -10,10 +11,18 @@ export interface CountryOption {
   currency?: string;
 }
 
+export interface GeoItem {
+  id: number;
+  name: string;
+  code?: string;
+  provinceId?: number;
+  countryId?: number;
+}
+
 // ==============================================================================
 // 1. Modern Material-Outlined Floating Label Input
 // ==============================================================================
-interface ModernFloatingInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface ModernFloatingInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   icon?: React.ReactNode;
   rightElement?: React.ReactNode;
@@ -32,6 +41,7 @@ export function ModernFloatingInput({
   className = '',
   onFocus,
   onBlur,
+  placeholder,
   ...props
 }: ModernFloatingInputProps) {
   const [isFocused, setIsFocused] = useState(false);
@@ -42,19 +52,19 @@ export function ModernFloatingInput({
   return (
     <div className="relative w-full group">
       <div
-        className={`relative flex items-center bg-white border rounded-xl transition-all duration-200 ${
+        className={`relative flex items-center bg-white dark:bg-slate-900 border rounded-xl transition-all duration-200 ${
           error
-            ? 'border-rose-400 ring-2 ring-rose-500/10'
+            ? 'border-rose-400 ring-2 ring-rose-500/10 dark:border-rose-500'
             : isFocused
-            ? 'border-blue-600 ring-3 ring-blue-600/15 shadow-sm'
-            : 'border-slate-300 hover:border-slate-400'
+            ? 'border-blue-600 dark:border-blue-500 ring-3 ring-blue-600/15 dark:ring-blue-500/20 shadow-xs'
+            : 'border-slate-300 dark:border-slate-700/80 hover:border-slate-400 dark:hover:border-slate-600'
         }`}
       >
         {/* Left Icon */}
         {icon && (
           <div
             className={`pl-3.5 pr-1 flex items-center pointer-events-none transition-colors ${
-              error ? 'text-rose-500' : isFocused ? 'text-blue-600' : 'text-slate-400'
+              error ? 'text-rose-500' : isFocused ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'
             }`}
           >
             {icon}
@@ -73,8 +83,8 @@ export function ModernFloatingInput({
             setIsFocused(false);
             onBlur?.(e);
           }}
-          className={`w-full bg-transparent px-3.5 py-3 text-sm text-slate-900 placeholder-transparent focus:outline-none ${className}`}
-          placeholder={label}
+          className={`w-full bg-transparent px-3.5 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none ${className}`}
+          placeholder={isFloated ? (placeholder || '') : ''}
           {...props}
         />
 
@@ -85,16 +95,16 @@ export function ModernFloatingInput({
             icon ? (isFloated ? 'left-3' : 'left-10') : 'left-3.5'
           } ${
             isFloated
-              ? '-top-2.5 px-1.5 bg-white text-[11px] font-semibold leading-none rounded z-10'
-              : 'top-3.5 text-sm font-normal text-slate-500'
+              ? '-top-2.5 px-1.5 bg-white dark:bg-slate-900 text-[11px] font-semibold leading-none rounded z-10'
+              : 'top-3.5 text-sm font-normal text-slate-500 dark:text-slate-400'
           } ${
             error
-              ? 'text-rose-600'
+              ? 'text-rose-600 dark:text-rose-400'
               : isFocused
-              ? 'text-blue-600'
+              ? 'text-blue-600 dark:text-blue-400'
               : isFloated
-              ? 'text-slate-700'
-              : 'text-slate-500'
+              ? 'text-slate-700 dark:text-slate-300'
+              : 'text-slate-500 dark:text-slate-400'
           }`}
         >
           {label} {required && <span className="text-rose-500">*</span>}
@@ -102,13 +112,13 @@ export function ModernFloatingInput({
 
         {/* Right Action (e.g. Eye toggle) */}
         {rightElement && (
-          <div className="pr-3 flex items-center">{rightElement}</div>
+          <div className="pr-3 flex items-center shrink-0">{rightElement}</div>
         )}
       </div>
 
       {/* Error Message */}
       {error && (
-        <p className="mt-1 text-[11px] text-rose-600 font-medium pl-1 animate-fadeIn">
+        <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-400 font-medium pl-1 animate-fadeIn">
           {error}
         </p>
       )}
@@ -117,17 +127,168 @@ export function ModernFloatingInput({
 }
 
 // ==============================================================================
-// 2. Advanced Searchable Country Combobox (Matches Screenshot)
+// 2. Modern Material-Outlined Floating Label Textarea
 // ==============================================================================
-interface ModernCountrySelectProps {
+export interface ModernFloatingTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
-  countries: CountryOption[];
-  selectedCode: string;
-  onSelect: (country: CountryOption) => void;
-  loading?: boolean;
+  error?: string;
+  required?: boolean;
 }
 
-// Flag rendering helper with fallback to emoji
+export function ModernFloatingTextarea({
+  label,
+  error,
+  required,
+  value,
+  id,
+  className = '',
+  rows = 4,
+  onFocus,
+  onBlur,
+  placeholder,
+  ...props
+}: ModernFloatingTextareaProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const inputId = id || `floating-area-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+  const hasValue = value !== undefined && value !== null && String(value).length > 0;
+  const isFloated = isFocused || hasValue;
+
+  return (
+    <div className="relative w-full group">
+      <div
+        className={`relative flex bg-white dark:bg-slate-900 border rounded-xl transition-all duration-200 ${
+          error
+            ? 'border-rose-400 ring-2 ring-rose-500/10 dark:border-rose-500'
+            : isFocused
+            ? 'border-blue-600 dark:border-blue-500 ring-3 ring-blue-600/15 dark:ring-blue-500/20 shadow-xs'
+            : 'border-slate-300 dark:border-slate-700/80 hover:border-slate-400 dark:hover:border-slate-600'
+        }`}
+      >
+        <textarea
+          id={inputId}
+          rows={rows}
+          value={value}
+          onFocus={(e) => {
+            setIsFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setIsFocused(false);
+            onBlur?.(e);
+          }}
+          className={`w-full bg-transparent px-3.5 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none resize-y ${className}`}
+          placeholder={isFloated ? (placeholder || '') : ''}
+          {...props}
+        />
+
+        {/* Floating Label */}
+        <label
+          htmlFor={inputId}
+          className={`absolute pointer-events-none transition-all duration-150 ease-out origin-top-left left-3.5 ${
+            isFloated
+              ? '-top-2.5 px-1.5 bg-white dark:bg-slate-900 text-[11px] font-semibold leading-none rounded z-10'
+              : 'top-3.5 text-sm font-normal text-slate-500 dark:text-slate-400'
+          } ${
+            error
+              ? 'text-rose-600 dark:text-rose-400'
+              : isFocused
+              ? 'text-blue-600 dark:text-blue-400'
+              : isFloated
+              ? 'text-slate-700 dark:text-slate-300'
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          {label} {required && <span className="text-rose-500">*</span>}
+        </label>
+      </div>
+
+      {error && (
+        <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-400 font-medium pl-1 animate-fadeIn">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ==============================================================================
+// 3. Modern Material-Outlined Floating Select
+// ==============================================================================
+export interface ModernFloatingSelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  label: string;
+  icon?: React.ReactNode;
+  error?: string;
+  required?: boolean;
+  options: { value: string | number; label: string }[];
+}
+
+export function ModernFloatingSelect({
+  label,
+  icon,
+  error,
+  required,
+  value,
+  id,
+  className = '',
+  options,
+  ...props
+}: ModernFloatingSelectProps) {
+  const inputId = id || `floating-select-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+
+  return (
+    <div className="relative w-full group">
+      <div
+        className={`relative flex items-center bg-white dark:bg-slate-900 border rounded-xl transition-all duration-200 ${
+          error
+            ? 'border-rose-400 ring-2 ring-rose-500/10 dark:border-rose-500'
+            : 'border-slate-300 dark:border-slate-700/80 hover:border-slate-400 dark:hover:border-slate-600 focus-within:border-blue-600 dark:focus-within:border-blue-500 focus-within:ring-3 focus-within:ring-blue-600/15'
+        }`}
+      >
+        {icon && (
+          <div className="pl-3.5 pr-1 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
+            {icon}
+          </div>
+        )}
+
+        <select
+          id={inputId}
+          value={value}
+          className={`w-full bg-transparent px-3.5 py-3 text-sm text-slate-900 dark:text-white focus:outline-none appearance-none cursor-pointer ${className}`}
+          {...props}
+        >
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+              {opt.label}
+            </option>
+          ))}
+        </select>
+
+        {/* Floating Label */}
+        <label
+          htmlFor={inputId}
+          className="absolute pointer-events-none -top-2.5 left-3 px-1.5 bg-white dark:bg-slate-900 text-[11px] font-semibold text-slate-700 dark:text-slate-300 leading-none rounded z-10"
+        >
+          {label} {required && <span className="text-rose-500">*</span>}
+        </label>
+
+        {/* Custom Chevron Indicator */}
+        <div className="pr-3.5 pointer-events-none text-slate-400 dark:text-slate-500 shrink-0">
+          <ChevronDown className="w-4 h-4" />
+        </div>
+      </div>
+
+      {error && (
+        <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-400 font-medium pl-1 animate-fadeIn">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ==============================================================================
+// 4. Country Flag Helper
+// ==============================================================================
 export function CountryFlag({ code, flag, name, className = "w-5 h-3.5" }: { code: string; flag?: string; name?: string; className?: string }) {
   const [imgError, setImgError] = useState(false);
   const cleanCode = (code || '').trim().toLowerCase();
@@ -137,7 +298,7 @@ export function CountryFlag({ code, flag, name, className = "w-5 h-3.5" }: { cod
       <img
         src={`https://flagcdn.com/w40/${cleanCode}.png`}
         alt={name || code}
-        className={`${className} object-cover rounded-sm inline-block shadow-xs shrink-0`}
+        className={`${className} object-cover rounded-xs inline-block shadow-xs shrink-0`}
         onError={() => setImgError(true)}
       />
     );
@@ -150,12 +311,25 @@ export function CountryFlag({ code, flag, name, className = "w-5 h-3.5" }: { cod
   );
 }
 
+// ==============================================================================
+// 5. Advanced Searchable Country Combobox (Matches Screenshot)
+// ==============================================================================
+export interface ModernCountrySelectProps {
+  label: string;
+  countries: CountryOption[];
+  selectedCode: string;
+  onSelect: (country: CountryOption) => void;
+  loading?: boolean;
+  required?: boolean;
+}
+
 export function ModernCountrySelect({
   label,
   countries,
   selectedCode,
   onSelect,
   loading = false,
+  required = true,
 }: ModernCountrySelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -163,10 +337,9 @@ export function ModernCountrySelect({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const selectedCountry = useMemo(() => {
-    return countries.find((c) => c.code.toLowerCase() === selectedCode.toLowerCase()) || countries[0];
+    return countries.find((c) => c.code.toLowerCase() === (selectedCode || '').toLowerCase()) || countries[0];
   }, [countries, selectedCode]);
 
-  // Filter and rank countries by relevance
   const filteredCountries = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return countries;
@@ -188,22 +361,18 @@ export function ModernCountrySelect({
         const aName = (a.name || '').toLowerCase();
         const bName = (b.name || '').toLowerCase();
 
-        // 1. Exact match comes first
         if (aName === q && bName !== q) return -1;
         if (bName === q && aName !== q) return 1;
 
-        // 2. Starts with query comes second
         const aStarts = aName.startsWith(q);
         const bStarts = bName.startsWith(q);
         if (aStarts && !bStarts) return -1;
         if (!aStarts && bStarts) return 1;
 
-        // 3. Alphabetical order
         return aName.localeCompare(bName);
       });
   }, [countries, searchTerm]);
 
-  // Close when clicked outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -214,7 +383,6 @@ export function ModernCountrySelect({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Auto-focus search input when opening
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => {
@@ -227,54 +395,48 @@ export function ModernCountrySelect({
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      {/* Trigger Button with Outlined Floating Label */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className={`relative flex items-center justify-between w-full bg-white border rounded-xl px-3.5 py-3 cursor-pointer select-none transition-all duration-200 ${
+        className={`relative flex items-center justify-between w-full bg-white dark:bg-slate-900 border rounded-xl px-3.5 py-3 cursor-pointer select-none transition-all duration-200 ${
           isOpen
-            ? 'border-blue-600 ring-3 ring-blue-600/15 shadow-sm'
-            : 'border-slate-300 hover:border-slate-400'
+            ? 'border-blue-600 dark:border-blue-500 ring-3 ring-blue-600/15 dark:ring-blue-500/20 shadow-xs'
+            : 'border-slate-300 dark:border-slate-700/80 hover:border-slate-400 dark:hover:border-slate-600'
         }`}
       >
-        {/* Floating Label */}
-        <span className="absolute -top-2.5 left-3 px-1.5 bg-white text-[11px] font-semibold text-slate-700 leading-none rounded z-10">
-          {label} <span className="text-rose-500">*</span>
+        <span className="absolute -top-2.5 left-3 px-1.5 bg-white dark:bg-slate-900 text-[11px] font-semibold text-slate-700 dark:text-slate-300 leading-none rounded z-10">
+          {label} {required && <span className="text-rose-500">*</span>}
         </span>
 
-        {/* Selected Country Display with Flag */}
         <div className="flex items-center gap-2.5 min-w-0 pr-2">
           {selectedCountry ? (
             <>
               <CountryFlag code={selectedCountry.code} flag={selectedCountry.flag} name={selectedCountry.name} />
-              <span className="text-sm font-medium text-slate-900 truncate">
+              <span className="text-sm font-medium text-slate-900 dark:text-white truncate">
                 {selectedCountry.name}
               </span>
-              <span className="text-xs text-slate-500 font-mono shrink-0">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-mono shrink-0">
                 ({selectedCountry.dialCode})
               </span>
             </>
           ) : (
-            <span className="text-sm text-slate-400">Select Country...</span>
+            <span className="text-sm text-slate-400 dark:text-slate-500">Select Country...</span>
           )}
         </div>
 
-        {/* Caret Indicator */}
-        <div className="shrink-0 text-slate-500">
+        <div className="shrink-0 text-slate-500 dark:text-slate-400">
           {loading ? (
             <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
           ) : isOpen ? (
-            <ChevronUp className="w-4 h-4 text-blue-600 transition-transform" />
+            <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 transition-transform" />
           ) : (
             <ChevronDown className="w-4 h-4 transition-transform" />
           )}
         </div>
       </div>
 
-      {/* Dropdown Popover */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-fadeIn">
-          {/* Search Header with Magnifier Icon */}
-          <div className="p-2 border-b border-slate-100 bg-slate-50/70">
+        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-fadeIn">
+          <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50">
             <div className="relative flex items-center">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
               <input
@@ -282,17 +444,16 @@ export function ModernCountrySelect({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search country, code or dial code..."
-                className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                placeholder="Search country, ISO code or dial code..."
+                className="w-full pl-9 pr-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
               />
             </div>
           </div>
 
-          {/* Scrollable Countries List */}
-          <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
+          <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-800/50">
             {filteredCountries.length > 0 ? (
               filteredCountries.map((c, index) => {
-                const isSelected = c.code.toLowerCase() === selectedCode.toLowerCase();
+                const isSelected = c.code.toLowerCase() === (selectedCountry?.code || '').toLowerCase();
                 return (
                   <div
                     key={`${c.code}-${c.name}-${index}`}
@@ -302,8 +463,8 @@ export function ModernCountrySelect({
                     }}
                     className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
                       isSelected
-                        ? 'bg-blue-50/80 text-blue-950 font-medium'
-                        : 'hover:bg-slate-100 text-slate-800'
+                        ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-950 dark:text-blue-300 font-medium'
+                        : 'hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-800 dark:text-slate-200'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -312,14 +473,14 @@ export function ModernCountrySelect({
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-slate-400 font-mono">{c.dialCode}</span>
-                      {isSelected && <Check className="w-4 h-4 text-blue-600" />}
+                      <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">{c.dialCode}</span>
+                      {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
                     </div>
                   </div>
                 );
               })
             ) : (
-              <div className="px-4 py-6 text-center text-xs text-slate-500">
+              <div className="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
                 No countries found matching "{searchTerm}"
               </div>
             )}
@@ -331,14 +492,16 @@ export function ModernCountrySelect({
 }
 
 // ==============================================================================
-// 3. Advanced Searchable State/Province Combobox (Live Fetched)
+// 6. Advanced Searchable State/Province Combobox (Live from MS SQL Server)
 // ==============================================================================
-interface ModernStateSelectProps {
+export interface ModernStateSelectProps {
   label: string;
-  states: string[];
+  states: (string | GeoItem)[];
   selectedState: string;
-  onSelect: (state: string) => void;
+  onSelect: (stateName: string, stateObj?: GeoItem) => void;
   loading?: boolean;
+  required?: boolean;
+  placeholder?: string;
 }
 
 export function ModernStateSelect({
@@ -347,23 +510,31 @@ export function ModernStateSelect({
   selectedState,
   onSelect,
   loading = false,
+  required = false,
+  placeholder = "Select State / Province...",
 }: ModernStateSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // If country has no sub-states, allow direct typing
-  const hasStatesList = states && states.length > 0;
+  const normalizedStates: GeoItem[] = useMemo(() => {
+    return states.map((s, idx) => {
+      if (typeof s === 'string') {
+        return { id: idx + 1, name: s };
+      }
+      return s;
+    });
+  }, [states]);
 
-  // Filter states
+  const hasStatesList = normalizedStates.length > 0;
+
   const filteredStates = useMemo(() => {
-    if (!searchTerm.trim()) return states;
+    if (!searchTerm.trim()) return normalizedStates;
     const q = searchTerm.toLowerCase();
-    return states.filter((s) => s.toLowerCase().includes(q));
-  }, [states, searchTerm]);
+    return normalizedStates.filter((s) => s.name.toLowerCase().includes(q) || (s.code && s.code.toLowerCase().includes(q)));
+  }, [normalizedStates, searchTerm]);
 
-  // Click outside to close
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -390,29 +561,26 @@ export function ModernStateSelect({
         label={label}
         value={selectedState}
         onChange={(e) => onSelect(e.target.value)}
-        placeholder="Region / Province / Area"
-        required
+        placeholder="State, Province, or Region"
+        required={required}
       />
     );
   }
 
   return (
     <div className="relative w-full" ref={containerRef}>
-      {/* Trigger Button */}
       <div
         onClick={() => !loading && setIsOpen(!isOpen)}
-        className={`relative flex items-center justify-between w-full bg-white border rounded-xl px-3.5 py-3 cursor-pointer select-none transition-all duration-200 ${
+        className={`relative flex items-center justify-between w-full bg-white dark:bg-slate-900 border rounded-xl px-3.5 py-3 cursor-pointer select-none transition-all duration-200 ${
           isOpen
-            ? 'border-blue-600 ring-3 ring-blue-600/15 shadow-sm'
-            : 'border-slate-300 hover:border-slate-400'
+            ? 'border-blue-600 dark:border-blue-500 ring-3 ring-blue-600/15 dark:ring-blue-500/20 shadow-xs'
+            : 'border-slate-300 dark:border-slate-700/80 hover:border-slate-400 dark:hover:border-slate-600'
         } ${loading ? 'opacity-70 cursor-wait' : ''}`}
       >
-        {/* Floating Label */}
-        <span className="absolute -top-2.5 left-3 px-1.5 bg-white text-[11px] font-semibold text-slate-700 leading-none rounded z-10">
-          {label} <span className="text-rose-500">*</span>
+        <span className="absolute -top-2.5 left-3 px-1.5 bg-white dark:bg-slate-900 text-[11px] font-semibold text-slate-700 dark:text-slate-300 leading-none rounded z-10">
+          {label} {required && <span className="text-rose-500">*</span>}
         </span>
 
-        {/* Selected State Display */}
         <div className="flex items-center gap-2 min-w-0 pr-2">
           {loading ? (
             <span className="text-sm text-slate-400 flex items-center gap-2">
@@ -420,29 +588,26 @@ export function ModernStateSelect({
               Loading regions...
             </span>
           ) : selectedState ? (
-            <span className="text-sm font-medium text-slate-900 truncate">
+            <span className="text-sm font-medium text-slate-900 dark:text-white truncate">
               {selectedState}
             </span>
           ) : (
-            <span className="text-sm text-slate-400">Select Region/State...</span>
+            <span className="text-sm text-slate-400 dark:text-slate-500">{placeholder}</span>
           )}
         </div>
 
-        {/* Caret */}
-        <div className="shrink-0 text-slate-500">
+        <div className="shrink-0 text-slate-500 dark:text-slate-400">
           {isOpen ? (
-            <ChevronUp className="w-4 h-4 text-blue-600" />
+            <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
           ) : (
             <ChevronDown className="w-4 h-4" />
           )}
         </div>
       </div>
 
-      {/* Dropdown Popover */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-fadeIn">
-          {/* Search Header */}
-          <div className="p-2 border-b border-slate-100 bg-slate-50/70">
+        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-fadeIn">
+          <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50">
             <div className="relative flex items-center">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
               <input
@@ -450,38 +615,204 @@ export function ModernStateSelect({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search state, province or county..."
-                className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                placeholder="Search state or province..."
+                className="w-full pl-9 pr-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
               />
             </div>
           </div>
 
-          {/* List */}
-          <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
+          <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-800/50">
             {filteredStates.length > 0 ? (
               filteredStates.map((st) => {
-                const isSelected = st === selectedState;
+                const isSelected = st.name === selectedState;
                 return (
                   <div
-                    key={st}
+                    key={`${st.id}-${st.name}`}
                     onClick={() => {
-                      onSelect(st);
+                      onSelect(st.name, st);
                       setIsOpen(false);
                     }}
                     className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
                       isSelected
-                        ? 'bg-blue-50/80 text-blue-950 font-medium'
-                        : 'hover:bg-slate-100 text-slate-800'
+                        ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-950 dark:text-blue-300 font-medium'
+                        : 'hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-800 dark:text-slate-200'
                     }`}
                   >
-                    <span className="truncate">{st}</span>
-                    {isSelected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                    <span className="truncate">{st.name}</span>
+                    {st.code && <span className="text-xs text-slate-400 dark:text-slate-500 font-mono shrink-0">{st.code}</span>}
+                    {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 ml-2" />}
                   </div>
                 );
               })
             ) : (
-              <div className="px-4 py-6 text-center text-xs text-slate-500">
-                No regions found matching "{searchTerm}"
+              <div className="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                No states found matching "{searchTerm}"
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==============================================================================
+// 7. Advanced Searchable City Combobox (Live from MS SQL Server)
+// ==============================================================================
+export interface ModernCitySelectProps {
+  label: string;
+  cities: GeoItem[];
+  selectedCity: string;
+  onSelect: (cityName: string, cityObj?: GeoItem) => void;
+  loading?: boolean;
+  required?: boolean;
+  placeholder?: string;
+}
+
+export function ModernCitySelect({
+  label,
+  cities,
+  selectedCity,
+  onSelect,
+  loading = false,
+  required = false,
+  placeholder = "Select or search city...",
+}: ModernCitySelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredCities = useMemo(() => {
+    if (!searchTerm.trim()) return cities;
+    const q = searchTerm.toLowerCase();
+    return cities.filter((c) => c.name.toLowerCase().includes(q));
+  }, [cities, searchTerm]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+    } else {
+      setSearchTerm('');
+    }
+  }, [isOpen]);
+
+  // If no cities available in dropdown, gracefully render ModernFloatingInput
+  if (cities.length === 0 && !loading) {
+    return (
+      <ModernFloatingInput
+        label={label}
+        value={selectedCity}
+        onChange={(e) => onSelect(e.target.value)}
+        placeholder="City name (e.g. New York, London, Peshawar)"
+        required={required}
+      />
+    );
+  }
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <div
+        onClick={() => !loading && setIsOpen(!isOpen)}
+        className={`relative flex items-center justify-between w-full bg-white dark:bg-slate-900 border rounded-xl px-3.5 py-3 cursor-pointer select-none transition-all duration-200 ${
+          isOpen
+            ? 'border-blue-600 dark:border-blue-500 ring-3 ring-blue-600/15 dark:ring-blue-500/20 shadow-xs'
+            : 'border-slate-300 dark:border-slate-700/80 hover:border-slate-400 dark:hover:border-slate-600'
+        } ${loading ? 'opacity-70 cursor-wait' : ''}`}
+      >
+        <span className="absolute -top-2.5 left-3 px-1.5 bg-white dark:bg-slate-900 text-[11px] font-semibold text-slate-700 dark:text-slate-300 leading-none rounded z-10">
+          {label} {required && <span className="text-rose-500">*</span>}
+        </span>
+
+        <div className="flex items-center gap-2 min-w-0 pr-2">
+          {loading ? (
+            <span className="text-sm text-slate-400 flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+              Loading cities...
+            </span>
+          ) : selectedCity ? (
+            <span className="text-sm font-medium text-slate-900 dark:text-white truncate">
+              {selectedCity}
+            </span>
+          ) : (
+            <span className="text-sm text-slate-400 dark:text-slate-500">{placeholder}</span>
+          )}
+        </div>
+
+        <div className="shrink-0 text-slate-500 dark:text-slate-400">
+          {isOpen ? (
+            <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+          ) : (
+            <ChevronDown className="w-4 h-4" />
+          )}
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-fadeIn">
+          <div className="p-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50">
+            <div className="relative flex items-center">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search city..."
+                className="w-full pl-9 pr-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+              />
+            </div>
+          </div>
+
+          <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-800/50">
+            {filteredCities.length > 0 ? (
+              filteredCities.map((ct) => {
+                const isSelected = ct.name === selectedCity;
+                return (
+                  <div
+                    key={`${ct.id}-${ct.name}`}
+                    onClick={() => {
+                      onSelect(ct.name, ct);
+                      setIsOpen(false);
+                    }}
+                    className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-950 dark:text-blue-300 font-medium'
+                        : 'hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-800 dark:text-slate-200'
+                    }`}
+                  >
+                    <span className="truncate">{ct.name}</span>
+                    {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 ml-2" />}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-3 text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">No predefined cities matching "{searchTerm}"</p>
+                {searchTerm.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelect(searchTerm.trim());
+                      setIsOpen(false);
+                    }}
+                    className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline"
+                  >
+                    Use custom city "{searchTerm.trim()}"
+                  </button>
+                )}
               </div>
             )}
           </div>

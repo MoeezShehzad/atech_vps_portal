@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { User, Mail, Phone, MapPin, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../services/api';
+import { ModernFloatingInput } from '../components/ModernFormControls';
 
 type StepId = 'details' | 'review' | 'payment';
 
@@ -59,6 +61,7 @@ export default function Checkout() {
     country: 'Pakistan',
     termsAccepted: false,
   });
+  const [showGuestPassword, setShowGuestPassword] = useState(false);
 
   // Pre-fill fields whenever the authenticated user is loaded
   useEffect(() => {
@@ -446,78 +449,65 @@ export default function Checkout() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Full Name</label>
-                        <input
-                          type="text"
-                          disabled
-                          value={user?.fullName || ''}
-                          className="w-full p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 font-medium cursor-not-allowed"
-                        />
-                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-1">
+                      <ModernFloatingInput
+                        label="Full Legal Name"
+                        disabled
+                        value={user?.fullName || ''}
+                        icon={<User className="w-4 h-4" />}
+                        placeholder="John Doe"
+                      />
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Email Address</label>
-                        <input
-                          type="email"
-                          disabled
-                          value={user?.email || ''}
-                          className="w-full p-3 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 font-medium cursor-not-allowed"
-                        />
-                      </div>
+                      <ModernFloatingInput
+                        label="Email Address"
+                        type="email"
+                        disabled
+                        value={user?.email || ''}
+                        icon={<Mail className="w-4 h-4" />}
+                        placeholder="name@company.com"
+                      />
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Phone Number</label>
-                        <input
-                          type="tel"
-                          value={customerInfo.phone}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                          className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
-                          placeholder="+92 300 1234567"
-                        />
-                      </div>
+                      <ModernFloatingInput
+                        label="Phone Number"
+                        type="tel"
+                        value={customerInfo.phone}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                        icon={<Phone className="w-4 h-4" />}
+                        placeholder="+1 (555) 000-0000"
+                      />
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">City *</label>
-                        <input
-                          type="text"
-                          value={customerInfo.city}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, city: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.city ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="Peshawar"
+                      <ModernFloatingInput
+                        label="City"
+                        required
+                        value={customerInfo.city}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, city: e.target.value })}
+                        icon={<MapPin className="w-4 h-4" />}
+                        error={errors.city}
+                        placeholder="e.g. New York, London, Peshawar"
+                      />
+
+                      <div className="sm:col-span-2">
+                        <ModernFloatingInput
+                          label="Street Address"
+                          required
+                          value={customerInfo.address}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
+                          icon={<MapPin className="w-4 h-4" />}
+                          error={errors.address}
+                          placeholder="123 Cloud Avenue, Suite 400"
                         />
-                        {errors.city && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.city}</p>}
                       </div>
 
                       <div className="sm:col-span-2">
-                        <label className="block font-bold text-slate-700 mb-1.5">Street Address *</label>
-                        <input
-                          type="text"
-                          value={customerInfo.address}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.address ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="Street 1, Main Sector"
-                        />
-                        {errors.address && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.address}</p>}
-                      </div>
-
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Postal / ZIP Code *</label>
-                        <input
-                          type="text"
+                        <ModernFloatingInput
+                          label="Postal / ZIP Code"
+                          required
                           value={customerInfo.zip}
                           onChange={(e) => setCustomerInfo({ ...customerInfo, zip: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.zip ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="25000"
+                          icon={<MapPin className="w-4 h-4" />}
+                          error={errors.zip}
+                          placeholder="e.g. 10001 or 25000"
                         />
-                        {errors.zip && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.zip}</p>}
                       </div>
                     </div>
 
@@ -551,132 +541,111 @@ export default function Checkout() {
                     </div>
 
                     {/* Account Setup Fields */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">First Name *</label>
-                        <input
-                          type="text"
-                          value={customerInfo.firstName}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, firstName: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.firstName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="Alex"
-                        />
-                        {errors.firstName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.firstName}</p>}
-                      </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-1">
+                      <ModernFloatingInput
+                        label="First Name"
+                        required
+                        value={customerInfo.firstName}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, firstName: e.target.value })}
+                        icon={<User className="w-4 h-4" />}
+                        error={errors.firstName}
+                        placeholder="Alex"
+                      />
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Last Name *</label>
-                        <input
-                          type="text"
-                          value={customerInfo.lastName}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, lastName: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.lastName ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="Morgan"
-                        />
-                        {errors.lastName && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.lastName}</p>}
-                      </div>
+                      <ModernFloatingInput
+                        label="Last Name"
+                        required
+                        value={customerInfo.lastName}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, lastName: e.target.value })}
+                        icon={<User className="w-4 h-4" />}
+                        error={errors.lastName}
+                        placeholder="Morgan"
+                      />
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Email Address (Username) *</label>
-                        <input
-                          type="email"
-                          value={customerInfo.email}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.email ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="alex.morgan@company.com"
-                        />
-                        {errors.email && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.email}</p>}
-                      </div>
+                      <ModernFloatingInput
+                        label="Email Address (Username)"
+                        type="email"
+                        required
+                        value={customerInfo.email}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
+                        icon={<Mail className="w-4 h-4" />}
+                        error={errors.email}
+                        placeholder="alex.morgan@company.com"
+                      />
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Phone Number *</label>
-                        <input
-                          type="tel"
-                          value={customerInfo.phone}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.phone ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="+1 (555) 000-0000"
-                        />
-                        {errors.phone && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.phone}</p>}
-                      </div>
+                      <ModernFloatingInput
+                        label="Phone Number"
+                        type="tel"
+                        required
+                        value={customerInfo.phone}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                        icon={<Phone className="w-4 h-4" />}
+                        error={errors.phone}
+                        placeholder="+1 (555) 000-0000"
+                      />
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Create Password *</label>
-                        <input
-                          type="password"
-                          value={customerInfo.password}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, password: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.password ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="••••••••••••"
-                        />
-                        {errors.password && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.password}</p>}
-                      </div>
+                      <ModernFloatingInput
+                        label="Create Password"
+                        type={showGuestPassword ? "text" : "password"}
+                        required
+                        value={customerInfo.password}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, password: e.target.value })}
+                        icon={<Lock className="w-4 h-4" />}
+                        rightElement={
+                          <button
+                            type="button"
+                            onClick={() => setShowGuestPassword(!showGuestPassword)}
+                            className="text-slate-400 hover:text-slate-600 focus:outline-none"
+                          >
+                            {showGuestPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        }
+                        error={errors.password}
+                        placeholder="••••••••••••"
+                      />
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Confirm Password *</label>
-                        <input
-                          type="password"
-                          value={customerInfo.confirmPassword}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, confirmPassword: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.confirmPassword ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="••••••••••••"
-                        />
-                        {errors.confirmPassword && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.confirmPassword}</p>}
-                      </div>
+                      <ModernFloatingInput
+                        label="Confirm Password"
+                        type={showGuestPassword ? "text" : "password"}
+                        required
+                        value={customerInfo.confirmPassword}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, confirmPassword: e.target.value })}
+                        icon={<Lock className="w-4 h-4" />}
+                        error={errors.confirmPassword}
+                        placeholder="••••••••••••"
+                      />
 
                       <div className="sm:col-span-2 pt-2 border-t border-slate-100">
-                        <label className="block font-bold text-slate-700 mb-1.5">Street Address *</label>
-                        <input
-                          type="text"
+                        <ModernFloatingInput
+                          label="Street Address"
+                          required
                           value={customerInfo.address}
                           onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.address ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="1360 Brentwood Trl"
+                          icon={<MapPin className="w-4 h-4" />}
+                          error={errors.address}
+                          placeholder="1360 Brentwood Trl, Suite 200"
                         />
-                        {errors.address && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.address}</p>}
                       </div>
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">City *</label>
-                        <input
-                          type="text"
-                          value={customerInfo.city}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, city: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.city ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="Bolingbrook"
-                        />
-                        {errors.city && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.city}</p>}
-                      </div>
+                      <ModernFloatingInput
+                        label="City"
+                        required
+                        value={customerInfo.city}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, city: e.target.value })}
+                        icon={<MapPin className="w-4 h-4" />}
+                        error={errors.city}
+                        placeholder="Bolingbrook"
+                      />
 
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Postal / ZIP Code *</label>
-                        <input
-                          type="text"
-                          value={customerInfo.zip}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, zip: e.target.value })}
-                          className={`w-full p-3 rounded-xl bg-slate-50 border text-slate-900 focus:outline-none focus:bg-white transition-colors font-medium ${
-                            errors.zip ? 'border-red-500 bg-red-50/20' : 'border-slate-200 focus:border-blue-600'
-                          }`}
-                          placeholder="60490"
-                        />
-                        {errors.zip && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.zip}</p>}
-                      </div>
+                      <ModernFloatingInput
+                        label="Postal / ZIP Code"
+                        required
+                        value={customerInfo.zip}
+                        onChange={(e) => setCustomerInfo({ ...customerInfo, zip: e.target.value })}
+                        icon={<MapPin className="w-4 h-4" />}
+                        error={errors.zip}
+                        placeholder="60490"
+                      />
 
                       <div className="sm:col-span-2 pt-2">
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -996,48 +965,6 @@ export default function Checkout() {
                         </div>
                       </>
                     )}
-
-                    {/* Row 2: Country & ZIP Code */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                      {/* Country */}
-                      <div className="md:col-span-6">
-                        <label className="block font-bold text-slate-700 mb-1.5">Country *</label>
-                        <div className="relative">
-                          <select
-                            value={customerInfo.country || 'United States'}
-                            onChange={(e) => setCustomerInfo({ ...customerInfo, country: e.target.value })}
-                            className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 text-xs font-medium appearance-none focus:outline-none focus:bg-white focus:border-blue-600 transition-colors"
-                          >
-                            <option value="United States">United States</option>
-                            <option value="United Kingdom">United Kingdom</option>
-                            <option value="Canada">Canada</option>
-                            <option value="Germany">Germany</option>
-                            <option value="France">France</option>
-                            <option value="Australia">Australia</option>
-                            <option value="Pakistan">Pakistan</option>
-                            <option value="United Arab Emirates">United Arab Emirates</option>
-                            <option value="Saudi Arabia">Saudi Arabia</option>
-                            <option value="Singapore">Singapore</option>
-                            <option value="Other">Other Country</option>
-                          </select>
-                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">
-                            ▼
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* ZIP Code */}
-                      <div className="md:col-span-6">
-                        <label className="block font-bold text-slate-700 mb-1.5">ZIP code *</label>
-                        <input
-                          type="text"
-                          value={customerInfo.zip}
-                          onChange={(e) => setCustomerInfo({ ...customerInfo, zip: e.target.value })}
-                          className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 font-mono text-xs font-medium focus:outline-none focus:bg-white focus:border-blue-600 transition-colors"
-                          placeholder="12345"
-                        />
-                      </div>
-                    </div>
                   </div>
                 )}
 

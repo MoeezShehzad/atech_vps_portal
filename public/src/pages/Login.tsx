@@ -4,6 +4,7 @@ import { Mail, Lock, ArrowRight, ShieldCheck, Eye, EyeOff, AlertCircle } from 'l
 import { useAuth } from '../context/AuthContext';
 import { apiCall, setAccessToken, API_BASE_URL } from '../services/api';
 import atcLogo from '../assets/ATC_Logo.png';
+import { ModernFloatingInput } from '../components/ModernFormControls';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -127,55 +128,42 @@ export default function Login() {
           )}
 
           <form className="space-y-4" onSubmit={handleLogin}>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Email Address
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Mail className="h-4 w-4" />
-                </div>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                  placeholder="admin@atech.local"
-                />
-              </div>
-            </div>
+            <ModernFloatingInput
+              label="Email Address"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              icon={<Mail className="h-4 w-4" />}
+              placeholder="name@company.com"
+              autoComplete="email"
+            />
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Password
-              </label>
+            <div className="space-y-1.5">
+              <ModernFloatingInput
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                icon={<Lock className="h-4 w-4" />}
+                placeholder="••••••••••••"
+                autoComplete="current-password"
+                rightElement={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors focus:outline-none cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                }
+              />
 
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Lock className="h-4 w-4" />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white transition-all"
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-
-              <div className="flex justify-end mt-1.5">
+              <div className="flex justify-end pt-1">
                 <Link
                   to="/forgot-password"
-                  className="text-xs text-blue-600 font-semibold hover:underline"
+                  className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline"
                 >
                   Forgot password?
                 </Link>

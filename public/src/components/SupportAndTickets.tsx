@@ -34,6 +34,11 @@ import {
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
 import { formatDateTime } from '../utils/dateFormatter';
+import {
+  ModernFloatingInput,
+  ModernFloatingTextarea,
+  ModernFloatingSelect,
+} from './ModernFormControls';
 
 export interface ChatMessage {
   id: string;
@@ -670,21 +675,19 @@ export default function SupportAndTickets() {
             onSubmit={handleSendCustomerReply}
             className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3"
           >
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-              {activeTicket.status === 'CLOSED' ? 'Ticket Closed (Sending a message will reopen it):' : 'Write a Follow-Up Reply:'}
-            </label>
             <div className="flex items-center gap-3">
-              <input
-                type="text"
-                placeholder={activeTicket.status === 'CLOSED' ? 'This ticket is closed. Type here to reopen and ask a follow-up...' : 'Write your follow-up reply or question...'}
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                className="flex-1 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
-              />
+              <div className="flex-1">
+                <ModernFloatingInput
+                  label={activeTicket.status === 'CLOSED' ? 'Reopen Ticket with Follow-Up' : 'Write Follow-Up Reply'}
+                  placeholder={activeTicket.status === 'CLOSED' ? 'This ticket is closed. Type here to reopen and ask a follow-up...' : 'Type your follow-up reply or question here...'}
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                />
+              </div>
               <button
                 type="submit"
                 disabled={sendingReply || !replyText.trim()}
-                className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm disabled:opacity-50 transition-all shrink-0 cursor-pointer"
+                className="px-5 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm disabled:opacity-50 transition-all shrink-0 cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
                 <span>{sendingReply ? 'Sending...' : 'Send Reply'}</span>
@@ -818,98 +821,74 @@ export default function SupportAndTickets() {
 
             {/* Form */}
             <form onSubmit={handleCreateTicket} className="p-6 space-y-4">
-              {/* Category Selection with 'Other' support */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Topic / Category *
-                </label>
-                <select
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 cursor-pointer"
-                >
-                  <option value="TECHNICAL">Technical & Server Diagnostics</option>
-                  <option value="BILLING">Billing, Invoices & Subscriptions</option>
-                  <option value="NETWORK">Networking & Port Forwarding</option>
-                  <option value="ACCESS">Account Access & Credentials</option>
-                  <option value="OTHER">Other (Specify custom topic)</option>
-                </select>
+              <ModernFloatingSelect
+                label="Topic / Category"
+                required
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                options={[
+                  { value: 'TECHNICAL', label: 'Technical & Server Diagnostics' },
+                  { value: 'BILLING', label: 'Billing, Invoices & Subscriptions' },
+                  { value: 'NETWORK', label: 'Networking & Port Forwarding' },
+                  { value: 'ACCESS', label: 'Account Access & Credentials' },
+                  { value: 'OTHER', label: 'Other (Specify custom topic)' },
+                ]}
+              />
 
-                {newCategory === 'OTHER' && (
-                  <input
-                    type="text"
-                    required
-                    placeholder="Enter your custom topic or inquiry area..."
-                    value={otherCategoryText}
-                    onChange={(e) => setOtherCategoryText(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-blue-300 dark:border-blue-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 animate-in fade-in duration-150"
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Subject Line *
-                </label>
-                <input
-                  type="text"
+              {newCategory === 'OTHER' && (
+                <ModernFloatingInput
+                  label="Custom Topic / Inquiry Area"
                   required
-                  placeholder="e.g. Cannot connect via SSH on port 22, network timeout"
-                  value={newSubject}
-                  onChange={(e) => setNewSubject(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                  placeholder="e.g. Reverse DNS, IP Whitelist, or Backup Migration"
+                  value={otherCategoryText}
+                  onChange={(e) => setOtherCategoryText(e.target.value)}
+                />
+              )}
+
+              <ModernFloatingInput
+                label="Subject Line"
+                required
+                placeholder="e.g. Cannot connect via SSH on port 22, network timeout"
+                value={newSubject}
+                onChange={(e) => setNewSubject(e.target.value)}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <ModernFloatingSelect
+                  label="Priority Level"
+                  required
+                  value={newPriority}
+                  onChange={(e) => setNewPriority(e.target.value as any)}
+                  options={[
+                    { value: 'LOW', label: 'Low (General Inquiries)' },
+                    { value: 'NORMAL', label: 'Normal (Configuration)' },
+                    { value: 'HIGH', label: 'High (Performance Degraded)' },
+                    { value: 'URGENT', label: 'Urgent (VM Offline / Outage)' },
+                  ]}
+                />
+
+                <ModernFloatingSelect
+                  label="Related VM (Optional)"
+                  value={selectedVmId}
+                  onChange={(e) => setSelectedVmId(e.target.value)}
+                  options={[
+                    { value: '', label: 'General Account / Platform' },
+                    ...userVms.map((v) => ({
+                      value: String(v.vmId),
+                      label: `${v.name} (${v.ip})`,
+                    })),
+                  ]}
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Priority Level
-                  </label>
-                  <select
-                    value={newPriority}
-                    onChange={(e) => setNewPriority(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
-                  >
-                    <option value="LOW" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Low (General Inquiries)</option>
-                    <option value="NORMAL" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Normal (Configuration)</option>
-                    <option value="HIGH" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">High (Performance Degraded)</option>
-                    <option value="URGENT" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">Urgent (VM Offline / Outage)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Related VM (Optional)
-                  </label>
-                  <select
-                    value={selectedVmId}
-                    onChange={(e) => setSelectedVmId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
-                  >
-                    <option value="" className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">General Account / Platform</option>
-                    {userVms.map((v) => (
-                      <option key={v.vmId} value={v.vmId} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
-                        {v.name} ({v.ip})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Describe Your Issue or Request *
-                </label>
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="Provide detailed error logs, terminal output, or what steps caused the issue..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600 resize-none"
-                />
-              </div>
+              <ModernFloatingTextarea
+                label="Describe Your Issue or Request"
+                required
+                rows={4}
+                placeholder="Provide detailed error logs, terminal output, or what steps caused the issue..."
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+              />
 
               <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
                 <button
