@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { Client as SSHClient } from 'ssh2';
 import net from 'net';
+import { sanitizeInfrastructureError } from './lib/errorSanitizer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -510,7 +511,8 @@ const server = http.createServer(async (req, res) => {
   } catch (error) {
     console.error(`[AGENT HANDLER ERROR]`, error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: error.error || error.message || 'Host execution failed', details: error }));
+    const rawMsg = error.error || error.message || 'Host execution failed';
+    res.end(JSON.stringify({ error: sanitizeInfrastructureError(rawMsg) }));
   }
 });
 

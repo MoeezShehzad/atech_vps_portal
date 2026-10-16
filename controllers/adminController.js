@@ -15,6 +15,7 @@ import { calculateTicketMetrics } from '../services/ticketAutomationService.js';
 import { sanitizeAuditDetails } from './securityController.js';
 import { createStripeRefund } from '../services/stripeService.js';
 import { startBroadcastCampaign, getBroadcastJobStatus as getJobStatus, listRecentBroadcasts } from '../services/safeBroadcastService.js';
+import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
 
 /**
  * 1. GET /api/admin/overview
@@ -389,7 +390,7 @@ export async function adminPowerControl(req, res) {
     });
   } catch (error) {
     console.error('adminPowerControl error:', error);
-    res.status(500).json({ error: error.message || 'Power action failed' });
+    res.status(500).json({ error: sanitizeInfrastructureError(error) });
   }
 }
 

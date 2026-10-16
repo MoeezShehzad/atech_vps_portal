@@ -13,6 +13,7 @@ import {
   sendSpecificationResizeReceiptEmail 
 } from '../services/emailService.js';
 import firewallService from '../services/firewallService.js';
+import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
 
 /**
  * 1. GET /api/vms - Get all VMs for current user
@@ -547,7 +548,7 @@ export async function deployVM(req, res) {
       }).catch(() => {});
 
       return res.status(500).json({
-        error: `Hyper-V Provisioning failed: ${provisionErr.message}. Ensure start_hyperv_agent.bat is running on Windows.`,
+        error: sanitizeInfrastructureError(provisionErr),
       });
     }
   } catch (error) {
@@ -568,7 +569,7 @@ export async function deployVM(req, res) {
         data: { status: 'AVAILABLE', assignedVmId: null },
       }).catch(() => {});
     }
-    return res.status(500).json({ error: error.message || 'Failed to deploy virtual machine.' });
+    return res.status(500).json({ error: sanitizeInfrastructureError(error) });
   }
 }
 
@@ -610,7 +611,7 @@ export async function powerAction(req, res) {
       } else if (normAction === 'START' && (msg.includes('already running') || msg.includes('running'))) {
         powerResult = { Status: 'SUCCESS', State: 'Running' };
       } else {
-        return res.status(500).json({ error: hvErr.message || 'Failed to execute power command on Hyper-V host.' });
+        return res.status(500).json({ error: sanitizeInfrastructureError(hvErr) });
       }
     }
 
@@ -647,7 +648,7 @@ export async function powerAction(req, res) {
     });
   } catch (error) {
     console.error('[VM Controller] Power action error:', error);
-    return res.status(500).json({ error: error.message || 'Failed to execute power command.' });
+    return res.status(500).json({ error: sanitizeInfrastructureError(error) });
   }
 }
 
@@ -829,7 +830,7 @@ export async function resizeVM(req, res) {
     });
   } catch (error) {
     console.error('[VM Controller] Resize error:', error);
-    return res.status(500).json({ error: error.message || 'Failed to adjust virtual machine specifications.' });
+    return res.status(500).json({ error: sanitizeInfrastructureError(error) });
   }
 }
 
@@ -931,7 +932,7 @@ export async function destroyVM(req, res) {
     });
   } catch (error) {
     console.error('[VM Controller] Destroy error:', error);
-    return res.status(500).json({ error: error.message || 'Failed to destroy virtual machine.' });
+    return res.status(500).json({ error: sanitizeInfrastructureError(error) });
   }
 }
 
@@ -1432,7 +1433,7 @@ export async function rebuildVMInstance(req, res) {
     return res.json({ success: true, message: 'VM rebuild completed successfully.' });
   } catch (err) {
     console.error('[rebuildVMInstance Error]:', err);
-    return res.status(500).json({ error: err.message || 'Failed to rebuild VM' });
+    return res.status(500).json({ error: sanitizeInfrastructureError(err) });
   }
 }
 

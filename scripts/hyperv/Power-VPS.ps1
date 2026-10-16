@@ -24,7 +24,28 @@ try {
             if ($VM.State -eq "Paused") {
                 Resume-VM -Name $VMName -Confirm:$false -ErrorAction Stop
             } elseif ($VM.State -ne "Running") {
-                Start-VM -Name $VMName -Confirm:$false -ErrorAction Stop
+                try {
+                    Start-VM -Name $VMName -Confirm:$false -ErrorAction Stop
+                } catch {
+                    $errText = $_.Exception.Message
+                    if ($errText -match "memory" -or $errText -match "0x8007000E") {
+                        try {
+                            $CurrentMem = Get-VMMemory -VMName $VMName
+                            $MaxMem = $CurrentMem.Startup
+                            if ($CurrentMem.DynamicMemoryEnabled -eq $true -and $CurrentMem.Maximum -gt 0) {
+                                $MaxMem = $CurrentMem.Maximum
+                            }
+                            $SafeStartup = [Math]::Min([int64]1024 * 1MB, $MaxMem)
+                            $SafeMin = [Math]::Min([int64]512 * 1MB, $MaxMem)
+                            Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $true -StartupBytes $SafeStartup -MinimumBytes $SafeMin -MaximumBytes $MaxMem -Buffer 20
+                            Start-VM -Name $VMName -Confirm:$false -ErrorAction Stop
+                        } catch {
+                            throw $_
+                        }
+                    } else {
+                        throw $_
+                    }
+                }
             }
         }
         "STOP" {
@@ -49,7 +70,28 @@ try {
                 Resume-VM -Name $VMName -Confirm:$false -ErrorAction Stop
                 Restart-VM -Name $VMName -Force -Confirm:$false -ErrorAction Stop
             } else {
-                Start-VM -Name $VMName -Confirm:$false -ErrorAction Stop
+                try {
+                    Start-VM -Name $VMName -Confirm:$false -ErrorAction Stop
+                } catch {
+                    $errText = $_.Exception.Message
+                    if ($errText -match "memory" -or $errText -match "0x8007000E") {
+                        try {
+                            $CurrentMem = Get-VMMemory -VMName $VMName
+                            $MaxMem = $CurrentMem.Startup
+                            if ($CurrentMem.DynamicMemoryEnabled -eq $true -and $CurrentMem.Maximum -gt 0) {
+                                $MaxMem = $CurrentMem.Maximum
+                            }
+                            $SafeStartup = [Math]::Min([int64]1024 * 1MB, $MaxMem)
+                            $SafeMin = [Math]::Min([int64]512 * 1MB, $MaxMem)
+                            Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $true -StartupBytes $SafeStartup -MinimumBytes $SafeMin -MaximumBytes $MaxMem -Buffer 20
+                            Start-VM -Name $VMName -Confirm:$false -ErrorAction Stop
+                        } catch {
+                            throw $_
+                        }
+                    } else {
+                        throw $_
+                    }
+                }
             }
         }
         "PAUSE" {

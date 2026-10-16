@@ -74,7 +74,10 @@ try {
 
     # 5. Hardware Configuration
     Set-VMProcessor -VMName $VMName -Count $CPUCount
-    Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $false
+    $TargetMaxBytes = [int64]$RAMMB * 1MB
+    $StartupBytes = [Math]::Min([int64]1024 * 1MB, $TargetMaxBytes)
+    $MinBytes = [Math]::Min([int64]512 * 1MB, $TargetMaxBytes)
+    Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $true -StartupBytes $StartupBytes -MinimumBytes $MinBytes -MaximumBytes $TargetMaxBytes -Buffer 20
 
     # 6. Firmware & Secure Boot Configuration
     # Disable Secure Boot for Linux to prevent "unsigned image hash not allowed" boot failures
