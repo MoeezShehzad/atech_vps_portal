@@ -36,6 +36,7 @@ import {
   Info,
 } from 'lucide-react';
 import { ModernFloatingInput, ModernFloatingSelect } from './ModernFormControls';
+import { apiCall } from '../services/api';
 
 export interface MarketplaceVM {
   vmId: number;
@@ -238,9 +239,8 @@ export default function OneClickMarketplace({
     const fetchCatalog = async () => {
       setLoadingCatalog(true);
       try {
-        const res = await fetch('/api/apps', { credentials: 'include' });
-        const data = await res.json();
-        if (mounted && data.success) {
+        const data = await apiCall('/apps');
+        if (mounted && data?.success) {
           setApps(data.apps || []);
           setCategories(data.categories || []);
         }
@@ -260,17 +260,15 @@ export default function OneClickMarketplace({
   const fetchVmAppStatus = async (vmId: number, silent = false) => {
     if (!silent) setLoadingInstalled(true);
     try {
-      const [instRes, jobsRes] = await Promise.all([
-        fetch(`/api/apps/vms/${vmId}/installed`, { credentials: 'include' }),
-        fetch(`/api/apps/vms/${vmId}/jobs`, { credentials: 'include' }),
+      const [instData, jobsData] = await Promise.all([
+        apiCall(`/apps/vms/${vmId}/installed`),
+        apiCall(`/apps/vms/${vmId}/jobs`),
       ]);
-      const instData = await instRes.json();
-      const jobsData = await jobsRes.json();
 
-      if (instData.success) {
+      if (instData?.success) {
         setInstalledApps(instData.installed || []);
       }
-      if (jobsData.success) {
+      if (jobsData?.success) {
         const jobsList: InstallJobItem[] = jobsData.jobs || [];
         setVmJobs(jobsList);
 
@@ -358,10 +356,8 @@ export default function OneClickMarketplace({
 
     setSubmittingInstall(true);
     try {
-      const res = await fetch(`/api/apps/vms/${activeVm.vmId}/install`, {
+      const data = await apiCall(`/apps/vms/${activeVm.vmId}/install`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({
           appId: configureApp.id,
           asyncMode: true,
@@ -373,9 +369,9 @@ export default function OneClickMarketplace({
           },
         }),
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to start 1-Click installation.');
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to start 1-Click installation.');
       }
 
       const launchedJob: InstallJobItem = data.result?.job || {
@@ -408,16 +404,14 @@ export default function OneClickMarketplace({
   const handleRemoveInstalledApp = async (appId: string, appName: string) => {
     if (!activeVm) return;
     try {
-      const res = await fetch(`/api/apps/vms/${activeVm.vmId}/installed/${appId}`, {
+      const data = await apiCall(`/apps/vms/${activeVm.vmId}/installed/${appId}`, {
         method: 'DELETE',
-        credentials: 'include',
       });
-      const data = await res.json();
-      if (data.success) {
+      if (data?.success) {
         setInstalledApps((prev) => prev.filter((a) => a.appId !== appId));
         showNotification('success', `Removed ${appName} from ${activeVm.vmName}'s installed apps.`);
       } else {
-        showNotification('error', data.error || 'Failed to remove application.');
+        showNotification('error', data?.error || 'Failed to remove application.');
       }
     } catch (err: any) {
       showNotification('error', err.message || 'Error removing application.');

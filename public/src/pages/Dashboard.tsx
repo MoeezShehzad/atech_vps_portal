@@ -343,7 +343,10 @@ export default function Dashboard() {
 
   const fetchCatalog = async () => {
     try {
-      const data = await apiCall('/vms/catalog');
+      const [data, appsData] = await Promise.all([
+        apiCall('/vms/catalog'),
+        apiCall('/apps').catch(() => null),
+      ]);
       if (data) {
         if (data.plans) setCatalogPlans(data.plans);
         if (data.images) setCatalogImages(data.images);
@@ -356,6 +359,9 @@ export default function Dashboard() {
         if (data.images?.[0]) {
           setSelectedImageId(data.images[0].imageId);
         }
+      }
+      if (appsData?.apps) {
+        setMarketplaceApps(appsData.apps);
       }
     } catch (err) {
       console.error('Failed to load catalog:', err);

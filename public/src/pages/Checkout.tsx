@@ -307,6 +307,7 @@ export default function Checkout() {
                 password: orderData.rootPassword || 'root',
                 authMethod: 'password',
                 enableBackups: orderData.addons?.some((a: any) => a.name?.toLowerCase().includes('backup')),
+                appId: orderData.appId || undefined,
               };
               await apiCall('/vms/deploy', {
                 method: 'POST',
@@ -722,6 +723,19 @@ export default function Checkout() {
                       <span className="text-slate-500">Operating System</span>
                       <span className="font-bold text-slate-900">{orderData.os?.name || 'Ubuntu 22.04 LTS'}</span>
                     </div>
+                    {(orderData.app || orderData.appId) && (
+                      <div className="flex justify-between items-center border-b border-slate-100 pb-2 bg-blue-50/70 p-2.5 rounded-lg border border-blue-100">
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-950 font-bold">1-Click App</span>
+                          <span className="text-[9px] bg-blue-600 text-white font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Auto-Provisioning
+                          </span>
+                        </div>
+                        <span className="font-extrabold text-blue-900">
+                          {orderData.app?.name || orderData.appId} (Pre-installed on boot)
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between border-b border-slate-100 pb-2">
                       <span className="text-slate-500">Datacenter Location</span>
                       <span className="font-bold text-slate-900">{orderData.location?.name || 'United States'}</span>
@@ -1241,6 +1255,16 @@ export default function Checkout() {
                     {orderData.os?.fee ? `$${orderData.os.fee}/mo` : 'Included'}
                   </span>
                 </div>
+
+                {(orderData.app || orderData.appId) && (
+                  <div className="flex justify-between text-slate-600 bg-blue-50/70 p-2 rounded-lg border border-blue-100">
+                    <div>
+                      <span className="font-bold text-blue-950 block">App: {orderData.app?.name || orderData.appId}</span>
+                      <span className="text-[10px] text-blue-600 font-medium">Auto-installs on boot</span>
+                    </div>
+                    <span className="font-extrabold text-emerald-600">Free 1-Click</span>
+                  </div>
+                )}
 
                 <div className="flex justify-between text-slate-600">
                   <span>Location: {orderData.location?.name || 'US East'}</span>

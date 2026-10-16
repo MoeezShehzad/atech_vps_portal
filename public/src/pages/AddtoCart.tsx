@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Tag, Check, X, ShieldAlert, AlertCircle } from 'lucide-react';
+import { Tag, Check, X, ShieldAlert, AlertCircle, Zap, Search, Server, Boxes } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { apiCall } from '../services/api';
 
 // Data Structures for IONOS-Style Options
 const OS_OPTIONS = [
@@ -53,6 +54,20 @@ export default function ServerConfigure() {
   const [selectedTerm, setSelectedTerm] = useState('12m');
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
 
+  // 1-Click Apps Selection during checkout
+  const [imageType, setImageType] = useState<'os' | 'apps'>('os');
+  const [catalogApps, setCatalogApps] = useState<any[]>([]);
+  const [selectedAppId, setSelectedAppId] = useState<string>('');
+  const [appSearch, setAppSearch] = useState('');
+
+  useEffect(() => {
+    apiCall('/apps')
+      .then((data) => {
+        if (data?.apps) setCatalogApps(data.apps);
+      })
+      .catch(() => {});
+  }, []);
+
   // Coupon States
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
@@ -69,6 +84,7 @@ export default function ServerConfigure() {
   // Calculations
   const activeOsObj = OS_OPTIONS.find((os) => os.id === selectedOs);
   const activeTermObj = BILLING_TERMS.find((t) => t.id === selectedTerm);
+  const selectedAppObj = catalogApps.find((a) => a.id === selectedAppId);
 
   const isYearly = selectedTerm === '12m';
   const isMultiYear = selectedTerm === '24m';
@@ -167,6 +183,8 @@ export default function ServerConfigure() {
     const configurationOrder = {
       plan: selectedPlan,
       os: activeOsObj,
+      appId: imageType === 'apps' && selectedAppId ? selectedAppId : undefined,
+      app: imageType === 'apps' && selectedAppObj ? selectedAppObj : undefined,
       location: DATACENTER_LOCATIONS.find((l) => l.id === selectedLocation) || DATACENTER_LOCATIONS[0],
       term: activeTermObj,
       addons: selectedAddons.map((id) => ADDONS.find((a) => a.id === id)),
@@ -248,36 +266,170 @@ export default function ServerConfigure() {
               </div>
             </section>
 
-            {/* 2. OPERATING SYSTEM SELECTION */}
+            {/* 2. OPERATING SYSTEM / 1-CLICK APPS SELECTION */}
             <section className="space-y-4">
-              <h3 className="text-lg font-bold text-slate-950">1. Select Operating System</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {OS_OPTIONS.map((os) => {
-                  const isSelected = selectedOs === os.id;
-                  return (
-                    <button
-                      key={os.id}
-                      onClick={() => setSelectedOs(os.id)}
-                      className={`flex items-center justify-between p-4 rounded-xl border text-left transition-all ${
-                        isSelected
-                          ? 'border-blue-600 bg-blue-50/50 shadow-sm ring-1 ring-blue-600'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{os.icon}</span>
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">{os.name}</p>
-                          <p className="text-[10px] text-slate-400 font-medium">{os.category}</p>
-                        </div>
-                      </div>
-                      <span className="text-xs font-semibold text-slate-600">
-                        {os.fee === 0 ? 'Free' : `+$${os.fee}/mo`}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950">1. Image & Environment</h3>
+                  <p className="text-xs text-slate-500">
+                    Choose a pure operating system or deploy with enterprise applications pre-installed.
+                  </p>
+                </div>
+
+                {/* Switcher Tabs */}
+                <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageType('os');
+                      setSelectedAppId('');
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      imageType === 'os'
+                        ? 'bg-white text-blue-600 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Server className="w-3.5 h-3.5" />
+                    <span>Clean OS Distribution</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageType('apps');
+                      if (!selectedAppId && catalogApps.length > 0) {
+                        setSelectedAppId(catalogApps[0].id);
+                      }
+                      setSelectedOs('ubuntu-22');
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      imageType === 'apps'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Boxes className="w-3.5 h-3.5" />
+                    <span>1-Click Marketplace Apps</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                      imageType === 'apps' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      100+
+                    </span>
+                  </button>
+                </div>
               </div>
+
+              {imageType === 'os' ? (
+                /* Pure OS Distribution Grid */
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {OS_OPTIONS.map((os) => {
+                    const isSelected = selectedOs === os.id;
+                    return (
+                      <button
+                        key={os.id}
+                        type="button"
+                        onClick={() => setSelectedOs(os.id)}
+                        className={`flex items-center justify-between p-4 rounded-xl border text-left transition-all ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50/50 shadow-sm ring-1 ring-blue-600'
+                            : 'border-slate-200 bg-white hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{os.icon}</span>
+                          <div>
+                            <p className="text-xs font-bold text-slate-900">{os.name}</p>
+                            <p className="text-[10px] text-slate-400 font-medium">{os.category}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600">
+                          {os.fee === 0 ? 'Free' : `+$${os.fee}/mo`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* 1-Click Applications Grid */
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type="text"
+                      placeholder="Search 1-Click Apps (e.g. WordPress, Docker, MySQL, WireGuard, Node, aaPanel)..."
+                      value={appSearch}
+                      onChange={(e) => setAppSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 shadow-xs"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto pr-1">
+                    {catalogApps
+                      .filter((app) => {
+                        if (!appSearch.trim()) return true;
+                        const q = appSearch.toLowerCase();
+                        return (
+                          app.name.toLowerCase().includes(q) ||
+                          app.description?.toLowerCase().includes(q) ||
+                          (app.tags && app.tags.some((t: string) => t.toLowerCase().includes(q)))
+                        );
+                      })
+                      .map((app) => {
+                        const isSelected = selectedAppId === app.id;
+                        return (
+                          <button
+                            key={app.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAppId(app.id);
+                              setSelectedOs('ubuntu-22');
+                            }}
+                            className={`p-3.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                              isSelected
+                                ? 'border-blue-600 bg-blue-50/60 shadow-sm ring-2 ring-blue-600'
+                                : 'border-slate-200 bg-white hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-slate-950 flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                                  {app.name}
+                                </span>
+                                {isSelected ? (
+                                  <span className="text-[10px] bg-blue-600 text-white font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                    <Check className="w-3 h-3" /> Selected
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-semibold text-slate-400">
+                                    Port {app.defaultPort || 80}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                                {app.description}
+                              </p>
+                            </div>
+                            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                              <span className="text-slate-400 font-medium">Auto-installs on boot</span>
+                              <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                Free 1-Click
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+
+                  <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-center gap-2.5">
+                    <Zap className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>
+                      <strong>Seamless 1-Click Provisioning:</strong> Selected application is automatically installed in the background upon virtual machine startup. No terminal commands or manual setup required!
+                    </span>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* 3. DATACENTER LOCATION */}
@@ -385,12 +537,28 @@ export default function ServerConfigure() {
                   <span className="font-bold text-slate-900">${basePriceMonthly.toFixed(2)}/mo</span>
                 </div>
 
-                <div className="flex justify-between text-slate-600">
-                  <span>OS: {activeOsObj?.name}</span>
-                  <span className="font-bold text-slate-900">
-                    {osPrice === 0 ? 'Included' : `+$${osPrice.toFixed(2)}/mo`}
-                  </span>
-                </div>
+                {imageType === 'apps' && selectedAppObj ? (
+                  <>
+                    <div className="flex justify-between text-slate-600 bg-blue-50/70 p-2 rounded-lg border border-blue-100">
+                      <div>
+                        <span className="font-bold text-blue-950 block">App: {selectedAppObj.name}</span>
+                        <span className="text-[10px] text-blue-600 font-medium">Auto-installs on boot</span>
+                      </div>
+                      <span className="font-extrabold text-emerald-600">Free 1-Click</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Base OS: {activeOsObj?.name}</span>
+                      <span className="font-bold text-slate-900">Included</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between text-slate-600">
+                    <span>OS: {activeOsObj?.name}</span>
+                    <span className="font-bold text-slate-900">
+                      {osPrice === 0 ? 'Included' : `+$${osPrice.toFixed(2)}/mo`}
+                    </span>
+                  </div>
+                )}
 
                 {selectedAddons.length > 0 && (
                   <div className="pt-2 border-t border-slate-100 space-y-2">
