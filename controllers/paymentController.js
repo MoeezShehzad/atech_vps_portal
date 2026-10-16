@@ -217,9 +217,9 @@ export async function processCardPayment(req, res) {
     // 5. Record Payment with Encrypted Security Token
     const encryptedCardRef = encryptSensitive(
       JSON.stringify({
-        brand: cardBrand,
-        last4,
-        cardholder: cardName || req.user.fullName,
+        brand: effectiveBrand,
+        last4: effectiveLast4,
+        cardholder: effectiveCardName,
         stripeChargeId: stripeResult.transactionId,
         authorizedAt: now.toISOString(),
       })
@@ -244,14 +244,14 @@ export async function processCardPayment(req, res) {
         userId,
         action: 'PAYMENT_RECEIVED',
         status: 'SUCCESS',
-        details: `Payment of $${Number(amount).toFixed(2)} USD processed via ${cardBrand} (•••• ${last4}) for ${invoiceNumber}`,
+        details: `Payment of $${Number(amount).toFixed(2)} USD processed via ${effectiveBrand} (•••• ${effectiveLast4}) for ${invoiceNumber}`,
       },
     }).catch(() => {});
 
     // 7. Dispatch Payment Receipt Email via billing@atechconsult.com
     sendInvoiceReceiptEmail({
       email: req.user.email,
-      fullName: req.user.fullName || cardName,
+      fullName: req.user.fullName || effectiveCardName,
       invoiceNumber,
       amount: Number(amount),
       planName: plan.name,
@@ -264,8 +264,8 @@ export async function processCardPayment(req, res) {
       transactionId: stripeResult.transactionId,
       invoiceNumber,
       subscriptionId: subscription.subscriptionId,
-      cardBrand,
-      last4,
+      cardBrand: effectiveBrand,
+      last4: effectiveLast4,
       amount: Number(amount).toFixed(2),
       currency: 'USD',
     });
