@@ -65,6 +65,7 @@ const StorageAndDisks = React.lazy(() => import('../components/StorageAndDisks')
 const BillingAndInvoices = React.lazy(() => import('../components/BillingAndInvoices'));
 const ConnectionGuideModal = React.lazy(() => import('../components/ConnectionGuideModal'));
 const SupportAndTickets = React.lazy(() => import('../components/SupportAndTickets'));
+const OneClickMarketplace = React.lazy(() => import('../components/OneClickMarketplace'));
 
 interface Instance {
   id: string;
@@ -757,6 +758,23 @@ export default function Dashboard() {
     }
   };
 
+  // 1-Click Marketplace target VM & Drawer installed apps state
+  const [marketplaceTargetVmId, setMarketplaceTargetVmId] = useState<number | null>(null);
+  const [drawerInstalledApps, setDrawerInstalledApps] = useState<any[]>([]);
+  const [drawerAppsLoading, setDrawerAppsLoading] = useState(false);
+
+  const fetchDrawerInstalledApps = async (vmId: number) => {
+    try {
+      setDrawerAppsLoading(true);
+      const res = await apiCall(`/apps/vms/${vmId}/installed`);
+      setDrawerInstalledApps(res.installed || []);
+    } catch (err: any) {
+      console.warn('Installed apps fetch error:', err);
+    } finally {
+      setDrawerAppsLoading(false);
+    }
+  };
+
   // Fetch Firewall Rules for selected instance
   const fetchFirewallRules = async (vmId: number) => {
     try {
@@ -775,10 +793,12 @@ export default function Dashboard() {
       fetchSnapshots(selectedInstance.vmId);
       fetchBackups(selectedInstance.vmId);
       fetchFirewallRules(selectedInstance.vmId);
+      fetchDrawerInstalledApps(selectedInstance.vmId);
     } else {
       setVmSnapshots([]);
       setVmBackups([]);
       setVmFirewallRules([]);
+      setDrawerInstalledApps([]);
     }
   }, [selectedInstance?.vmId]);
 
@@ -1255,6 +1275,46 @@ export default function Dashboard() {
             </div>
           }>
             <SupportAndTickets />
+          </React.Suspense>
+        )}
+
+        {/* RENDER 1-CLICK APPLICATION MARKETPLACE */}
+        {activeTab === 'marketplace' && (
+          <React.Suspense fallback={
+            <div className="py-20 flex justify-center">
+              <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+            </div>
+          }>
+            <div className="max-w-7xl mx-auto">
+              <OneClickMarketplace
+                vms={instances.map((inst) => ({
+                  vmId: inst.vmId,
+                  vmName: inst.name,
+                  osName: inst.os,
+                  status: inst.status,
+                  cpuCores: inst.vCPU,
+                  ramGb: inst.ramGB,
+                  storageGb: inst.diskGB,
+                  ipAddress: inst.ip,
+                }))}
+                selectedVmId={marketplaceTargetVmId || instances[0]?.vmId || null}
+                onSelectVmId={(vmId) => setMarketplaceTargetVmId(vmId)}
+                onOpenDeployModal={() => {
+                  handleOpenDeployModal();
+                  setDeployTab('apps');
+                }}
+                onStartVm={(vmId) => executePowerAction(vmId, 'START')}
+                onOpenTerminal={(vmId) => {
+                  const found = instances.find((i) => i.vmId === vmId);
+                  if (found) setConsoleVm(found);
+                }}
+                showNotification={(type, msg) => {
+                  if (type === 'success') toast.success(msg);
+                  else if (type === 'error') toast.error(msg);
+                  else toast.info(msg);
+                }}
+              />
+            </div>
           </React.Suspense>
         )}
 
@@ -1780,6 +1840,19 @@ export default function Dashboard() {
                                   </button>
                                 )}
 
+                                {/* 1-CLICK APPS MARKETPLACE BUTTON */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMarketplaceTargetVmId(inst.vmId);
+                                    setActiveTab('marketplace');
+                                  }}
+                                  title="Install 1-Click Marketplace Apps on this VM"
+                                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 hover:border-indigo-200 dark:hover:border-indigo-800 transition-all cursor-pointer"
+                                >
+                                  <Boxes className="w-3.5 h-3.5" />
+                                </button>
+
                                 {/* RESIZE SPECS BUTTON */}
                                 <button
                                   onClick={(e) => openResizeModal(inst, e)}
@@ -1991,7 +2064,7 @@ export default function Dashboard() {
         )}
 
         {/* PLACEHOLDER FOR OTHER TABS */}
-        {!['dashboard', 'vms', 'settings', 'security', 'storage', 'pools', 'billing', 'support'].includes(activeTab) && (
+        {!['dashboard', 'marketplace', 'vms', 'settings', 'security', 'storage', 'pools', 'billing', 'support'].includes(activeTab) && (
           <div className="max-w-7xl mx-auto bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-500 font-medium">
             Section <strong className="capitalize text-slate-800">{activeTab}</strong> is under construction.
           </div>
@@ -3404,6 +3477,77 @@ export default function Dashboard() {
                     <span>Rebuild OS</span>
                   </button>
                 </div>
+              </div>
+
+              {/* SECTION 2.5: 1-CLICK MARKETPLACE APPS ON THIS VM */}
+              <div className="bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Boxes className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      1-Click Marketplace Apps
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      {drawerInstalledApps.length} Installed
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetVmId = selectedInstance.vmId;
+                      setSelectedInstance(null);
+                      setMarketplaceTargetVmId(targetVmId);
+                      setActiveTab('marketplace');
+                    }}
+                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                  >
+                    <Zap className="w-3 h-3" />
+                    <span>+ Install 1-Click App</span>
+                  </button>
+                </div>
+
+                {drawerAppsLoading ? (
+                  <div className="py-2 text-center text-xs text-slate-400">
+                    Checking installed applications...
+                  </div>
+                ) : drawerInstalledApps.length === 0 ? (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    No 1-Click applications installed yet. Deploy WordPress, Docker, MySQL, Nginx, WireGuard, or 100+ stacks with a single click.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-40 overflow-y-auto pt-1">
+                    {drawerInstalledApps.map((appItem: any) => (
+                      <div
+                        key={appItem.appId}
+                        className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <strong className="text-slate-800 dark:text-slate-200 font-bold text-xs">
+                              {appItem.appName}
+                            </strong>
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
+                              :{appItem.port}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5 font-mono truncate max-w-[230px]">
+                            {appItem.accessUrl}
+                          </div>
+                        </div>
+
+                        <a
+                          href={appItem.accessUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-700 dark:text-blue-400 rounded-lg text-[10px] font-bold transition-colors border border-blue-200/60 dark:border-blue-800/60 flex items-center gap-1"
+                        >
+                          <span>Open</span>
+                          <ArrowUpRight className="w-3 h-3" />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* SECTION 3: HARDWARE SPECIFICATIONS */}

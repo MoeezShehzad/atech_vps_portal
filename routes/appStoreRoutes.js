@@ -9,7 +9,9 @@ import {
   getApps,
   getCategories,
   getInstalledApps,
+  getVMJobs,
   installApp,
+  uninstallApp,
 } from '../controllers/appStoreController.js';
 
 const router = express.Router();
@@ -20,6 +22,8 @@ router.get('/categories', getCategories);
 
 // VM App Management (requires authentication)
 router.get('/vms/:vmId/installed', authenticateToken, getInstalledApps);
+router.get('/vms/:vmId/jobs', authenticateToken, getVMJobs);
 router.post('/vms/:vmId/install', authenticateToken, installApp);
+router.delete('/vms/:vmId/installed/:appId', authenticateToken, uninstallApp);
 
 export default router;

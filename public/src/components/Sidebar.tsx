@@ -11,6 +11,7 @@ import {
   LifeBuoy,
   ChevronLeft,
   ChevronRight,
+  Boxes,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -51,6 +52,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'marketplace', label: '1-Click Marketplace', icon: Boxes },
     { id: 'storage', label: 'Storage & Disk', icon: HardDrive },
     { id: 'billing', label: 'Billing & Invoices', icon: CreditCard },
     { id: 'security', label: 'Security & Logs', icon: Shield },

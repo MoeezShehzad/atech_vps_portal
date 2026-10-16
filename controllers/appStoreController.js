@@ -6,7 +6,9 @@
 import {
   listAppCatalog,
   getInstalledAppsForVM,
+  getVMInstallJobs,
   installAppOnVM,
+  uninstallAppFromVM,
 } from '../services/appStoreService.js';
 import { APP_CATEGORIES } from '../lib/appsCatalog.js';
 
@@ -38,20 +40,56 @@ export async function getInstalledApps(req, res) {
   }
 }
 
+export async function getVMJobs(req, res) {
+  try {
+    const { vmId } = req.params;
+    const userId = req.user.userId;
+
+    const jobs = await getVMInstallJobs(vmId, userId);
+    res.json({ success: true, jobs });
+  } catch (err) {
+    console.error('getVMJobs error:', err);
+    res.status(400).json({ success: false, error: err.message });
+  }
+}
+
 export async function installApp(req, res) {
   try {
     const { vmId } = req.params;
-    const { appId } = req.body;
+    const { appId, config, asyncMode } = req.body;
     const userId = req.user.userId;
 
     if (!appId) {
       return res.status(400).json({ success: false, error: 'Application ID is required.' });
     }
 
-    const result = await installAppOnVM({ vmId, userId, appId });
+    const result = await installAppOnVM({
+      vmId,
+      userId,
+      appId,
+      config: config || {},
+      asyncMode: Boolean(asyncMode),
+    });
     res.json({ success: true, result });
   } catch (err) {
     console.error('installApp error:', err);
     res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+export async function uninstallApp(req, res) {
+  try {
+    const { vmId, appId } = req.params;
+    const userId = req.user.userId;
+
+    if (!appId) {
+      return res.status(400).json({ success: false, error: 'Application ID is required.' });
+    }
+
+    const result = await uninstallAppFromVM({ vmId, userId, appId });
+    res.json({ success: true, result });
+  } catch (err) {
+    console.error('uninstallApp error:', err);
+    res.status(400).json({ success: false, error: err.message });
   }
 }
