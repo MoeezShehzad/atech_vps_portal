@@ -22,6 +22,9 @@ const AddtoCart = lazy(() => import('./pages/AddtoCart'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
 
 // Lightweight, seamless route suspense fallback
 function RouteLoadingFallback() {
@@ -141,6 +144,9 @@ function AppContent() {
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/configure" element={<AddtoCart />} />
             <Route path="/checkout" element={<Checkout />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
 
             {/* PROTECTED ROUTE */}
             <Route

@@ -194,8 +194,9 @@ export default function Footer() {
         <div className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>© {new Date().getFullYear()} Analytical Technical Consulting. All rights reserved.</p>
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-slate-800 dark:hover:text-slate-300 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-slate-800 dark:hover:text-slate-300 transition-colors">Terms of Service</a>
+            <Link to="/privacy" className="hover:text-blue-600 dark:hover:text-white transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-blue-600 dark:hover:text-white transition-colors">Terms of Service</Link>
+            <Link to="/refund-policy" className="hover:text-blue-600 dark:hover:text-white transition-colors">Refund Policy</Link>
           </div>
         </div>
 

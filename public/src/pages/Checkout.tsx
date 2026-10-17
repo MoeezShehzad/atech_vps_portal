@@ -666,7 +666,7 @@ export default function Checkout() {
                             className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                           />
                           <span className="text-slate-600 text-xs font-medium">
-                            I agree to the <a href="/terms" className="text-blue-600 underline">Terms of Service</a> & <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>
+                            I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Terms of Service</a>, <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Privacy Policy</a>, and <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Refund Policy</a>
                             {isNonRefundable && (
                               <span className="text-amber-800 font-bold block mt-0.5">
                                 • I acknowledge that annual plans are billed upfront for the full 12-month period and are strictly non-refundable.
