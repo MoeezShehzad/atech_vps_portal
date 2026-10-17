@@ -10,6 +10,8 @@ conn.on('ready', () => {
     cd /home/ubuntu/atech_vps_portal &&
     git fetch origin develop &&
     git reset --hard origin/develop &&
+    npm install --no-audit --omit=dev &&
+    npm --prefix public run build &&
     pm2 restart all &&
     pm2 status
   `;

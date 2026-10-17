@@ -129,10 +129,13 @@ export default function AccountSettings() {
     }
   };
 
-  const fetchCities = async (provinceId: number) => {
+  const fetchCities = async (provinceId: number | string, countryCode?: string, stateCode?: string) => {
     try {
       setLoadingCities(true);
-      const res = await apiCall(`/geo/cities?provinceId=${provinceId}`);
+      let url = `/geo/cities?provinceId=${encodeURIComponent(String(provinceId))}`;
+      if (countryCode) url += `&countryCode=${encodeURIComponent(countryCode)}`;
+      if (stateCode) url += `&stateCode=${encodeURIComponent(stateCode)}`;
+      const res = await apiCall(url);
       if (res && res.cities) {
         setCitiesList(res.cities);
       } else {
@@ -238,7 +241,7 @@ export default function AccountSettings() {
         (p) => p.name.toLowerCase() === stateName.toLowerCase() || (p.code && p.code.toLowerCase() === stateName.toLowerCase())
       );
       if (match && match.id) {
-        fetchCities(match.id);
+        fetchCities(match.id, match.countryCode || selectedCountryCode, match.code);
       }
     }
   }, [stateName, provincesList.length]);
@@ -543,19 +546,10 @@ export default function AccountSettings() {
         {/* Location Section */}
         <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-4">
           <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Location Details (Live SQL Geo Data)
+            <MapPin className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" /> Location Details
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2">
-              <ModernFloatingInput
-                label="Street Address"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                icon={<MapPin className="w-4 h-4" />}
-                placeholder="123 Cloud Avenue, Suite 400"
-              />
-            </div>
-
+            {/* Country / Region */}
             <ModernCountrySelect
               label="Country / Region"
               countries={countriesList}
@@ -564,10 +558,14 @@ export default function AccountSettings() {
               onSelect={(c) => {
                 setSelectedCountryCode(c.code);
                 setCountry(c.name);
+                setStateName('');
+                setCity('');
+                setCitiesList([]);
                 fetchProvinces(c.code);
               }}
             />
 
+            {/* State / Province */}
             <ModernStateSelect
               label="State / Province"
               states={provincesList}
@@ -576,12 +574,15 @@ export default function AccountSettings() {
               placeholder="Select State / Province..."
               onSelect={(name, obj) => {
                 setStateName(name);
+                setCity('');
+                setCitiesList([]);
                 if (obj?.id) {
-                  fetchCities(obj.id);
+                  fetchCities(obj.id, obj.countryCode || selectedCountryCode, obj.code);
                 }
               }}
             />
 
+            {/* City */}
             <ModernCitySelect
               label="City"
               cities={citiesList}
@@ -591,6 +592,7 @@ export default function AccountSettings() {
               onSelect={(name) => setCity(name)}
             />
 
+            {/* Postal / ZIP Code */}
             <ModernFloatingInput
               label="Postal / ZIP Code"
               value={postalCode}
@@ -598,6 +600,17 @@ export default function AccountSettings() {
               icon={<MapPin className="w-4 h-4" />}
               placeholder="e.g. 10001 or 60490"
             />
+
+            {/* Street Address (comes after City) */}
+            <div className="sm:col-span-2">
+              <ModernFloatingInput
+                label="Street Address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                icon={<MapPin className="w-4 h-4" />}
+                placeholder="123 Cloud Avenue, Suite 400"
+              />
+            </div>
           </div>
         </div>
 

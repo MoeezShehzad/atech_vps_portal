@@ -12,11 +12,12 @@ export interface CountryOption {
 }
 
 export interface GeoItem {
-  id: number;
+  id: number | string;
   name: string;
   code?: string;
-  provinceId?: number;
+  provinceId?: number | string;
   countryId?: number;
+  countryCode?: string;
 }
 
 // ==============================================================================

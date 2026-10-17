@@ -2,9 +2,11 @@
 // Controller: geoController.js
 // Purpose: Live Geographical API querying MS SQL Server tables:
 //          [UM].[UM_Countries], [UM].[UM_Provinces], [UM].[UM_Counties], [UM].[UM_Cities]
+//          with high-fidelity global fallback from country-state-city.
 // ==============================================================================
 
 import prisma from '../lib/prisma.js';
+import { State, City } from 'country-state-city';
 
 // Convert 2-letter ISO code to native emoji flag
 const isoToFlag = (iso) => {
@@ -67,52 +69,90 @@ export const getCountries = async (req, res) => {
 /**
  * GET /api/geo/provinces (and /api/geo/states)
  * Returns all states/provinces for a country by countryCode (ISO) or countryId
+ * If MS SQL Server does not have provinces for the country, falls back to country-state-city
  */
 export const getProvinces = async (req, res) => {
   try {
-    const countryCode = req.query.countryCode || req.params.countryCode;
+    const countryCode = (req.query.countryCode || req.params.countryCode || '').trim();
     const countryId = req.query.countryId;
+    let cleanIso = countryCode ? countryCode.toUpperCase() : '';
 
     let targetCountryId = countryId ? Number(countryId) : null;
 
-    if (!targetCountryId && countryCode) {
-      const cleanIso = countryCode.trim().replace(/'/g, "''");
+    if (!targetCountryId && cleanIso) {
+      const sanitizedIso = cleanIso.replace(/'/g, "''");
       const cRow = await prisma.$queryRawUnsafe(
-        `SELECT TOP 1 CountryID FROM [UM].[UM_Countries] WHERE CountryISO = '${cleanIso}'`
+        `SELECT TOP 1 CountryID, UPPER(RTRIM(CountryISO)) AS code FROM [UM].[UM_Countries] WHERE UPPER(CountryISO) = '${sanitizedIso}'`
       );
       if (cRow && cRow.length > 0) {
         targetCountryId = cRow[0].CountryID;
+        cleanIso = cRow[0].code || cleanIso;
+      }
+    } else if (targetCountryId && !cleanIso) {
+      const cRow = await prisma.$queryRawUnsafe(
+        `SELECT TOP 1 UPPER(RTRIM(CountryISO)) AS code FROM [UM].[UM_Countries] WHERE CountryID = ${targetCountryId}`
+      );
+      if (cRow && cRow.length > 0) {
+        cleanIso = cRow[0].code || '';
       }
     }
 
-    let query = `
-      SELECT 
-        ProvinceID AS id,
-        RTRIM(ProvinceName) AS name,
-        RTRIM(ProvinceCode) AS code,
-        PK_Country_ID AS countryId
-      FROM [UM].[UM_Provinces]
-      WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
-    `;
-
+    let provinces = [];
     if (targetCountryId) {
-      query += ` AND PK_Country_ID = ${targetCountryId}`;
+      const query = `
+        SELECT 
+          ProvinceID AS id,
+          RTRIM(ProvinceName) AS name,
+          RTRIM(ProvinceCode) AS code,
+          PK_Country_ID AS countryId
+        FROM [UM].[UM_Provinces]
+        WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
+          AND PK_Country_ID = ${targetCountryId}
+        ORDER BY ProvinceName ASC
+      `;
+      provinces = await prisma.$queryRawUnsafe(query);
     }
 
-    query += ' ORDER BY ProvinceName ASC';
+    // If database returned provinces, return them
+    if (provinces && provinces.length > 0) {
+      return res.json({
+        success: true,
+        count: provinces.length,
+        provinces: provinces.map((p) => ({
+          id: p.id,
+          name: p.name.trim(),
+          code: p.code ? p.code.trim() : '',
+          countryId: p.countryId,
+          countryCode: cleanIso,
+        })),
+        states: provinces.map((p) => p.name.trim()),
+      });
+    }
 
-    const provinces = await prisma.$queryRawUnsafe(query);
+    // Fallback: Use country-state-city dataset for worldwide coverage
+    if (cleanIso) {
+      const cscStates = State.getStatesOfCountry(cleanIso);
+      if (cscStates && cscStates.length > 0) {
+        return res.json({
+          success: true,
+          count: cscStates.length,
+          provinces: cscStates.map((s, idx) => ({
+            id: `csc_${cleanIso}_${s.isoCode || idx}`,
+            name: s.name,
+            code: s.isoCode || '',
+            countryId: targetCountryId,
+            countryCode: cleanIso,
+          })),
+          states: cscStates.map((s) => s.name),
+        });
+      }
+    }
 
     return res.json({
       success: true,
-      count: provinces.length,
-      provinces: provinces.map((p) => ({
-        id: p.id,
-        name: p.name,
-        code: p.code || '',
-        countryId: p.countryId,
-      })),
-      states: provinces.map((p) => p.name), // String array backward compatibility
+      count: 0,
+      provinces: [],
+      states: [],
     });
   } catch (error) {
     console.error('[Geo API Error] Failed to retrieve provinces:', error);
@@ -138,7 +178,7 @@ export const getCounties = async (req, res) => {
       WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
     `;
 
-    if (provinceId) {
+    if (provinceId && !isNaN(Number(provinceId))) {
       query += ` AND ProvinceID = ${Number(provinceId)}`;
     }
 
@@ -169,44 +209,119 @@ export const getCounties = async (req, res) => {
 
 /**
  * GET /api/geo/cities
- * Returns cities for a given provinceId or search keyword
+ * Returns complete cities for a given provinceId or search keyword
+ * Provides complete A-Z coverage with no artificial 50-item cutoff
  */
 export const getCities = async (req, res) => {
   try {
-    const { provinceId, search, limit = 50 } = req.query;
+    const { provinceId, countryCode, stateCode, search, limit } = req.query;
+    const maxLimit = limit ? Math.min(Number(limit), 10000) : 5000;
 
-    let query = `
-      SELECT TOP ${Math.min(Number(limit) || 50, 200)}
-        CityID AS id,
-        RTRIM(CityName) AS name,
-        RTRIM(CityCode) AS code,
-        PK_Province_ID AS provinceId
-      FROM [UM].[UM_Cities]
-      WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
-    `;
+    let cities = [];
 
-    if (provinceId) {
-      query += ` AND PK_Province_ID = ${Number(provinceId)}`;
+    // Case 1: provinceId is from country-state-city (e.g. csc_DE_BY)
+    if (typeof provinceId === 'string' && provinceId.startsWith('csc_')) {
+      const parts = provinceId.split('_');
+      const cCode = (parts[1] || countryCode || '').toUpperCase();
+      const sCode = (parts[2] || stateCode || '').toUpperCase();
+
+      if (cCode && sCode) {
+        const cscCities = City.getCitiesOfState(cCode, sCode);
+        if (cscCities && cscCities.length > 0) {
+          cities = cscCities.map((c, idx) => ({
+            id: `csc_city_${idx}_${c.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+            name: c.name,
+            code: sCode,
+            provinceId: provinceId,
+          }));
+        }
+      }
+    } else if (provinceId && !isNaN(Number(provinceId))) {
+      // Case 2: Numeric provinceId -> Query MS SQL Server [UM].[UM_Cities]
+      let query = `
+        SELECT TOP ${maxLimit}
+          CityID AS id,
+          RTRIM(CityName) AS name,
+          RTRIM(CityCode) AS code,
+          PK_Province_ID AS provinceId
+        FROM [UM].[UM_Cities]
+        WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
+          AND PK_Province_ID = ${Number(provinceId)}
+      `;
+
+      if (search && search.trim()) {
+        const sanitized = search.trim().replace(/'/g, "''");
+        query += ` AND CityName LIKE '${sanitized}%'`;
+      }
+
+      query += ' ORDER BY CityName ASC';
+
+      const sqlCities = await prisma.$queryRawUnsafe(query);
+      if (sqlCities && sqlCities.length > 0) {
+        cities = sqlCities.map((c) => ({
+          id: c.id,
+          name: c.name ? c.name.trim() : '',
+          code: c.code ? c.code.trim() : '',
+          provinceId: c.provinceId,
+        }));
+      }
+
+      // Case 2b: If SQL has 0 cities for this province, look up country & state to provide fallback cities
+      if (cities.length === 0) {
+        const pRows = await prisma.$queryRawUnsafe(`
+          SELECT TOP 1 p.ProvinceName, p.ProvinceCode, UPPER(RTRIM(c.CountryISO)) AS CountryISO
+          FROM [UM].[UM_Provinces] p
+          INNER JOIN [UM].[UM_Countries] c ON p.PK_Country_ID = c.CountryID
+          WHERE p.ProvinceID = ${Number(provinceId)}
+        `);
+        if (pRows && pRows.length > 0) {
+          const cIso = (pRows[0].CountryISO || '').toUpperCase();
+          const pCode = (pRows[0].ProvinceCode || '').split('-').pop() || '';
+          const pName = (pRows[0].ProvinceName || '').trim();
+
+          const cscStates = State.getStatesOfCountry(cIso);
+          const matchedState = cscStates.find(
+            (s) => s.isoCode === pCode || s.name.toLowerCase() === pName.toLowerCase()
+          );
+
+          if (matchedState) {
+            const fallbackCities = City.getCitiesOfState(cIso, matchedState.isoCode);
+            if (fallbackCities && fallbackCities.length > 0) {
+              cities = fallbackCities.map((c, idx) => ({
+                id: `csc_fallback_${idx}`,
+                name: c.name,
+                code: matchedState.isoCode,
+                provinceId: Number(provinceId),
+              }));
+            }
+          }
+        }
+      }
+    } else if (countryCode && stateCode) {
+      // Case 3: Direct countryCode + stateCode lookup
+      const cscCities = City.getCitiesOfState(countryCode.toUpperCase(), stateCode.toUpperCase());
+      if (cscCities && cscCities.length > 0) {
+        cities = cscCities.map((c, idx) => ({
+          id: `csc_city_${idx}_${c.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+          name: c.name,
+          code: stateCode.toUpperCase(),
+        }));
+      }
     }
 
-    if (search && search.trim()) {
-      const sanitized = search.trim().replace(/'/g, "''");
-      query += ` AND CityName LIKE '${sanitized}%'`;
+    // Apply search filter if provided
+    if (search && search.trim() && cities.length > 0) {
+      const q = search.trim().toLowerCase();
+      cities = cities.filter((c) => c.name.toLowerCase().includes(q));
     }
 
-    query += ' ORDER BY CityName ASC';
-
-    const cities = await prisma.$queryRawUnsafe(query);
+    // Ensure strict alphabetical sorting A to Z
+    cities.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
     return res.json({
       success: true,
       count: cities.length,
-      cities: cities.map((c) => ({
-        id: c.id,
-        name: c.name,
-        code: c.code || '',
-        provinceId: c.provinceId,
-      })),
+      cities,
     });
   } catch (error) {
     console.error('[Geo API Error] Failed to retrieve cities:', error);
