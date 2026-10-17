@@ -304,7 +304,7 @@ export function setupTerminalWebSocket(server) {
         );
       });
 
-      sshConn.on('error', (err) => {
+      sshConn.on('error', async (err) => {
         console.warn(`[SSH2 Connection Attempt on ${targetIp} for ${user}]:`, err.message);
         
         // Multi-tier credential fallback for newly provisioned or template instances
