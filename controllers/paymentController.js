@@ -409,7 +409,6 @@ export async function processBankPayment(req, res) {
     }
 
     const now = new Date();
-    const isYearly = term === '12m' || term === 'yearly';
     const durationDays = isYearly ? 365 : (term === '24m' ? 730 : 30);
 
     // 3. Create Subscription (Pending Bank Remittance Confirmation)
