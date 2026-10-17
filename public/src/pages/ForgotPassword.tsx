@@ -94,7 +94,7 @@ export default function ForgotPassword() {
 
         <div className="relative z-10">
           <Link to="/" className="inline-flex items-center gap-3">
-            <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain brightness-200" />
+            <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
             <span className="font-bold font-poppins text-lg">Analytical Technical Consulting</span>
           </Link>
         </div>

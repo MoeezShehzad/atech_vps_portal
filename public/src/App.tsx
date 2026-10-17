@@ -74,7 +74,7 @@ function AppContent() {
       {!isAuthPage && (
         <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 px-10 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 font-bold text-blue-950 font-poppins">
-            <img src={atcLogo} alt="ATC Logo" width="160" height="32" fetchPriority="high" className="h-8 w-auto object-contain" />
+            <img src={atcLogo} alt="ATC Logo" width="160" height="40" fetchPriority="high" className="h-10 w-auto object-contain" />
             <span className="text-lg">Analytical Technical Consulting</span>
           </Link>
 

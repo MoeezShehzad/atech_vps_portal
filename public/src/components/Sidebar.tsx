@@ -83,7 +83,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <img 
               src={atcLogo} 
               alt="ATC Logo" 
-              className={`object-contain transition-all ${collapsed ? 'w-8 h-8' : 'w-8 h-8 rounded-lg drop-shadow-xs'}`} 
+              className={`object-contain transition-all ${collapsed ? 'h-7 w-auto' : 'h-8 w-auto drop-shadow-xs'}`} 
             />
           </div>
           {!collapsed && (

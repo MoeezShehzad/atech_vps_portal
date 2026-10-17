@@ -271,8 +271,8 @@ export default function Auth({ initialMode }: AuthProps) {
           ========================================================================= */}
       <header className="relative z-30 w-full max-w-[1220px] mx-auto px-4 sm:px-8 pt-5 pb-2 flex items-center justify-between">
         <Link to="/" className="inline-flex items-center gap-3 group">
-          <div className="p-2 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md group-hover:bg-white/15 transition-all">
-            <img src={atcLogo} alt="ATC Logo" className="h-7 w-auto object-contain brightness-200" />
+          <div className="p-1.5 rounded-xl bg-white/10 border border-white/15 backdrop-blur-md group-hover:bg-white/15 transition-all">
+            <img src={atcLogo} alt="ATC Logo" className="h-9 w-auto object-contain" />
           </div>
           <div>
             <span className="text-white font-bold font-poppins text-sm sm:text-base block leading-none">
