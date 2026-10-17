@@ -1588,14 +1588,21 @@ export async function processAdminRefund(req, res) {
           data: { status: 'REFUNDED' },
         });
 
-        // Deactivate active subscription slot tied to this customer/invoice
-        await tx.subscription.updateMany({
-          where: {
-            userId: targetInvoice.userId,
-            status: 'ACTIVE',
-          },
-          data: { status: 'CANCELLED' },
-        });
+        // Deactivate the specific subscription slot tied to this refunded invoice
+        if (targetInvoice.subscriptionId) {
+          await tx.subscription.update({
+            where: { subscriptionId: targetInvoice.subscriptionId },
+            data: { status: 'CANCELLED' },
+          }).catch(() => {});
+        } else {
+          await tx.subscription.updateMany({
+            where: {
+              userId: targetInvoice.userId,
+              status: 'ACTIVE',
+            },
+            data: { status: 'CANCELLED' },
+          });
+        }
       }
 
       await tx.activityLog.create({

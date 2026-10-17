@@ -160,8 +160,11 @@ export async function getBillingOverview(req, res) {
       };
     });
 
-    // Primary next billing date from earliest active subscription
-    const activeSubs = formattedSubscriptions.filter((sub) => sub.status === 'ACTIVE' || sub.status === 'active' || sub.status === 'TRIAL');
+    // Filter active and trial subscriptions for slots committed to customer compute
+    const activeSubs = formattedSubscriptions.filter(
+      (sub) => sub.status === 'ACTIVE' || sub.status === 'active' || sub.status === 'TRIAL' || sub.status === 'trial'
+    );
+
     const primaryNextBillingDate = activeSubs.length > 0 
       ? activeSubs[0].nextBillingDate 
       : (formattedSubscriptions.length > 0 ? formattedSubscriptions[0].nextBillingDate : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
@@ -172,19 +175,21 @@ export async function getBillingOverview(req, res) {
       orderBy: { createdAt: 'desc' },
     });
 
+    const expYearFormatted = savedCard && savedCard.expYear ? String(savedCard.expYear).slice(-2) : '28';
+
     return res.json({
       success: true,
       user,
       summary: {
         monthlySpend: Number(monthlySpend.toFixed(2)),
-        activeSubscriptionsCount: subscriptions.length,
+        activeSubscriptionsCount: activeSubs.length,
         currency: 'USD',
         nextBillingDate: primaryNextBillingDate,
         paymentMethod: {
           brand: savedCard ? savedCard.cardBrand : 'Visa',
           last4: savedCard ? savedCard.last4 : '4242',
           expMonth: savedCard ? savedCard.expMonth : '12',
-          expYear: savedCard ? savedCard.expYear : '2028',
+          expYear: expYearFormatted,
           funding: 'Credit',
           holderName: (savedCard && savedCard.cardholderName) || user.fullName || 'Authorized Customer',
           hasSavedMethod: Boolean(savedCard),
@@ -195,12 +200,13 @@ export async function getBillingOverview(req, res) {
               brand: savedCard.cardBrand,
               last4: savedCard.last4,
               expMonth: savedCard.expMonth,
-              expYear: savedCard.expYear,
+              expYear: expYearFormatted,
               holderName: savedCard.cardholderName || user.fullName || 'Authorized Customer',
             }
           : null,
       },
-      subscriptions: formattedSubscriptions,
+      subscriptions: activeSubs,
+      allSubscriptions: formattedSubscriptions,
       invoices: formattedInvoices,
     });
   } catch (err) {
@@ -323,12 +329,16 @@ export async function getRevealedPaymentMethod(req, res) {
     if (pm.encryptedCardNumber) {
       try {
         const decrypted = decryptSensitive(pm.encryptedCardNumber);
-        // Format with spaces every 4 digits: 4111 1111 1111 1111
-        fullCardNumber = decrypted.replace(/(\d{4})(?=\d)/g, '$1 ');
+        if (decrypted && decrypted !== '***-REDACTED-***') {
+          // Format with spaces every 4 digits: 4111 1111 1111 1111
+          fullCardNumber = decrypted.replace(/(\d{4})(?=\d)/g, '$1 ');
+        }
       } catch (e) {
         console.warn('Failed to decrypt card number:', e.message);
       }
     }
+
+    const expYear2Digit = pm.expYear ? String(pm.expYear).slice(-2) : '28';
 
     return res.json({
       success: true,
@@ -337,7 +347,7 @@ export async function getRevealedPaymentMethod(req, res) {
         fullNumber: fullCardNumber,
         last4: pm.last4,
         expMonth: pm.expMonth,
-        expYear: pm.expYear,
+        expYear: expYear2Digit,
         holderName: pm.cardholderName,
       },
     });

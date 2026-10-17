@@ -394,14 +394,14 @@ export default function BillingAndInvoices() {
             <span>{revealedCard?.brand || summary?.paymentMethod?.brand || 'Visa'}</span>
             <span>
               {showCardDetails
-                ? (revealedCard?.fullNumber || `•••• •••• •••• ${summary?.paymentMethod?.last4 || '4242'}`)
-                : `•••• ${summary?.paymentMethod?.last4 || '4242'}`}
+                ? (revealedCard?.fullNumber && revealedCard.fullNumber !== '***-REDACTED-***'
+                    ? revealedCard.fullNumber
+                    : `•••• •••• •••• ${summary?.paymentMethod?.last4 || revealedCard?.last4 || '4242'}`)
+                : `•••• ${summary?.paymentMethod?.last4 || revealedCard?.last4 || '4242'}`}
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 font-mono">
-            {showCardDetails
-              ? `Expires ${revealedCard?.expMonth || summary?.paymentMethod?.expMonth || '12'}/${revealedCard?.expYear || summary?.paymentMethod?.expYear || '2028'}`
-              : 'Expires ••/••••'}
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+            Expires {String(revealedCard?.expMonth || summary?.paymentMethod?.expMonth || '12').padStart(2, '0')}/{String(revealedCard?.expYear || summary?.paymentMethod?.expYear || '28').slice(-2)}
           </p>
         </div>
       </div>
@@ -484,6 +484,11 @@ export default function BillingAndInvoices() {
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                             30-Day Trial
                           </span>
+                        ) : sub.status === 'CANCELLED' || sub.status === 'REFUNDED' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                            {sub.status === 'REFUNDED' ? 'Refunded' : 'Cancelled'}
+                          </span>
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
@@ -550,16 +555,31 @@ export default function BillingAndInvoices() {
                       {inv.description}
                     </td>
                     <td className="py-4 px-6 text-slate-500 dark:text-slate-400 font-mono">
-                      {formatDate(inv.issueDate)}
+                      <div className="font-semibold text-slate-800 dark:text-slate-200">
+                        {formatDate(inv.issueDate)}
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-mono">
+                        {inv.issueDate ? new Date(inv.issueDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : ''}
+                      </div>
                     </td>
                     <td className="py-4 px-6 font-mono font-bold text-slate-900 dark:text-white">
                       ${inv.amount.toFixed(2)} USD
                     </td>
                     <td className="py-4 px-6">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        {inv.status}
-                      </span>
+                      {inv.status === 'REFUNDED' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800">
+                          REFUNDED
+                        </span>
+                      ) : inv.status === 'PENDING' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800">
+                          PENDING
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          PAID
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-6 text-right">
                       <div className="flex items-center justify-end gap-2">

@@ -16,16 +16,30 @@ export const stripe = stripeSecretKey
 // ==============================================================================
 // AES-256-GCM Military-Grade Cryptography for Sensitive Financial References
 // ==============================================================================
-const ENCRYPTION_SECRET = process.env.PAYMENT_ENCRYPTION_KEY || process.env.JWT_SECRET || 'atech_vps_default_aes256_enc_key_32b!';
-const KEY = crypto.createHash('sha256').update(String(ENCRYPTION_SECRET)).digest();
+function getCandidateSecrets() {
+  const secrets = [
+    process.env.PAYMENT_ENCRYPTION_KEY,
+    process.env.JWT_SECRET,
+    'super_secret_atech_vps_key_2026',
+    'atech_vps_default_aes256_enc_key_32b!',
+    'atech_vps_default_jwt_secret_must_change',
+  ].filter(Boolean);
+  return [...new Set(secrets)];
+}
+
+function getPrimaryKey() {
+  const primarySecret = process.env.PAYMENT_ENCRYPTION_KEY || process.env.JWT_SECRET || 'super_secret_atech_vps_key_2026';
+  return crypto.createHash('sha256').update(String(primarySecret)).digest();
+}
 
 /**
  * Encrypt any sensitive financial data (Bank account, Sort Code, Token) before saving to DB
  */
 export function encryptSensitive(text) {
   if (!text) return '';
+  const key = getPrimaryKey();
   const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', KEY, iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   let encrypted = cipher.update(String(text), 'utf8', 'hex');
   encrypted += cipher.final('hex');
   const authTag = cipher.getAuthTag().toString('hex');
@@ -34,23 +48,32 @@ export function encryptSensitive(text) {
 }
 
 /**
- * Decrypt sensitive financial data
+ * Decrypt sensitive financial data with multi-key self-healing fallback
  */
 export function decryptSensitive(ciphertext) {
   if (!ciphertext || !ciphertext.includes(':')) return ciphertext;
-  try {
-    const [ivHex, authTagHex, encrypted] = ciphertext.split(':');
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', KEY, iv);
-    decipher.setAuthTag(authTag);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch (err) {
-    console.warn('[Encryption Warning] Failed to decrypt financial field:', err.message);
-    return '***-REDACTED-***';
+  
+  const secrets = getCandidateSecrets();
+  const [ivHex, authTagHex, encrypted] = ciphertext.split(':');
+  if (!ivHex || !authTagHex || !encrypted) return ciphertext;
+
+  for (const secret of secrets) {
+    try {
+      const key = crypto.createHash('sha256').update(String(secret)).digest();
+      const iv = Buffer.from(ivHex, 'hex');
+      const authTag = Buffer.from(authTagHex, 'hex');
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAuthTag(authTag);
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    } catch (_) {
+      // Try next candidate secret
+    }
   }
+
+  console.warn('[Encryption Notice] Could not decrypt data with available keys.');
+  return null;
 }
 
 /**
