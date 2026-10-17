@@ -246,11 +246,21 @@ export default function Auth({ initialMode }: AuthProps) {
           ========================================================================= */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-950 text-white p-12 flex-col justify-between select-none">
         
-        {/* Real High-Resolution Enterprise Datacenter Imagery with Dark Ambient Overlay */}
+        {/* Dual High-Resolution Enterprise Datacenter Backgrounds with Smooth Crossfade */}
         <div 
-          className="absolute inset-0 bg-cover bg-center transition-all duration-1000 transform scale-105"
+          className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ease-in-out transform scale-105 ${
+            mode === 'login' ? 'opacity-90' : 'opacity-0 pointer-events-none'
+          }`}
           style={{
             backgroundImage: `url('https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1600&q=80')`,
+          }}
+        />
+        <div 
+          className={`absolute inset-0 bg-cover bg-center transition-opacity duration-700 ease-in-out transform scale-105 ${
+            mode === 'signup' ? 'opacity-90' : 'opacity-0 pointer-events-none'
+          }`}
+          style={{
+            backgroundImage: `url('https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&w=1600&q=80')`,
           }}
         />
         
@@ -424,8 +434,12 @@ export default function Auth({ initialMode }: AuthProps) {
       {/* =========================================================================
           RIGHT: DYNAMIC INTERACTIVE FORM CONTAINER (SIGN IN <-> SIGN UP SLIDER)
           ========================================================================= */}
-      <div className="flex-1 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-12 xl:px-16 overflow-y-auto">
+      <div className="flex-1 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-12 xl:px-16 overflow-y-auto relative">
         
+        {/* Subtle Ambient Background Gradients on Right Side */}
+        <div className="absolute top-10 right-10 w-72 h-72 bg-blue-500/10 dark:bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-10 left-10 w-72 h-72 bg-cyan-500/10 dark:bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+
         {/* MOBILE BRAND LOGO (Hidden on desktop) */}
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center lg:hidden mb-6">
           <Link to="/" className="inline-flex items-center gap-3">
@@ -433,36 +447,44 @@ export default function Auth({ initialMode }: AuthProps) {
           </Link>
         </div>
 
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
           
-          {/* TOP SLIDING SEGMENTED SWITCHER (Sign In <-> Create Account) */}
-          <div className="p-1.5 bg-slate-200/70 dark:bg-slate-800/80 rounded-2xl flex items-center mb-6 shadow-inner border border-slate-300/50 dark:border-slate-700/50">
+          {/* TOP SLIDING SEGMENTED SWITCHER (Interactive Animated Pill) */}
+          <div className="relative p-1.5 bg-slate-200/80 dark:bg-slate-800/90 rounded-2xl flex items-center mb-6 shadow-inner border border-slate-300/60 dark:border-slate-700/60 select-none">
+            {/* Sliding Pill Indicator */}
+            <div 
+              className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 shadow-md transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+                mode === 'login' ? 'left-1.5' : 'left-[calc(50%+3px)]'
+              }`}
+            />
             <button
               type="button"
               onClick={() => switchMode('login')}
-              className={`flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+              className={`relative z-10 flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer ${
                 mode === 'login'
-                  ? 'bg-white dark:bg-slate-900 text-blue-950 dark:text-white shadow-md shadow-slate-950/5 scale-[1.02]'
+                  ? 'text-white'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
+              <User className="w-4 h-4" />
               Sign In
             </button>
             <button
               type="button"
               onClick={() => switchMode('signup')}
-              className={`flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+              className={`relative z-10 flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer ${
                 mode === 'signup'
-                  ? 'bg-white dark:bg-slate-900 text-blue-950 dark:text-white shadow-md shadow-slate-950/5 scale-[1.02]'
+                  ? 'text-white'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
+              <Sparkles className="w-4 h-4" />
               Create Account
             </button>
           </div>
 
-          {/* MAIN CARD */}
-          <div className="bg-white dark:bg-slate-900 py-8 px-6 sm:px-10 shadow-xl shadow-blue-950/5 border border-slate-200 dark:border-slate-800 rounded-3xl transition-all duration-300">
+          {/* MAIN CARD WITH GLASSMORPHISM */}
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md py-8 px-6 sm:px-10 shadow-2xl shadow-blue-950/10 border border-slate-200 dark:border-slate-800 rounded-3xl transition-all duration-300">
             
             {/* -------------------------------------------------------------
                 MODE A: SIGN IN FORM
