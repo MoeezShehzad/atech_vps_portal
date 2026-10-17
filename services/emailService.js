@@ -655,6 +655,67 @@ export async function sendSystemAlertEmail({ subject, alertLevel = 'WARNING', de
 }
 
 /**
+ * Dispatch Urgent Failure Alert to Customer Support when VM action or Hyper-V script fails
+ */
+export async function sendVmFailureAlertToSupport({
+  vmName,
+  vmId,
+  customerEmail,
+  customerName,
+  action,
+  error,
+  scriptName = 'Power-VPS.ps1',
+  hostStatus = 'Online'
+}) {
+  const subject = `[URGENT SUPPORT ALERT] VM Operation Failure: ${vmName || 'Unknown VM'} (${action})`;
+  const isHostDown = error && (error.includes('offline') || error.includes('unreachable') || error.includes('ECONNREFUSED'));
+
+  const contentHtml = `
+    <div style="background-color:#fff1f2;padding:16px 20px;border-radius:12px;border:1px solid #fecdd3;margin:16px 0;">
+      <h3 style="margin-top:0;color:#9f1239;font-size:16px;">⚠️ Virtual Machine Infrastructure Alert</h3>
+      <p style="margin:0 0 12px 0;font-size:14px;color:#881337;">
+        An automated system alert was triggered during execution of action <strong>${escapeHtml(action)}</strong>.
+      </p>
+      <table style="width:100%;font-size:13px;color:#334155;border-collapse:collapse;">
+        <tr><td style="padding:6px 0;font-weight:bold;width:140px;">VM Name:</td><td>${escapeHtml(vmName || 'N/A')} (ID: ${vmId || 'N/A'})</td></tr>
+        <tr><td style="padding:6px 0;font-weight:bold;">Customer:</td><td>${escapeHtml(customerName || 'N/A')} &lt;${escapeHtml(customerEmail || 'N/A')}&gt;</td></tr>
+        <tr><td style="padding:6px 0;font-weight:bold;">Action Attempted:</td><td><span style="background:#e0e7ff;color:#3730a3;padding:2px 8px;border-radius:4px;font-family:monospace;font-weight:bold;">${escapeHtml(action)}</span></td></tr>
+        <tr><td style="padding:6px 0;font-weight:bold;">Hyper-V Script:</td><td><code>${escapeHtml(scriptName)}</code></td></tr>
+        <tr><td style="padding:6px 0;font-weight:bold;">Host Status:</td><td><span style="color:${isHostDown ? '#e11d48' : '#059669'};font-weight:bold;">${escapeHtml(hostStatus)}</span></td></tr>
+        <tr><td style="padding:6px 0;font-weight:bold;vertical-align:top;">Failure Details:</td><td style="color:#b91c1c;font-family:monospace;background:#fee2e2;padding:8px;border-radius:6px;word-break:break-all;">${escapeHtml(error || 'Unknown infrastructure exception')}</td></tr>
+      </table>
+    </div>
+    <p style="font-size:12px;color:#64748b;margin-bottom:0;">
+      Timestamp: ${new Date().toUTCString()} • Host Node Gateway: 172.18.240.1:5050
+    </p>
+  `;
+
+  const html = wrapEmailTemplate({
+    title: `VM Action Failure: ${action}`,
+    subtitle: `Automated Notification for Customer Support Team`,
+    categoryBadge: 'Critical Infrastructure Alert',
+    contentHtml,
+    ctaText: 'Open Hyper-V Admin Console',
+    ctaUrl: `${APP_URL}/admin?tab=overview`,
+    footerNote: 'ATC Cloud Reliability & Incident Automation Engine',
+  });
+
+  try {
+    const info = await transporterSupport.sendMail({
+      from: `"ATC Cloud Alerts" <${SUPPORT_EMAIL}>`,
+      to: [SUPPORT_EMAIL, 'info@atechconsult.com'],
+      subject,
+      html,
+    });
+    console.log(`[Support Alert Dispatched] Message ID: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Support Alert Error] Failed to send alert email:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * 30-Day Free Trial Welcome Email
  */
 export async function sendTrialStartedEmail({ email, fullName, planName, trialEndsDate, cardLast4 }) {
@@ -861,6 +922,7 @@ export default {
   sendInvoiceReceiptEmail,
   sendSpecificationResizeReceiptEmail,
   sendSystemAlertEmail,
+  sendVmFailureAlertToSupport,
   sendTrialStartedEmail,
   sendTrialWarningEmail,
   sendTrialConvertedPaidEmail,

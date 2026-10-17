@@ -3,6 +3,8 @@ import { WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
 import { Client as SSHClient } from 'ssh2';
 import prisma from '../lib/prisma.js';
+import hypervService from './hypervService.js';
+import { sendVmFailureAlertToSupport } from './emailService.js';
 
 export function setupTerminalWebSocket(server) {
   const wss = new WebSocketServer({ noServer: true });
@@ -176,11 +178,27 @@ export function setupTerminalWebSocket(server) {
       return ws.close();
     }
 
+    // Live probe to Hyper-V host to verify actual VM state before initiating SSH connection
+    try {
+      const liveStatus = await hypervService.getStatus(vm.vmName);
+      if (liveStatus && liveStatus.Found) {
+        const rawState = String(liveStatus.State || '').toUpperCase();
+        if (rawState === 'OFF' || rawState === 'STOPPED' || rawState === 'PAUSED') {
+          const newStatus = rawState === 'PAUSED' ? 'PAUSED' : 'STOPPED';
+          await prisma.virtualMachine.update({
+            where: { vmId: vm.vmId },
+            data: { status: newStatus },
+          }).catch(() => {});
+          vm.status = newStatus;
+        }
+      }
+    } catch (_) {}
+
     if (vm.status === 'STOPPED') {
       ws.send(`\r\n\x1b[33m====================================================\x1b[0m\r\n`);
       ws.send(`\x1b[1;33m  [NOTICE] SERVER IS CURRENTLY POWERED OFF\x1b[0m\r\n`);
-      ws.send(`  Virtual machine '${vm.vmName}' is not running.\r\n`);
-      ws.send(`  Please click the Power On button in your dashboard to activate the server.\r\n`);
+      ws.send(`  Virtual machine '${vm.vmName}' is turned off in Hyper-V.\r\n`);
+      ws.send(`  Please click the Start button on your dashboard to boot the server.\r\n`);
       ws.send(`\x1b[33m====================================================\x1b[0m\r\n\r\n`);
       return ws.close();
     }
@@ -318,8 +336,21 @@ export function setupTerminalWebSocket(server) {
           return;
         }
 
+        // Dispatch automated incident alert to customer support
+        sendVmFailureAlertToSupport({
+          vmName: vm.vmName,
+          vmId: vm.vmId,
+          customerEmail: decoded.email || 'customer@atechconsult.com',
+          customerName: decoded.name || 'Customer',
+          action: 'WEB_CONSOLE_SSH_BRIDGE',
+          error: `Guest SSH service on ${targetIp}:22 was unreachable after ${maxRetries} connection attempts (${err.message}).`,
+          scriptName: 'WebConsole / SSH Bridge',
+          hostStatus: (await hypervService.isHostReachable()) ? 'Online' : 'Offline / Unreachable',
+        }).catch((e) => console.error('[Console Alert Dispatch Err]', e.message));
+
         if (ws.readyState === ws.OPEN) {
           ws.send(`\r\n\x1b[31m[SSH Error] Connection failed: ${err.message}\x1b[0m\r\n`);
+          ws.send(`\x1b[33m[Support System] Our customer support team has been automatically alerted of this VM connection issue.\x1b[0m\r\n`);
           ws.close();
         }
       });

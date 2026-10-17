@@ -4,12 +4,42 @@
 //          to execute real PowerShell cmdlets in Hyper-V on Windows.
 // ==============================================================================
 
+import fs from 'fs';
 import prisma from '../lib/prisma.js';
 
+// Dynamically determine the Windows Host default gateway from Linux routing table
+function getLinuxDefaultGateway() {
+  try {
+    if (process.platform === 'linux' && fs.existsSync('/proc/net/route')) {
+      const routeData = fs.readFileSync('/proc/net/route', 'utf8');
+      const lines = routeData.trim().split('\n');
+      for (const line of lines) {
+        const fields = line.split('\t');
+        if (fields[1] === '00000000' && fields[2]) {
+          const hex = fields[2];
+          const parts = [
+            parseInt(hex.substring(6, 8), 16),
+            parseInt(hex.substring(4, 6), 16),
+            parseInt(hex.substring(2, 4), 16),
+            parseInt(hex.substring(0, 2), 16),
+          ];
+          return parts.join('.');
+        }
+      }
+    }
+  } catch (_) {}
+  return null;
+}
+
+const detectedGw = getLinuxDefaultGateway();
+const gwHost = detectedGw ? `http://${detectedGw}:5050` : null;
+
 // Host agent candidates (prioritize direct Windows host gateway on Hyper-V Default Switch)
-const PRIMARY_HOST = process.env.HYPERV_HOST_URL || process.env.HYPERV_AGENT_URL || 'http://172.27.32.1:5050';
+const PRIMARY_HOST = process.env.HYPERV_HOST_URL || process.env.HYPERV_AGENT_URL || gwHost || 'http://172.18.240.1:5050';
 const HOST_CANDIDATES = [
   PRIMARY_HOST,
+  gwHost,
+  'http://172.18.240.1:5050',
   'http://172.27.32.1:5050',
   'http://localhost:5050',
   'http://127.0.0.1:5050',
@@ -32,13 +62,20 @@ class HyperVService {
       return this.activeHost;
     }
 
-    const candidates = [this.activeHost, ...HOST_CANDIDATES.filter((h) => h !== this.activeHost)].filter(Boolean);
+    const dynGw = getLinuxDefaultGateway();
+    const dynGwUrl = dynGw ? `http://${dynGw}:5050` : null;
+
+    const candidates = [
+      this.activeHost,
+      dynGwUrl,
+      ...HOST_CANDIDATES.filter((h) => h !== this.activeHost)
+    ].filter(Boolean);
 
     for (const host of candidates) {
       try {
         const ping = await fetch(`${host}/health`, {
           method: 'GET',
-          signal: AbortSignal.timeout(2500),
+          signal: AbortSignal.timeout(2000),
         });
         if (ping.ok) {
           this.activeHost = host;
@@ -49,6 +86,11 @@ class HyperVService {
     }
 
     return null;
+  }
+
+  async isHostReachable() {
+    const host = await this.findReachableHost();
+    return Boolean(host);
   }
 
   /**

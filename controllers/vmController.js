@@ -10,7 +10,8 @@ import { calculateResizePrice, calculateCustomPrice } from '../services/pricingS
 import { 
   sendVmProvisionedEmail, 
   sendInvoiceReceiptEmail, 
-  sendSpecificationResizeReceiptEmail 
+  sendSpecificationResizeReceiptEmail,
+  sendVmFailureAlertToSupport
 } from '../services/emailService.js';
 import firewallService from '../services/firewallService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
@@ -117,7 +118,7 @@ export async function getUserVMs(req, res) {
 
           // If state changed in Hyper-V (e.g. stopped/started/paused outside portal)
           if (liveInfo && liveInfo.State) {
-            const raw = liveInfo.State.toUpperCase();
+            const raw = String(liveInfo.State).toUpperCase();
             const liveStatus = raw === 'RUNNING' ? 'RUNNING' : (raw === 'PAUSED' ? 'PAUSED' : 'STOPPED');
             if (liveStatus !== vm.status) {
               await prisma.virtualMachine.update({
@@ -126,6 +127,8 @@ export async function getUserVMs(req, res) {
               }).catch(() => {});
               vm.status = liveStatus;
             }
+            vm._liveCpu = liveStatus === 'RUNNING' ? (liveInfo.CPUUsage || 0) : 0;
+            vm._liveRamMb = liveStatus === 'RUNNING' ? (liveInfo.RAMUsedMB || 0) : 0;
           }
 
           // Dynamic DHCP IP Discovery: Sync real guest IP from Hyper-V
@@ -220,8 +223,10 @@ export async function getUserVMs(req, res) {
         adminPassword: vm.adminPassword || 'root',
         os: vm.image?.name || 'Ubuntu 24.04 LTS',
         status: vm.status ? vm.status.toLowerCase() : 'stopped',
-        cpuUsage: Math.floor(Math.random() * 20) + 5,
-        ramUsage: `${(vm.ramGb * 0.45).toFixed(1)} / ${vm.ramGb} GB`,
+        cpuUsage: vm.status === 'RUNNING' ? (vm._liveCpu !== undefined ? vm._liveCpu : 0) : 0,
+        ramUsage: vm.status === 'RUNNING'
+          ? (vm._liveRamMb ? `${(vm._liveRamMb / 1024).toFixed(1)} / ${vm.ramGb} GB` : `0.0 / ${vm.ramGb} GB`)
+          : `0.0 / ${vm.ramGb} GB`,
         diskUsage: `${Math.round(vm.storageGb * 0.35)} / ${vm.storageGb} GB`,
         vCPU: vm.cpuCores,
         ramGB: vm.ramGb,
@@ -611,6 +616,18 @@ export async function powerAction(req, res) {
       } else if (normAction === 'START' && (msg.includes('already running') || msg.includes('running'))) {
         powerResult = { Status: 'SUCCESS', State: 'Running' };
       } else {
+        // Dispatch urgent alert to customer support
+        sendVmFailureAlertToSupport({
+          vmName: vm.vmName,
+          vmId: vm.vmId,
+          customerEmail: req.user?.email || 'customer@atechconsult.com',
+          customerName: req.user?.fullName || req.user?.name || 'Customer',
+          action: `VM_POWER_${normAction}`,
+          error: hvErr.message,
+          scriptName: 'Power-VPS.ps1',
+          hostStatus: (await hypervService.isHostReachable()) ? 'Online' : 'Offline / Unreachable',
+        }).catch((alertErr) => console.error('[Support Alert Dispatch Err]', alertErr.message));
+
         return res.status(500).json({ error: sanitizeInfrastructureError(hvErr) });
       }
     }
@@ -980,6 +997,42 @@ export async function getVMMetrics(req, res) {
     try {
       const liveData = await hypervService.getStatus(vm.vmName);
       if (liveData && liveData.Found) {
+        const rawState = String(liveData.State || '').toUpperCase();
+        const isOff = rawState === 'OFF' || rawState === 'STOPPED';
+
+        if (isOff && vm.status === 'RUNNING') {
+          await prisma.virtualMachine.update({
+            where: { vmId: vm.vmId },
+            data: { status: 'STOPPED' },
+          }).catch(() => {});
+          vm.status = 'STOPPED';
+        }
+
+        if (isOff) {
+          return res.json({
+            found: true,
+            vmName: liveData.VMName || vm.vmName,
+            vmId: liveData.VMId || vm.hypervVmId,
+            state: 'STOPPED',
+            status: 'Powered Off',
+            uptime: '00:00:00',
+            processorCount: liveData.CPUCount || vm.cpuCores,
+            cpuUsage: 0,
+            avgCpu: 0,
+            ramTotalMb: (vm.ramGb || 2) * 1024,
+            ramUsedMb: 0,
+            ramPercent: 0,
+            diskTotalGb: vm.storageGb || 40,
+            diskUsedGb: 0,
+            diskPercent: 0,
+            diskReadMb: 0,
+            diskWriteMb: 0,
+            ipAddresses: liveData.IPAddresses || [],
+            heartbeat: 'OFFLINE',
+            timestamp: liveData.Timestamp || new Date().toISOString(),
+          });
+        }
+
         return res.json({
           found: true,
           vmName: liveData.VMName || vm.vmName,
@@ -1006,20 +1059,20 @@ export async function getVMMetrics(req, res) {
       return res.json(liveData);
     } catch (metricErr) {
       console.warn(`[METRICS WARNING] Failed to query live metrics for ${vm.vmName}:`, metricErr.message);
-      // Fallback response if host agent is momentarily busy
+      const isStopped = vm.status !== 'RUNNING';
       return res.json({
         found: true,
         vmName: vm.vmName,
         state: vm.status,
-        status: 'Operating normally',
+        status: isStopped ? 'Powered Off' : 'Host communication unavailable',
         cpuUsage: 0,
         avgCpu: 0,
         ramTotalMb: (vm.ramGb || 2) * 1024,
-        ramUsedMb: Math.round(((vm.ramGb || 2) * 1024) * 0.25),
-        ramPercent: 25,
+        ramUsedMb: 0,
+        ramPercent: 0,
         diskTotalGb: vm.storageGb || 40,
-        diskUsedGb: Math.round((vm.storageGb || 40) * 0.2),
-        diskPercent: 20,
+        diskUsedGb: 0,
+        diskPercent: 0,
         diskReadMb: 0,
         diskWriteMb: 0,
         uptime: '00:00:00',
