@@ -1,30 +1,31 @@
 import React, { useState } from 'react';
 import { 
   ShieldCheck, Lock, Eye, Database, Globe, UserCheck, 
-  FileText, Bell, ChevronRight, Server, CheckCircle2 
+  FileText, Bell, ChevronRight, Server, CheckCircle2, KeyRound,
+  ShieldAlert, HardDrive, Cpu, Terminal
 } from 'lucide-react';
 
 export default function PrivacyPolicy() {
   const lastUpdated = "October 17, 2026";
-  const [activeSection, setActiveSection] = useState('priv-1');
+  const [activeSection, setActiveSection] = useState('gpriv-1');
 
   const tableOfContents = [
-    { id: 'priv-1', title: '1. Commitment & Regulatory Scope' },
-    { id: 'priv-2', title: '2. Distinction: Customer Content vs Account Data' },
-    { id: 'priv-3', title: '3. Categories of Personal Data Collected' },
-    { id: 'priv-4', title: '4. Lawful Bases for Processing' },
-    { id: 'priv-5', title: '5. Payment Card Processing & PCI-DSS' },
-    { id: 'priv-6', title: '6. Telemetry, Network Logs & Security' },
-    { id: 'priv-7', title: '7. Subprocessors & Third-Party Sharing' },
-    { id: 'priv-8', title: '8. Absolute Zero Sale of Personal Data' },
-    { id: 'priv-9', title: '9. Law Enforcement & Subpoena Guidelines' },
-    { id: 'priv-10', title: '10. Data Retention & NIST 800-88 Sanitization' },
-    { id: 'priv-11', title: '11. Your Statutory Privacy Rights (GDPR & CCPA)' },
-    { id: 'priv-12', title: '12. Cookies, Tracking & GPC Signals' },
-    { id: 'priv-13', title: '13. Cross-Border Data Transfers' },
-    { id: 'priv-14', title: '14. Security Safeguards & Encryption' },
-    { id: 'priv-15', title: '15. Protection of Minors' },
-    { id: 'priv-16', title: '16. Revisions & Data Protection Officer' },
+    { id: 'gpriv-1', title: '1. Google Cloud Trust Model & Scope' },
+    { id: 'gpriv-2', title: '2. The Four Foundational Privacy Commitments' },
+    { id: 'gpriv-3', title: '3. Customer Data vs Account Data Demarcation' },
+    { id: 'gpriv-4', title: '4. Information We Collect' },
+    { id: 'gpriv-5', title: '5. Lawful Bases for Processing' },
+    { id: 'gpriv-6', title: '6. Payment Processing & PCI-DSS Level 1' },
+    { id: 'gpriv-7', title: '7. Infrastructure Telemetry & Perimeter Security' },
+    { id: 'gpriv-8', title: '8. Controlled Subprocessors & Third Parties' },
+    { id: 'gpriv-9', title: '9. Absolute Prohibition on Sale of Data' },
+    { id: 'gpriv-10', title: '10. Government Demands & Subpoena Scrutiny' },
+    { id: 'gpriv-11', title: '11. Cryptographic Erasure & NIST SP 800-88' },
+    { id: 'gpriv-12', title: '12. Global Privacy Rights (GDPR & CCPA/CPRA)' },
+    { id: 'gpriv-13', title: '13. Essential Cookies & GPC Signal Handling' },
+    { id: 'gpriv-14', title: '14. Security Safeguards & Defense-in-Depth' },
+    { id: 'gpriv-15', title: '15. Protection of Minors' },
+    { id: 'gpriv-16', title: '16. Data Protection Officer & Legal Notices' },
   ];
 
   const scrollTo = (id: string) => {
@@ -41,7 +42,7 @@ export default function PrivacyPolicy() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         
-        {/* HEADER NOTICE HERO */}
+        {/* GOOGLE CLOUD STYLE PRIVACY HERO */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 shadow-sm mb-10">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6 mb-6">
             <div className="flex items-center gap-4">
@@ -50,35 +51,39 @@ export default function PrivacyPolicy() {
               </div>
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  Global Privacy Statement
+                  Google Cloud Standard Enterprise Privacy Notice
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-poppins">
-                  Privacy Policy
+                  Cloud Privacy Notice
                 </h1>
               </div>
             </div>
-            <div className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-              Revision: 2026.4 • Effective: {lastUpdated}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                Framework: GCP-DPA 2026.4
+              </span>
+              <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                Effective: {lastUpdated}
+              </span>
             </div>
           </div>
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
-            Analytical Technical Consulting Inc. (&quot;ATC&quot;, &quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) is committed to 
-            protecting the privacy and confidentiality of our customers&apos; information. This Privacy Policy details the standards, practices, 
-            and technical controls governing the collection, utilization, disclosure, retention, and cryptographic disposal of personal data across 
-            our websites, APIs, and cloud hosting infrastructure pursuant to the California Consumer Privacy Act (CCPA/CPRA), General Data Protection 
-            Regulation (GDPR/UK GDPR), and applicable United States privacy statutes.
+            At <strong>Analytical Technical Consulting Inc.</strong> (&quot;ATC&quot;, &quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), 
+            we build our cloud infrastructure around the world-class enterprise data privacy and trust standards established by Google Cloud. 
+            This Cloud Privacy Notice delineates how we handle, process, and secure Customer Data and Account Information across our Microsoft Hyper-V 
+            virtualization clusters, NVMe block storage networks, APIs, and portals in compliance with GDPR, UK GDPR, CCPA/CPRA, and federal U.S. data protection statutes.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3 text-xs">
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-200 dark:border-emerald-800">
-              <Lock className="w-3.5 h-3.5" /> PCI-DSS Level 1 Tokenization
+              <CheckCircle2 className="w-3.5 h-3.5" /> Customer Data Sovereignty (You Own Your Data)
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 font-bold border border-blue-200 dark:border-blue-800">
-              <Globe className="w-3.5 h-3.5" /> Zero Selling or Renting of Data
+              <Lock className="w-3.5 h-3.5" /> PCI-DSS Level 1 Tokenized Billing
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700">
-              <Database className="w-3.5 h-3.5" /> NIST SP 800-88 Sanitization
+              <Database className="w-3.5 h-3.5" /> NIST SP 800-88 Cryptographic Sanitization
             </span>
           </div>
         </div>
@@ -89,7 +94,7 @@ export default function PrivacyPolicy() {
           {/* DESKTOP STICKY SIDEBAR NAVIGATION */}
           <aside className="hidden lg:block lg:col-span-4 sticky top-24 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm max-h-[calc(100vh-8rem)] overflow-y-auto">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-4 px-2">
-              Privacy Articles
+              Privacy Notice Articles
             </h3>
             <nav className="space-y-1">
               {tableOfContents.map((item) => (
@@ -110,7 +115,7 @@ export default function PrivacyPolicy() {
 
             <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-2">
               <p className="font-semibold text-slate-800 dark:text-slate-300">Data Protection Officer</p>
-              <p>For data export, deletion, or privacy verification:</p>
+              <p>For GDPR/CCPA verifications or subpoena requests:</p>
               <a href="mailto:privacy@atechconsult.com" className="text-emerald-600 dark:text-emerald-400 font-bold underline block">
                 privacy@atechconsult.com
               </a>
@@ -121,138 +126,160 @@ export default function PrivacyPolicy() {
           <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-12 shadow-sm space-y-12 text-sm sm:text-base leading-relaxed text-slate-700 dark:text-slate-300">
 
             {/* SECTION 1 */}
-            <section id="priv-1" className="space-y-4 pt-2">
+            <section id="gpriv-1" className="space-y-4 pt-2">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">1</span>
-                Commitment, Scope &amp; Applicable Laws
+                Google Cloud Trust Model &amp; Regulatory Jurisdiction
               </h2>
               <p>
-                This Privacy Policy applies to all services provided by <strong>Analytical Technical Consulting Inc.</strong> (&quot;ATC&quot;), 
-                having its corporate headquarters and primary operations in Bolingbrook, Illinois, United States. 
-                Whether you access our services as an individual developer, commercial enterprise, or institutional subscriber, 
-                we process your personal data strictly in conformity with applicable international and state data protection frameworks, including:
+                This Cloud Privacy Notice applies to all cloud infrastructure services provided by <strong>Analytical Technical Consulting Inc.</strong>, 
+                an Illinois corporation with its primary data center and operational facility located at 
+                <strong> 1360 Brentwood Trl, Bolingbrook, IL 60490, United States</strong>.
               </p>
-              <ul className="list-disc pl-6 space-y-1 text-xs sm:text-sm">
-                <li>The European Union General Data Protection Regulation (Regulation (EU) 2016/679, &quot;GDPR&quot;) and the UK GDPR;</li>
-                <li>The California Consumer Privacy Act as amended by the California Privacy Rights Act (Cal. Civ. Code § 1798.100 et seq., &quot;CCPA/CPRA&quot;);</li>
-                <li>State privacy acts in Virginia (VCDPA), Colorado (CPA), Connecticut (CTDPA), and Utah (UCPA); and</li>
-                <li>United States federal telecommunications and data confidentiality regulations.</li>
-              </ul>
+              <p>
+                Modeled after the Google Cloud Data Protection Addendum (DPA), this policy establishes institutional transparency regarding our data handling 
+                pursuant to the European Union General Data Protection Regulation (Regulation (EU) 2016/679, &quot;GDPR&quot;), the UK Data Protection Act 2018, 
+                the California Consumer Privacy Act as amended by the California Privacy Rights Act (Cal. Civ. Code § 1798.100 et seq., &quot;CCPA/CPRA&quot;), 
+                and comprehensive state privacy statutes in Virginia, Colorado, Connecticut, and Utah.
+              </p>
             </section>
 
-            {/* SECTION 2 - CRITICAL DISTINCTION */}
-            <section id="priv-2" className="space-y-4 bg-slate-100 dark:bg-slate-800/60 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-700">
+            {/* SECTION 2 - THE FOUR FOUNDATIONAL COMMITMENTS */}
+            <section id="gpriv-2" className="space-y-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 p-6 sm:p-8 rounded-2xl">
+              <h2 className="text-xl font-bold text-emerald-950 dark:text-emerald-300 font-poppins flex items-center gap-3">
+                <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                2. Google Cloud Enterprise Trust Commitments
+              </h2>
+              <p className="text-xs sm:text-sm text-emerald-950 dark:text-emerald-200 leading-relaxed font-semibold">
+                ATC adheres strictly to the four foundational enterprise data protection commitments pioneered by Google Cloud:
+              </p>
+              <div className="grid sm:grid-cols-2 gap-3 pt-2 text-xs sm:text-sm">
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40">
+                  <strong className="text-emerald-900 dark:text-emerald-200 block mb-1">Commitment 1: You Own Your Data</strong>
+                  ATC never claims ownership or copyright over Customer Data. You own all data, applications, and source code stored in your virtual machines.
+                </div>
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40">
+                  <strong className="text-emerald-900 dark:text-emerald-200 block mb-1">Commitment 2: Contractual Purpose Only</strong>
+                  ATC processes Customer Data strictly as necessary to execute, route, and secure the cloud services contracted in your agreement.
+                </div>
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40">
+                  <strong className="text-emerald-900 dark:text-emerald-200 block mb-1">Commitment 3: No Advertising Use</strong>
+                  ATC never scans, indexes, mines, or analyzes Customer Data for advertising, marketing profiling, or consumer targeting purposes.
+                </div>
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40">
+                  <strong className="text-emerald-900 dark:text-emerald-200 block mb-1">Commitment 4: Zero Selling of Data</strong>
+                  ATC does not sell, rent, or lease your personal data, server logs, or telemetry to any third party or data broker.
+                </div>
+              </div>
+            </section>
+
+            {/* SECTION 3 - DEMARCATION */}
+            <section id="gpriv-3" className="space-y-4 bg-slate-100 dark:bg-slate-800/60 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <Server className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                2. Fundamental Distinction: Customer Content vs. Account Data
+                3. Customer Data vs. Account Data Demarcation
               </h2>
               <p className="text-xs sm:text-sm leading-relaxed">
-                Like Tier-1 infrastructure providers (DigitalOcean, AWS, Linode), ATC maintains a rigorous operational distinction between:
+                In adherence to Google Cloud architecture, ATC maintains a strict institutional boundary between:
               </p>
               <div className="space-y-3 pt-2 text-xs sm:text-sm">
                 <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-300 dark:border-slate-700">
-                  <strong className="text-slate-900 dark:text-white block mb-1">A. Customer Content (Data Controller: Customer):</strong>
-                  Any files, code, software, databases, applications, or personal data stored within, processed by, or transmitted across 
-                  Customer&apos;s provisioned virtual private servers or NVMe storage blocks. 
-                  <strong> ATC DOES NOT INSPECT, ACCESS, AUDIT, SHARE, OR SELL CUSTOMER CONTENT</strong>. Customer remains the sole Data Controller 
-                  under GDPR/CCPA for all data stored within their virtual machines. ATC acts strictly as a neutral Data Processor.
+                  <strong className="text-slate-900 dark:text-white block mb-1">A. Customer Data (Controller: Customer):</strong>
+                  Data, files, code, software, and databases uploaded to or processed within Customer&apos;s virtual machines. 
+                  <strong> ATC DOES NOT INSPECT, ACCESS, AUDIT, SHARE, OR SELL CUSTOMER DATA</strong>. 
+                  Under GDPR and CCPA, Customer is the sole Data Controller of Customer Data; ATC operates strictly as a neutral Data Processor.
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-300 dark:border-slate-700">
-                  <strong className="text-slate-900 dark:text-white block mb-1">B. Account &amp; Telemetry Data (Data Controller: ATC):</strong>
-                  Information collected directly from Customer to create, authenticate, bill, secure, and deliver the Services (such as name, 
-                  email address, IP access logs, and billing tokens). This policy governs our collection and processing of Account &amp; Telemetry Data.
+                  <strong className="text-slate-900 dark:text-white block mb-1">B. Account &amp; Telemetry Data (Controller: ATC):</strong>
+                  Data collected from Customer to authenticate accounts, bill for services, prevent infrastructure abuse, and deliver customer support. 
+                  ATC acts as the Data Controller solely for this administrative metadata.
                 </div>
               </div>
-            </section>
-
-            {/* SECTION 3 */}
-            <section id="priv-3" className="space-y-4">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">3</span>
-                Categories of Information We Collect
-              </h2>
-              <p>
-                We collect personal information directly from you when you register, order services, open a support ticket, or interact with our portal:
-              </p>
-              <ul className="list-disc pl-6 space-y-1.5 text-xs sm:text-sm">
-                <li><strong>Identity &amp; Contact Data:</strong> Full legal name, corporate business entity, physical billing address, telephone number, verified email address, and username;</li>
-                <li><strong>Authentication Security Credentials:</strong> Cryptographically salted and hashed passwords (using industry-standard bcrypt/argon2), SSH public keys uploaded by customer, and session tokens;</li>
-                <li><strong>Billing &amp; Tax Information:</strong> Payment card brand, last four digits of card, expiration month/year, Stripe billing reference token, VAT/tax identification numbers, and transactional payment history;</li>
-                <li><strong>Technical &amp; Telemetry Metadata:</strong> Internet Protocol (IP) addresses used to access the portal, browser type, operating system, hypervisor hyper-call latency, bandwidth consumption, CPU/RAM utilization metrics, and hardware node uptime logs.</li>
-              </ul>
             </section>
 
             {/* SECTION 4 */}
-            <section id="priv-4" className="space-y-4">
+            <section id="gpriv-4" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">4</span>
+                Categories of Information We Collect
+              </h2>
+              <p>We collect information directly from you to deliver, bill, and protect enterprise cloud infrastructure:</p>
+              <ul className="list-disc pl-6 space-y-1.5 text-xs sm:text-sm">
+                <li><strong>Identity &amp; Account Profile Data:</strong> Full legal name, corporate business name, physical corporate billing address, telephone number, and verified administrative email address;</li>
+                <li><strong>Authentication &amp; Access Credentials:</strong> Cryptographically salted and hashed passwords (using bcrypt algorithms), customer-uploaded SSH public keys, and session tokens;</li>
+                <li><strong>Billing &amp; Financial Metadata:</strong> Payment card brand, last four digits of payment card, expiration month/year, Stripe billing reference token, tax IDs, and transaction invoice records;</li>
+                <li><strong>Telemetry &amp; Infrastructure Diagnostics:</strong> Source IP addresses used to access the portal, web browser user-agent strings, hypervisor API calls, bandwidth consumption metrics, CPU/RAM utilization logs, and firewall access attempts.</li>
+              </ul>
+            </section>
+
+            {/* SECTION 5 */}
+            <section id="gpriv-5" className="space-y-4">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">5</span>
                 Lawful Bases for Data Processing
               </h2>
-              <p>Under GDPR and global privacy frameworks, ATC processes personal data pursuant to clearly defined lawful bases:</p>
+              <p>Under global data privacy laws, ATC processes personal data pursuant to clearly established lawful grounds:</p>
               <div className="grid sm:grid-cols-2 gap-3 text-xs sm:text-sm pt-2">
                 <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <strong className="text-slate-900 dark:text-white block mb-0.5">Contractual Necessity:</strong>
-                  To provision virtual compute resources, allocate dedicated networking IPs, invoice accounts, and fulfill obligations under our Terms of Service.
+                  <strong className="text-slate-900 dark:text-white block mb-0.5">Contractual Execution:</strong>
+                  Provisioning Hyper-V virtual compute, allocating dedicated IP addresses, calculating resource usage, and invoicing accounts.
                 </div>
                 <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <strong className="text-slate-900 dark:text-white block mb-0.5">Legitimate Business Interests:</strong>
-                  To safeguard infrastructure stability, defend against DDoS attacks, detect fraud, monitor network perimeter firewalls, and prevent abusive bot behavior.
+                  <strong className="text-slate-900 dark:text-white block mb-0.5">Legitimate Security Interests:</strong>
+                  Defending hypervisor clusters against DDoS attacks, detecting rogue port-scanning, deflecting brute-force attacks, and preventing fraudulent billing.
                 </div>
                 <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <strong className="text-slate-900 dark:text-white block mb-0.5">Legal Obligation:</strong>
-                  To satisfy federal and state tax reporting, commercial accounting standards, and statutory records retention requirements.
+                  <strong className="text-slate-900 dark:text-white block mb-0.5">Statutory Legal Obligation:</strong>
+                  Compliance with federal tax (IRS) regulations, Illinois corporate accounting laws, and statutory records retention requirements.
                 </div>
                 <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
                   <strong className="text-slate-900 dark:text-white block mb-0.5">Customer Consent:</strong>
-                  Where you voluntarily opt in to non-essential communications, scheduled maintenance newsletters, or optional beta test programs.
+                  Opt-in notifications regarding scheduled maintenance windows, feature updates, or customer satisfaction reviews.
                 </div>
               </div>
             </section>
 
-            {/* SECTION 5 - PAYMENT TOKENIZATION */}
-            <section id="priv-5" className="space-y-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 p-6 sm:p-8 rounded-2xl">
+            {/* SECTION 6 - PAYMENT TOKENIZATION */}
+            <section id="gpriv-6" className="space-y-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 p-6 sm:p-8 rounded-2xl">
               <h2 className="text-xl font-bold text-emerald-950 dark:text-emerald-300 font-poppins flex items-center gap-3">
                 <Lock className="w-6 h-6 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                5. Payment Card Processing &amp; PCI-DSS Level 1 Guarantee
+                6. Payment Card Processing &amp; PCI-DSS Level 1 Security Guarantee
               </h2>
               <div className="text-xs sm:text-sm text-emerald-950 dark:text-emerald-200 font-bold uppercase tracking-wide">
-                ATC DOES NOT RECEIVE, PROCESS, STORE, OR TRANSMIT RAW CREDIT CARD NUMBERS, CVV SECURITY CODES, OR CARD TRACK DATA ON OUR HOSTS.
+                ATC DOES NOT RECEIVE, PROCESS, STORE, OR TRANSMIT RAW CREDIT CARD NUMBERS, CVV SECURITY CODES, OR CARD TRACK DATA ON OUR HOST SERVERS.
               </div>
               <p className="text-xs sm:text-sm text-emerald-900 dark:text-emerald-300 leading-relaxed">
-                All payment transactions are conducted through our certified payment processor, <strong>Stripe Inc.</strong>, an audited 
-                PCI-DSS Level 1 Service Provider. Payment card data entered via our portal checkout interface is ingested directly into Stripe&apos;s 
-                hardened vault via encrypted Stripe Elements frames. ATC receives and maintains only a tokenized customer identifier, payment method ID, 
+                All payment transactions are executed through our certified payment processing partner, <strong>Stripe Inc.</strong>, an audited 
+                PCI-DSS Level 1 Service Provider. Payment card details entered via our checkout interface are ingested directly into Stripe&apos;s 
+                vault via encrypted Stripe Elements frames. ATC receives and maintains only a tokenized customer identifier, payment method ID, 
                 card brand, and the last 4 digits of the payment instrument for billing records and recurring invoice generation.
               </p>
             </section>
 
-            {/* SECTION 6 */}
-            <section id="priv-6" className="space-y-4">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">6</span>
-                Telemetry, Network Logs &amp; Perimeter Defense
-              </h2>
-              <p>
-                To safeguard our high-performance cluster and maintain network availability, ATC automatically captures and retains operational log telemetry:
-              </p>
-              <ul className="list-disc pl-6 space-y-1 text-xs sm:text-sm">
-                <li><strong>Firewall &amp; Flow Logs:</strong> Inbound and outbound packet flows, port hits, SYN rates, and dropped packet telemetry to detect and deflect volumetric DDoS attacks;</li>
-                <li><strong>Hypervisor Health Logs:</strong> Virtual machine state transitions (start, stop, reboot, snapshot, rebuild) and resource allocations to diagnose hardware faults;</li>
-                <li><strong>Console &amp; API Audits:</strong> Web console connections, API token requests, and administrative actions for security auditing and accountability.</li>
-              </ul>
-              <p className="text-xs text-slate-500">
-                Telemetry logs are retained for a rolling ninety (90) calendar days for security and forensic analysis, after which they are automatically expunged.
-              </p>
-            </section>
-
             {/* SECTION 7 */}
-            <section id="priv-7" className="space-y-4">
+            <section id="gpriv-7" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">7</span>
-                Subprocessors &amp; Controlled Third-Party Disclosures
+                Infrastructure Telemetry, Flow Logs &amp; Perimeter Defense
               </h2>
               <p>
-                ATC utilizes only vetted, industry-leading subprocessors who operate under strict Data Processing Agreements (DPAs) 
+                To defend our virtualization nodes and maintain 99.9% availability, ATC captures operational telemetry:
+              </p>
+              <ul className="list-disc pl-6 space-y-1 text-xs sm:text-sm">
+                <li><strong>Firewall NetFlow Logs:</strong> Inbound/outbound packet counts, port hit distributions, and dropped connection events to identify and null-route DDoS attacks;</li>
+                <li><strong>Hypervisor VM Lifecycle Events:</strong> State changes (provision, reboot, power-off, snapshot creation, disk resize) to diagnose cluster performance;</li>
+                <li><strong>Audit Trails:</strong> Management portal logins, API calls, and console access timestamps retained for ninety (90) calendar days for security accountability.</li>
+              </ul>
+            </section>
+
+            {/* SECTION 8 */}
+            <section id="gpriv-8" className="space-y-4">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">8</span>
+                Audited Subprocessors &amp; Controlled Third-Party Disclosures
+              </h2>
+              <p>
+                ATC utilizes only vetted, industry-standard subprocessors who operate under strict Data Processing Agreements (DPAs) 
                 mandating confidentiality and security standards equivalent to our own:
               </p>
               <div className="grid sm:grid-cols-2 gap-3 text-xs sm:text-sm">
@@ -267,14 +294,14 @@ export default function PrivacyPolicy() {
               </div>
             </section>
 
-            {/* SECTION 8 - ZERO SALE OF DATA */}
-            <section id="priv-8" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
+            {/* SECTION 9 - ZERO SALE OF DATA */}
+            <section id="gpriv-9" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins uppercase tracking-wide">
-                8. Absolute Zero Sale or Rental of Personal Information
+                9. Absolute Prohibition on the Sale or Rental of Personal Data
               </h2>
               <p className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
                 ANALYTICAL TECHNICAL CONSULTING INC. HAS NEVER SOLD, DOES NOT SELL, AND WILL NEVER SELL, RENT, LEASE, OR TRADE YOUR PERSONAL INFORMATION, 
-                CUSTOMER CONTENT, TELEMETRY, OR IP USAGE TO THIRD PARTIES, DATA BROKERS, OR ADVERTISERS FOR MONETARY OR OTHER VALUABLE CONSIDERATION.
+                CUSTOMER DATA, TELEMETRY, OR IP USAGE TO THIRD PARTIES, DATA BROKERS, OR ADVERTISERS FOR MONETARY OR OTHER VALUABLE CONSIDERATION.
               </p>
               <p className="text-xs sm:text-sm leading-relaxed">
                 We do not engage in cross-context behavioral advertising. Pursuant to California Civil Code § 1798.120, Customer does not need 
@@ -282,27 +309,26 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
-            {/* SECTION 9 - LAW ENFORCEMENT */}
-            <section id="priv-9" className="space-y-4">
+            {/* SECTION 10 - GOVERNMENT DEMANDS */}
+            <section id="gpriv-10" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">9</span>
-                Government, Subpoena &amp; Law Enforcement Request Guidelines
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">10</span>
+                Government Demands &amp; Subpoena Scrutiny (Google Cloud Standard)
               </h2>
               <p>
-                ATC is committed to protecting customer confidentiality. ATC scrutinizes every government and law enforcement demand for customer records 
-                to ensure strict conformity with constitutional standards and statutory authority:
+                ATC enforces the same rigorous standards regarding government demands for customer records as Google Cloud:
               </p>
               <ul className="list-disc pl-6 space-y-1.5 text-xs sm:text-sm">
-                <li><strong>Judicial Process Required:</strong> ATC will NOT disclose Customer Content or account data without valid, binding legal process—such as a subpoena, court order signed by a judge of competent jurisdiction, or search warrant issued under the Federal Rules of Criminal Procedure or state equivalent;</li>
-                <li><strong>No Warrantless or Foreign Disclosures:</strong> Non-U.S. government entities must follow established international Mutual Legal Assistance Treaties (MLAT) or formal letters rogatory;</li>
+                <li><strong>Judicial Process Required:</strong> ATC will NOT disclose Customer Data or account records without valid, binding legal process—such as a subpoena, court order signed by a judge of competent jurisdiction, or search warrant issued under the Federal Rules of Criminal Procedure or state equivalent;</li>
+                <li><strong>Scrutiny of Legal Basis:</strong> ATC reviews each demand to confirm that it complies with the law and will challenge or narrow overbroad or inappropriate requests;</li>
                 <li><strong>Notice to Customer:</strong> Unless explicitly prohibited by a valid statutory non-disclosure gag order issued under 18 U.S.C. § 2705(b), ATC will notify Customer in writing prior to disclosing account information to allow Customer an opportunity to challenge the legal process.</li>
               </ul>
             </section>
 
-            {/* SECTION 10 - DATA RETENTION & SANITIZATION */}
-            <section id="priv-10" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
+            {/* SECTION 11 - NIST SP 800-88 SANITIZATION */}
+            <section id="gpriv-11" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins uppercase tracking-wide">
-                10. Data Retention &amp; NIST SP 800-88 Storage Sanitization
+                11. Data Retention &amp; NIST SP 800-88 Cryptographic Sanitization
               </h2>
               <p className="text-xs sm:text-sm leading-relaxed">
                 We retain account identification records for the duration of your active subscription, and for up to seven (7) years following 
@@ -316,11 +342,11 @@ export default function PrivacyPolicy() {
               </div>
             </section>
 
-            {/* SECTION 11 - STATUTORY RIGHTS */}
-            <section id="priv-11" className="space-y-4">
+            {/* SECTION 12 - STATUTORY RIGHTS */}
+            <section id="gpriv-12" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">11</span>
-                Your Statutory Privacy Rights (GDPR &amp; CCPA/CPRA)
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">12</span>
+                Your Global Statutory Privacy Rights (GDPR &amp; CCPA/CPRA)
               </h2>
               <p>Depending on your jurisdiction, you possess enforceable legal rights regarding your personal data:</p>
               <div className="grid sm:grid-cols-2 gap-3 text-xs sm:text-sm">
@@ -346,10 +372,10 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
-            {/* SECTION 12 */}
-            <section id="priv-12" className="space-y-4">
+            {/* SECTION 13 */}
+            <section id="gpriv-13" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">12</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">13</span>
                 Cookies, Session Storage &amp; Global Privacy Control (GPC)
               </h2>
               <p>
@@ -359,24 +385,11 @@ export default function PrivacyPolicy() {
               </p>
             </section>
 
-            {/* SECTION 13 */}
-            <section id="priv-13" className="space-y-4">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">13</span>
-                Cross-Border International Data Transfers
-              </h2>
-              <p>
-                ATC hosts infrastructure within the United States. If you access our services from the European Economic Area (EEA), United Kingdom, 
-                or Switzerland, your account information will be transferred to and processed in the United States. Where required by GDPR, 
-                we execute European Commission Standard Contractual Clauses (SCCs) to ensure equivalent data protection.
-              </p>
-            </section>
-
             {/* SECTION 14 */}
-            <section id="priv-14" className="space-y-4">
+            <section id="gpriv-14" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">14</span>
-                Enterprise Security Safeguards
+                Defense-in-Depth Security Safeguards
               </h2>
               <p>
                 We enforce multi-tiered defense-in-depth security measures to protect your account information:
@@ -390,7 +403,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 15 */}
-            <section id="priv-15" className="space-y-4">
+            <section id="gpriv-15" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">15</span>
                 Protection of Minors
@@ -403,14 +416,14 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 16 */}
-            <section id="priv-16" className="space-y-4">
+            <section id="gpriv-16" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">16</span>
                 Policy Amendments &amp; Data Protection Officer Contact
               </h2>
               <p>
-                ATC reserves the right to amend this Privacy Policy periodically. Modifications take effect upon posting to our portal. 
-                If you have inquiries regarding this policy or wish to exercise statutory data rights, contact our Data Protection Officer at:
+                ATC reserves the right to amend this Privacy Notice periodically. Modifications take effect upon posting to our portal. 
+                If you have inquiries regarding this notice or wish to exercise statutory data rights, contact our Data Protection Officer at:
               </p>
               <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl text-xs font-mono space-y-1">
                 <p className="font-bold text-slate-900 dark:text-white">Data Protection Officer — Privacy Compliance</p>
