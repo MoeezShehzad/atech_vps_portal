@@ -155,7 +155,17 @@ export function sanitizeClientErrorMessage(rawMessage: string): string {
 
   const lower = rawMessage.toLowerCase();
 
-  // 1. RAM / Memory Exhaustion
+  // 0. Gateway / Proxy / Service Connectivity
+  if (lower.includes('502') || lower.includes('bad gateway')) {
+    return 'Cloud API gateway is temporarily synchronizing. Please try again in a few moments.';
+  }
+  if (lower.includes('503') || lower.includes('service unavailable')) {
+    return 'Cloud infrastructure is undergoing momentary routine maintenance. Please retry shortly.';
+  }
+  if (lower.includes('504') || lower.includes('gateway timeout')) {
+    return 'Gateway timed out contacting compute host. Please retry in a moment.';
+  }
+
   if (
     lower.includes('not enough memory') ||
     lower.includes('could not initialize memory') ||

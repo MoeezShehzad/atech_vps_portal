@@ -241,6 +241,20 @@ export default function Auth({ initialMode }: AuthProps) {
     }
   };
 
+  const handleResendFromLogin = async () => {
+    if (resendCooldown > 0 || !loginEmail.trim()) return;
+    try {
+      await apiCall('/auth/resend-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: loginEmail.trim().toLowerCase() }),
+      });
+      setResendCooldown(60);
+      setLoginError('Verification email resent! Please check your inbox and spam folder.');
+    } catch (e: unknown) {
+      console.warn('Resend error:', e);
+    }
+  };
+
   const currentSlide = SHOWCASE_SLIDES[activeSlide];
 
   return (
@@ -413,9 +427,36 @@ export default function Auth({ initialMode }: AuthProps) {
                 </div>
 
                 {loginError && (
-                  <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                    <span>{loginError}</span>
+                  <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-400 text-xs flex flex-col gap-1.5 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                      <span className="font-semibold">{loginError}</span>
+                    </div>
+                    {loginError.toLowerCase().includes('invalid email') && (
+                      <p className="text-[11px] text-rose-600/90 dark:text-rose-400/90 pl-6">
+                        Please double-check your email address spelling, or{' '}
+                        <button
+                          type="button"
+                          onClick={() => switchMode('signup')}
+                          className="font-bold underline hover:text-rose-800 dark:hover:text-rose-300"
+                        >
+                          click here to create a new account
+                        </button>.
+                      </p>
+                    )}
+                    {loginError.toLowerCase().includes('verify') && (
+                      <p className="text-[11px] text-rose-600/90 dark:text-rose-400/90 pl-6">
+                        Didn't receive the verification email?{' '}
+                        <button
+                          type="button"
+                          onClick={handleResendFromLogin}
+                          disabled={resendCooldown > 0}
+                          className="font-bold underline hover:text-rose-800 dark:hover:text-rose-300 disabled:opacity-50"
+                        >
+                          {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
+                        </button>
+                      </p>
+                    )}
                   </div>
                 )}
 

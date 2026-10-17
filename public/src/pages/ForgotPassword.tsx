@@ -53,8 +53,9 @@ export default function ForgotPassword() {
     e.preventDefault();
     if (!newPassword || !confirmPassword) return;
 
-    if (newPassword.length < 6) {
-      setResetError('Password must be at least 6 characters long.');
+    const passwordComplexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_+\-=[\]\\/]).{8,}$/;
+    if (!passwordComplexityRegex.test(newPassword)) {
+      setResetError('Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.');
       return;
     }
 

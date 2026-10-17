@@ -145,6 +145,48 @@ export async function processCardPayment(req, res) {
       return res.status(404).json({ success: false, error: 'Selected VPS plan not found.' });
     }
 
+    // Server-Side Anti-Tampering Price Verification
+    const baseMonthly = Number(plan.monthlyPrice);
+    const isYearlyOrder = term === '12m' || term === 'yearly';
+    const isMultiYearOrder = term === '24m';
+    let expectedSubtotal = baseMonthly;
+    if (isYearlyOrder) {
+      expectedSubtotal = Number((baseMonthly * 12 * 0.85).toFixed(2));
+    } else if (isMultiYearOrder) {
+      expectedSubtotal = Number((baseMonthly * 24 * 0.75).toFixed(2));
+    }
+
+    let couponDiscount = 0;
+    if (couponCode) {
+      const promo = await prisma.promoCode.findUnique({
+        where: { code: String(couponCode).trim().toUpperCase() },
+      });
+      const now = new Date();
+      if (
+        promo &&
+        promo.isActive &&
+        (!promo.expiresAt || new Date(promo.expiresAt) > now) &&
+        (!promo.validFrom || new Date(promo.validFrom) <= now) &&
+        promo.timesUsed < promo.maxUses &&
+        (!promo.applicablePlanId || promo.applicablePlanId === plan.planId)
+      ) {
+        if (promo.discountType === 'PERCENT') {
+          couponDiscount = Number(((expectedSubtotal * Number(promo.discountValue)) / 100).toFixed(2));
+        } else {
+          couponDiscount = Math.min(expectedSubtotal, Number(promo.discountValue));
+        }
+      }
+    }
+
+    const minAuthorizedPrice = Math.max(0.50, Number((expectedSubtotal - couponDiscount).toFixed(2)));
+    if (Number(amount) < (minAuthorizedPrice - 0.50)) {
+      console.warn(`[SECURITY ALERT] Price tampering attempt detected for User #${userId}: submitted $${amount}, required min $${minAuthorizedPrice}`);
+      return res.status(400).json({
+        success: false,
+        error: 'Order price validation failed. The submitted amount does not match the configured plan pricing.',
+      });
+    }
+
     // 2. Process Charge through Stripe Engine (PCI-DSS compliant sandbox)
     const stripeResult = await processTestCardCharge({
       amount,
@@ -322,6 +364,48 @@ export async function processBankPayment(req, res) {
 
     if (!plan) {
       return res.status(404).json({ success: false, error: 'Selected VPS plan not found.' });
+    }
+
+    // Server-Side Anti-Tampering Price Verification
+    const baseMonthly = Number(plan.monthlyPrice);
+    const isYearly = term === '12m' || term === 'yearly';
+    const isMultiYear = term === '24m';
+    let expectedSubtotal = baseMonthly;
+    if (isYearly) {
+      expectedSubtotal = Number((baseMonthly * 12 * 0.85).toFixed(2));
+    } else if (isMultiYear) {
+      expectedSubtotal = Number((baseMonthly * 24 * 0.75).toFixed(2));
+    }
+
+    let couponDiscount = 0;
+    if (couponCode) {
+      const promo = await prisma.promoCode.findUnique({
+        where: { code: String(couponCode).trim().toUpperCase() },
+      });
+      const nowTime = new Date();
+      if (
+        promo &&
+        promo.isActive &&
+        (!promo.expiresAt || new Date(promo.expiresAt) > nowTime) &&
+        (!promo.validFrom || new Date(promo.validFrom) <= nowTime) &&
+        promo.timesUsed < promo.maxUses &&
+        (!promo.applicablePlanId || promo.applicablePlanId === plan.planId)
+      ) {
+        if (promo.discountType === 'PERCENT') {
+          couponDiscount = Number(((expectedSubtotal * Number(promo.discountValue)) / 100).toFixed(2));
+        } else {
+          couponDiscount = Math.min(expectedSubtotal, Number(promo.discountValue));
+        }
+      }
+    }
+
+    const minAuthorizedPrice = Math.max(0.50, Number((expectedSubtotal - couponDiscount).toFixed(2)));
+    if (Number(amount) < (minAuthorizedPrice - 0.50)) {
+      console.warn(`[SECURITY ALERT] Price tampering attempt detected for User #${userId} (Bank Transfer): submitted $${amount}, required min $${minAuthorizedPrice}`);
+      return res.status(400).json({
+        success: false,
+        error: 'Order price validation failed. The submitted amount does not match the configured plan pricing.',
+      });
     }
 
     const now = new Date();

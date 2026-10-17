@@ -771,8 +771,11 @@ export const resetPasswordHandler = async (req, res) => {
       return res.status(400).json({ error: 'Token and new password are required.' });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    const passwordComplexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_+\-=[\]\\/]).{8,}$/;
+    if (!passwordComplexityRegex.test(newPassword)) {
+      return res.status(400).json({
+        error: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
+      });
     }
 
     let decoded;
