@@ -85,23 +85,74 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link to="/" className="inline-flex items-center gap-3">
-          <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
-        </Link>
-        <h2 className="mt-6 text-3xl font-extrabold text-blue-950 font-poppins">
-          {token ? 'Set New Password' : 'Reset Password'}
-        </h2>
-        <p className="mt-2 text-sm text-slate-600">
-          {token
-            ? 'Enter your new password below to update your account credentials.'
-            : 'Enter your email address to receive password reset instructions.'}
-        </p>
+    <div className="min-h-screen flex font-sans bg-slate-50">
+      {/* LEFT: SECURITY SHOWCASE PANEL */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white p-12 flex-col justify-between">
+        <div className="absolute inset-0 opacity-20 bg-[linear-gradient(rgba(148,163,184,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.15)_1px,transparent_1px)] [background-size:40px_40px]" />
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-600/30 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-32 -right-20 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" />
+
+        <div className="relative z-10">
+          <Link to="/" className="inline-flex items-center gap-3">
+            <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain brightness-200" />
+            <span className="font-bold font-poppins text-lg">Analytical Technical Consulting</span>
+          </Link>
+        </div>
+
+        <div className="relative z-10 space-y-8 my-auto py-8">
+          <div>
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5" /> End-to-End Account Protection
+            </span>
+            <h1 className="mt-5 text-4xl xl:text-5xl font-extrabold font-poppins leading-tight">
+              Secure Credential<br />
+              <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">Recovery System.</span>
+            </h1>
+            <p className="mt-4 text-slate-300 max-w-md text-sm leading-relaxed">
+              We employ cryptographic verification tokens and hardware rate-limiting to protect your cloud infrastructure against unauthorized access.
+            </p>
+          </div>
+
+          <div className="space-y-3.5 max-w-md">
+            {[
+              { title: 'Time-Limited Tokenization', desc: 'Password reset links expire automatically within 1 hour for security.' },
+              { title: 'Instant SMTP Dispatch', desc: 'Delivered instantly through our dedicated mail cluster at mail.atechconsult.com.' },
+              { title: 'Bcrypt Hash Architecture', desc: 'Raw passwords are never stored or transmitted in plain text on our servers.' },
+            ].map((item, idx) => (
+              <div key={idx} className="flex items-start gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white font-poppins">{item.title}</h4>
+                  <p className="text-[11px] text-slate-300 mt-0.5 leading-normal">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="relative z-10 text-xs text-slate-500">© {new Date().getFullYear()} Analytical Technical Consulting Inc. All rights reserved.</p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 shadow-xl shadow-blue-950/5 border border-slate-200 rounded-2xl sm:px-10">
+      {/* RIGHT: RESET FORM */}
+      <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-16">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+          <Link to="/" className="inline-flex items-center gap-3 lg:hidden mb-4">
+            <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
+          </Link>
+          <h2 className="text-3xl font-extrabold text-blue-950 font-poppins">
+            {token ? 'Set New Password' : 'Reset Password'}
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            {token
+              ? 'Enter your new password below to update your account credentials.'
+              : 'Enter your email address to receive password reset instructions.'}
+          </p>
+        </div>
+
+        <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-6 shadow-xl shadow-blue-950/5 border border-slate-200 rounded-2xl sm:px-10">
 
           {/* TOKEN MODE: SET NEW PASSWORD */}
           {token ? (
@@ -266,6 +317,7 @@ export default function ForgotPassword() {
             <span>Enterprise Data Protection</span>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

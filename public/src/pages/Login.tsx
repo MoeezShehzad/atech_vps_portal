@@ -64,13 +64,72 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
+    <div className="min-h-screen flex font-sans bg-slate-50">
+      {/* LEFT: SHOWCASE PANEL */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white p-12 flex-col justify-between">
+        <div className="absolute inset-0 opacity-20 bg-[linear-gradient(rgba(148,163,184,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.15)_1px,transparent_1px)] [background-size:40px_40px]" />
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-600/30 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-32 -right-20 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" />
+
+        <div className="relative z-10">
+          <Link to="/" className="inline-flex items-center gap-3">
+            <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain brightness-200" />
+            <span className="font-bold font-poppins text-lg">Analytical Technical Consulting</span>
+          </Link>
+        </div>
+
+        <div className="relative z-10 space-y-8">
+          <div>
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> All systems operational
+            </span>
+            <h1 className="mt-5 text-4xl xl:text-5xl font-extrabold font-poppins leading-tight">
+              Deploy cloud servers<br />
+              <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">in seconds.</span>
+            </h1>
+            <p className="mt-4 text-slate-300 max-w-md text-sm leading-relaxed">
+              Enterprise Hyper-V virtual machines on NVMe storage, managed from one powerful dashboard.
+            </p>
+          </div>
+
+          {/* Terminal mockup */}
+          <div className="rounded-2xl bg-slate-950/80 border border-slate-700/60 shadow-2xl backdrop-blur max-w-md overflow-hidden">
+            <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-slate-800">
+              <span className="w-3 h-3 rounded-full bg-rose-500" />
+              <span className="w-3 h-3 rounded-full bg-amber-400" />
+              <span className="w-3 h-3 rounded-full bg-emerald-500" />
+              <span className="ml-3 text-[11px] text-slate-500 font-mono">root@atc-vps</span>
+            </div>
+            <div className="p-4 font-mono text-xs space-y-1.5">
+              <p><span className="text-emerald-400">$</span> atc deploy --plan pro --os ubuntu-24.04</p>
+              <p className="text-slate-400">→ Allocating 4 vCPU / 8 GB RAM / 120 GB NVMe</p>
+              <p className="text-slate-400">→ Assigning public IPv4...</p>
+              <p className="text-emerald-400">✓ Server online in 9.4s</p>
+              <p><span className="text-emerald-400">$</span> <span className="inline-block w-2 h-3.5 bg-slate-300 animate-pulse align-middle" /></p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 max-w-md">
+            {[['99.9%', 'Uptime SLA'], ['<10s', 'Provisioning'], ['24/7', 'Support']].map(([v, l]) => (
+              <div key={l} className="rounded-xl bg-white/5 border border-white/10 p-3">
+                <p className="text-xl font-bold font-poppins">{v}</p>
+                <p className="text-[11px] text-slate-400">{l}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="relative z-10 text-xs text-slate-500">© {new Date().getFullYear()} Analytical Technical Consulting Inc.</p>
+      </div>
+
+      {/* RIGHT: FORM */}
+      <div className="flex-1 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-16">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link to="/" className="inline-flex items-center gap-3">
+        <Link to="/" className="inline-flex items-center gap-3 lg:hidden">
           <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
         </Link>
         <h2 className="mt-6 text-3xl font-extrabold text-blue-950 font-poppins">
-          Sign in to your account
+          Welcome back
         </h2>
         <p className="mt-2 text-sm text-slate-600">
           Don't have an account?{' '}
@@ -184,6 +243,7 @@ export default function Login() {
             <span>Enterprise Data Protection</span>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

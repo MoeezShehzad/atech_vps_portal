@@ -183,26 +183,93 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex flex-col justify-center py-10 sm:px-6 lg:px-8 font-sans">
-      {/* BRAND HEADER */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-2xl text-center">
-        <Link to="/" className="inline-flex items-center gap-3">
-          <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
-        </Link>
-        <h2 className="mt-4 text-3xl font-extrabold text-blue-950 font-poppins tracking-tight">
-          Create your account
-        </h2>
-        
-        <p className="mt-2 text-sm text-slate-600">
-          Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-500">
-            Sign in
+    <div className="min-h-screen flex font-sans bg-slate-50">
+      {/* LEFT: ENTERPRISE SHOWCASE PANEL */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white p-12 flex-col justify-between">
+        <div className="absolute inset-0 opacity-20 bg-[linear-gradient(rgba(148,163,184,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.15)_1px,transparent_1px)] [background-size:40px_40px]" />
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-600/30 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-32 -right-20 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" />
+
+        <div className="relative z-10">
+          <Link to="/" className="inline-flex items-center gap-3">
+            <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain brightness-200" />
+            <span className="font-bold font-poppins text-lg">Analytical Technical Consulting</span>
           </Link>
-        </p>
+        </div>
+
+        <div className="relative z-10 space-y-8 my-auto py-8">
+          <div>
+            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" /> Instant Cloud Access
+            </span>
+            <h1 className="mt-5 text-4xl xl:text-5xl font-extrabold font-poppins leading-tight">
+              Enterprise Cloud VPS,<br />
+              <span className="bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent">engineered for scale.</span>
+            </h1>
+            <p className="mt-4 text-slate-300 max-w-md text-sm leading-relaxed">
+              Create your account to provision ultra-low latency Hyper-V Gen2 virtual servers with dedicated NVMe storage in under 10 seconds.
+            </p>
+          </div>
+
+          {/* Key Advantages Checklist */}
+          <div className="space-y-3.5 max-w-md">
+            {[
+              { title: 'Free 30-Day Starter Package', desc: 'Test drive 2 vCPU, 2 GB RAM, and 50 GB NVMe with zero initial commitment.' },
+              { title: 'Bare-Metal NVMe Performance', desc: 'Direct-attached enterprise NVMe storage arrays delivering sub-millisecond I/O.' },
+              { title: 'Perimeter Hardware Defense', desc: 'Multi-layer Cisco & Sophos firewall filtering protecting every provisioned IP.' },
+              { title: 'Instant OS Rebuilds & Snapshots', desc: 'One-click root password resets, automated snapshots, and web VNC console.' },
+            ].map((item, idx) => (
+              <div key={idx} className="flex items-start gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
+                <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-cyan-400 flex items-center justify-center shrink-0 mt-0.5">
+                  <Check className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white font-poppins">{item.title}</h4>
+                  <p className="text-[11px] text-slate-300 mt-0.5 leading-normal">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Infrastructure Metrics */}
+          <div className="grid grid-cols-3 gap-3 max-w-md">
+            <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-center">
+              <p className="text-xl font-bold font-poppins text-cyan-300">&lt;10s</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">Deploy Speed</p>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-center">
+              <p className="text-xl font-bold font-poppins text-emerald-400">99.9%</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">SLA Uptime</p>
+            </div>
+            <div className="rounded-xl bg-white/5 border border-white/10 p-3 text-center">
+              <p className="text-xl font-bold font-poppins text-blue-400">1 Gbps</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">Port Speed</p>
+            </div>
+          </div>
+        </div>
+
+        <p className="relative z-10 text-xs text-slate-500">© {new Date().getFullYear()} Analytical Technical Consulting Inc. All rights reserved.</p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-lg">
-        <div className="bg-white py-8 px-6 shadow-2xl shadow-blue-950/5 border border-slate-200 rounded-3xl sm:px-10">
+      {/* RIGHT: REGISTRATION FORM */}
+      <div className="flex-1 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-12 xl:px-16 overflow-y-auto">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+          <Link to="/" className="inline-flex items-center gap-3 lg:hidden mb-4">
+            <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
+          </Link>
+          <h2 className="text-3xl font-extrabold text-blue-950 font-poppins tracking-tight">
+            Create your account
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Already have an account?{' '}
+            <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-500">
+              Sign in
+            </Link>
+          </p>
+        </div>
+
+        <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-6 shadow-xl shadow-blue-950/5 border border-slate-200 rounded-3xl sm:px-10">
           
           {/* VERIFICATION SENT SCREEN */}
           {verificationSent ? (
@@ -446,6 +513,7 @@ export default function Signup() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
