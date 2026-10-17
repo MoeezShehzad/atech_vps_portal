@@ -7,25 +7,25 @@ import {
 
 export default function PrivacyPolicy() {
   const lastUpdated = "October 17, 2026";
-  const [activeSection, setActiveSection] = useState('gpriv-1');
+  const [activeSection, setActiveSection] = useState('atcpriv-1');
 
   const tableOfContents = [
-    { id: 'gpriv-1', title: '1. Google Cloud Trust Model & Scope' },
-    { id: 'gpriv-2', title: '2. The Four Foundational Privacy Commitments' },
-    { id: 'gpriv-3', title: '3. Customer Data vs Account Data Demarcation' },
-    { id: 'gpriv-4', title: '4. Information We Collect' },
-    { id: 'gpriv-5', title: '5. Lawful Bases for Processing' },
-    { id: 'gpriv-6', title: '6. Payment Processing & PCI-DSS Level 1' },
-    { id: 'gpriv-7', title: '7. Infrastructure Telemetry & Perimeter Security' },
-    { id: 'gpriv-8', title: '8. Controlled Subprocessors & Third Parties' },
-    { id: 'gpriv-9', title: '9. Absolute Prohibition on Sale of Data' },
-    { id: 'gpriv-10', title: '10. Government Demands & Subpoena Scrutiny' },
-    { id: 'gpriv-11', title: '11. Cryptographic Erasure & NIST SP 800-88' },
-    { id: 'gpriv-12', title: '12. Global Privacy Rights (GDPR & CCPA/CPRA)' },
-    { id: 'gpriv-13', title: '13. Essential Cookies & GPC Signal Handling' },
-    { id: 'gpriv-14', title: '14. Security Safeguards & Defense-in-Depth' },
-    { id: 'gpriv-15', title: '15. Protection of Minors' },
-    { id: 'gpriv-16', title: '16. Data Protection Officer & Legal Notices' },
+    { id: 'atcpriv-1', title: '1. Institutional Scope & Regulatory Jurisdiction' },
+    { id: 'atcpriv-2', title: '2. The Four Foundational Privacy Commitments' },
+    { id: 'atcpriv-3', title: '3. Customer Data vs Account Data Demarcation' },
+    { id: 'atcpriv-4', title: '4. Information We Collect' },
+    { id: 'atcpriv-5', title: '5. Lawful Bases for Processing' },
+    { id: 'atcpriv-6', title: '6. Payment Processing & PCI-DSS Level 1' },
+    { id: 'atcpriv-7', title: '7. Infrastructure Telemetry & Perimeter Security' },
+    { id: 'atcpriv-8', title: '8. Controlled Subprocessors & Third Parties' },
+    { id: 'atcpriv-9', title: '9. Absolute Prohibition on Sale of Data' },
+    { id: 'atcpriv-10', title: '10. Government Demands & Subpoena Scrutiny' },
+    { id: 'atcpriv-11', title: '11. Cryptographic Erasure & NIST SP 800-88' },
+    { id: 'atcpriv-12', title: '12. Global Privacy Rights (GDPR & CCPA/CPRA)' },
+    { id: 'atcpriv-13', title: '13. Essential Cookies & GPC Signal Handling' },
+    { id: 'atcpriv-14', title: '14. Security Safeguards & Defense-in-Depth' },
+    { id: 'atcpriv-15', title: '15. Protection of Minors' },
+    { id: 'atcpriv-16', title: '16. Data Protection Officer & Legal Notices' },
   ];
 
   const scrollTo = (id: string) => {
@@ -42,7 +42,7 @@ export default function PrivacyPolicy() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         
-        {/* GOOGLE CLOUD STYLE PRIVACY HERO */}
+        {/* PRIVACY HERO */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 shadow-sm mb-10">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6 mb-6">
             <div className="flex items-center gap-4">
@@ -51,7 +51,7 @@ export default function PrivacyPolicy() {
               </div>
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  Google Cloud Standard Enterprise Privacy Notice
+                  Analytical Technical Consulting Inc. • Enterprise Privacy Architecture
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-poppins">
                   Cloud Privacy Notice
@@ -60,7 +60,7 @@ export default function PrivacyPolicy() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                Framework: GCP-DPA 2026.4
+                Framework: ATC-DPA 2026.4
               </span>
               <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                 Effective: {lastUpdated}
@@ -70,7 +70,7 @@ export default function PrivacyPolicy() {
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
             At <strong>Analytical Technical Consulting Inc.</strong> (&quot;ATC&quot;, &quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), 
-            we build our cloud infrastructure around the world-class enterprise data privacy and trust standards established by Google Cloud. 
+            we operate our enterprise cloud infrastructure under rigorous data privacy, sovereignty, and trust commitments. 
             This Cloud Privacy Notice delineates how we handle, process, and secure Customer Data and Account Information across our Microsoft Hyper-V 
             virtualization clusters, NVMe block storage networks, APIs, and portals in compliance with GDPR, UK GDPR, CCPA/CPRA, and federal U.S. data protection statutes.
           </p>
@@ -126,10 +126,10 @@ export default function PrivacyPolicy() {
           <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-12 shadow-sm space-y-12 text-sm sm:text-base leading-relaxed text-slate-700 dark:text-slate-300">
 
             {/* SECTION 1 */}
-            <section id="gpriv-1" className="space-y-4 pt-2">
+            <section id="atcpriv-1" className="space-y-4 pt-2">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">1</span>
-                Google Cloud Trust Model &amp; Regulatory Jurisdiction
+                Institutional Scope &amp; Regulatory Jurisdiction
               </h2>
               <p>
                 This Cloud Privacy Notice applies to all cloud infrastructure services provided by <strong>Analytical Technical Consulting Inc.</strong>, 
@@ -137,21 +137,21 @@ export default function PrivacyPolicy() {
                 <strong> 1360 Brentwood Trl, Bolingbrook, IL 60490, United States</strong>.
               </p>
               <p>
-                Modeled after the Google Cloud Data Protection Addendum (DPA), this policy establishes institutional transparency regarding our data handling 
-                pursuant to the European Union General Data Protection Regulation (Regulation (EU) 2016/679, &quot;GDPR&quot;), the UK Data Protection Act 2018, 
-                the California Consumer Privacy Act as amended by the California Privacy Rights Act (Cal. Civ. Code § 1798.100 et seq., &quot;CCPA/CPRA&quot;), 
-                and comprehensive state privacy statutes in Virginia, Colorado, Connecticut, and Utah.
+                This policy establishes institutional transparency regarding our data handling pursuant to the European Union General Data Protection 
+                Regulation (Regulation (EU) 2016/679, &quot;GDPR&quot;), the UK Data Protection Act 2018, the California Consumer Privacy Act as amended by the 
+                California Privacy Rights Act (Cal. Civ. Code § 1798.100 et seq., &quot;CCPA/CPRA&quot;), and comprehensive state privacy statutes in Virginia, 
+                Colorado, Connecticut, and Utah.
               </p>
             </section>
 
             {/* SECTION 2 - THE FOUR FOUNDATIONAL COMMITMENTS */}
-            <section id="gpriv-2" className="space-y-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 p-6 sm:p-8 rounded-2xl">
+            <section id="atcpriv-2" className="space-y-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 p-6 sm:p-8 rounded-2xl">
               <h2 className="text-xl font-bold text-emerald-950 dark:text-emerald-300 font-poppins flex items-center gap-3">
                 <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                2. Google Cloud Enterprise Trust Commitments
+                2. ATC Enterprise Data Trust Commitments
               </h2>
               <p className="text-xs sm:text-sm text-emerald-950 dark:text-emerald-200 leading-relaxed font-semibold">
-                ATC adheres strictly to the four foundational enterprise data protection commitments pioneered by Google Cloud:
+                ATC adheres strictly to four foundational enterprise data protection commitments:
               </p>
               <div className="grid sm:grid-cols-2 gap-3 pt-2 text-xs sm:text-sm">
                 <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-emerald-200/60 dark:border-emerald-900/40">
@@ -174,13 +174,13 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 3 - DEMARCATION */}
-            <section id="gpriv-3" className="space-y-4 bg-slate-100 dark:bg-slate-800/60 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <section id="atcpriv-3" className="space-y-4 bg-slate-100 dark:bg-slate-800/60 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <Server className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                 3. Customer Data vs. Account Data Demarcation
               </h2>
               <p className="text-xs sm:text-sm leading-relaxed">
-                In adherence to Google Cloud architecture, ATC maintains a strict institutional boundary between:
+                ATC maintains a strict institutional boundary between:
               </p>
               <div className="space-y-3 pt-2 text-xs sm:text-sm">
                 <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-300 dark:border-slate-700">
@@ -198,7 +198,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 4 */}
-            <section id="gpriv-4" className="space-y-4">
+            <section id="atcpriv-4" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">4</span>
                 Categories of Information We Collect
@@ -213,7 +213,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 5 */}
-            <section id="gpriv-5" className="space-y-4">
+            <section id="atcpriv-5" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">5</span>
                 Lawful Bases for Data Processing
@@ -240,7 +240,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 6 - PAYMENT TOKENIZATION */}
-            <section id="gpriv-6" className="space-y-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 p-6 sm:p-8 rounded-2xl">
+            <section id="atcpriv-6" className="space-y-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 p-6 sm:p-8 rounded-2xl">
               <h2 className="text-xl font-bold text-emerald-950 dark:text-emerald-300 font-poppins flex items-center gap-3">
                 <Lock className="w-6 h-6 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
                 6. Payment Card Processing &amp; PCI-DSS Level 1 Security Guarantee
@@ -257,7 +257,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 7 */}
-            <section id="gpriv-7" className="space-y-4">
+            <section id="atcpriv-7" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">7</span>
                 Infrastructure Telemetry, Flow Logs &amp; Perimeter Defense
@@ -273,7 +273,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 8 */}
-            <section id="gpriv-8" className="space-y-4">
+            <section id="atcpriv-8" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">8</span>
                 Audited Subprocessors &amp; Controlled Third-Party Disclosures
@@ -295,7 +295,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 9 - ZERO SALE OF DATA */}
-            <section id="gpriv-9" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
+            <section id="atcpriv-9" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins uppercase tracking-wide">
                 9. Absolute Prohibition on the Sale or Rental of Personal Data
               </h2>
@@ -310,13 +310,13 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 10 - GOVERNMENT DEMANDS */}
-            <section id="gpriv-10" className="space-y-4">
+            <section id="atcpriv-10" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">10</span>
-                Government Demands &amp; Subpoena Scrutiny (Google Cloud Standard)
+                Government Demands &amp; Subpoena Scrutiny
               </h2>
               <p>
-                ATC enforces the same rigorous standards regarding government demands for customer records as Google Cloud:
+                ATC enforces rigorous standards regarding government demands for customer records:
               </p>
               <ul className="list-disc pl-6 space-y-1.5 text-xs sm:text-sm">
                 <li><strong>Judicial Process Required:</strong> ATC will NOT disclose Customer Data or account records without valid, binding legal process—such as a subpoena, court order signed by a judge of competent jurisdiction, or search warrant issued under the Federal Rules of Criminal Procedure or state equivalent;</li>
@@ -326,7 +326,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 11 - NIST SP 800-88 SANITIZATION */}
-            <section id="gpriv-11" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
+            <section id="atcpriv-11" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins uppercase tracking-wide">
                 11. Data Retention &amp; NIST SP 800-88 Cryptographic Sanitization
               </h2>
@@ -343,7 +343,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 12 - STATUTORY RIGHTS */}
-            <section id="gpriv-12" className="space-y-4">
+            <section id="atcpriv-12" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">12</span>
                 Your Global Statutory Privacy Rights (GDPR &amp; CCPA/CPRA)
@@ -373,7 +373,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 13 */}
-            <section id="gpriv-13" className="space-y-4">
+            <section id="atcpriv-13" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">13</span>
                 Cookies, Session Storage &amp; Global Privacy Control (GPC)
@@ -386,7 +386,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 14 */}
-            <section id="gpriv-14" className="space-y-4">
+            <section id="atcpriv-14" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">14</span>
                 Defense-in-Depth Security Safeguards
@@ -403,7 +403,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 15 */}
-            <section id="gpriv-15" className="space-y-4">
+            <section id="atcpriv-15" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">15</span>
                 Protection of Minors
@@ -416,7 +416,7 @@ export default function PrivacyPolicy() {
             </section>
 
             {/* SECTION 16 */}
-            <section id="gpriv-16" className="space-y-4">
+            <section id="atcpriv-16" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">16</span>
                 Policy Amendments &amp; Data Protection Officer Contact

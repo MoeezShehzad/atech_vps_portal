@@ -8,28 +8,28 @@ import {
 
 export default function TermsOfService() {
   const lastUpdated = "October 17, 2026";
-  const [activeSection, setActiveSection] = useState('gcp-1');
+  const [activeSection, setActiveSection] = useState('atc-1');
 
   const tableOfContents = [
-    { id: 'gcp-1', title: '1. Services Provision & Modifications' },
-    { id: 'gcp-2', title: '2. Customer Obligations & Consents' },
-    { id: 'gcp-3', title: '3. Customer Data & Intellectual Property' },
-    { id: 'gcp-4', title: '4. Shared Security Responsibility Model' },
-    { id: 'gcp-5', title: '5. Acceptable Use Policy & High-Risk Activities' },
-    { id: 'gcp-6', title: '6. Absolute Backup Disclaimer & Data Loss Immunity' },
-    { id: 'gcp-7', title: '7. Service Level Agreement (SLA) & Remedies' },
-    { id: 'gcp-8', title: '8. Fees, Invoicing, Billing & Taxes' },
-    { id: 'gcp-9', title: '9. Suspension & Emergency Security Actions' },
-    { id: 'gcp-10', title: '10. Term, Termination & Data Sanitization' },
-    { id: 'gcp-11', title: '11. Complete Disclaimer of Warranties ("AS IS")' },
-    { id: 'gcp-12', title: '12. Strict Limitation of Liability & Damages Cap' },
-    { id: 'gcp-13', title: '13. Comprehensive Customer Indemnification' },
-    { id: 'gcp-14', title: '14. Mandatory Binding Individual Arbitration' },
-    { id: 'gcp-15', title: '15. Governing Law, Exclusive Venue & Time Bar' },
-    { id: 'gcp-16', title: '16. Safe Harbor, DMCA & Copyright Enforcement' },
-    { id: 'gcp-17', title: '17. U.S. Export Controls & Trade Sanctions' },
-    { id: 'gcp-18', title: '18. Force Majeure & Operational Continuity' },
-    { id: 'gcp-19', title: '19. Miscellaneous & Legal Definitions' },
+    { id: 'atc-1', title: '1. Services Provision & Modifications' },
+    { id: 'atc-2', title: '2. Customer Obligations & Consents' },
+    { id: 'atc-3', title: '3. Customer Data & Intellectual Property' },
+    { id: 'atc-4', title: '4. Shared Security Responsibility Model' },
+    { id: 'atc-5', title: '5. Acceptable Use Policy & High-Risk Activities' },
+    { id: 'atc-6', title: '6. Absolute Backup Disclaimer & Data Loss Immunity' },
+    { id: 'atc-7', title: '7. Service Level Agreement (SLA) & Remedies' },
+    { id: 'atc-8', title: '8. Fees, Invoicing, Billing & Taxes' },
+    { id: 'atc-9', title: '9. Suspension & Emergency Security Actions' },
+    { id: 'atc-10', title: '10. Term, Termination & Data Sanitization' },
+    { id: 'atc-11', title: '11. Complete Disclaimer of Warranties ("AS IS")' },
+    { id: 'atc-12', title: '12. Strict Limitation of Liability & Damages Cap' },
+    { id: 'atc-13', title: '13. Comprehensive Customer Indemnification' },
+    { id: 'atc-14', title: '14. Mandatory Binding Individual Arbitration' },
+    { id: 'atc-15', title: '15. Governing Law, Exclusive Venue & Time Bar' },
+    { id: 'atc-16', title: '16. Safe Harbor, DMCA & Copyright Enforcement' },
+    { id: 'atc-17', title: '17. U.S. Export Controls & Trade Sanctions' },
+    { id: 'atc-18', title: '18. Force Majeure & Operational Continuity' },
+    { id: 'atc-19', title: '19. Miscellaneous & Legal Definitions' },
   ];
 
   const scrollTo = (id: string) => {
@@ -46,7 +46,7 @@ export default function TermsOfService() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         
-        {/* GOOGLE CLOUD STYLE ENTERPRISE HERO */}
+        {/* ENTERPRISE HERO */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 shadow-sm mb-10">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6 mb-6">
             <div className="flex items-center gap-4">
@@ -55,7 +55,7 @@ export default function TermsOfService() {
               </div>
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                  Google Cloud Standard Master Services Agreement
+                  Analytical Technical Consulting Inc. • Master Services Agreement
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-poppins">
                   Cloud Platform Terms of Service
@@ -64,7 +64,7 @@ export default function TermsOfService() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                Version: Enterprise GCP-4.2
+                Version: ATC-MSA 2026.4
               </span>
               <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
                 Effective: {lastUpdated}
@@ -81,10 +81,10 @@ export default function TermsOfService() {
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
             This Cloud Platform Master Services Agreement (&quot;Agreement&quot;) is made and entered into by and between 
-            <strong> Analytical Technical Consulting Inc.</strong> (&quot;ATC&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), an Illinois corporation having its principal office 
-            and data infrastructure at <strong>1360 Brentwood Trl, Bolingbrook, IL 60490, United States</strong>, and the entity or individual agreeing to these terms 
-            (&quot;Customer&quot;, &quot;you&quot;, or &quot;your&quot;). This Agreement models the security, unmanaged infrastructure, liability limitations, and shared responsibility standards 
-            of enterprise cloud hypervisors.
+            <strong> Analytical Technical Consulting Inc.</strong> (&quot;ATC&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), an Illinois corporation having its principal corporate office 
+            and data infrastructure operations at <strong>1360 Brentwood Trl, Bolingbrook, IL 60490, United States</strong>, and the entity or individual agreeing to these terms 
+            (&quot;Customer&quot;, &quot;you&quot;, or &quot;your&quot;). This Agreement governs your access to and use of all ATC cloud virtual machines, dedicated servers, hypervisor compute nodes, 
+            enterprise NVMe block storage volumes, networks, IP allocations, software images, and technical infrastructure.
           </p>
         </div>
 
@@ -126,7 +126,7 @@ export default function TermsOfService() {
           <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-12 shadow-sm space-y-12 text-sm sm:text-base leading-relaxed text-slate-700 dark:text-slate-300">
 
             {/* SECTION 1 */}
-            <section id="gcp-1" className="space-y-4 pt-2">
+            <section id="atc-1" className="space-y-4 pt-2">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">1</span>
                 Services Provision, Modifications &amp; Unmanaged Scope
@@ -138,7 +138,7 @@ export default function TermsOfService() {
                 in accordance with this Agreement and our published Service Level Agreement.
               </p>
               <p>
-                <strong>1.2 Strict Unmanaged Infrastructure Scope:</strong> Following Google Cloud and enterprise hypervisor conventions, the Services 
+                <strong>1.2 Strict Unmanaged Infrastructure Scope:</strong> Following enterprise cloud infrastructure conventions, the Services 
                 are provided strictly on an <strong>Unmanaged Infrastructure-as-a-Service (IaaS)</strong> basis. ATC manages and secures solely the underlying 
                 physical data center chassis, host hypervisor operating systems, virtualization engines, and primary network switches. 
                 Customer maintains exclusive and absolute responsibility for the deployment, configuration, kernel updates, security patching, 
@@ -151,7 +151,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 2 */}
-            <section id="gcp-2" className="space-y-4">
+            <section id="atc-2" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">2</span>
                 Customer Obligations, Corporate Authority &amp; Authentication
@@ -175,7 +175,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 3 - CUSTOMER DATA */}
-            <section id="gcp-3" className="space-y-4">
+            <section id="atc-3" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">3</span>
                 Customer Data &amp; Intellectual Property Sovereignty
@@ -198,10 +198,10 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 4 - SHARED RESPONSIBILITY MODEL */}
-            <section id="gcp-4" className="space-y-4 bg-slate-100 dark:bg-slate-800/60 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <section id="atc-4" className="space-y-4 bg-slate-100 dark:bg-slate-800/60 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <Shield className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                4. Shared Security Responsibility Model (Google Cloud Standard)
+                4. ATC Shared Security Responsibility Model
               </h2>
               <p className="text-xs sm:text-sm leading-relaxed">
                 Cloud security is a shared responsibility between ATC and Customer. The demarcation of responsibilities is strictly established as follows:
@@ -229,7 +229,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 5 - AUP & HIGH-RISK ACTIVITIES */}
-            <section id="gcp-5" className="space-y-4 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/60 p-6 sm:p-8 rounded-2xl">
+            <section id="atc-5" className="space-y-4 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/60 p-6 sm:p-8 rounded-2xl">
               <h2 className="text-xl font-bold text-rose-900 dark:text-rose-300 font-poppins flex items-center gap-3">
                 <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400 flex-shrink-0" />
                 5. Acceptable Use Policy (AUP) &amp; High-Risk Activities Prohibition
@@ -257,7 +257,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 6 - ABSOLUTE BACKUP DISCLAIMER */}
-            <section id="gcp-6" className="space-y-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 p-6 sm:p-8 rounded-2xl">
+            <section id="atc-6" className="space-y-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 p-6 sm:p-8 rounded-2xl">
               <h2 className="text-xl font-bold text-amber-950 dark:text-amber-300 font-poppins flex items-center gap-3">
                 <AlertOctagon className="w-6 h-6 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                 6. Absolute Backup Disclaimer &amp; Complete Immunity for Data Loss
@@ -279,7 +279,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 7 */}
-            <section id="gcp-7" className="space-y-4">
+            <section id="atc-7" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">7</span>
                 Service Level Agreement (SLA) &amp; Sole Remedy
@@ -300,7 +300,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 8 */}
-            <section id="gcp-8" className="space-y-4">
+            <section id="atc-8" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">8</span>
                 Fees, Invoicing, Automated Billing &amp; Taxes
@@ -323,13 +323,13 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 9 */}
-            <section id="gcp-9" className="space-y-4">
+            <section id="atc-9" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">9</span>
                 Emergency Security Actions &amp; Immediate Suspension
               </h2>
               <p>
-                <strong>Emergency Suspension:</strong> Following Google Cloud protocols, ATC may immediately suspend Customer&apos;s use of the Services or isolate 
+                <strong>Emergency Suspension:</strong> ATC may immediately suspend Customer&apos;s use of the Services or isolate 
                 Customer&apos;s virtual machines without prior notice (&quot;Emergency Suspension&quot;) if ATC reasonably determines that: 
                 (a) there is an active security breach or vulnerability affecting Customer&apos;s instance; 
                 (b) Customer&apos;s instance is generating abusive network traffic that disrupts our cluster or upstream transit providers; 
@@ -340,7 +340,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 10 */}
-            <section id="gcp-10" className="space-y-4">
+            <section id="atc-10" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">10</span>
                 Term, Termination &amp; NIST SP 800-88 Data Sanitization
@@ -354,7 +354,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 11 - DISCLAIMER OF WARRANTIES */}
-            <section id="gcp-11" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
+            <section id="atc-11" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins uppercase tracking-wide">
                 11. Complete Disclaimer of Warranties (&quot;AS IS&quot; &amp; &quot;AS AVAILABLE&quot;)
               </h2>
@@ -373,7 +373,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 12 - STRICT LIMITATION OF LIABILITY */}
-            <section id="gcp-12" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
+            <section id="atc-12" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins uppercase tracking-wide">
                 12. Strict Limitation of Liability &amp; Absolute Damages Cap
               </h2>
@@ -402,7 +402,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 13 - INDEMNIFICATION */}
-            <section id="gcp-13" className="space-y-4">
+            <section id="atc-13" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">13</span>
                 Comprehensive Customer Indemnification
@@ -424,7 +424,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 14 - BINDING ARBITRATION & CLASS ACTION WAIVER */}
-            <section id="gcp-14" className="space-y-4 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 p-6 sm:p-8 rounded-2xl">
+            <section id="atc-14" className="space-y-4 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 p-6 sm:p-8 rounded-2xl">
               <h2 className="text-xl font-bold text-blue-950 dark:text-blue-200 font-poppins flex items-center gap-3">
                 <Scale className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                 14. Mandatory Binding Individual Arbitration &amp; Class Action Waiver
@@ -458,7 +458,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 15 */}
-            <section id="gcp-15" className="space-y-4">
+            <section id="atc-15" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">15</span>
                 Governing Law, Exclusive Venue &amp; One-Year Limitation Bar
@@ -480,7 +480,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 16 */}
-            <section id="gcp-16" className="space-y-4">
+            <section id="atc-16" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">16</span>
                 Safe Harbor, DMCA &amp; Copyright Notice
@@ -498,7 +498,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 17 */}
-            <section id="gcp-17" className="space-y-4">
+            <section id="atc-17" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">17</span>
                 U.S. Export Controls &amp; Trade Sanctions
@@ -511,7 +511,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 18 */}
-            <section id="gcp-18" className="space-y-4">
+            <section id="atc-18" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">18</span>
                 Force Majeure &amp; Upstream Continuity
@@ -524,7 +524,7 @@ export default function TermsOfService() {
             </section>
 
             {/* SECTION 19 */}
-            <section id="gcp-19" className="space-y-4">
+            <section id="atc-19" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">19</span>
                 Miscellaneous Legal Provisions &amp; Defined Terms

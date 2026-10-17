@@ -461,7 +461,7 @@ export default function StorageAndDisks() {
                 </div>
               </div>
 
-              {/* Google-Style Prorated Financial Quote Card */}
+              {/* ATC Enterprise Prorated Financial Quote Card */}
               {quoteLoading ? (
                 <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 text-xs text-slate-500">
                   <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600" /> Calculating prorated billing quote...
