@@ -60,7 +60,7 @@ async function provisionGuestVM({ vmName, adminUsername, adminPassword, sshPubli
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     await new Promise((r) => setTimeout(r, 3000));
   }
 
@@ -524,20 +524,20 @@ server.listen(PORT, HOST, () => {
   console.log(`================================================================`);
 
   // Forward localhost:5000 and localhost:5174 to Ubuntu VM for Google OAuth & local portal access
-  const VM_IP = process.env.UBUNTU_VM_IP || '172.27.45.113';
+  const VM_IP = process.env.UBUNTU_VM_IP || '172.20.208.223';
   [5000, 5174].forEach((fwdPort) => {
     try {
       const bridge = net.createServer((socket) => {
         const target = net.connect(fwdPort, VM_IP);
         socket.pipe(target);
         target.pipe(socket);
-        socket.on('error', () => {});
-        target.on('error', () => {});
+        socket.on('error', () => { });
+        target.on('error', () => { });
       });
-      bridge.on('error', () => {}); // Port already forwarded or in use
+      bridge.on('error', () => { }); // Port already forwarded or in use
       bridge.listen(fwdPort, '127.0.0.1', () => {
         console.log(`[PORT BRIDGE] Forwarding localhost:${fwdPort} -> ${VM_IP}:${fwdPort}`);
       });
-    } catch (_) {}
+    } catch (_) { }
   });
 });
