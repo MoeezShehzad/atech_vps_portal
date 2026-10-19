@@ -58,6 +58,7 @@ import { apiCall, setAccessToken } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import WindowsResourceGraph from '../components/WindowsResourceGraph';
 import { formatDate, formatDateTime } from '../utils/dateFormatter';
+import TableSkeleton from '../components/TableSkeleton';
 
 const WebConsoleModal = React.lazy(() => import('../components/WebConsoleModal'));
 const SecurityAndLogs = React.lazy(() => import('../components/SecurityAndLogs'));
@@ -72,6 +73,7 @@ interface Instance {
   vmId: number;
   name: string;
   hostname: string;
+  hasPublicIp?: boolean;
   ip: string;
   adminUser?: string;
   adminPassword?: string;
@@ -383,17 +385,19 @@ export default function Dashboard() {
     if (!hasProvisioning) return;
 
     const timer = setInterval(() => {
+      if (document.hidden) return;
       fetchVMs();
-    }, 3000);
+    }, 3500);
     return () => clearInterval(timer);
   }, [instances]);
 
-  // Periodic background sync: Keeps VM power states updated (e.g., if user ran 'sudo poweroff' or 'sudo reboot' inside guest OS)
+  // Periodic background sync: Keeps VM power states updated with visibility pause
   useEffect(() => {
     if (Boolean(consoleVm)) return;
     const timer = setInterval(() => {
+      if (document.hidden) return;
       fetchVMs();
-    }, 12000);
+    }, 15000);
     return () => clearInterval(timer);
   }, [Boolean(consoleVm)]);
 
@@ -417,7 +421,7 @@ export default function Dashboard() {
     }
   }, [instances]);
 
-  // Real-time telemetry monitoring (polls every 5 seconds for active dashboard VM)
+  // Real-time telemetry monitoring (polls only when telemetry panel is enabled)
   const fetchTelemetryMetrics = async (vmId: number) => {
     try {
       const data: VMMetrics = await apiCall(`/vms/${vmId}/metrics`);
@@ -445,24 +449,22 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (!activeTelemetryVmId || Boolean(consoleVm)) {
+    if (!activeTelemetryVmId || Boolean(consoleVm) || !showTelemetry) {
       setLiveMetrics(null);
-      setCpuHistory(Array(20).fill(0));
-      setRamHistory(Array(20).fill(0));
-      setDiskHistory(Array(20).fill(0));
       return;
     }
 
     setMetricsLoading(true);
     fetchTelemetryMetrics(activeTelemetryVmId).finally(() => setMetricsLoading(false));
 
-    // Telemetry polling interval (5 seconds)
+    // Telemetry polling interval (pauses when browser tab is inactive)
     const metricsTimer = setInterval(() => {
+      if (document.hidden) return;
       fetchTelemetryMetrics(activeTelemetryVmId);
-    }, 5000);
+    }, 6000);
 
     return () => clearInterval(metricsTimer);
-  }, [activeTelemetryVmId, Boolean(consoleVm)]);
+  }, [activeTelemetryVmId, Boolean(consoleVm), showTelemetry]);
 
   // Handle Escape key to close any active drawer or modal
   useEffect(() => {
@@ -866,13 +868,26 @@ export default function Dashboard() {
   // Create Manual Backup Now
   const handleCreateBackup = async () => {
     if (!selectedInstance) return;
+    if (!isAutoBackupActive) {
+      const proceed = window.confirm(
+        `Automated Daily Backups & Recovery is currently inactive for ${selectedInstance.name}.\n\nTaking a backup activates the Disaster Recovery & Daily Backup Add-on (+$2.00/month added to your monthly server total).\n\nDo you want to proceed and create your recovery snapshot now?`
+      );
+      if (!proceed) return;
+    }
+
     try {
       setBackupActionLoading(true);
-      await apiCall(`/vms/${selectedInstance.vmId}/backups`, {
+      const res = await apiCall(`/vms/${selectedInstance.vmId}/backups`, {
         method: 'POST',
         body: JSON.stringify({ label: `Manual Point - ${formatDate(new Date())}` }),
       });
-      toast.success('Disaster recovery backup snapshot created.');
+      if (res?.backupNewlySubscribed) {
+        setIsAutoBackupActive(true);
+        toast.success(res.message || 'Automated backups activated ($2.00/mo added to monthly total). Recovery snapshot created.');
+        await fetchVMs();
+      } else {
+        toast.success(res?.message || 'Disaster recovery backup snapshot created.');
+      }
       fetchBackups(selectedInstance.vmId);
     } catch (err: any) {
       toast.error(err.message || 'Failed to create backup');
@@ -919,6 +934,18 @@ export default function Dashboard() {
   // Toggle Automated Daily Backups ($2.00/mo)
   const handleToggleAutoBackups = async (enable: boolean) => {
     if (!selectedInstance) return;
+    if (enable) {
+      const confirmEnable = window.confirm(
+        `Enable Automated Daily Backups for ${selectedInstance.name}?\n\nThis will add +$2.00/month to your server subscription.`
+      );
+      if (!confirmEnable) return;
+    } else {
+      const confirmDisable = window.confirm(
+        `Disable Automated Daily Backups for ${selectedInstance.name}?\n\nThis will remove $2.00/month from your monthly subscription. Existing recovery points will remain until deleted.`
+      );
+      if (!confirmDisable) return;
+    }
+
     try {
       setBackupActionLoading(true);
       const res = await apiCall(`/vms/${selectedInstance.vmId}/toggle-backups`, {
@@ -926,7 +953,7 @@ export default function Dashboard() {
         body: JSON.stringify({ enabled: enable }),
       });
       setIsAutoBackupActive(res.backupEnabled);
-      toast.success(res.message || (enable ? 'Automated daily backups enabled ($2.00/mo).' : 'Automated backups disabled.'));
+      toast.success(res.message || (enable ? 'Automated daily backups enabled ($2.00/mo added to monthly total).' : 'Automated backups disabled.'));
       await fetchVMs();
       fetchBackups(selectedInstance.vmId);
     } catch (err: any) {
@@ -1355,10 +1382,16 @@ export default function Dashboard() {
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight font-poppins">
                   Virtual Machines
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                  {instances.length} {instances.length === 1 ? 'server' : 'servers'}
-                </span>
-                {runningCount > 0 && (
+                {isLoading ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 animate-pulse">
+                    Syncing fleet...
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                    {instances.length} {instances.length === 1 ? 'server' : 'servers'}
+                  </span>
+                )}
+                {!isLoading && runningCount > 0 && (
                   <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                     {runningCount} active
@@ -1375,24 +1408,36 @@ export default function Dashboard() {
                 <button 
                   onClick={() => fetchVMs()}
                   title="Refresh instances"
-                  className="p-2.5 text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all shadow-xs"
+                  disabled={isLoading}
+                  className="p-2.5 text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-600' : ''}`} />
                 </button>
                 <button 
+                  disabled={isLoading}
                   onClick={() => {
                     if (activeSlot) {
                       handleOpenDeployModal();
-                    } else if (instances.length === 0) {
+                    } else if (instances.length === 0 && (!activeSubscriptions || activeSubscriptions.length === 0)) {
                       setTrialCardholder(user?.fullName || '');
                       setIsTrialModalOpen(true);
                     } else {
                       navigate('/configure');
                     }
                   }}
-                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 shadow-sm shadow-blue-500/20 cursor-pointer"
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 text-white rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 shadow-sm shadow-blue-500/20 cursor-pointer disabled:cursor-not-allowed"
                 >
-                  <Plus className="w-4 h-4" /> {activeSlot ? 'Deploy Instance' : (instances.length === 0 ? 'Claim Free Trial' : 'Order New VPS')}
+                  {isLoading ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Loading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      <span>{activeSlot ? 'Deploy Instance' : (instances.length === 0 && (!activeSubscriptions || activeSubscriptions.length === 0) ? 'Claim Free Trial' : 'Order New VPS')}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -1430,6 +1475,19 @@ export default function Dashboard() {
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* SKELETON LOADING STATE WHILE DATA IS FETCHED */}
+            {isLoading && (
+              <div className="space-y-6">
+                <div className="p-8 rounded-3xl bg-slate-100/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 animate-pulse space-y-4">
+                  <div className="h-5 w-48 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+                  <div className="h-8 w-80 bg-slate-200 dark:bg-slate-800 rounded-lg"></div>
+                  <div className="h-4 w-full max-w-md bg-slate-200 dark:bg-slate-800 rounded"></div>
+                  <div className="h-10 w-36 bg-slate-200 dark:bg-slate-800 rounded-xl pt-2"></div>
+                </div>
+                <TableSkeleton rows={4} cols={5} />
               </div>
             )}
 
@@ -3340,7 +3398,16 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <p className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                      {selectedInstance.hostname} • <span className="text-blue-600 dark:text-blue-400 font-semibold">{selectedInstance.ip}</span>
+                      {selectedInstance.hasPublicIp ? (
+                        <>
+                          {selectedInstance.hostname} • <span className="text-blue-600 dark:text-blue-400 font-semibold">{selectedInstance.ip}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-slate-400">Local IP: </span>
+                          <span className="text-blue-600 dark:text-blue-400 font-semibold">{selectedInstance.ip}</span>
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>

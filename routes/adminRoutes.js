@@ -27,6 +27,7 @@ import {
   getIpamPool,
   addIpToPool,
   releaseIpFromPool,
+  deleteIpFromPool,
   getSecurityThreats,
   banThreatIp,
   getAdminTickets,
@@ -120,6 +121,7 @@ router.delete('/coupons/:id', deleteAdminCoupon);
 router.get('/ipam', getIpamPool);
 router.post('/ipam', addIpToPool);
 router.patch('/ipam/:ipId/release', releaseIpFromPool);
+router.delete('/ipam/:ipId', deleteIpFromPool);
 
 // Option 5: Security Threats & Cluster IP Bans
 router.get('/security/threats', getSecurityThreats);

@@ -82,7 +82,7 @@ async function provisionGuestVM({ vmName, adminUsername, adminPassword, sshPubli
       const effectivePass = adminPassword || defaultPass;
       const b64Pass = Buffer.from(effectivePass).toString('base64');
       const safeUser = (adminUsername || defaultUser).toLowerCase().replace(/[^a-z0-9_-]/g, '');
-      const formattedHostname = targetIp.replace(/\./g, '-');
+      const cleanHostname = (vmName || '').toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '') || targetIp.replace(/\./g, '-');
 
       let script = `
 # 1. First establish passwordless sudo so subsequent operations never fail
@@ -95,10 +95,10 @@ sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
 sudo resize2fs /dev/ubuntu-vg/ubuntu-lv 2>/dev/null || true
 
 # 3. Hostname setup
-sudo hostnamectl set-hostname "${formattedHostname}" 2>/dev/null || true
-echo "${formattedHostname}" | sudo tee /etc/hostname >/dev/null 2>&1 || true
-sudo sed -i 's/127.0.1.1.*/127.0.1.1 ${formattedHostname}/g' /etc/hosts 2>/dev/null || true
-echo "127.0.0.1 ${formattedHostname}" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
+sudo hostnamectl set-hostname "${cleanHostname}" 2>/dev/null || true
+echo "${cleanHostname}" | sudo tee /etc/hostname >/dev/null 2>&1 || true
+sudo sed -i 's/127.0.1.1.*/127.0.1.1 ${cleanHostname}/g' /etc/hosts 2>/dev/null || true
+echo "127.0.0.1 ${cleanHostname}" | sudo tee -a /etc/hosts >/dev/null 2>&1 || true
 
 # 4. User and password synchronization
 P=\$(echo '${b64Pass}' | base64 -d)

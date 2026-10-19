@@ -78,7 +78,6 @@ export default function ServerConfigure() {
   const isYearly = selectedTerm === '12m';
   const isMultiYear = selectedTerm === '24m';
   const termMonths = isYearly ? 12 : (isMultiYear ? 24 : 1);
-  const isNonRefundable = true;
 
   const basePriceMonthly =
     Number(
@@ -186,7 +185,7 @@ export default function ServerConfigure() {
       monthlyTotal: totalDueToday, // Legacy compatibility
       termMonths,
       isYearly,
-      isNonRefundable,
+      isNonRefundable: false,
       recurringPrice,
       isUpgrade,
     };
@@ -611,18 +610,7 @@ export default function ServerConfigure() {
                 )}
               </div>
 
-              {/* NON-REFUNDABLE NOTICE FOR ANNUAL / MULTI-YEAR PLANS */}
-              {isNonRefundable && (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] space-y-1">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-800">
-                    <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Annual Plan • Non-Refundable</span>
-                  </div>
-                  <p className="text-amber-700 leading-relaxed">
-                    Full payment for {termMonths} months is collected upfront today. Annual contract terms are strictly non-refundable once activated.
-                  </p>
-                </div>
-              )}
+              {/* Total Calculation */}
 
               {/* Total Calculation */}
               <div className="pt-4 border-t border-slate-200 space-y-1">

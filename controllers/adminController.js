@@ -818,15 +818,24 @@ export async function getIpamPool(req, res) {
 export async function addIpToPool(req, res) {
   try {
     const { ipAddress, subnetMask, gateway, ipType } = req.body;
-    if (!ipAddress) {
-      return res.status(400).json({ error: 'ipAddress is required' });
+    const cleanIp = (ipAddress || '').trim();
+    const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    if (!cleanIp || !ipv4Regex.test(cleanIp)) {
+      return res.status(400).json({ error: 'Please enter a valid IPv4 address (e.g. 198.51.100.14).' });
+    }
+
+    const existing = await prisma.iPPool.findUnique({
+      where: { ipAddress: cleanIp },
+    });
+    if (existing) {
+      return res.status(409).json({ error: `IP address ${cleanIp} already exists in the IP inventory.` });
     }
 
     const created = await prisma.iPPool.create({
       data: {
-        ipAddress,
-        subnetMask: subnetMask || '255.255.255.0',
-        gateway: gateway || '172.19.124.1',
+        ipAddress: cleanIp,
+        subnetMask: (subnetMask || '255.255.255.0').trim(),
+        gateway: (gateway || '198.51.100.1').trim(),
         ipType: ipType || 'PUBLIC_IPV4',
         status: 'AVAILABLE',
       },
@@ -851,6 +860,21 @@ export async function releaseIpFromPool(req, res) {
     res.json({ success: true, message: `IP ${updated.ipAddress} released back to pool` });
   } catch (error) {
     res.status(500).json({ error: 'Failed to release IP' });
+  }
+}
+
+export async function deleteIpFromPool(req, res) {
+  try {
+    const ipId = Number(req.params.ipId);
+    const ip = await prisma.iPPool.findUnique({ where: { ipId } });
+    if (!ip) return res.status(404).json({ error: 'IP address not found in pool' });
+    if (ip.status === 'ASSIGNED') {
+      return res.status(400).json({ error: 'Cannot delete an active assigned IP. Please release or unassign it first.' });
+    }
+    await prisma.iPPool.delete({ where: { ipId } });
+    return res.json({ success: true, message: `IP ${ip.ipAddress} removed from inventory.` });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete IP address' });
   }
 }
 

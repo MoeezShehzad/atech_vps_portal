@@ -45,7 +45,6 @@ export default function Checkout() {
 
   const isYearly = orderData.isYearly || orderData.term?.id === '12m';
   const isMultiYear = orderData.term?.id === '24m';
-  const isNonRefundable = true;
   const effectiveAmount = Number(orderData.totalDueToday ?? orderData.monthlyTotal ?? 11);
 
   // State Management
@@ -668,9 +667,6 @@ export default function Checkout() {
                           />
                           <span className="text-slate-600 text-xs font-medium">
                             I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Terms of Service</a>, <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Privacy Policy</a>, and <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Refund Policy</a>
-                            <span className="text-amber-800 font-bold block mt-0.5">
-                              • I acknowledge that all sales are final and non-refundable once server resources are provisioned.
-                            </span>
                           </span>
                         </label>
                         {errors.termsAccepted && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.termsAccepted}</p>}
@@ -1269,17 +1265,6 @@ export default function Checkout() {
                 )}
               </div>
 
-              {/* NON-REFUNDABLE BADGE */}
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] space-y-1">
-                <div className="font-bold flex items-center gap-1.5 text-amber-800">
-                  <span>⚠️</span>
-                  <span>All Sales Final • Non-Refundable</span>
-                </div>
-                <p className="text-amber-700 text-[10px] leading-relaxed">
-                  Once cloud server resources and IP allocations are provisioned on our infrastructure, all payments are final and non-refundable.
-                </p>
-              </div>
-
               {/* Total Calculation */}
               <div className="pt-4 border-t border-slate-200 space-y-1">
                 <div className="flex justify-between items-baseline">
@@ -1303,7 +1288,7 @@ export default function Checkout() {
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-400">
-                  {isYearly ? 'Renews annually at standard rate. Non-refundable.' : 'Includes full root access & automated provisioning'}
+                  {isYearly ? 'Renews annually at standard rate.' : 'Includes full root access & automated provisioning'}
                 </p>
               </div>
 

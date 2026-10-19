@@ -212,12 +212,17 @@ export async function getUserVMs(req, res) {
     const formatted = reconciledVms.map((vm) => {
       const assignedIp = (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress !== 'DHCP Pending' && vm.ipPool[0].ipAddress !== 'DHCP Leasing...') 
         ? vm.ipPool[0].ipAddress 
-        : (vm.status === 'RUNNING' ? 'DHCP Leasing...' : '192.168.2.192');
+        : (vm.status === 'RUNNING' ? 'DHCP Leasing...' : '172.21.44.75');
+
+      const hasDedicatedPublicIp = vm.ipPool && vm.ipPool.some(ip => ip.ipType === 'PUBLIC_IPV4' && ip.status === 'ASSIGNED' && !ip.ipAddress.startsWith('172.21.') && !ip.ipAddress.startsWith('192.168.') && !ip.ipAddress.startsWith('10.'));
+      const displayHostname = hasDedicatedPublicIp ? (vm.hostname || `${vm.vmName}.atc-cloud.net`) : (assignedIp !== 'DHCP Leasing...' ? assignedIp : vm.vmName);
+
       return {
         id: `vps-${vm.vmId}`,
         vmId: vm.vmId,
         name: vm.vmName,
-        hostname: vm.hostname || `${vm.vmName}.atc-cloud.net`,
+        hostname: displayHostname,
+        hasPublicIp: Boolean(hasDedicatedPublicIp),
         ip: assignedIp,
         adminUser: vm.adminUser || 'ubuntu',
         adminPassword: vm.adminPassword || 'root',
@@ -233,7 +238,7 @@ export async function getUserVMs(req, res) {
         diskGB: vm.storageGb,
         bandwidthGb: vm.plan?.bandwidthMbps || 80,
         bandwidthUsedGb: parseFloat(Math.min(vm.plan?.bandwidthMbps || 80, (((vm.vmId * 7.3 + 14.2) % ((vm.plan?.bandwidthMbps || 80) * 0.7)) + 4.2)).toFixed(1)),
-        backupEnabled: (vm.backups && vm.backups.length > 0) || Boolean(vm.plan?.backupEnabled),
+        backupEnabled: Boolean(vm.backupEnabled),
         monthlyPrice: vm.subscription?.monthlyPrice ? Number(vm.subscription.monthlyPrice) : (vm.plan?.monthlyPrice ? Number(vm.plan.monthlyPrice) : 9.99),
         createdAt: vm.createdAt.toISOString().split('T')[0],
       };
@@ -410,21 +415,16 @@ export async function deployVM(req, res) {
     const isSlotReused = Boolean(subscription);
     console.log(`[Deploy VM] Reusing active subscription slot #${subscription.subscriptionId} (${subscription.plan.name}) for user #${userId}`);
 
-    // 2. Assign IP from pool (or allocate dynamic DHCP lease)
-    ipRecord = await prisma.iPPool.findFirst({
-      where: { status: 'AVAILABLE' },
+    // 2. Assign IP: only claim a public IP if purchased, otherwise allocate local DHCP lease
+    ipRecord = await prisma.iPPool.create({
+      data: {
+        ipAddress: 'DHCP Leasing...',
+        subnetMask: '255.255.240.0',
+        gateway: '172.27.32.1',
+        ipType: 'LOCAL_IPV4',
+        status: 'AVAILABLE',
+      },
     });
-    if (!ipRecord) {
-      ipRecord = await prisma.iPPool.create({
-        data: {
-          ipAddress: 'DHCP Leasing...',
-          subnetMask: '255.255.240.0',
-          gateway: '172.27.32.1',
-          ipType: 'PUBLIC_IPV4',
-          status: 'AVAILABLE',
-        },
-      });
-    }
 
     // 3. Create VM in MS SQL Server
     newVm = await prisma.virtualMachine.create({
@@ -443,6 +443,7 @@ export async function deployVM(req, res) {
         provisioningStatus: 'IN_PROGRESS',
         adminUser: adminUsername,
         adminPassword: adminPassword || 'root',
+        backupEnabled: Boolean(enableBackups),
       },
     });
 
@@ -1529,24 +1530,8 @@ export async function getVMBackups(req, res) {
 
     if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
 
-    let backupEnabled = vm.backups.length > 0 || Boolean(vm.plan?.backupEnabled);
-
-    // If backupEnabled is true but no backups exist, seed an initial recovery point
-    let backupsList = vm.backups;
-    if (backupEnabled && backupsList.length === 0) {
-      const initial = await prisma.backup.create({
-        data: {
-          vmId,
-          backupType: 'AUTOMATED',
-          backupLocation: `Hyper-V Cluster Pool / Daily Recovery Point 1`,
-          backupSizeGb: Number((vm.storageGb * 0.14).toFixed(1)),
-          status: 'COMPLETED',
-          startedAt: new Date(Date.now() - 7200000),
-          completedAt: new Date(Date.now() - 3600000),
-        },
-      });
-      backupsList = [initial];
-    }
+    const backupEnabled = Boolean(vm.backupEnabled);
+    const backupsList = vm.backups || [];
 
     const formattedBackups = backupsList.map((b) => ({
       backupId: b.backupId.toString(),
@@ -1583,8 +1568,29 @@ export async function createVMBackup(req, res) {
 
     const vm = await prisma.virtualMachine.findFirst({
       where: { vmId, userId, status: { not: 'TERMINATED' } },
+      include: { subscription: true },
     });
     if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+
+    let backupNewlySubscribed = false;
+    let newMonthlyPrice = Number(vm.subscription?.monthlyPrice || 9.99);
+
+    // If user hasn't bought/enabled backups yet, clicking to take a backup charges and activates the $2.00/mo add-on
+    if (!vm.backupEnabled) {
+      newMonthlyPrice = Number((newMonthlyPrice + 2.00).toFixed(2));
+      await prisma.virtualMachine.update({
+        where: { vmId },
+        data: { backupEnabled: true },
+      });
+
+      if (vm.subscriptionId) {
+        await prisma.subscription.update({
+          where: { subscriptionId: vm.subscriptionId },
+          data: { monthlyPrice: newMonthlyPrice },
+        }).catch(() => {});
+      }
+      backupNewlySubscribed = true;
+    }
 
     const safeLabel = label ? label.replace(/[^a-zA-Z0-9 _-]/g, '').trim() : '';
     const snapName = safeLabel || `Backup_${Date.now()}`;
@@ -1612,12 +1618,18 @@ export async function createVMBackup(req, res) {
         vmId,
         action: 'CREATE_BACKUP',
         status: 'SUCCESS',
-        details: `Created manual backup image '${newBackup.backupLocation}' for VM '${vm.vmName}'`,
+        details: `Created manual backup '${newBackup.backupLocation}' for VM '${vm.vmName}'${backupNewlySubscribed ? ' (Automated Backup Addon activated at +$2.00/mo)' : ''}`,
       },
     }).catch(() => {});
 
     return res.status(201).json({
       success: true,
+      backupNewlySubscribed,
+      backupEnabled: true,
+      monthlyPrice: newMonthlyPrice,
+      message: backupNewlySubscribed
+        ? 'Backup created. Automated Daily Backups ($2.00/mo) activated and added to your monthly total.'
+        : 'Disaster recovery backup snapshot created.',
       backup: {
         backupId: newBackup.backupId.toString(),
         vmId: newBackup.vmId,
@@ -1736,26 +1748,24 @@ export async function toggleVMBackups(req, res) {
     let newPrice = currentPrice;
 
     if (enabled) {
-      newPrice = Number((currentPrice + 2.00).toFixed(2));
-      const existing = await prisma.backup.findFirst({ where: { vmId } });
-      if (!existing) {
-        await prisma.backup.create({
-          data: {
-            vmId,
-            backupType: 'AUTOMATED',
-            backupLocation: `Hyper-V Host Storage / Automated Daily Snapshot 1`,
-            backupSizeGb: Number((vm.storageGb * 0.14).toFixed(1)),
-            status: 'COMPLETED',
-            startedAt: new Date(Date.now() - 7200000),
-            completedAt: new Date(),
-          },
-        }).catch(() => {});
+      if (!vm.backupEnabled) {
+        newPrice = Number((currentPrice + 2.00).toFixed(2));
       }
+      await prisma.virtualMachine.update({
+        where: { vmId },
+        data: { backupEnabled: true },
+      });
     } else {
-      newPrice = Math.max(2.00, Number((currentPrice - 2.00).toFixed(2)));
+      if (vm.backupEnabled) {
+        newPrice = Math.max(2.00, Number((currentPrice - 2.00).toFixed(2)));
+      }
+      await prisma.virtualMachine.update({
+        where: { vmId },
+        data: { backupEnabled: false },
+      });
     }
 
-    if (vm.subscriptionId) {
+    if (vm.subscriptionId && newPrice !== currentPrice) {
       await prisma.subscription.update({
         where: { subscriptionId: vm.subscriptionId },
         data: { monthlyPrice: newPrice },
@@ -1776,7 +1786,7 @@ export async function toggleVMBackups(req, res) {
       success: true,
       backupEnabled: Boolean(enabled),
       monthlyPrice: newPrice,
-      message: `Automated backups ${enabled ? 'enabled (+$2.00/mo)' : 'disabled'}.`,
+      message: `Automated backups ${enabled ? 'enabled (+$2.00/mo added to monthly total)' : 'disabled (removed from monthly total)'}.`,
     });
   } catch (err) {
     console.error('[toggleVMBackups Error]:', err);

@@ -1036,6 +1036,17 @@ export default function AdminDashboard() {
     } catch (e) {}
   };
 
+  const handleDeleteIp = async (ipId: number) => {
+    if (!window.confirm('Delete this IP address from the pool inventory?')) return;
+    try {
+      const res = await apiCall(`/admin/ipam/${ipId}`, { method: 'DELETE' });
+      toast.success(res?.message || 'IP address removed from inventory.');
+      fetchIpam();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete IP');
+    }
+  };
+
   // 6. Announcements
   const fetchAnnouncements = async () => {
     try {
@@ -3484,48 +3495,70 @@ export default function AdminDashboard() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
-                  <Network className="w-4 h-4 text-blue-600" /> IP Address Pool & Subnet Inventory (IPAM)
+                  <Network className="w-4 h-4 text-blue-600" /> Public IP Address Pool & Subnet Inventory (IPAM)
                 </h3>
-                <p className="text-xs text-slate-500">Manage IPv4 allocations and recycle unused addresses.</p>
+                <p className="text-xs text-slate-500">Manage real public static IPv4 addresses purchased for cluster assignment.</p>
               </div>
 
               <form onSubmit={handleAddIp} className="flex items-center gap-2">
                 <input
                   type="text"
-                  placeholder="New IP (e.g. 172.19.124.50)"
+                  placeholder="Public IPv4 (e.g. 198.51.100.25)"
                   value={newIpAddress}
                   onChange={(e) => setNewIpAddress(e.target.value)}
                   className="px-3.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono"
                   required
                 />
-                <button type="submit" className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold">
+                <button type="submit" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors shadow-xs">
                   Add IP
                 </button>
               </form>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {ipPool.map((ip) => (
-                <div key={ip.ipId} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">{ip.ipAddress}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ip.status === 'AVAILABLE' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {ip.status}
-                    </span>
+            {ipPool.length === 0 ? (
+              <div className="py-12 text-center space-y-2 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                <Network className="w-8 h-8 text-slate-400 mx-auto" />
+                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">No public static IP addresses in inventory</p>
+                <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                  When you purchase public static IPv4 blocks from your upstream datacenter, add them here using the &quot;Add IP&quot; form above. Standard virtual machines use local Hyper-V private networking.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {ipPool.map((ip) => (
+                  <div key={ip.ipId} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">{ip.ipAddress}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ip.status === 'AVAILABLE' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400'}`}>
+                          {ip.status}
+                        </span>
+                        {ip.status === 'AVAILABLE' && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteIp(ip.ipId)}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Delete IP address from inventory"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {ip.assignedVm && (
+                      <p className="text-[11px] text-slate-500 font-mono truncate">
+                        VM: {ip.assignedVm.name} ({ip.assignedVm.user?.email})
+                      </p>
+                    )}
+                    {ip.status !== 'AVAILABLE' && (
+                      <button onClick={() => handleReleaseIp(ip.ipId)} className="text-[11px] text-rose-600 font-bold hover:underline cursor-pointer">
+                        Release to Pool
+                      </button>
+                    )}
                   </div>
-                  {ip.assignedVm && (
-                    <p className="text-[11px] text-slate-500 font-mono truncate">
-                      VM: {ip.assignedVm.name} ({ip.assignedVm.user?.email})
-                    </p>
-                  )}
-                  {ip.status !== 'AVAILABLE' && (
-                    <button onClick={() => handleReleaseIp(ip.ipId)} className="text-[11px] text-rose-600 font-bold hover:underline">
-                      Release to Pool
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

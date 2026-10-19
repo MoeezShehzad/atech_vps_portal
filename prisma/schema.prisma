@@ -163,6 +163,7 @@ model VirtualMachine {
   provisioningError  String?   @map("provisioning_error") @db.NVarChar(Max)
   adminUser          String?   @default("ubuntu") @map("admin_user") @db.VarChar(50)
   adminPassword      String?   @map("admin_password") @db.VarChar(100)
+  backupEnabled      Boolean   @default(false) @map("backup_enabled")
   createdAt          DateTime  @default(now()) @map("created_at")
   startedAt          DateTime? @map("started_at")
   stoppedAt          DateTime? @map("stopped_at")
