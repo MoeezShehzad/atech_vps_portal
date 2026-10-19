@@ -22,27 +22,27 @@ interface AuthProps {
 const SHOWCASE_SLIDES = [
   {
     image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1800&q=85',
-    badge: 'Tier-4 Chicago Infrastructure',
-    title: 'Bare-Metal Speed. Cloud Flexibility.',
-    subtitle: 'Generation-2 Hyper-V virtual machines powered by dual-socket AMD EPYC™ processors and enterprise NVMe storage arrays.',
+    badge: 'Bolingbrook, IL Infrastructure',
+    title: 'Dedicated Compute. Cloud Flexibility.',
+    subtitle: 'Enterprise Generation-2 virtual machines powered by dedicated multi-core processors and high-speed NVMe storage.',
     statLabel: 'Provisioning Time',
-    statValue: '< 10 Seconds',
+    statValue: '< 60 Seconds',
   },
   {
     image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1800&q=85',
-    badge: 'Global Carrier Backbone',
-    title: 'Ultra-Low Latency Network Fabric.',
-    subtitle: 'Redundant 10 Gbps fiber uplinks protected by inline hardware firewall inspection and automated DDoS mitigation.',
+    badge: 'Enterprise Network Fabric',
+    title: 'Low-Latency Network Routing.',
+    subtitle: 'High-throughput network uplinks protected by perimeter firewall inspection and automated traffic filtering.',
     statLabel: 'Network Uptime SLA',
-    statValue: '99.99% Guaranteed',
+    statValue: '99.9% Target SLA',
   },
   {
     image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1800&q=85',
-    badge: '30-Day Risk-Free Trial',
-    title: 'Engineered for Mission-Critical Workloads.',
+    badge: 'ATC Cloud Platform',
+    title: 'Engineered for Production Workloads.',
     subtitle: 'Launch production Linux or Windows Server workloads with full root access, live web console, and instant snapshots.',
-    statLabel: 'Starter Trial Spec',
-    statValue: '2 vCPU • 2GB RAM • 50GB NVMe',
+    statLabel: 'Dedicated Resources',
+    statValue: 'vCPU • ECC RAM • NVMe',
   },
 ];
 
@@ -72,7 +72,18 @@ export default function Auth({ initialMode }: AuthProps) {
     return () => clearInterval(timer);
   }, []);
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
+  const searchParams = new URLSearchParams(location.search);
+  const redirectParam = searchParams.get('redirect');
+  const locState = location.state as {
+    from?: { pathname: string };
+    returnTo?: string;
+    selectedPlan?: unknown;
+    config?: unknown;
+  } | null;
+  const from = redirectParam || locState?.returnTo || locState?.from?.pathname || '/dashboard';
+  const forwardState = locState?.selectedPlan
+    ? { selectedPlan: locState.selectedPlan, config: locState.config }
+    : undefined;
 
   // -------------------------------------------------------------
   // Sign In States
@@ -95,6 +106,7 @@ export default function Auth({ initialMode }: AuthProps) {
   const [signupError, setSignupError] = useState('');
   const [verificationSent, setVerificationSent] = useState(false);
   const [targetOtpEmail, setTargetOtpEmail] = useState('');
+  const [otpSessionToken, setOtpSessionToken] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState('');
@@ -182,7 +194,7 @@ export default function Auth({ initialMode }: AuthProps) {
         localStorage.setItem('user', JSON.stringify(data.user));
       }
       login(token, data.user);
-      navigate(from, { replace: true });
+      navigate(from, { replace: true, state: forwardState });
     } catch (err: unknown) {
       if (err instanceof Error) {
         setLoginError(err.message);
@@ -199,8 +211,8 @@ export default function Auth({ initialMode }: AuthProps) {
     e.preventDefault();
     setSignupError('');
 
-    if (strengthScore < 3) {
-      setSignupError('Please create a stronger password meeting at least 3 security criteria.');
+    if (strengthScore < 4 || !hasMinLength) {
+      setSignupError('Password must be at least 8 characters and include uppercase, lowercase, number, and symbol.');
       return;
     }
     if (!agreeTerms) {
@@ -222,6 +234,9 @@ export default function Auth({ initialMode }: AuthProps) {
         }),
       });
 
+      if (res?.sessionToken) {
+        setOtpSessionToken(res.sessionToken);
+      }
       setTargetOtpEmail(normalized);
       setVerificationSent(true);
       setOtpCode('');
@@ -253,12 +268,18 @@ export default function Auth({ initialMode }: AuthProps) {
     setOtpLoading(true);
 
     try {
+      const customHeaders: Record<string, string> = {};
+      if (otpSessionToken) {
+        customHeaders['X-OTP-Session'] = otpSessionToken;
+      }
       const data = await apiCall('/auth/verify-otp', {
         method: 'POST',
+        headers: customHeaders,
         body: JSON.stringify({
           email: emailToVerify,
           otp: code,
           purpose: 'VERIFY_EMAIL',
+          sessionToken: otpSessionToken || undefined,
         }),
       });
 
@@ -273,7 +294,7 @@ export default function Auth({ initialMode }: AuthProps) {
       login(token, data.user);
       setOtpSuccess('Email verified successfully! Launching your cloud console...');
       setTimeout(() => {
-        navigate(from, { replace: true });
+        navigate(from, { replace: true, state: forwardState });
       }, 700);
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -294,13 +315,16 @@ export default function Auth({ initialMode }: AuthProps) {
     setOtpError('');
     setOtpSuccess('');
     try {
-      await apiCall('/auth/send-otp', {
+      const res = await apiCall('/auth/send-otp', {
         method: 'POST',
         body: JSON.stringify({
           email: emailToResend,
           purpose: 'VERIFY_EMAIL',
         }),
       });
+      if (res?.sessionToken) {
+        setOtpSessionToken(res.sessionToken);
+      }
       setResendCooldown(60);
       setOtpSuccess('A fresh 6-digit code has been dispatched to your email.');
     } catch (e: unknown) {
@@ -312,13 +336,16 @@ export default function Auth({ initialMode }: AuthProps) {
   const handleResendFromLogin = async () => {
     if (resendCooldown > 0 || !loginEmail.trim()) return;
     try {
-      await apiCall('/auth/send-otp', {
+      const res = await apiCall('/auth/send-otp', {
         method: 'POST',
         body: JSON.stringify({
           email: loginEmail.trim().toLowerCase(),
           purpose: 'VERIFY_EMAIL',
         }),
       });
+      if (res?.sessionToken) {
+        setOtpSessionToken(res.sessionToken);
+      }
       setResendCooldown(60);
       setLoginError('Verification code dispatched! Please check your inbox.');
     } catch (e: unknown) {
@@ -458,12 +485,12 @@ export default function Auth({ initialMode }: AuthProps) {
                   </p>
                 </div>
 
-                {/* SSO Federated Login Buttons */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* SSO Federated Login Button */}
+                <div>
                   <button
                     type="button"
-                    onClick={() => { window.location.href = `${API_BASE_URL}/auth/google`; }}
-                    className="flex items-center justify-center gap-2 py-2.5 px-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 transition-all font-semibold text-xs text-slate-700 dark:text-slate-200 cursor-pointer shadow-2xs"
+                    onClick={() => { window.location.href = `${API_BASE_URL}/auth/google?returnTo=${encodeURIComponent(from)}`; }}
+                    className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 transition-all font-semibold text-xs text-slate-700 dark:text-slate-200 cursor-pointer shadow-2xs"
                   >
                     <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -471,18 +498,7 @@ export default function Auth({ initialMode }: AuthProps) {
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                     </svg>
-                    <span>Google</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => { window.location.href = `${API_BASE_URL}/auth/github`; }}
-                    className="flex items-center justify-center gap-2 py-2.5 px-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 transition-all font-semibold text-xs text-slate-700 dark:text-slate-200 cursor-pointer shadow-2xs"
-                  >
-                    <svg className="w-4 h-4 fill-slate-900 dark:fill-white shrink-0" viewBox="0 0 24 24">
-                      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-                    </svg>
-                    <span>GitHub</span>
+                    <span>Continue with Google</span>
                   </button>
                 </div>
 
@@ -519,10 +535,14 @@ export default function Auth({ initialMode }: AuthProps) {
                       <div className="text-[11px] text-rose-600/90 dark:text-rose-400/90 pl-6 flex items-center gap-2 pt-1 flex-wrap">
                         <button
                           type="button"
-                          onClick={() => {
-                            setTargetOtpEmail(loginEmail.trim().toLowerCase());
+                          onClick={async () => {
+                            const emailNorm = loginEmail.trim().toLowerCase();
+                            setTargetOtpEmail(emailNorm);
                             setVerificationSent(true);
                             setMode('signup');
+                            if (!otpSessionToken && resendCooldown <= 0) {
+                              await handleResendFromLogin();
+                            }
                           }}
                           className="font-bold underline hover:text-rose-800 dark:hover:text-rose-300 cursor-pointer"
                         >
@@ -740,7 +760,7 @@ export default function Auth({ initialMode }: AuthProps) {
                     {/* Security Footnote */}
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
                       <p className="text-[11px] text-slate-400">
-                        Code expires in 10 minutes • Up to 5 verification attempts allowed
+                        Code expires in 5 minutes • Up to 5 verification attempts allowed
                       </p>
                       <button
                         type="button"
@@ -759,7 +779,7 @@ export default function Auth({ initialMode }: AuthProps) {
                   <div className="space-y-4">
                     <div className="hidden lg:flex items-center justify-between">
                       <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 text-[11px] font-bold uppercase tracking-wider border border-cyan-200/60 dark:border-cyan-800/60">
-                        <Sparkles className="w-3.5 h-3.5" /> 30-Day Free Compute
+                        <Sparkles className="w-3.5 h-3.5" /> Enterprise Cloud Account
                       </span>
                       <button
                         type="button"
@@ -781,10 +801,10 @@ export default function Auth({ initialMode }: AuthProps) {
                     </div>
 
                     {/* Federated SSO */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div>
                       <a
-                        href={`${API_BASE_URL}/auth/google`}
-                        className="flex items-center justify-center gap-2 py-2.5 px-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all font-semibold text-xs text-slate-700 dark:text-slate-200 shadow-2xs"
+                        href={`${API_BASE_URL}/auth/google?returnTo=${encodeURIComponent(from)}`}
+                        className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all font-semibold text-xs text-slate-700 dark:text-slate-200 shadow-2xs"
                       >
                         <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -792,17 +812,7 @@ export default function Auth({ initialMode }: AuthProps) {
                           <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
                           <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
                         </svg>
-                        <span>Google</span>
-                      </a>
-
-                      <a
-                        href={`${API_BASE_URL}/auth/github`}
-                        className="flex items-center justify-center gap-2 py-2.5 px-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all font-semibold text-xs text-slate-700 dark:text-slate-200 shadow-2xs"
-                      >
-                        <svg className="w-4 h-4 fill-slate-900 dark:fill-white shrink-0" viewBox="0 0 24 24">
-                          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-                        </svg>
-                        <span>GitHub</span>
+                        <span>Continue with Google</span>
                       </a>
                     </div>
 
@@ -951,7 +961,7 @@ export default function Auth({ initialMode }: AuthProps) {
                           </>
                         ) : (
                           <>
-                            Create Account &amp; Claim Trial <ArrowRight className="w-4 h-4" />
+                            Create Cloud Account <ArrowRight className="w-4 h-4" />
                           </>
                         )}
                       </button>
@@ -1042,19 +1052,19 @@ export default function Auth({ initialMode }: AuthProps) {
                     <div className="flex items-center gap-1.5 text-cyan-400 text-[11px] font-bold">
                       <Server className="w-3.5 h-3.5" /> Compute
                     </div>
-                    <p className="text-sm font-extrabold text-white mt-1 font-poppins">AMD EPYC™</p>
+                    <p className="text-sm font-extrabold text-white mt-1 font-poppins">Dedicated vCPU</p>
                   </div>
                   <div className="p-3 rounded-2xl bg-slate-950/60 border border-white/15 backdrop-blur-md">
                     <div className="flex items-center gap-1.5 text-blue-400 text-[11px] font-bold">
                       <HardDrive className="w-3.5 h-3.5" /> Storage
                     </div>
-                    <p className="text-sm font-extrabold text-white mt-1 font-poppins">Gen4 NVMe</p>
+                    <p className="text-sm font-extrabold text-white mt-1 font-poppins">NVMe Arrays</p>
                   </div>
                   <div className="p-3 rounded-2xl bg-slate-950/60 border border-white/15 backdrop-blur-md">
                     <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] font-bold">
                       <Shield className="w-3.5 h-3.5" /> Defense
                     </div>
-                    <p className="text-sm font-extrabold text-white mt-1 font-poppins">L3/L4 DDoS</p>
+                    <p className="text-sm font-extrabold text-white mt-1 font-poppins">Firewall Guard</p>
                   </div>
                 </div>
               </div>
@@ -1068,7 +1078,7 @@ export default function Auth({ initialMode }: AuthProps) {
                         New to Analytical Technical Consulting?
                       </span>
                       <p className="text-sm font-bold text-white">
-                        Launch your 30-day free VPS trial today.
+                        Deploy high-performance cloud instances today.
                       </p>
                     </div>
                     <button
@@ -1086,7 +1096,7 @@ export default function Auth({ initialMode }: AuthProps) {
                         Already have an ATC Cloud account?
                       </span>
                       <p className="text-sm font-bold text-white">
-                        Sign in to your live hypervisor console.
+                        Sign in to your live cloud console.
                       </p>
                     </div>
                     <button

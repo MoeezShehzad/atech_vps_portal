@@ -332,8 +332,8 @@ export default function AccountSettings() {
       setMessage({ type: 'error', text: 'Please enter your current password.' });
       return;
     }
-    if (!newPassword || newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'New password must be at least 6 characters long.' });
+    if (!newPassword || newPassword.length < 8) {
+      setMessage({ type: 'error', text: 'New password must be at least 8 characters long.' });
       return;
     }
     if (newPassword !== confirmPassword) {

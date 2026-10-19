@@ -152,7 +152,7 @@ async function executeThrottledEmailDispatch(jobId, recipients, title, message) 
                     <h3 style="margin-top: 0; color: #0f172a; font-size: 16px;">${title}</h3>
                     <p style="margin-bottom: 0; white-space: pre-line;">${message}</p>
                   </div>
-                  <p>You can manage your instances, subscriptions, and security alerts anytime directly in the <a href="http://172.27.45.113:5174/dashboard" style="color: #2563eb; font-weight: 600;">ATC Cloud Dashboard</a>.</p>
+                  <p>You can manage your instances, subscriptions, and security alerts anytime directly in the <a href="${(process.env.FRONTEND_URL || 'http://localhost:5174').replace(/\/$/, '')}/dashboard" style="color: #2563eb; font-weight: 600;">ATC Cloud Dashboard</a>.</p>
                 </div>
                 <div class="footer">
                   <p>© ${new Date().getFullYear()} Analytical Technical Consulting Inc. All rights reserved.</p>

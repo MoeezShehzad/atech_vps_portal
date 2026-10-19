@@ -552,7 +552,7 @@ export default function WebsitesManager() {
                     If your browser shows <code className="bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded text-[11px] font-mono text-amber-800 dark:text-amber-200">ERR_NAME_NOT_RESOLVED</code>, it means this custom domain does not have a DNS record pointed to your server yet.
                   </p>
                   <div className="bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3 font-mono text-[11px] space-y-1 mt-2">
-                    <div className="text-slate-500">Go to your domain registrar (GoDaddy, Namecheap, Cloudflare) and create:</div>
+                    <div className="text-slate-500">Go to your domain registrar or DNS provider and create:</div>
                     <div className="text-emerald-600 dark:text-emerald-400 font-bold">
                       Type: <span className="text-slate-800 dark:text-slate-200">A</span> &nbsp;|&nbsp; 
                       Host: <span className="text-slate-800 dark:text-slate-200">{selectedSite.primaryDomain.split('.')[0]}</span> &nbsp;|&nbsp; 
@@ -794,7 +794,7 @@ export default function WebsitesManager() {
               <div className="p-5 border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl space-y-3">
                 <div className="flex items-center gap-2 text-blue-900 dark:text-blue-200 font-bold text-sm">
                   <ShieldCheck className="w-5 h-5 text-blue-600" />
-                  <span>Automated Let's Encrypt SSL Active</span>
+                  <span>Automated SSL/TLS Certificate Active</span>
                 </div>
                 <p className="text-xs text-blue-800/80 dark:text-blue-300/80 leading-relaxed">
                   All traffic to this site is encrypted with TLS 1.3. HTTPS certificates renew automatically every 90 days with zero downtime.

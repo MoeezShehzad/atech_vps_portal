@@ -76,8 +76,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const refreshUser = useCallback(async () => {
     try {
       const freshUser = await apiCall('/users/me', { method: 'GET' });
-      if (freshUser) {
-        setUser(freshUser);
+      const resolvedUser = freshUser?.user || freshUser;
+      if (resolvedUser && resolvedUser.userId) {
+        setUser(resolvedUser);
       }
     } catch (err) {
       console.error('[AuthContext] Failed to re-fetch user profile:', err);

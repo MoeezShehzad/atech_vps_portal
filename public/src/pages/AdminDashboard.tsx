@@ -355,10 +355,10 @@ export default function AdminDashboard() {
       setImpersonatingId(user.userId);
       const res = await apiCall(`/admin/impersonate/${user.userId}`, { method: 'POST' });
       if (res && res.success) {
-        const currentToken = localStorage.getItem('accessToken');
+        const currentToken = getAccessToken() || localStorage.getItem('accessToken');
         if (currentToken) sessionStorage.setItem('originalAdminToken', currentToken);
 
-        authLogin(res.accessToken, res.user);
+        authLogin(res.accessToken || res.token, res.user);
         toast.info(`Impersonation active as ${user.email}`);
         navigate('/dashboard');
       }
@@ -574,7 +574,7 @@ export default function AdminDashboard() {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
-      doc.text('Enterprise Cloud Infrastructure & Hyper-V Virtualization', 20, 30);
+      doc.text('Enterprise Cloud Infrastructure & Virtualization', 20, 30);
       doc.text('Billing & Accounts: billing@atechconsult.com', 20, 35);
 
       // Invoice Title & Number
@@ -645,7 +645,7 @@ export default function AdminDashboard() {
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
       const issueDateStr = formatDate(receiptData.issueDate || receiptData.createdAt || inv.createdAt);
       doc.text(`Issue Date: ${issueDateStr}`, 114, 62);
-      const gw = receiptData.paymentMethod || inv.paymentMethod || 'Stripe';
+      const gw = receiptData.paymentMethod || inv.paymentMethod || 'Card Gateway';
       doc.text(`Gateway / Method: ${gw}`, 114, 67);
       const txn = receiptData.transactionId || 'TXN-SETTLED';
       doc.text(`Transaction Reference: ${txn.slice(0, 22)}`, 114, 72);
@@ -828,7 +828,7 @@ export default function AdminDashboard() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `atech-${dataset}-report-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `atc-${dataset}-report-${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -1264,7 +1264,7 @@ export default function AdminDashboard() {
               {!sidebarCollapsed && (
                 <div className="min-w-0">
                   <span className="font-bold text-sm text-slate-900 dark:text-white font-poppins block truncate">
-                    ATEC CLOUD
+                    ATC CLOUD
                   </span>
                   <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded tracking-wide">
                     SUPER ADMIN
@@ -1378,12 +1378,12 @@ export default function AdminDashboard() {
             <div className="min-w-0">
               <div className="flex items-center gap-2.5">
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 tracking-wide uppercase">
-                  ATEC CLUSTER CORE
+                  ATC CLUSTER CORE
                 </span>
                 <h1 className="text-lg md:text-xl font-bold font-poppins text-slate-900 dark:text-white truncate">
                   {activeTab === 'overview' && 'Host Telemetry & Cluster Oversight'}
                   {activeTab === 'users' && 'Directory of Users, Roles & Ghost Mode'}
-                  {activeTab === 'finance' && 'Billing, Invoices & Stripe Payments'}
+                  {activeTab === 'finance' && 'Billing, Invoices & Payment Transactions'}
                   {activeTab === 'fleet' && 'Global Virtual Machine Fleet'}
                   {activeTab === 'broadcasts' && 'Safe Multi-Channel Broadcast Center'}
                   {activeTab === 'reports' && 'Executive Reports & Capacity Intelligence'}
@@ -1690,7 +1690,7 @@ export default function AdminDashboard() {
 
               <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
                 <div className="flex items-center justify-between text-slate-500 text-xs font-semibold">
-                  <span>Stripe Volume</span>
+                  <span>Card Gateway Volume</span>
                   <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 rounded-xl">
                     <CreditCard className="w-4 h-4" />
                   </div>
@@ -1981,7 +1981,7 @@ export default function AdminDashboard() {
                                     ${Number(inv.amount || inv.total || 0).toFixed(2)}
                                   </p>
                                   <span className="text-[10px] font-semibold text-slate-400 uppercase">
-                                    {inv.paymentMethod || 'Stripe'}
+                                    {inv.paymentMethod || 'Card Gateway'}
                                   </span>
                                 </td>
                                 <td className="px-5 py-4">
@@ -2031,7 +2031,7 @@ export default function AdminDashboard() {
                                           setRefundAmount(String(inv.amount || inv.total));
                                         }}
                                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-bold transition-all shadow-xs cursor-pointer"
-                                        title="Issue Stripe refund"
+                                        title="Issue administrative refund"
                                       >
                                         <RotateCcw className="w-3.5 h-3.5" />
                                         <span>Refund</span>
@@ -2188,7 +2188,7 @@ export default function AdminDashboard() {
                                 ${Number(inv.amount || inv.total || 0).toFixed(2)}
                               </p>
                               <span className="text-[10px] font-semibold text-slate-400 uppercase">
-                                {inv.paymentMethod || 'Stripe'}
+                                {inv.paymentMethod || 'Card Gateway'}
                               </span>
                             </td>
                             <td className="px-6 py-4">
@@ -2337,7 +2337,7 @@ export default function AdminDashboard() {
                     Enterprise Safe Mail Server Rate-Limiting Protection
                   </h4>
                   <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                    Broadcast dispatches are throttled to <strong>20 emails per batch with a 2.5s pause</strong>. Automated RFC 2369 bulk headers, list unsubscribe tags, and spam suppression directives are embedded into every outbound message to safeguard your mail server IP from blacklisting by Google, Microsoft, and Yahoo.
+                    Broadcast dispatches are throttled to <strong>20 emails per batch with a 2.5s pause</strong>. Automated RFC 2369 bulk headers, list unsubscribe tags, and spam suppression directives are embedded into every outbound message to safeguard your mail server IP from blacklisting by external mail providers.
                   </p>
                 </div>
               </div>
@@ -2439,7 +2439,7 @@ export default function AdminDashboard() {
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Scheduled Network Maintenance on Hyper-V Host..."
+                      placeholder="e.g. Scheduled Network Maintenance on ATC Cloud Cluster..."
                       value={broadcastSubject}
                       onChange={(e) => setBroadcastSubject(e.target.value)}
                       required
@@ -2625,7 +2625,7 @@ export default function AdminDashboard() {
                   ${Number(reportsData?.financial?.grossVolume || 0).toFixed(2)}
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Stripe: ${Number(reportsData?.financial?.stripeVolume || 0).toFixed(2)} • Wire: ${Number(reportsData?.financial?.bankVolume || 0).toFixed(2)}
+                  Card: ${Number(reportsData?.financial?.stripeVolume || 0).toFixed(2)} • Wire: ${Number(reportsData?.financial?.bankVolume || 0).toFixed(2)}
                 </p>
               </div>
 
@@ -2728,7 +2728,7 @@ export default function AdminDashboard() {
               <div>
                 <h4 className="font-bold text-slate-900 dark:text-white text-base font-poppins flex items-center gap-2">
                   <Cpu className="w-5 h-5 text-indigo-600" />
-                  Host Hardware Capacity & Allocation (Hyper-V Server)
+                  Host Hardware Capacity & Allocation (ATC Cloud Cluster)
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Real physical cores, memory, and NVMe disk commitment across all customer virtual machines.
@@ -4342,7 +4342,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* STRIPE REFUND MODAL */}
+      {/* PAYMENT REFUND MODAL */}
       {refundModalInvoice && (
         <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200 space-y-4">
@@ -4351,7 +4351,7 @@ export default function AdminDashboard() {
                 <RotateCcw className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Process Stripe Refund</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white font-poppins">Process Payment Refund</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">Reversal of funds back to cardholder</p>
               </div>
             </div>
@@ -4394,7 +4394,7 @@ export default function AdminDashboard() {
             </div>
 
             <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-lg border border-amber-200 dark:border-amber-900/40">
-              Note: Issuing this refund will contact Stripe API, reverse the charge, mark the invoice as REFUNDED, and deactivate the associated VPS subscription slot.
+              Note: Issuing this refund will reverse the charge via the payment processor, mark the invoice as REFUNDED, and deactivate the associated VPS subscription slot.
             </p>
 
             <div className="flex items-center justify-end gap-3 pt-2">
@@ -4673,7 +4673,7 @@ export default function AdminDashboard() {
                 <div className="flex justify-between">
                   <span className="text-slate-500">Payment Gateway:</span>
                   <span className="font-semibold text-slate-800 dark:text-slate-200 uppercase">
-                    {selectedInvoiceReceipt.paymentMethod || 'Stripe'}
+                    {selectedInvoiceReceipt.paymentMethod || 'Card Gateway'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">

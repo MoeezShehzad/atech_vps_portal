@@ -27,25 +27,39 @@ export const getCountries = async (req, res) => {
   try {
     const { search } = req.query;
 
-    let query = `
-      SELECT 
-        CountryID AS id,
-        RTRIM(CountryName) AS name,
-        RTRIM(CountryCode) AS dialCode,
-        UPPER(RTRIM(CountryISO)) AS code,
-        RTRIM(CountryCurrency) AS currency
-      FROM [UM].[UM_Countries]
-      WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
-    `;
-
+    let rawRows;
     if (search && typeof search === 'string' && search.trim().length > 0) {
-      const sanitized = search.trim().replace(/'/g, "''");
-      query += ` AND (CountryName LIKE '%${sanitized}%' OR CountryISO LIKE '%${sanitized}%' OR CountryCode LIKE '%${sanitized}%')`;
+      const pattern = `%${search.trim()}%`;
+      rawRows = await prisma.$queryRawUnsafe(
+        `
+        SELECT 
+          CountryID AS id,
+          RTRIM(CountryName) AS name,
+          RTRIM(CountryCode) AS dialCode,
+          UPPER(RTRIM(CountryISO)) AS code,
+          RTRIM(CountryCurrency) AS currency
+        FROM [UM].[UM_Countries]
+        WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
+          AND (CountryName LIKE @P1 OR CountryISO LIKE @P1 OR CountryCode LIKE @P1)
+        ORDER BY CountryName ASC
+        `,
+        pattern
+      );
+    } else {
+      rawRows = await prisma.$queryRawUnsafe(
+        `
+        SELECT 
+          CountryID AS id,
+          RTRIM(CountryName) AS name,
+          RTRIM(CountryCode) AS dialCode,
+          UPPER(RTRIM(CountryISO)) AS code,
+          RTRIM(CountryCurrency) AS currency
+        FROM [UM].[UM_Countries]
+        WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
+        ORDER BY CountryName ASC
+        `
+      );
     }
-
-    query += ' ORDER BY CountryName ASC';
-
-    const rawRows = await prisma.$queryRawUnsafe(query);
 
     const countries = rawRows.map((r) => {
       const dial = r.dialCode ? (r.dialCode.startsWith('+') ? r.dialCode : `+${r.dialCode}`) : '';
@@ -77,12 +91,12 @@ export const getProvinces = async (req, res) => {
     const countryId = req.query.countryId;
     let cleanIso = countryCode ? countryCode.toUpperCase() : '';
 
-    let targetCountryId = countryId ? Number(countryId) : null;
+    let targetCountryId = countryId && !isNaN(Number(countryId)) ? Number(countryId) : null;
 
     if (!targetCountryId && cleanIso) {
-      const sanitizedIso = cleanIso.replace(/'/g, "''");
       const cRow = await prisma.$queryRawUnsafe(
-        `SELECT TOP 1 CountryID, UPPER(RTRIM(CountryISO)) AS code FROM [UM].[UM_Countries] WHERE UPPER(CountryISO) = '${sanitizedIso}'`
+        `SELECT TOP 1 CountryID, UPPER(RTRIM(CountryISO)) AS code FROM [UM].[UM_Countries] WHERE UPPER(CountryISO) = @P1`,
+        cleanIso
       );
       if (cRow && cRow.length > 0) {
         targetCountryId = cRow[0].CountryID;
@@ -90,7 +104,8 @@ export const getProvinces = async (req, res) => {
       }
     } else if (targetCountryId && !cleanIso) {
       const cRow = await prisma.$queryRawUnsafe(
-        `SELECT TOP 1 UPPER(RTRIM(CountryISO)) AS code FROM [UM].[UM_Countries] WHERE CountryID = ${targetCountryId}`
+        `SELECT TOP 1 UPPER(RTRIM(CountryISO)) AS code FROM [UM].[UM_Countries] WHERE CountryID = @P1`,
+        targetCountryId
       );
       if (cRow && cRow.length > 0) {
         cleanIso = cRow[0].code || '';
@@ -99,7 +114,8 @@ export const getProvinces = async (req, res) => {
 
     let provinces = [];
     if (targetCountryId) {
-      const query = `
+      provinces = await prisma.$queryRawUnsafe(
+        `
         SELECT 
           ProvinceID AS id,
           RTRIM(ProvinceName) AS name,
@@ -107,10 +123,11 @@ export const getProvinces = async (req, res) => {
           PK_Country_ID AS countryId
         FROM [UM].[UM_Provinces]
         WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
-          AND PK_Country_ID = ${targetCountryId}
+          AND PK_Country_ID = @P1
         ORDER BY ProvinceName ASC
-      `;
-      provinces = await prisma.$queryRawUnsafe(query);
+        `,
+        targetCountryId
+      );
     }
 
     // If database returned provinces, return them
@@ -167,29 +184,51 @@ export const getProvinces = async (req, res) => {
 export const getCounties = async (req, res) => {
   try {
     const { provinceId, search } = req.query;
+    const numProvId = provinceId && !isNaN(Number(provinceId)) ? Number(provinceId) : null;
+    const cleanSearch = search && typeof search === 'string' && search.trim() ? `%${search.trim()}%` : null;
 
-    let query = `
-      SELECT 
-        CountyID AS id,
-        RTRIM(CountyName) AS name,
-        RTRIM(CountyCode) AS code,
-        ProvinceID AS provinceId
-      FROM [UM].[UM_Counties]
-      WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
-    `;
-
-    if (provinceId && !isNaN(Number(provinceId))) {
-      query += ` AND ProvinceID = ${Number(provinceId)}`;
+    let counties = [];
+    if (numProvId && cleanSearch) {
+      counties = await prisma.$queryRawUnsafe(
+        `
+        SELECT CountyID AS id, RTRIM(CountyName) AS name, RTRIM(CountyCode) AS code, ProvinceID AS provinceId
+        FROM [UM].[UM_Counties]
+        WHERE (IsDeleted = 0 OR IsDeleted IS NULL) AND ProvinceID = @P1 AND CountyName LIKE @P2
+        ORDER BY CountyName ASC
+        `,
+        numProvId,
+        cleanSearch
+      );
+    } else if (numProvId) {
+      counties = await prisma.$queryRawUnsafe(
+        `
+        SELECT CountyID AS id, RTRIM(CountyName) AS name, RTRIM(CountyCode) AS code, ProvinceID AS provinceId
+        FROM [UM].[UM_Counties]
+        WHERE (IsDeleted = 0 OR IsDeleted IS NULL) AND ProvinceID = @P1
+        ORDER BY CountyName ASC
+        `,
+        numProvId
+      );
+    } else if (cleanSearch) {
+      counties = await prisma.$queryRawUnsafe(
+        `
+        SELECT CountyID AS id, RTRIM(CountyName) AS name, RTRIM(CountyCode) AS code, ProvinceID AS provinceId
+        FROM [UM].[UM_Counties]
+        WHERE (IsDeleted = 0 OR IsDeleted IS NULL) AND CountyName LIKE @P1
+        ORDER BY CountyName ASC
+        `,
+        cleanSearch
+      );
+    } else {
+      counties = await prisma.$queryRawUnsafe(
+        `
+        SELECT CountyID AS id, RTRIM(CountyName) AS name, RTRIM(CountyCode) AS code, ProvinceID AS provinceId
+        FROM [UM].[UM_Counties]
+        WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
+        ORDER BY CountyName ASC
+        `
+      );
     }
-
-    if (search && search.trim()) {
-      const sanitized = search.trim().replace(/'/g, "''");
-      query += ` AND CountyName LIKE '%${sanitized}%'`;
-    }
-
-    query += ' ORDER BY CountyName ASC';
-
-    const counties = await prisma.$queryRawUnsafe(query);
 
     return res.json({
       success: true,
@@ -215,7 +254,7 @@ export const getCounties = async (req, res) => {
 export const getCities = async (req, res) => {
   try {
     const { provinceId, countryCode, stateCode, search, limit } = req.query;
-    const maxLimit = limit ? Math.min(Number(limit), 10000) : 5000;
+    const maxLimit = limit && !isNaN(Number(limit)) ? Math.max(1, Math.min(Number(limit), 10000)) : 5000;
 
     let cities = [];
 
@@ -238,25 +277,42 @@ export const getCities = async (req, res) => {
       }
     } else if (provinceId && !isNaN(Number(provinceId))) {
       // Case 2: Numeric provinceId -> Query MS SQL Server [UM].[UM_Cities]
-      let query = `
-        SELECT TOP ${maxLimit}
-          CityID AS id,
-          RTRIM(CityName) AS name,
-          RTRIM(CityCode) AS code,
-          PK_Province_ID AS provinceId
-        FROM [UM].[UM_Cities]
-        WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
-          AND PK_Province_ID = ${Number(provinceId)}
-      `;
-
-      if (search && search.trim()) {
-        const sanitized = search.trim().replace(/'/g, "''");
-        query += ` AND CityName LIKE '${sanitized}%'`;
+      const numProvId = Number(provinceId);
+      let sqlCities;
+      if (search && typeof search === 'string' && search.trim()) {
+        const prefix = `${search.trim()}%`;
+        sqlCities = await prisma.$queryRawUnsafe(
+          `
+          SELECT TOP (${maxLimit})
+            CityID AS id,
+            RTRIM(CityName) AS name,
+            RTRIM(CityCode) AS code,
+            PK_Province_ID AS provinceId
+          FROM [UM].[UM_Cities]
+          WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
+            AND PK_Province_ID = @P1
+            AND CityName LIKE @P2
+          ORDER BY CityName ASC
+          `,
+          numProvId,
+          prefix
+        );
+      } else {
+        sqlCities = await prisma.$queryRawUnsafe(
+          `
+          SELECT TOP (${maxLimit})
+            CityID AS id,
+            RTRIM(CityName) AS name,
+            RTRIM(CityCode) AS code,
+            PK_Province_ID AS provinceId
+          FROM [UM].[UM_Cities]
+          WHERE (IsDeleted = 0 OR IsDeleted IS NULL)
+            AND PK_Province_ID = @P1
+          ORDER BY CityName ASC
+          `,
+          numProvId
+        );
       }
-
-      query += ' ORDER BY CityName ASC';
-
-      const sqlCities = await prisma.$queryRawUnsafe(query);
       if (sqlCities && sqlCities.length > 0) {
         cities = sqlCities.map((c) => ({
           id: c.id,
@@ -268,12 +324,15 @@ export const getCities = async (req, res) => {
 
       // Case 2b: If SQL has 0 cities for this province, look up country & state to provide fallback cities
       if (cities.length === 0) {
-        const pRows = await prisma.$queryRawUnsafe(`
+        const pRows = await prisma.$queryRawUnsafe(
+          `
           SELECT TOP 1 p.ProvinceName, p.ProvinceCode, UPPER(RTRIM(c.CountryISO)) AS CountryISO
           FROM [UM].[UM_Provinces] p
           INNER JOIN [UM].[UM_Countries] c ON p.PK_Country_ID = c.CountryID
-          WHERE p.ProvinceID = ${Number(provinceId)}
-        `);
+          WHERE p.ProvinceID = @P1
+          `,
+          numProvId
+        );
         if (pRows && pRows.length > 0) {
           const cIso = (pRows[0].CountryISO || '').toUpperCase();
           const pCode = (pRows[0].ProvinceCode || '').split('-').pop() || '';

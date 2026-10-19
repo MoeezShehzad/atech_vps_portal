@@ -292,7 +292,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(
         JSON.stringify({
           status: 'ok',
-          service: 'ATECH Windows Hyper-V Host Agent',
+          service: 'ATC Windows Hyper-V Host Agent',
           platform: process.platform,
           arch: process.arch,
           timestamp: new Date().toISOString(),

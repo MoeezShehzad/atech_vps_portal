@@ -144,7 +144,7 @@ export default function SecurityAndLogs() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `atech_security_audit_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `atc_security_audit_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

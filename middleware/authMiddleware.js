@@ -10,16 +10,26 @@ export const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token missing or malformed.' });
   }
 
-  const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
+  const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'atc_cloud_default_jwt_secret_must_change';
 
   jwt.verify(token, secret, (err, decoded) => {
     if (err) {
       return res.status(401).json({ error: 'Invalid or expired token.' });
     }
 
+    const rolesArray = Array.isArray(decoded.roles)
+      ? decoded.roles
+      : decoded.role
+      ? [decoded.role]
+      : ['Customer'];
+
     req.user = {
       ...decoded,
       userId: decoded.userId || decoded.id || decoded.sub,
+      roles: rolesArray,
+      role: rolesArray.some((r) => String(r).toLowerCase() === 'admin' || String(r).toLowerCase() === 'superuser')
+        ? 'Admin'
+        : rolesArray[0] || 'Customer',
     };
 
     next();

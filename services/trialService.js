@@ -23,18 +23,24 @@ import {
 export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
   if (!userId) throw new Error('Valid User ID is required to initialize trial.');
 
-  // Prevent duplicate active trials
+  // Prevent duplicate active or historical free trials per account
   const existingSub = await prisma.subscription.findFirst({
     where: {
       userId,
-      status: { in: ['ACTIVE', 'TRIAL'] },
-      endDate: { gt: new Date() },
+      OR: [
+        { status: { in: ['ACTIVE', 'TRIAL'] }, endDate: { gt: new Date() } },
+        { status: 'TRIAL' },
+      ],
     },
     include: { virtualMachines: true },
   });
 
-  if (existingSub) {
-    throw new Error('You already have an active subscription or free trial.');
+  const priorTrialLog = await prisma.activityLog.findFirst({
+    where: { userId, action: 'TRIAL_STARTED' },
+  });
+
+  if (existingSub || priorTrialLog) {
+    throw new Error('A free trial or active subscription has already been used on this account.');
   }
 
   // Check if user already has a saved payment method on file
@@ -203,14 +209,14 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
       imageId: image.imageId,
       hostId: host.hostId,
       vmName,
-      hostname: `${vmName}.atech-vps.net`,
+      hostname: `${vmName}.atc-cloud.net`,
       cpuCores: basicPlan?.cpuCores || 2,
       ramGb: basicPlan?.ramGb || 2,
       storageGb: basicPlan?.storageGb || 50,
       status: 'PROVISIONING',
       provisioningStatus: 'IN_PROGRESS',
       adminUser: 'ubuntu',
-      adminPassword: 'AtechSecure2026!',
+      adminPassword: 'AtcSecure2026!',
       startedAt: now,
     },
   });
@@ -232,7 +238,7 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
       storageGb: basicPlan?.storageGb || 50,
       templatePath: image.templatePath || 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx',
       adminUsername: 'ubuntu',
-      adminPassword: 'AtechSecure2026!',
+      adminPassword: 'AtcSecure2026!',
     });
   } catch (hvErr) {
     console.error(`[Trial Hyper-V Error] Failed to create physical VM '${vmName}':`, hvErr.message);
@@ -267,7 +273,7 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
     data: {
       userId,
       invoiceId: inv.invoiceId,
-      paymentGateway: 'STRIPE_CARD_TRIAL_VERIFY',
+      paymentGateway: 'CARD_TRIAL_VERIFY',
       transactionId: `auth_trial_${Date.now()}_${userId}`,
       amount: 0.00,
       currency: 'USD',
@@ -384,10 +390,9 @@ export async function checkExpiringTrials() {
         const chargeAmount = Number(sub.monthlyPrice || 4.99);
 
         try {
-          let paymentSuccess = true;
           let txnId = `txn_trial_conv_${Date.now()}_${sub.userId}`;
 
-          // Attempt charge via Stripe engine
+          // Attempt charge via Card Gateway
           if (defaultCard) {
             try {
               const stripeRes = await processTestCardCharge({
@@ -409,7 +414,7 @@ export async function checkExpiringTrials() {
                 txnId = stripeRes.transactionId;
               }
             } catch (stripeErr) {
-              console.warn('[Stripe Auto-Charge Notice, fallback to internal ledger]:', stripeErr.message);
+              console.warn('[Card Auto-Charge Notice, fallback to internal ledger]:', stripeErr.message);
             }
           }
 
@@ -524,8 +529,11 @@ export async function cancelUserTrial(userId, subscriptionId) {
     },
   });
 
-  // Suspend/Stop associated virtual machines
+  // Suspend/Stop associated virtual machines on Hyper-V and in DB
   for (const vm of sub.virtualMachines) {
+    try {
+      await hypervService.powerAction(vm.vmName, 'stop');
+    } catch (_) {}
     await prisma.virtualMachine.update({
       where: { vmId: vm.vmId },
       data: {

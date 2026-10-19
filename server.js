@@ -28,6 +28,7 @@ import ticketRoutes from './routes/ticketRoutes.js';
 import appStoreRoutes from './routes/appStoreRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import geoRoutes from './routes/geoRoutes.js';
+import siteRoutes from './routes/siteRoutes.js';
 import { setupTerminalWebSocket } from './services/terminalService.js';
 import { startTicketAutomationWorker } from './services/ticketAutomationService.js';
 import { startTrialAutomationWorker } from './services/trialService.js';
@@ -75,7 +76,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-OTP-Session', 'X-Sudo-Token'],
 }));
 
 // 3. Body & Cookie Parsing Middlewares
@@ -86,7 +87,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // 4. Rate Limiting Configurations
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // 20 attempts per IP
+  max: 25, // 25 attempts per IP
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many authentication attempts. Please try again after 15 minutes.' },
@@ -106,8 +107,8 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for high-frequency telemetry polling and console tickets
-    return req.path.includes('/metrics') || req.path.includes('/health') || req.path.includes('/console-session');
+    // Skip rate limiting for high-frequency telemetry polling
+    return req.path.includes('/metrics') || req.path.includes('/health');
   },
 });
 
@@ -115,6 +116,11 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/verify-otp', authLimiter);
+app.use('/api/auth/send-otp', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password-otp', authLimiter);
+app.use('/api/auth/sudo/verify-otp', authLimiter);
 app.use('/api/contact', contactLimiter);
 
 // 5. Route Mounting
@@ -134,6 +140,7 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/apps', appStoreRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/geo', geoRoutes);
+app.use('/api/sites', siteRoutes);
 
 // Public announcements route for website navbar ticker
 app.get('/api/announcements', async (req, res) => {
@@ -165,7 +172,7 @@ app.get('/', (req, res) => {
   }
   res.json({
     status: 'ok',
-    message: 'ATECH Cloud VPS Portal API is running',
+    message: 'ATC Cloud VPS Portal API is running',
     frontend: frontendUrl,
     version: '1.0.0',
   });

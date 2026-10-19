@@ -217,7 +217,7 @@ export default function BillingAndInvoices() {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
       doc.text(`Issue Date: ${formatDate(inv.issueDate)}`, 114, 62);
-      doc.text(`Payment: ${inv.transactionId ? 'Stripe (' + inv.transactionId + ')' : 'Direct Card (•••• 4242)'}`, 114, 67);
+      doc.text(`Payment: ${inv.transactionId ? 'Card Gateway (' + inv.transactionId + ')' : 'Direct Card (•••• 4242)'}`, 114, 67);
       doc.text('Status: Verified & Settled', 114, 72);
 
       // Table Header
@@ -710,7 +710,7 @@ export default function BillingAndInvoices() {
               {/* Payment Proof Footer */}
               <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/40 rounded-xl border border-emerald-100 dark:border-emerald-800/80 text-[11px] text-emerald-900 dark:text-emerald-300 space-y-1">
                 <div className="font-semibold flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
-                  <ShieldCheck className="w-4 h-4" /> Payment Confirmed via Stripe
+                  <ShieldCheck className="w-4 h-4" /> Payment Confirmed & Verified
                 </div>
                 <div>Transaction ID: <span className="font-mono font-semibold">{selectedInvoice.transactionId}</span></div>
               </div>

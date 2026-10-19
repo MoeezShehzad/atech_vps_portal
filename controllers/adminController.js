@@ -27,7 +27,7 @@ export async function getAdminOverview(req, res) {
     const [userCount, vmCount, activeVmCount, subscriptionCount] = await Promise.all([
       prisma.user.count(),
       prisma.virtualMachine.count(),
-      prisma.virtualMachine.count({ where: { status: 'running' } }),
+      prisma.virtualMachine.count({ where: { status: { in: ['RUNNING', 'running'] } } }),
       prisma.subscription.count({ where: { status: 'ACTIVE' } }),
     ]);
 
@@ -194,6 +194,14 @@ export async function toggleUserStatus(req, res) {
       data: { isActive: Boolean(isActive) },
     });
 
+    // Immediately revoke all active refresh tokens when suspending a user
+    if (!Boolean(isActive)) {
+      await prisma.refreshToken.updateMany({
+        where: { userId: targetUserId, isRevoked: false },
+        data: { isRevoked: true },
+      }).catch(() => {});
+    }
+
     // Log this administrative action
     await prisma.activityLog.create({
       data: {
@@ -313,7 +321,7 @@ export async function getFleetVMs(req, res) {
       return {
         vmId: v.vmId,
         name: vmDisplayName,
-        hostname: v.hostname || `${vmDisplayName}.atech-vps.net`,
+        hostname: v.hostname || `${vmDisplayName}.atc-cloud.net`,
         os: v.image?.name || 'Ubuntu 24.04 LTS',
         status: hv?.State ? (hv.State === 'Running' ? 'running' : 'stopped') : (v.status ? v.status.toLowerCase() : 'stopped'),
         ip: assignedIp,
@@ -365,8 +373,8 @@ export async function adminPowerControl(req, res) {
     const vmTargetName = vm.vmName || vm.name;
     const result = await hypervService.controlPower(vmTargetName, action);
 
-    // Update DB status
-    const newStatus = (action === 'START' || action === 'RESTART') ? 'running' : 'stopped';
+    // Update DB status (standardized uppercase)
+    const newStatus = (action === 'START' || action === 'RESTART') ? 'RUNNING' : 'STOPPED';
     await prisma.virtualMachine.update({
       where: { vmId },
       data: { status: newStatus },
@@ -489,8 +497,9 @@ export async function impersonateUser(req, res) {
       return res.status(404).json({ error: 'Target user not found' });
     }
 
-    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
-    const primaryRole = targetUser.userRoles?.[0]?.role?.roleName || 'Customer';
+    const secret = process.env.JWT_SECRET || 'atc_cloud_default_jwt_secret_must_change';
+    const userRolesList = targetUser.userRoles?.map((ur) => ur.role?.roleName).filter(Boolean) || ['Customer'];
+    const primaryRole = userRolesList[0] || 'Customer';
 
     // Scoped 2-hour impersonation access token
     const impersonationToken = jwt.sign(
@@ -498,6 +507,7 @@ export async function impersonateUser(req, res) {
         userId: targetUser.userId,
         email: targetUser.email,
         role: primaryRole,
+        roles: userRolesList,
         isImpersonated: true,
         impersonatedBy: req.adminUser.email,
       },
@@ -1046,7 +1056,7 @@ export async function replyAdminTicket(req, res) {
       });
     }
 
-    const targetStatus = status || (existing.status === 'CLOSED' ? 'CLOSED' : 'RESOLVED');
+    const targetStatus = status || (existing.status === 'CLOSED' ? 'CLOSED' : existing.status === 'OPEN' ? 'AWAITING_USER_ACTION' : existing.status);
 
     // If transitioned to AWAITING_USER_ACTION, start the 10-day countdown clock
     let awaitingSince = existing.awaitingActionSince;
@@ -1484,7 +1494,7 @@ export async function getAdminInvoiceDetails(req, res) {
     const plan = invoice.subscription?.plan;
     const vmSpecs = plan
       ? `${plan.cpuCores || 2} vCPU / ${plan.ramGb || 4} GB RAM / ${plan.storageGb || 40} GB NVMe SSD`
-      : 'Dedicated Hyper-V Virtual Machine Node';
+      : 'Dedicated Cloud Virtual Machine Node';
 
     return res.json({
       success: true,
@@ -1574,6 +1584,7 @@ export async function processAdminRefund(req, res) {
       });
     }
 
+    let vmsToStop = [];
     await prisma.$transaction(async (tx) => {
       if (targetPayment) {
         await tx.payment.update({
@@ -1592,15 +1603,28 @@ export async function processAdminRefund(req, res) {
         if (targetInvoice.subscriptionId) {
           await tx.subscription.update({
             where: { subscriptionId: targetInvoice.subscriptionId },
-            data: { status: 'CANCELLED' },
+            data: { status: 'CANCELLED', endDate: new Date() },
           }).catch(() => {});
+
+          vmsToStop = await tx.virtualMachine.findMany({
+            where: {
+              subscriptionId: targetInvoice.subscriptionId,
+              status: { notIn: ['TERMINATED', 'terminated'] },
+            },
+          });
+          if (vmsToStop.length > 0) {
+            await tx.virtualMachine.updateMany({
+              where: { subscriptionId: targetInvoice.subscriptionId, status: { notIn: ['TERMINATED', 'terminated'] } },
+              data: { status: 'STOPPED' },
+            });
+          }
         } else {
           await tx.subscription.updateMany({
             where: {
               userId: targetInvoice.userId,
               status: 'ACTIVE',
             },
-            data: { status: 'CANCELLED' },
+            data: { status: 'CANCELLED', endDate: new Date() },
           });
         }
       }
@@ -1614,6 +1638,13 @@ export async function processAdminRefund(req, res) {
         },
       });
     });
+
+    // Power off any VMs tied to the refunded subscription in the background
+    for (const vm of vmsToStop) {
+      if (vm.vmName) {
+        hypervService.powerAction(vm.vmName, 'stop').catch(() => {});
+      }
+    }
 
     return res.json({
       success: true,
@@ -1656,16 +1687,48 @@ export async function markInvoiceAsPaid(req, res) {
     const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
     await prisma.$transaction(async (tx) => {
-      // 1. Update Invoice status
+      // 1. Activate existing linked subscription or create & link a new active subscription slot
+      let activeSubId = invoice.subscriptionId;
+      if (activeSubId) {
+        await tx.subscription.update({
+          where: { subscriptionId: activeSubId },
+          data: {
+            status: 'ACTIVE',
+            startDate: now,
+            nextBillingDate: periodEnd,
+            endDate: periodEnd,
+          },
+        }).catch(() => {});
+      } else {
+        const defaultPlan = await tx.vPSPlan.findFirst({ orderBy: { monthlyPrice: 'asc' } });
+        const planPrice = invoice.subscription?.plan?.monthlyPrice || defaultPlan?.monthlyPrice || 9.99;
+
+        const createdSub = await tx.subscription.create({
+          data: {
+            userId: invoice.userId,
+            planId: invoice.subscription?.planId || defaultPlan?.planId || 1,
+            status: 'ACTIVE',
+            startDate: now,
+            nextBillingDate: periodEnd,
+            endDate: periodEnd,
+            monthlyPrice: planPrice,
+            currency: 'USD',
+          },
+        });
+        activeSubId = createdSub.subscriptionId;
+      }
+
+      // 2. Update Invoice status and ensure subscriptionId is linked
       await tx.invoice.update({
         where: { invoiceId: invoice.invoiceId },
         data: {
           status: 'PAID',
           paidDate: now,
+          ...(activeSubId && !invoice.subscriptionId ? { subscriptionId: activeSubId } : {}),
         },
       });
 
-      // 2. Create Payment ledger entry
+      // 3. Create Payment ledger entry
       await tx.payment.create({
         data: {
           userId: invoice.userId,
@@ -1676,22 +1739,6 @@ export async function markInvoiceAsPaid(req, res) {
           currency: 'USD',
           status: 'COMPLETED',
           paymentDate: now,
-        },
-      });
-
-      // 3. Deposit active subscription slot
-      const defaultPlan = await tx.vPSPlan.findFirst({ orderBy: { monthlyPrice: 'asc' } });
-      const planPrice = invoice.subscription?.plan?.monthlyPrice || defaultPlan?.monthlyPrice || 9.99;
-
-      await tx.subscription.create({
-        data: {
-          userId: invoice.userId,
-          planId: invoice.subscription?.planId || defaultPlan?.planId || 1,
-          status: 'ACTIVE',
-          startDate: now,
-          nextBillingDate: periodEnd,
-          monthlyPrice: planPrice,
-          currency: 'USD',
         },
       });
 
@@ -1779,7 +1826,7 @@ export async function adminUpdateSubscription(req, res) {
 
     const sub = await prisma.subscription.findUnique({
       where: { subscriptionId },
-      include: { user: true },
+      include: { user: true, virtualMachines: true },
     });
 
     if (!sub) {
@@ -1788,8 +1835,10 @@ export async function adminUpdateSubscription(req, res) {
 
     let updateData = {};
     if (action === 'EXTEND_30_DAYS') {
-      const currentEnd = sub.nextBillingDate ? new Date(sub.nextBillingDate) : new Date();
-      updateData.nextBillingDate = new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const currentEnd = sub.nextBillingDate ? new Date(sub.nextBillingDate) : sub.endDate ? new Date(sub.endDate) : new Date();
+      const extendedDate = new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000);
+      updateData.nextBillingDate = extendedDate;
+      updateData.endDate = extendedDate;
       updateData.status = 'ACTIVE';
     } else if (action === 'SUSPEND') {
       updateData.status = 'SUSPENDED';
@@ -1797,6 +1846,7 @@ export async function adminUpdateSubscription(req, res) {
       updateData.status = 'ACTIVE';
     } else if (action === 'CANCEL') {
       updateData.status = 'CANCELLED';
+      updateData.endDate = new Date();
     } else {
       return res.status(400).json({ error: 'Invalid action specified' });
     }
@@ -1805,6 +1855,19 @@ export async function adminUpdateSubscription(req, res) {
       where: { subscriptionId: sub.subscriptionId },
       data: updateData,
     });
+
+    // Stop associated VMs if subscription is suspended or cancelled
+    if ((action === 'SUSPEND' || action === 'CANCEL') && sub.virtualMachines?.length > 0) {
+      await prisma.virtualMachine.updateMany({
+        where: { subscriptionId: sub.subscriptionId, status: { notIn: ['TERMINATED', 'terminated'] } },
+        data: { status: 'STOPPED' },
+      }).catch(() => {});
+      for (const vm of sub.virtualMachines) {
+        if (vm.vmName && !['TERMINATED', 'terminated'].includes(vm.status)) {
+          hypervService.powerAction(vm.vmName, 'stop').catch(() => {});
+        }
+      }
+    }
 
     await prisma.activityLog.create({
       data: {
@@ -1928,7 +1991,7 @@ export async function getAdminReports(req, res) {
     const totalHostRamGb = Math.round(os.totalmem() / (1024 * 1024 * 1024)) || 16;
     const totalHostStorageGb = 500;
 
-    const activeVms = vms.filter((v) => v.status !== 'terminated');
+    const activeVms = vms.filter((v) => !['TERMINATED', 'terminated'].includes(v.status));
     const allocatedVcpus = activeVms.reduce((sum, v) => sum + Number(v.cpuCores || 0), 0);
     const allocatedRamGb = activeVms.reduce((sum, v) => sum + Number(v.ramGb || 0), 0);
     const allocatedDiskGb = activeVms.reduce((sum, v) => sum + Number(v.storageGb || 0), 0);
@@ -2018,8 +2081,8 @@ export async function getAdminReports(req, res) {
           ramAllocationPercent,
           diskAllocationPercent,
           totalVms: vms.length,
-          runningVms: activeVms.filter((v) => v.status === 'running').length,
-          stoppedVms: activeVms.filter((v) => v.status === 'stopped').length,
+          runningVms: activeVms.filter((v) => ['RUNNING', 'running'].includes(v.status)).length,
+          stoppedVms: activeVms.filter((v) => ['STOPPED', 'stopped'].includes(v.status)).length,
         },
         planPopularity: Object.values(planStats),
         userBreakdown,

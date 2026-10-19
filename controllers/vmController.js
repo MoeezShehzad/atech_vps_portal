@@ -217,7 +217,7 @@ export async function getUserVMs(req, res) {
         id: `vps-${vm.vmId}`,
         vmId: vm.vmId,
         name: vm.vmName,
-        hostname: vm.hostname || `${vm.vmName}.atech-vps.net`,
+        hostname: vm.hostname || `${vm.vmName}.atc-cloud.net`,
         ip: assignedIp,
         adminUser: vm.adminUser || 'ubuntu',
         adminPassword: vm.adminPassword || 'root',
@@ -356,27 +356,12 @@ export async function deployVM(req, res) {
     if (!host) {
       host = await prisma.hyperVHost.create({
         data: {
-          hostname: 'host1.atech.internal',
+          hostname: 'host1.atc.internal',
           ipAddress: '172.25.80.1',
           status: 'ONLINE',
           location: 'Main DC - Cluster 01',
         },
       });
-    }
-
-    // Specs calculation
-    const finalCpu = customCpu ? Number(customCpu) : plan.cpuCores;
-    const finalRam = customRam ? Number(customRam) : plan.ramGb;
-    const finalStorage = customStorage ? Number(customStorage) : plan.storageGb;
-
-    const pricing = calculateCustomPrice(plan, {
-      cpuCores: finalCpu,
-      ramGb: finalRam,
-      storageGb: finalStorage,
-    });
-
-    if (enableBackups) {
-      pricing.totalMonthlyPrice = Number((Number(pricing.totalMonthlyPrice) + 2.0).toFixed(2));
     }
 
     // Check if user has an existing active or trial subscription with an available server slot (Multi-tenant cloud model)
@@ -400,6 +385,26 @@ export async function deployVM(req, res) {
         code: 'PAYMENT_REQUIRED',
         planId: plan.planId,
       });
+    }
+
+    // Specs calculation — enforce subscription plan limits for TRIAL accounts and hardware max bounds
+    const isTrialSub = subscription.status === 'TRIAL';
+    const maxAllowedCpu = isTrialSub ? (subscription.plan?.cpuCores || 2) : 32;
+    const maxAllowedRam = isTrialSub ? (subscription.plan?.ramGb || 2) : 128;
+    const maxAllowedStorage = isTrialSub ? (subscription.plan?.storageGb || 50) : 2000;
+
+    const finalCpu = Math.max(1, Math.min(maxAllowedCpu, customCpu ? Number(customCpu) : (subscription.plan?.cpuCores || plan.cpuCores)));
+    const finalRam = Math.max(1, Math.min(maxAllowedRam, customRam ? Number(customRam) : (subscription.plan?.ramGb || plan.ramGb)));
+    const finalStorage = Math.max(10, Math.min(maxAllowedStorage, customStorage ? Number(customStorage) : (subscription.plan?.storageGb || plan.storageGb)));
+
+    const pricing = calculateCustomPrice(plan, {
+      cpuCores: finalCpu,
+      ramGb: finalRam,
+      storageGb: finalStorage,
+    });
+
+    if (enableBackups) {
+      pricing.totalMonthlyPrice = Number((Number(pricing.totalMonthlyPrice) + 2.0).toFixed(2));
     }
 
     const isSlotReused = Boolean(subscription);
@@ -426,11 +431,11 @@ export async function deployVM(req, res) {
       data: {
         userId,
         subscriptionId: subscription.subscriptionId,
-        planId: plan.planId,
+        planId: subscription.planId || plan.planId,
         imageId: image.imageId,
         hostId: host.hostId,
         vmName: cleanVmName,
-        hostname: `${cleanVmName}.atech-vps.net`,
+        hostname: `${cleanVmName}.atc-cloud.net`,
         cpuCores: finalCpu,
         ramGb: finalRam,
         storageGb: finalStorage,
@@ -708,8 +713,8 @@ export async function resizeVM(req, res) {
     const targetCpu = Number(cpuCores);
     const targetRam = Number(ramGb);
 
-    if (!targetCpu || !targetRam || targetCpu < 1 || targetRam < 1) {
-      return res.status(400).json({ error: 'Invalid CPU cores or RAM amount specified.' });
+    if (!targetCpu || !targetRam || targetCpu < 1 || targetRam < 1 || targetCpu > 32 || targetRam > 128) {
+      return res.status(400).json({ error: 'Invalid CPU cores (1-32) or RAM amount (1-128 GB) specified.' });
     }
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -721,7 +726,17 @@ export async function resizeVM(req, res) {
       return res.status(404).json({ error: 'Virtual machine not found.' });
     }
 
+    if (vm.subscription?.status === 'TRIAL') {
+      return res.status(403).json({
+        error: 'Hardware upgrades are not available on free trial instances. Please convert to a paid subscription first.',
+      });
+    }
+
     const targetStorage = storageGb ? Number(storageGb) : vm.storageGb;
+
+    if (targetStorage > 2000) {
+      return res.status(400).json({ error: 'Maximum NVMe storage allocation per instance is 2000 GB.' });
+    }
 
     // Disallow disk shrinking
     if (targetStorage < vm.storageGb) {
@@ -1568,7 +1583,8 @@ export async function createVMBackup(req, res) {
     });
     if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
 
-    const snapName = `Backup_${Date.now()}`;
+    const safeLabel = label ? label.replace(/[^a-zA-Z0-9 _-]/g, '').trim() : '';
+    const snapName = safeLabel || `Backup_${Date.now()}`;
     try {
       await hypervService.snapshotAction(vm.vmName, 'CREATE', snapName);
     } catch (e) {
@@ -1579,7 +1595,7 @@ export async function createVMBackup(req, res) {
       data: {
         vmId,
         backupType: 'MANUAL',
-        backupLocation: label ? `Hyper-V Host Storage / ${label}` : `Hyper-V Host Storage / ${snapName}`,
+        backupLocation: `ATC Cloud Storage / ${snapName}`,
         backupSizeGb: Number((vm.storageGb * 0.16).toFixed(1)),
         status: 'COMPLETED',
         startedAt: new Date(),
@@ -1674,6 +1690,18 @@ export async function deleteVMBackup(req, res) {
       where: { vmId, userId, status: { not: 'TERMINATED' } },
     });
     if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+
+    const backup = await prisma.backup.findFirst({
+      where: { backupId: BigInt(backupId), vmId },
+    });
+    if (backup && backup.backupLocation) {
+      try {
+        const snapName = backup.backupLocation.split('/').pop().trim();
+        await hypervService.snapshotAction(vm.vmName, 'DELETE', snapName);
+      } catch (e) {
+        console.warn('[Delete Backup Notice]:', e.message);
+      }
+    }
 
     await prisma.backup.deleteMany({
       where: { backupId: BigInt(backupId), vmId },

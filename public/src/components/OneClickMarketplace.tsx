@@ -438,7 +438,7 @@ export default function OneClickMarketplace({
             <div className="space-y-2 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-bold uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                Linode-Style StackScript Automation Engine
+                ATC Automated Cloud Deployment Engine
               </div>
               <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight font-poppins">
                 1-Click Application Marketplace

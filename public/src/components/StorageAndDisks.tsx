@@ -31,7 +31,7 @@ interface VirtualDisk {
   capacityGb: number;
   type: string;
   bus: string;
-  status: 'ONLINE' | 'DETACHED';
+  status: 'ONLINE' | 'OFFLINE';
   path: string;
 }
 
@@ -49,12 +49,6 @@ export default function StorageAndDisks() {
   const [expandQuote, setExpandQuote] = useState<any>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
 
-  const [isAttachOpen, setIsAttachOpen] = useState(false);
-  const [attachTargetVmId, setAttachTargetVmId] = useState<number | null>(null);
-  const [attachVolumeSize, setAttachVolumeSize] = useState(25);
-  const [attachVolumeName, setAttachVolumeName] = useState('data-volume-01');
-  const [attachLoading, setAttachLoading] = useState(false);
-
   const fetchStorageData = async () => {
     try {
       setLoading(true);
@@ -65,15 +59,16 @@ export default function StorageAndDisks() {
       // Map VMs to Virtual Disks
       const virtualDisks: VirtualDisk[] = [];
       vms.forEach((vm: any) => {
+        const isOnline = String(vm.status || '').toUpperCase() === 'RUNNING';
         virtualDisks.push({
           id: `disk-${vm.vmId}-os`,
           diskName: `${vm.name.toLowerCase()}-disk0`,
           vmId: vm.vmId,
           vmName: vm.name,
           capacityGb: vm.storageGb || vm.diskGB || 40,
-          type: 'NVMe Gen4 SSD',
+          type: 'Enterprise NVMe SSD',
           bus: 'SCSI Controller (0:0)',
-          status: vm.status === 'RUNNING' ? 'ONLINE' : 'ONLINE',
+          status: isOnline ? 'ONLINE' : 'OFFLINE',
           path: `/dev/cloud-storage/vol-${vm.vmId}`,
         });
       });
@@ -167,42 +162,6 @@ export default function StorageAndDisks() {
     }
   };
 
-  const handleAttachVolume = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!attachTargetVmId) {
-      toast.warning('Please select a target Virtual Machine');
-      return;
-    }
-
-    try {
-      setAttachLoading(true);
-      const targetVm = instances.find((v) => v.vmId === attachTargetVmId);
-      
-      // Simulate/Attach secondary volume
-      await new Promise((r) => setTimeout(r, 1200));
-
-      const newVol: VirtualDisk = {
-        id: `vol-${Date.now()}`,
-        diskName: `${attachVolumeName.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}-vol`,
-        vmId: attachTargetVmId,
-        vmName: targetVm ? targetVm.name : 'Virtual Machine',
-        capacityGb: attachVolumeSize,
-        type: 'Block Storage (NVMe)',
-        bus: 'SCSI Controller (0:1)',
-        status: 'ONLINE',
-        path: `/dev/cloud-storage/${attachVolumeName.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`,
-      };
-
-      setDisks((prev) => [...prev, newVol]);
-      toast.success(`Secondary block storage attached to ${newVol.vmName}.`);
-      setIsAttachOpen(false);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to attach storage volume');
-    } finally {
-      setAttachLoading(false);
-    }
-  };
-
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
@@ -213,11 +172,11 @@ export default function StorageAndDisks() {
               Storage & Virtual Disks
             </h1>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400">
-              NVMe Tier-1 Cluster
+              Enterprise NVMe Storage
             </span>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Manage attached virtual hard drives, perform on-the-fly disk expansions, and attach secondary block storage.
+            Manage attached virtual hard drives and perform live disk capacity expansions for your instances.
           </p>
         </div>
 
@@ -230,20 +189,11 @@ export default function StorageAndDisks() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <button
-            onClick={() => {
-              if (instances.length > 0) setAttachTargetVmId(instances[0].vmId);
-              setIsAttachOpen(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-blue-500/20"
-          >
-            <Plus className="w-4 h-4" /> Attach Secondary Volume
-          </button>
         </div>
       </div>
 
       {/* Top Storage Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>Total Storage Allocated</span>
@@ -254,7 +204,7 @@ export default function StorageAndDisks() {
           <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
             {totalAllocatedGb} <span className="text-sm font-sans font-medium text-slate-500 dark:text-slate-400">GB NVMe</span>
           </div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">High-speed PCIe 4.0 storage</p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">Provisioned across active instances</p>
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
@@ -272,28 +222,15 @@ export default function StorageAndDisks() {
 
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
-            <span>IOPS Performance</span>
+            <span>Storage Architecture</span>
             <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl">
-              <Zap className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
-            Up to 80,000 <span className="text-sm font-sans font-medium text-slate-500 dark:text-slate-400">IOPS</span>
-          </div>
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Sub-millisecond latency</p>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
-            <span>Redundancy Tier</span>
-            <div className="p-2 bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 rounded-xl">
               <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
-            RAID-10
+            Enterprise NVMe
           </div>
-          <p className="text-[11px] text-slate-400 dark:text-slate-500">Automated fault-tolerant array</p>
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Dedicated VHDX block isolation</p>
         </div>
       </div>
 
@@ -364,8 +301,12 @@ export default function StorageAndDisks() {
                       {disk.bus}
                     </td>
                     <td className="py-4 px-6">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                        disk.status === 'ONLINE'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200/60 dark:border-emerald-800/60'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${disk.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                         {disk.status}
                       </span>
                     </td>
@@ -520,92 +461,6 @@ export default function StorageAndDisks() {
                   ) : (
                     `Confirm & Expand ${expandQuote?.dueToday ? `($${expandQuote.dueToday.toFixed(2)})` : ''}`
                   )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ATTACH SECONDARY VOLUME MODAL */}
-      {isAttachOpen && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
-            <button
-              onClick={() => setIsAttachOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400 mb-4">
-              <div className="p-2.5 bg-blue-50 dark:bg-blue-950/60 rounded-xl">
-                <Plus className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Attach Secondary Volume</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Create dedicated block storage for your VM</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleAttachVolume} className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Volume Name</label>
-                <input
-                  type="text"
-                  value={attachVolumeName}
-                  onChange={(e) => setAttachVolumeName(e.target.value)}
-                  placeholder="data-volume-01"
-                  required
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs font-mono focus:outline-hidden focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Attach to Virtual Machine</label>
-                <select
-                  value={attachTargetVmId || ''}
-                  onChange={(e) => setAttachTargetVmId(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-xs focus:outline-hidden focus:border-blue-500"
-                >
-                  {instances.map((v) => (
-                    <option key={v.vmId} value={v.vmId} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
-                      {v.name} ({v.ip || 'Provisioning'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span className="text-slate-700 dark:text-slate-300">Volume Size</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-bold font-mono">{attachVolumeSize} GB</span>
-                </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="250"
-                  step="5"
-                  value={attachVolumeSize}
-                  onChange={(e) => setAttachVolumeSize(Number(e.target.value))}
-                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setIsAttachOpen(false)}
-                  className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={attachLoading || instances.length === 0}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20 disabled:opacity-50 cursor-pointer"
-                >
-                  {attachLoading ? 'Attaching...' : 'Attach Volume'}
                 </button>
               </div>
             </form>

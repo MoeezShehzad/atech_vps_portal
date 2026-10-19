@@ -18,6 +18,7 @@ export default function ForgotPassword() {
   // Inputs
   const [email, setEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
+  const [otpSessionToken, setOtpSessionToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -50,12 +51,16 @@ export default function ForgotPassword() {
     try {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: targetEmail }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to request password reset code.');
+      }
+      if (data.sessionToken) {
+        setOtpSessionToken(data.sessionToken);
       }
       setStep('otp');
       setResendCooldown(60);
@@ -84,12 +89,16 @@ export default function ForgotPassword() {
     try {
       const res = await fetch('/api/auth/forgot-password', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: targetEmail }),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to resend code.');
+      }
+      if (data.sessionToken) {
+        setOtpSessionToken(data.sessionToken);
       }
       setResendCooldown(60);
       setSuccessMessage('A fresh 6-digit code has been sent to your email.');
@@ -130,13 +139,19 @@ export default function ForgotPassword() {
     setIsSubmitting(true);
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (otpSessionToken) {
+        headers['X-OTP-Session'] = otpSessionToken;
+      }
       const res = await fetch('/api/auth/reset-password-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
           otp: otpCode.trim(),
           newPassword,
+          sessionToken: otpSessionToken || undefined,
         }),
       });
       const data = await res.json();
@@ -179,6 +194,7 @@ export default function ForgotPassword() {
     try {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword }),
       });
@@ -229,7 +245,7 @@ export default function ForgotPassword() {
 
           <div className="space-y-3.5 max-w-md">
             {[
-              { title: 'Cryptographic OTP Security', desc: 'Secure 6-digit codes with 10-minute expiry, strict attempt caps, and instant consumption.' },
+              { title: 'Cryptographic OTP Security', desc: 'Secure 6-digit codes with 5-minute expiry, strict attempt caps, and single-use consumption.' },
               { title: 'Instant Dedicated SMTP', desc: 'Delivered directly through our dedicated mail cluster at mail.atechconsult.com with SSL encryption.' },
               { title: 'Bcrypt Hash Architecture', desc: 'Raw passwords are never stored or transmitted in plain text across our infrastructure.' },
             ].map((item, idx) => (
@@ -408,7 +424,7 @@ export default function ForgotPassword() {
                     hasError={Boolean(errorMessage && otpCode.length < 6)}
                   />
                   <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                    <span>Valid for 10 minutes</span>
+                    <span>Valid for 5 minutes</span>
                     <button
                       type="button"
                       onClick={handleResendOtp}

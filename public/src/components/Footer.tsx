@@ -123,12 +123,12 @@ export default function Footer() {
               </li>
               <li>
                 <Link to="/about" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white transition-colors">
-                  About me
+                  About Us
                 </Link>
               </li>
               <li>
                 <Link to="/pricing" className="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white transition-colors">
-                  Reviews
+                  Pricing
                 </Link>
               </li>
               <li>

@@ -54,7 +54,7 @@ import Sidebar from '../components/Sidebar';
 import AccountSettings from '../components/AccountSettings';
 import NotificationBell from '../components/NotificationBell';
 import ThemeToggle from '../components/ThemeToggle';
-import { apiCall } from '../services/api';
+import { apiCall, setAccessToken } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import WindowsResourceGraph from '../components/WindowsResourceGraph';
 import { formatDate, formatDateTime } from '../utils/dateFormatter';
@@ -1226,6 +1226,7 @@ export default function Dashboard() {
               onClick={() => {
                 const orig = sessionStorage.getItem('originalAdminToken');
                 if (orig) {
+                  setAccessToken(orig);
                   localStorage.setItem('accessToken', orig);
                   sessionStorage.removeItem('originalAdminToken');
                 }
@@ -2386,7 +2387,7 @@ export default function Dashboard() {
                     >
                       {trialLoading ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" /> Provisioning VM on Hyper-V...
+                          <Loader2 className="w-4 h-4 animate-spin" /> Provisioning Cloud VM...
                         </>
                       ) : (
                         <>
@@ -2546,7 +2547,7 @@ export default function Dashboard() {
                             required
                             value={trialBankName}
                             onChange={(e) => setTrialBankName(e.target.value)}
-                            placeholder="Chase, Bank of America, Wells Fargo..."
+                            placeholder="Your Financial Institution..."
                             className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
                           />
                         </div>
@@ -2612,7 +2613,7 @@ export default function Dashboard() {
                       >
                         {trialLoading ? (
                           <>
-                            <Loader2 className="w-4 h-4 animate-spin" /> Provisioning VM on Hyper-V...
+                            <Loader2 className="w-4 h-4 animate-spin" /> Provisioning Cloud VM...
                           </>
                         ) : (
                           <>
@@ -3610,7 +3611,7 @@ export default function Dashboard() {
 
                 {(() => {
                   const quotaGb = selectedInstance.bandwidthGb || 80;
-                  const usedGb = selectedInstance.bandwidthUsedGb || parseFloat((((selectedInstance.vmId * 7.3 + 14.2) % (quotaGb * 0.7)) + 4.2).toFixed(1));
+                  const usedGb = Number(selectedInstance.bandwidthUsedGb || 0);
                   const percent = Math.min(100, Math.round((usedGb / quotaGb) * 100));
 
                   return (

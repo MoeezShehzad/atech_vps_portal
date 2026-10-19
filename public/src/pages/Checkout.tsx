@@ -37,7 +37,7 @@ export default function Checkout() {
       storageType: 'NVMe',
     },
     os: { name: 'Ubuntu 22.04 LTS', fee: 0 },
-    location: { name: 'United States (US East)', flag: '🇺🇸' },
+    location: { name: 'Bolingbrook, IL (US Central)', flag: '🇺🇸' },
     term: { label: '1 Month', id: '1m' },
     addons: [],
     monthlyTotal: 11.00,
@@ -45,7 +45,7 @@ export default function Checkout() {
 
   const isYearly = orderData.isYearly || orderData.term?.id === '12m';
   const isMultiYear = orderData.term?.id === '24m';
-  const isNonRefundable = orderData.isNonRefundable || isYearly || isMultiYear;
+  const isNonRefundable = true;
   const effectiveAmount = Number(orderData.totalDueToday ?? orderData.monthlyTotal ?? 11);
 
   // State Management
@@ -63,7 +63,7 @@ export default function Checkout() {
     address: '',
     city: '',
     zip: '',
-    country: 'Pakistan',
+    country: 'United States',
     termsAccepted: false,
   });
   const [showGuestPassword, setShowGuestPassword] = useState(false);
@@ -82,7 +82,7 @@ export default function Checkout() {
         address: u.address || '',
         city: u.city || '',
         zip: u.postalCode || '',
-        country: u.country || 'Pakistan',
+        country: u.country || 'United States',
       }));
     }
   }, [user]);
@@ -110,7 +110,7 @@ export default function Checkout() {
     }
   }, [isAuthenticated]);
 
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank_transfer' | 'paypal'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank_transfer'>('card');
   const [selectedCardBrand, setSelectedCardBrand] = useState<'Visa' | 'Mastercard' | 'American Express'>('Visa');
   const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvc: '', name: '' });
   const [bankDetails, setBankDetails] = useState({
@@ -261,7 +261,7 @@ export default function Checkout() {
 
     if (!isAuthenticated) {
       alert('Please log in or register before finalizing your payment.');
-      navigate('/login', { state: { returnTo: '/checkout' } });
+      navigate('/login?redirect=/checkout', { state: { returnTo: '/checkout', configurationOrder: orderData } });
       return;
     }
 
@@ -353,9 +353,6 @@ export default function Checkout() {
             isDeployLater: true,
           });
         }
-      } else {
-        alert('PayPal Express checkout simulation. Redirecting to payment authorization...');
-        navigate('/dashboard');
       }
     } catch (err: any) {
       setPaymentError(err.message || 'Payment processing failed. Please check your credentials or payment limits.');
@@ -543,7 +540,7 @@ export default function Checkout() {
                         <p className="text-xs text-slate-500 mt-1">Set up your credentials to manage your server dashboard after payment.</p>
                       </div>
                       <button
-                        onClick={() => navigate('/login?redirect=/checkout')}
+                        onClick={() => navigate('/login?redirect=/checkout', { state: { returnTo: '/checkout', configurationOrder: orderData } })}
                         className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors self-start sm:self-auto"
                       >
                         Already have an account? Log in
@@ -667,11 +664,9 @@ export default function Checkout() {
                           />
                           <span className="text-slate-600 text-xs font-medium">
                             I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Terms of Service</a>, <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Privacy Policy</a>, and <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Refund Policy</a>
-                            {isNonRefundable && (
-                              <span className="text-amber-800 font-bold block mt-0.5">
-                                • I acknowledge that annual plans are billed upfront for the full 12-month period and are strictly non-refundable.
-                              </span>
-                            )}
+                            <span className="text-amber-800 font-bold block mt-0.5">
+                              • I acknowledge that all sales are final and non-refundable once server resources are provisioned.
+                            </span>
                           </span>
                         </label>
                         {errors.termsAccepted && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.termsAccepted}</p>}
@@ -738,17 +733,15 @@ export default function Checkout() {
                     )}
                     <div className="flex justify-between border-b border-slate-100 pb-2">
                       <span className="text-slate-500">Datacenter Location</span>
-                      <span className="font-bold text-slate-900">{orderData.location?.name || 'United States'}</span>
+                      <span className="font-bold text-slate-900">{orderData.location?.name || 'Bolingbrook, IL (US Central)'}</span>
                     </div>
                     <div className="flex justify-between border-b border-slate-100 pb-2">
                       <span className="text-slate-500">Billing Term</span>
                       <div className="text-right">
                         <span className="font-bold text-slate-900 block">{orderData.term?.label || '1 Month'}</span>
-                        {isNonRefundable && (
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 inline-block mt-0.5">
-                            Non-refundable / Paid annually upfront
-                          </span>
-                        )}
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 inline-block mt-0.5">
+                          Final Sale Upon Provisioning
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -808,7 +801,7 @@ export default function Checkout() {
                 )}
 
                 {/* Payment Method Selector Tabs */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('card')}
@@ -820,7 +813,7 @@ export default function Checkout() {
                   >
                     <span className="text-lg">💳</span>
                     <span className="font-extrabold">Credit / Debit Card</span>
-                    <span className="text-[10px] text-slate-400 font-medium">Stripe / Visa / MC / Amex</span>
+                    <span className="text-[10px] text-slate-400 font-medium">Visa / Mastercard / Amex</span>
                   </button>
 
                   <button
@@ -836,23 +829,9 @@ export default function Checkout() {
                     <span className="font-extrabold">Direct Bank Wire</span>
                     <span className="text-[10px] text-slate-400 font-medium">Sorting A/C & Net Terms</span>
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('paypal')}
-                    className={`p-4 rounded-xl border font-bold flex flex-col items-center justify-center gap-1.5 transition-all ${
-                      paymentMethod === 'paypal'
-                        ? 'border-blue-600 bg-blue-50/60 text-blue-700 ring-2 ring-blue-500/20 shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                    }`}
-                  >
-                    <span className="text-lg">🅿️</span>
-                    <span className="font-extrabold">PayPal</span>
-                    <span className="text-[10px] text-slate-400 font-medium">Express Checkout</span>
-                  </button>
                 </div>
 
-                {/* 1. CREDIT / DEBIT CARD PANEL (Matches Stripe Elements in Image 1) */}
+                {/* 1. CREDIT / DEBIT CARD PANEL */}
                 {paymentMethod === 'card' && (
                   <div className="space-y-4 text-xs pt-2">
                     {savedPaymentMethod && useSavedCard ? (
@@ -1015,7 +994,7 @@ export default function Checkout() {
                         value={bankDetails.bankName}
                         onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
                         error={errors.bankName}
-                        placeholder="e.g. JPMorgan Chase, Barclays, HSBC"
+                        placeholder="e.g. Corporate Commercial Bank"
                       />
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1060,16 +1039,6 @@ export default function Checkout() {
                         />
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {/* 3. PAYPAL PANEL */}
-                {paymentMethod === 'paypal' && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-xs space-y-2">
-                    <p className="font-extrabold text-slate-900 text-sm">🅿️ PayPal Express Checkout</p>
-                    <p className="text-slate-500">
-                      You will be redirected to PayPal sandbox to authorize payment using your balance or connected accounts.
-                    </p>
                   </div>
                 )}
 
@@ -1144,8 +1113,8 @@ export default function Checkout() {
                     ) : (
                       <span>
                         {deployPreference === 'later'
-                          ? `Purchase & Reserve Slot ($${effectiveAmount.toFixed(2)}${isYearly ? ' Full Year Upfront' : '/mo'})`
-                          : `Complete & Deploy ($${effectiveAmount.toFixed(2)}${isYearly ? ' Full Year Upfront' : '/mo'})`}
+                          ? `Purchase & Reserve Slot ($${effectiveAmount.toFixed(2)}${isYearly ? ' Full Year Upfront' : isMultiYear ? ' 2-Year Term Upfront' : '/mo'})`
+                          : `Complete & Deploy ($${effectiveAmount.toFixed(2)}${isYearly ? ' Full Year Upfront' : isMultiYear ? ' 2-Year Term Upfront' : '/mo'})`}
                       </span>
                     )}
                   </button>
@@ -1211,7 +1180,7 @@ export default function Checkout() {
 
                   <div className="grid grid-cols-2 gap-3 pt-2">
                     <button
-                      onClick={() => navigate('/billing')}
+                      onClick={() => navigate('/dashboard?tab=billing')}
                       className="py-3 px-4 rounded-xl border border-slate-300 font-extrabold text-xs text-slate-700 hover:bg-slate-50 transition-colors"
                     >
                       View Invoices
@@ -1267,7 +1236,7 @@ export default function Checkout() {
                 )}
 
                 <div className="flex justify-between text-slate-600">
-                  <span>Location: {orderData.location?.name || 'US East'}</span>
+                  <span>Location: {orderData.location?.name || 'Bolingbrook, IL (US Central)'}</span>
                   <span className="font-bold text-slate-900">Included</span>
                 </div>
 
@@ -1297,17 +1266,15 @@ export default function Checkout() {
               </div>
 
               {/* NON-REFUNDABLE BADGE */}
-              {isNonRefundable && (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] space-y-1">
-                  <div className="font-bold flex items-center gap-1.5 text-amber-800">
-                    <span>⚠️</span>
-                    <span>Annual Plan • Non-Refundable</span>
-                  </div>
-                  <p className="text-amber-700 text-[10px] leading-relaxed">
-                    Billed upfront for full 12-month period. Once provisioned, annual contracts are strictly non-refundable.
-                  </p>
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] space-y-1">
+                <div className="font-bold flex items-center gap-1.5 text-amber-800">
+                  <span>⚠️</span>
+                  <span>All Sales Final • Non-Refundable</span>
                 </div>
-              )}
+                <p className="text-amber-700 text-[10px] leading-relaxed">
+                  Once cloud server resources and IP allocations are provisioned on our infrastructure, all payments are final and non-refundable.
+                </p>
+              </div>
 
               {/* Total Calculation */}
               <div className="pt-4 border-t border-slate-200 space-y-1">

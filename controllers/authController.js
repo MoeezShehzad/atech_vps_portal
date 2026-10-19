@@ -9,7 +9,7 @@ import { setupUserTrial } from '../services/trialService.js';
 import { generateAndSendOTP, verifyOTP } from '../services/otpService.js';
 
 // --- CENTRALIZED AUTH CONFIGURATION ---
-const JWT_SECRET = process.env.JWT_SECRET || 'atech_vps_default_jwt_secret_must_change';
+const JWT_SECRET = process.env.JWT_SECRET || 'atc_cloud_default_jwt_secret_must_change';
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
 const JWT_VERIFY_SECRET = process.env.JWT_VERIFY_SECRET || JWT_SECRET;
@@ -55,10 +55,26 @@ const setRefreshTokenCookie = (res, token) => {
   res.cookie('refreshToken', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+    sameSite: 'lax',
     path: '/',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
+};
+
+// Helper to validate OAuth redirect origin against allowed origins
+const isAllowedReturnOrigin = (originUrl) => {
+  if (!originUrl) return false;
+  const allowedList = [
+    process.env.FRONTEND_URL,
+    process.env.CLIENT_URL,
+    'http://localhost:5174',
+    'http://localhost:5173',
+  ].filter(Boolean);
+  return (
+    allowedList.includes(originUrl) ||
+    allowedList.includes(originUrl.replace(/\/$/, '')) ||
+    /^https?:\/\/(localhost|127\.0\.0\.1|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(originUrl)
+  );
 };
 
 // --- GOOGLE OAUTH: STEP 1 (REDIRECT TO GOOGLE WITH CSRF STATE) ---
@@ -66,12 +82,15 @@ export const googleAuth = (req, res) => {
   // Generate cryptographically secure state parameter to prevent OAuth Login CSRF
   const state = crypto.randomBytes(32).toString('hex');
   
-  // Dynamically capture originating frontend URL (port 80 IP, dev port, or domain)
+  // Dynamically capture originating frontend URL if in allowed origins
   let returnTo = FRONTEND_URL;
   if (req.headers.referer) {
     try {
       const refUrl = new URL(req.headers.referer);
-      returnTo = `${refUrl.protocol}//${refUrl.host}`;
+      const candidateOrigin = `${refUrl.protocol}//${refUrl.host}`;
+      if (isAllowedReturnOrigin(candidateOrigin)) {
+        returnTo = candidateOrigin;
+      }
     } catch (_) {}
   }
 
@@ -111,7 +130,8 @@ export const googleAuth = (req, res) => {
 export const googleAuthCallback = async (req, res) => {
   const { code, state } = req.query;
   const storedState = req.cookies?.oauth_state;
-  const returnTo = req.cookies?.oauth_return_to || FRONTEND_URL;
+  const rawReturnTo = req.cookies?.oauth_return_to;
+  const returnTo = isAllowedReturnOrigin(rawReturnTo) ? rawReturnTo : FRONTEND_URL;
 
   // Clear state and return cookies immediately
   res.clearCookie('oauth_state');
@@ -172,6 +192,9 @@ export const googleAuthCallback = async (req, res) => {
     });
 
     if (user) {
+      if (!user.isActive) {
+        return res.redirect(`${returnTo}/login?error=account_suspended`);
+      }
       // LINK ACCOUNT STRATEGY: Update existing manual user with googleId & provider status
       const updatedProvider = user.passwordHash ? 'BOTH' : 'GOOGLE';
       user = await prisma.user.update({
@@ -352,7 +375,7 @@ export const register = async (req, res) => {
       });
 
       return res.status(201).json({
-        message: 'Registration successful! Your 30-Day Free Trial has been activated.',
+        message: 'Registration successful! Your account has been activated.',
         accessToken,
         token: accessToken,
         user: {
@@ -399,7 +422,8 @@ export const register = async (req, res) => {
         res.cookie('atc_otp_session', otpSessionToken, {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
+          sameSite: 'lax',
+          path: '/',
           maxAge: 5 * 60 * 1000,
         });
       }
@@ -428,6 +452,7 @@ export const register = async (req, res) => {
     return res.status(201).json({
       success: true,
       requiresOtp: true,
+      sessionToken: otpSessionToken,
       message: 'Registration successful! A 6-digit verification code has been sent to your email.',
       email: newUser.email,
       user: {
@@ -455,7 +480,7 @@ export const verifyEmailHandler = async (req, res) => {
     // 1. Verify token signature
     const decoded = jwt.verify(token, JWT_VERIFY_SECRET);
 
-    // 2. Mark emailVerified as true in MariaDB
+    // 2. Mark emailVerified as true
     let user = await prisma.user.update({
       where: { userId: decoded.userId },
       data: { 
@@ -507,14 +532,34 @@ export const resendVerificationHandler = async (req, res) => {
       { expiresIn: '24h' }
     );
 
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
+    const clientUa = req.headers['user-agent'];
+
     const result = await generateAndSendOTP({
       email: user.email,
       purpose: 'VERIFY_EMAIL',
       fullName: user.fullName,
+      ipAddress: clientIp,
+      userAgent: clientUa,
+      userId: user.userId,
       fallbackToken: verificationToken,
     });
 
-    return res.json({ success: true, message: 'A 6-digit verification code has been sent to your email.' });
+    if (result?.sessionToken) {
+      res.cookie('atc_otp_session', result.sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 5 * 60 * 1000,
+      });
+    }
+
+    return res.json({
+      success: true,
+      sessionToken: result?.sessionToken,
+      message: 'A 6-digit verification code has been sent to your email.',
+    });
   } catch (error) {
     if (error.statusCode === 429) {
       return res.status(429).json({ error: error.message, remainingSeconds: error.remainingSeconds });
@@ -639,8 +684,14 @@ export const refreshTokenHandler = async (req, res) => {
       },
     });
 
-    if (!storedToken || storedToken.isRevoked || new Date() > storedToken.expiresAt) {
-      if (storedToken?.isRevoked) {
+    if (
+      !storedToken ||
+      storedToken.isRevoked ||
+      new Date() > storedToken.expiresAt ||
+      !storedToken.user ||
+      !storedToken.user.isActive
+    ) {
+      if (storedToken?.isRevoked || (storedToken?.user && !storedToken.user.isActive)) {
         await prisma.refreshToken.updateMany({
           where: { userId: storedToken.userId },
           data: { isRevoked: true },
@@ -649,10 +700,10 @@ export const refreshTokenHandler = async (req, res) => {
       res.clearCookie('refreshToken', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+        sameSite: 'lax',
         path: '/',
       });
-      return res.status(401).json({ error: 'Invalid or revoked session.' });
+      return res.status(401).json({ error: 'Invalid, revoked, or suspended session.' });
     }
 
     // Revoke old token for rotation
@@ -703,7 +754,7 @@ export const logoutHandler = async (req, res) => {
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      sameSite: 'lax',
       path: '/',
     });
 
@@ -799,7 +850,8 @@ export const forgotPasswordHandler = async (req, res) => {
       res.cookie('atc_otp_session', otpRes.sessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
+        path: '/',
         maxAge: 5 * 60 * 1000,
       });
     }
@@ -928,7 +980,8 @@ export const sendOtpHandler = async (req, res) => {
       res.cookie('atc_otp_session', result.sessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
+        path: '/',
         maxAge: 5 * 60 * 1000,
       });
     }
@@ -979,7 +1032,7 @@ export const verifyOtpHandler = async (req, res) => {
     }
 
     // Clean up OTP session cookie upon successful verification
-    res.clearCookie('atc_otp_session');
+    res.clearCookie('atc_otp_session', { path: '/' });
 
     // 1. If verifying registration email -> Mark verified and log user in immediately
     if (purpose === 'VERIFY_EMAIL') {
@@ -1109,7 +1162,7 @@ export const resetPasswordOtpHandler = async (req, res) => {
       });
     }
 
-    res.clearCookie('atc_otp_session');
+    res.clearCookie('atc_otp_session', { path: '/' });
 
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -1177,13 +1230,15 @@ export const requestSudoOtpHandler = async (req, res) => {
       res.cookie('atc_otp_session', result.sessionToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
+        path: '/',
         maxAge: 5 * 60 * 1000,
       });
     }
 
     return res.json({
       success: true,
+      sessionToken: result.sessionToken,
       message: `A privileged action authorization code has been dispatched to ${user.email}.`,
       expiresInMinutes: 5,
       cooldownSeconds: 60,
@@ -1240,7 +1295,7 @@ export const verifySudoOtpHandler = async (req, res) => {
       });
     }
 
-    res.clearCookie('atc_otp_session');
+    res.clearCookie('atc_otp_session', { path: '/' });
 
     // Issue 15-minute privileged SUDO token
     const sudoToken = jwt.sign(
@@ -1257,7 +1312,8 @@ export const verifySudoOtpHandler = async (req, res) => {
     res.cookie('atc_sudo_token', sudoToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
+      path: '/',
       maxAge: 15 * 60 * 1000, // 15-minute stateful window
     });
 

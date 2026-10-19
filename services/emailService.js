@@ -844,14 +844,14 @@ export async function sendTrialStartedEmail({ email, fullName, planName, trialEn
   const endsStr = new Date(trialEndsDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   const html = wrapEmailTemplate({
     title: 'Your 30-Day Free Trial is Active!',
-    subtitle: `Welcome to ATECH Cloud • ${planName}`,
+    subtitle: `Welcome to ATC Cloud • ${planName}`,
     categoryBadge: '30-Day Free Trial',
     contentHtml: `
       <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
         Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
       </p>
       <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
-        Welcome to ATECH Cloud! Your <strong>30-Day Free Trial</strong> has officially started. You now have full access to deploy and run your virtual machine with high-performance NVMe storage, dedicated compute, and 1 Gbps networking.
+        Welcome to ATC Cloud! Your <strong>30-Day Free Trial</strong> has officially started. You now have full access to deploy and run your virtual machine with high-performance NVMe storage, dedicated compute, and 1 Gbps networking.
       </p>
       <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:24px;">
         <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;line-height:1.8;">
@@ -1014,7 +1014,7 @@ export async function sendTrialCancelledEmail({ email, fullName, planName }) {
         ✅ <strong>No Charges:</strong> Your payment method on file has not been charged, and no future recurring payments will occur.
       </div>
       <p style="font-size:13px;line-height:1.6;color:#64748b;">
-        If you change your mind or need high-performance cloud compute in the future, you can resume your service anytime from the ATECH Cloud Portal.
+        If you change your mind or need high-performance cloud compute in the future, you can resume your service anytime from the ATC Cloud Portal.
       </p>
     `,
     ctaText: 'Visit ATC Cloud',

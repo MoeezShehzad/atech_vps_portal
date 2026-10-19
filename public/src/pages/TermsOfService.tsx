@@ -133,7 +133,7 @@ export default function TermsOfService() {
               </h2>
               <p>
                 <strong>1.1 Facility &amp; Compute Provision:</strong> During the Term of this Agreement, ATC will provide the cloud compute infrastructure, 
-                Generation 2 Microsoft Hyper-V virtual machine partitions, dedicated CPU allocation threads, host physical memory reservation, 
+                Generation 2 enterprise hypervisor virtual machine partitions, dedicated CPU allocation threads, host physical memory reservation, 
                 high-IOPS NVMe storage volumes, dedicated IP routing, and self-service management portal APIs (collectively, the &quot;Services&quot;) 
                 in accordance with this Agreement and our published Service Level Agreement.
               </p>
@@ -245,7 +245,7 @@ export default function TermsOfService() {
                   <strong>Network Attacks &amp; Warfare:</strong> Initiation or participation in Denial of Service (DoS/DDoS) floods, port-scanning, IP spoofing, packet injection, brute-force cracking, botnet Command-and-Control (C2), or malicious scanning.
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-rose-200/60 dark:border-rose-900/40">
-                  <strong>Unsolicited Email (SPAM):</strong> Distribution of unsolicited commercial email (SPAM), bulk harvesting, open mail relay operations, or causing ATC IP ranges or Autonomous System Numbers (ASNs) to appear on Spamhaus or other DNSBL/RBL blacklists.
+                  <strong>Unsolicited Email (SPAM):</strong> Distribution of unsolicited commercial email (SPAM), bulk harvesting, open mail relay operations, or causing ATC IP ranges or Autonomous System Numbers (ASNs) to appear on international DNSBL/RBL anti-spam blacklists.
                 </div>
                 <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-rose-200/60 dark:border-rose-900/40">
                   <strong>Heinous Content:</strong> Child Sexual Abuse Material (CSAM — zero tolerance, immediately preserved and reported to the National Center for Missing &amp; Exploited Children and federal authorities), violent extremism, narcotics trafficking, human exploitation, or hosting malware, trojans, or ransomware.
@@ -307,7 +307,7 @@ export default function TermsOfService() {
               </h2>
               <p>
                 <strong>8.1 Prepayment &amp; Measurement:</strong> All cloud compute subscriptions and recurring add-ons are billed in advance on a recurring monthly or annual billing cycle. Customer authorizes 
-                ATC and our PCI-DSS Level 1 payment processor (Stripe Inc.) to continuously store Customer&apos;s tokenized payment credentials and automatically 
+                ATC and our PCI-DSS Level 1 payment processor to continuously store Customer&apos;s tokenized payment credentials and automatically 
                 charge such payment method for recurring renewals, bandwidth overage tiers, and additional IP allocations.
               </p>
               <p>

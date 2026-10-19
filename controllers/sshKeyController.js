@@ -155,12 +155,12 @@ export async function generateSSHKeyPair(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const keyName = req.body.name?.trim() || `ATECH-Key-${Date.now().toString().slice(-4)}`;
-    const tempKeyFile = path.join(os.tmpdir(), `atech_ssh_${Date.now()}_${Math.floor(Math.random() * 10000)}`);
+    const keyName = req.body.name?.trim() || `ATC-Key-${Date.now().toString().slice(-4)}`;
+    const tempKeyFile = path.join(os.tmpdir(), `atc_ssh_${Date.now()}_${Math.floor(Math.random() * 10000)}`);
 
     execFile(
       'ssh-keygen',
-      ['-t', 'ed25519', '-N', '', '-C', `${keyName}@atech-vps`, '-f', tempKeyFile],
+      ['-t', 'ed25519', '-N', '', '-C', `${keyName}@atc-cloud`, '-f', tempKeyFile],
       async (err) => {
         if (err) {
           console.error('[SSH Keys] ssh-keygen generation failed:', err);

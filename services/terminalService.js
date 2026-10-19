@@ -21,6 +21,8 @@ export function setupTerminalWebSocket(server) {
           }
           wss.emit('connection', ws, request, url);
         });
+      } else {
+        socket.destroy();
       }
     } catch (e) {
       socket.destroy();
@@ -36,7 +38,7 @@ export function setupTerminalWebSocket(server) {
       return ws.close();
     }
 
-    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
+    const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'atc_cloud_default_jwt_secret_must_change';
     let decoded;
     try {
       decoded = jwt.verify(ticket, secret);
@@ -52,10 +54,19 @@ export function setupTerminalWebSocket(server) {
       }
     }
 
+    // If a console ticket is bound to a specific vmId or siteId, prevent switching target via query param
     const userId = decoded.userId;
     const siteIdParam = Number(url.searchParams.get('siteId'));
-    const siteId = siteIdParam || decoded.siteId;
-    const vmId = vmIdParam || decoded.vmId;
+    if (decoded.vmId && vmIdParam && Number(decoded.vmId) !== vmIdParam) {
+      ws.send('\r\n\x1b[31m[ERROR] Console ticket does not match requested VM.\x1b[0m\r\n');
+      return ws.close();
+    }
+    if (decoded.siteId && siteIdParam && Number(decoded.siteId) !== siteIdParam) {
+      ws.send('\r\n\x1b[31m[ERROR] Console ticket does not match requested site.\x1b[0m\r\n');
+      return ws.close();
+    }
+    const siteId = decoded.siteId || siteIdParam;
+    const vmId = decoded.vmId || vmIdParam;
 
     // =========================================================================
     // BRANCH A: Container Sandbox Terminal (for Managed Web Hosting / Developers)
@@ -197,7 +208,7 @@ export function setupTerminalWebSocket(server) {
     if (vm.status === 'STOPPED') {
       ws.send(`\r\n\x1b[33m====================================================\x1b[0m\r\n`);
       ws.send(`\x1b[1;33m  [NOTICE] SERVER IS CURRENTLY POWERED OFF\x1b[0m\r\n`);
-      ws.send(`  Virtual machine '${vm.vmName}' is turned off in Hyper-V.\r\n`);
+      ws.send(`  Virtual machine '${vm.vmName}' is turned off.\r\n`);
       ws.send(`  Please click the Start button on your dashboard to boot the server.\r\n`);
       ws.send(`\x1b[33m====================================================\x1b[0m\r\n\r\n`);
       return ws.close();
@@ -217,7 +228,7 @@ export function setupTerminalWebSocket(server) {
     const targetPassword = decoded.password || vm.adminPassword || 'root';
 
     ws.send(`\r\n\x1b[36m====================================================\x1b[0m\r\n`);
-    ws.send(`\x1b[1;32m  ATECH CLOUD WEB CONSOLE\x1b[0m — Connected to ${vm.vmName}\r\n`);
+    ws.send(`\x1b[1;32m  ATC CLOUD WEB CONSOLE\x1b[0m — Connected to ${vm.vmName}\r\n`);
     ws.send(`  Host IP: \x1b[33m${targetIp}\x1b[0m | User: \x1b[33m${targetUser}\x1b[0m\r\n`);
     ws.send(`\x1b[36m====================================================\x1b[0m\r\n\r\n`);
 

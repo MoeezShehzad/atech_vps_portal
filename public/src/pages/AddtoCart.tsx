@@ -14,20 +14,16 @@ const OS_OPTIONS = [
 ];
 
 const DATACENTER_LOCATIONS = [
-  { id: 'us-central', name: 'United States (US Central)', flag: '🇺🇸' },
+  { id: 'us-central', name: 'Bolingbrook, IL (US Central)', flag: '🇺🇸' },
 ];
 
 const BILLING_TERMS = [
-  { id: '1m', label: '1 Month', desc: 'Maximum flexibility, cancel anytime', monthlyPriceRatio: 1.0, discountText: '', nonRefundable: false },
-  { id: '12m', label: '12 Months (1 Year)', desc: 'Billed full year upfront. Strictly non-refundable.', monthlyPriceRatio: 0.85, discountText: 'Save 15%', nonRefundable: true },
-  { id: '24m', label: '24 Months (2 Years)', desc: 'Best multi-year value. Strictly non-refundable.', monthlyPriceRatio: 0.75, discountText: 'Save 25%', nonRefundable: true },
+  { id: '1m', label: '1 Month', desc: 'Flexible monthly billing, cancel anytime', monthlyPriceRatio: 1.0, discountText: '', nonRefundable: true },
+  { id: '12m', label: '12 Months (1 Year)', desc: 'Billed full year upfront with 15% savings.', monthlyPriceRatio: 0.85, discountText: 'Save 15%', nonRefundable: true },
+  { id: '24m', label: '24 Months (2 Years)', desc: 'Best multi-year value with 25% savings.', monthlyPriceRatio: 0.75, discountText: 'Save 25%', nonRefundable: true },
 ];
 
-const ADDONS = [
-  { id: 'cloud-backup', name: 'Cloud Backup Storage (Acronis)', desc: '$0.12 / GB block storage backup', price: 3.00 },
-  { id: 'extra-ipv4', name: 'Additional Public IPv4 Address', desc: '1 Dedicated IP address included', price: 2.50 },
-  { id: 'plesk-obsidian', name: 'Plesk Web Admin Edition', desc: 'Web server control panel (up to 10 domains)', price: 5.00 },
-];
+const ADDONS: { id: string; name: string; desc: string; price: number }[] = [];
 
 export default function ServerConfigure() {
   const navigate = useNavigate();
@@ -52,7 +48,7 @@ export default function ServerConfigure() {
   const [selectedOs, setSelectedOs] = useState('ubuntu-22');
   const [selectedLocation, setSelectedLocation] = useState('us-central');
   const [selectedTerm, setSelectedTerm] = useState('12m');
-  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
+  const [selectedAddons] = useState<string[]>([]);
 
   // 1-Click Apps Selection during checkout
   const [imageType, setImageType] = useState<'os' | 'apps'>('os');
@@ -74,13 +70,6 @@ export default function ServerConfigure() {
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState('');
 
-  // Toggle Addon
-  const toggleAddon = (addonId: string) => {
-    setSelectedAddons((prev) =>
-      prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]
-    );
-  };
-
   // Calculations
   const activeOsObj = OS_OPTIONS.find((os) => os.id === selectedOs);
   const activeTermObj = BILLING_TERMS.find((t) => t.id === selectedTerm);
@@ -89,7 +78,7 @@ export default function ServerConfigure() {
   const isYearly = selectedTerm === '12m';
   const isMultiYear = selectedTerm === '24m';
   const termMonths = isYearly ? 12 : (isMultiYear ? 24 : 1);
-  const isNonRefundable = isYearly || isMultiYear;
+  const isNonRefundable = true;
 
   const basePriceMonthly =
     Number(
@@ -187,7 +176,7 @@ export default function ServerConfigure() {
       app: imageType === 'apps' && selectedAppObj ? selectedAppObj : undefined,
       location: DATACENTER_LOCATIONS.find((l) => l.id === selectedLocation) || DATACENTER_LOCATIONS[0],
       term: activeTermObj,
-      addons: selectedAddons.map((id) => ADDONS.find((a) => a.id === id)),
+      addons: selectedAddons.map((id) => ADDONS.find((a) => a.id === id)).filter(Boolean),
       appliedCoupon,
       month1Discount,
       discountAmount: totalDiscount,
@@ -241,7 +230,7 @@ export default function ServerConfigure() {
                   <h2 className="text-2xl font-black text-slate-950 mt-1">{selectedPlan.name}</h2>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-black text-slate-950">${selectedPlan.monthlyPrice}</span>
+                  <span className="text-2xl font-black text-slate-950">${selectedPlan.monthlyPrice ?? selectedPlan.price}</span>
                   <span className="text-xs text-slate-500">/mo standard</span>
                 </div>
               </div>
@@ -249,19 +238,21 @@ export default function ServerConfigure() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-slate-400 block font-medium">vCPU Cores</span>
-                  <span className="font-bold text-slate-900">{selectedPlan.cpuCores} Cores</span>
+                  <span className="font-bold text-slate-900">{selectedPlan.cpuCores ?? selectedPlan.cpu} Cores</span>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-slate-400 block font-medium">RAM</span>
-                  <span className="font-bold text-slate-900">{selectedPlan.ramGb} GB</span>
+                  <span className="font-bold text-slate-900">{selectedPlan.ramGb ? `${selectedPlan.ramGb} GB` : selectedPlan.ram}</span>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-slate-400 block font-medium">Storage</span>
-                  <span className="font-bold text-slate-900">{selectedPlan.storageGb} GB {selectedPlan.storageType}</span>
+                  <span className="font-bold text-slate-900">{selectedPlan.storageGb ? `${selectedPlan.storageGb} GB ${selectedPlan.storageType || 'NVMe'}` : selectedPlan.storage}</span>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <span className="text-slate-400 block font-medium">Traffic</span>
-                  <span className="font-bold text-slate-900">1 Gbps Unlimited</span>
+                  <span className="text-slate-400 block font-medium">Network</span>
+                  <span className="font-bold text-slate-900">
+                    {selectedPlan.bandwidth || (selectedPlan.bandwidthMbps ? `${selectedPlan.bandwidthMbps >= 1000 ? `${selectedPlan.bandwidthMbps / 1000} Gbps` : `${selectedPlan.bandwidthMbps} Mbps`} Uplink` : '1 Gbps Uplink')}
+                  </span>
                 </div>
               </div>
             </section>
@@ -314,7 +305,7 @@ export default function ServerConfigure() {
                     <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
                       imageType === 'apps' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'
                     }`}>
-                      100+
+                      {catalogApps.length > 0 ? `${catalogApps.length}` : '20+'}
                     </span>
                   </button>
                 </div>
@@ -482,40 +473,6 @@ export default function ServerConfigure() {
                         <p className="text-[11px] text-slate-500 mt-1 leading-snug">{term.desc}</p>
                       </div>
                     </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* 5. RECOMMENDED ADD-ONS */}
-            <section className="space-y-4">
-              <h3 className="text-lg font-bold text-slate-950">4. Optional Features & Security</h3>
-              <div className="space-y-3">
-                {ADDONS.map((addon) => {
-                  const isChecked = selectedAddons.includes(addon.id);
-                  return (
-                    <label
-                      key={addon.id}
-                      className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${
-                        isChecked
-                          ? 'border-blue-600 bg-blue-50/30 ring-1 ring-blue-600'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleAddon(addon.id)}
-                          className="w-4 h-4 accent-blue-600 rounded cursor-pointer"
-                        />
-                        <div>
-                          <p className="text-xs font-bold text-slate-900">{addon.name}</p>
-                          <p className="text-[11px] text-slate-500">{addon.desc}</p>
-                        </div>
-                      </div>
-                      <span className="text-xs font-bold text-slate-900">+${addon.price.toFixed(2)}/mo</span>
-                    </label>
                   );
                 })}
               </div>

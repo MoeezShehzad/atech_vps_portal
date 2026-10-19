@@ -262,10 +262,10 @@ export async function getInvoiceDetails(req, res) {
         },
         items: [
           {
-            description: `ATECH VPS Cloud Compute - ${invoice.subscription?.plan?.name || 'Custom Plan'}`,
+            description: `ATC Cloud Compute - ${invoice.subscription?.plan?.name || 'Custom Plan'}`,
             specs: invoice.subscription?.plan 
               ? `${invoice.subscription.plan.cpuCores} vCPU, ${invoice.subscription.plan.ramGb}GB RAM, ${invoice.subscription.plan.storageGb}GB NVMe SSD`
-              : 'Dedicated Hyper-V Virtual Machine',
+              : 'Dedicated Cloud Virtual Machine',
             period: 'Monthly Subscription',
             amount: Number(invoice.subtotal),
           },

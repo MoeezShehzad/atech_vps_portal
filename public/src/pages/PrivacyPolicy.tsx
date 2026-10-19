@@ -71,7 +71,7 @@ export default function PrivacyPolicy() {
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
             At <strong>Analytical Technical Consulting Inc.</strong> (&quot;ATC&quot;, &quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), 
             we operate our enterprise cloud infrastructure under rigorous data privacy, sovereignty, and trust commitments. 
-            This Cloud Privacy Notice delineates how we handle, process, and secure Customer Data and Account Information across our Microsoft Hyper-V 
+            This Cloud Privacy Notice delineates how we handle, process, and secure Customer Data and Account Information across our enterprise 
             virtualization clusters, NVMe block storage networks, APIs, and portals in compliance with GDPR, UK GDPR, CCPA/CPRA, and federal U.S. data protection statutes.
           </p>
 
@@ -207,7 +207,7 @@ export default function PrivacyPolicy() {
               <ul className="list-disc pl-6 space-y-1.5 text-xs sm:text-sm">
                 <li><strong>Identity &amp; Account Profile Data:</strong> Full legal name, corporate business name, physical corporate billing address, telephone number, and verified administrative email address;</li>
                 <li><strong>Authentication &amp; Access Credentials:</strong> Cryptographically salted and hashed passwords (using bcrypt algorithms), customer-uploaded SSH public keys, and session tokens;</li>
-                <li><strong>Billing &amp; Financial Metadata:</strong> Payment card brand, last four digits of payment card, expiration month/year, Stripe billing reference token, tax IDs, and transaction invoice records;</li>
+                <li><strong>Billing &amp; Financial Metadata:</strong> Payment card brand, last four digits of payment card, expiration month/year, encrypted billing reference token, tax IDs, and transaction invoice records;</li>
                 <li><strong>Telemetry &amp; Infrastructure Diagnostics:</strong> Source IP addresses used to access the portal, web browser user-agent strings, hypervisor API calls, bandwidth consumption metrics, CPU/RAM utilization logs, and firewall access attempts.</li>
               </ul>
             </section>
@@ -222,7 +222,7 @@ export default function PrivacyPolicy() {
               <div className="grid sm:grid-cols-2 gap-3 text-xs sm:text-sm pt-2">
                 <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
                   <strong className="text-slate-900 dark:text-white block mb-0.5">Contractual Execution:</strong>
-                  Provisioning Hyper-V virtual compute, allocating dedicated IP addresses, calculating resource usage, and invoicing accounts.
+                  Provisioning virtual compute nodes, allocating dedicated IP addresses, calculating resource usage, and invoicing accounts.
                 </div>
                 <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
                   <strong className="text-slate-900 dark:text-white block mb-0.5">Legitimate Security Interests:</strong>
@@ -243,15 +243,15 @@ export default function PrivacyPolicy() {
             <section id="atcpriv-6" className="space-y-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 p-6 sm:p-8 rounded-2xl">
               <h2 className="text-xl font-bold text-emerald-950 dark:text-emerald-300 font-poppins flex items-center gap-3">
                 <Lock className="w-6 h-6 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                6. Payment Card Processing &amp; PCI-DSS Level 1 Security Guarantee
+                6. Payment Card Processing &amp; PCI-DSS Level 1 Security Standards
               </h2>
               <div className="text-xs sm:text-sm text-emerald-950 dark:text-emerald-200 font-bold uppercase tracking-wide">
                 ATC DOES NOT RECEIVE, PROCESS, STORE, OR TRANSMIT RAW CREDIT CARD NUMBERS, CVV SECURITY CODES, OR CARD TRACK DATA ON OUR HOST SERVERS.
               </div>
               <p className="text-xs sm:text-sm text-emerald-900 dark:text-emerald-300 leading-relaxed">
-                All payment transactions are executed through our certified payment processing partner, <strong>Stripe Inc.</strong>, an audited 
-                PCI-DSS Level 1 Service Provider. Payment card details entered via our checkout interface are ingested directly into Stripe&apos;s 
-                vault via encrypted Stripe Elements frames. ATC receives and maintains only a tokenized customer identifier, payment method ID, 
+                All payment transactions are executed through our certified PCI-DSS Level 1 payment processing gateway. 
+                Payment card details entered via our checkout interface are ingested directly into an encrypted PCI-DSS Level 1 vault. 
+                ATC receives and maintains only a tokenized customer identifier, payment method ID, 
                 card brand, and the last 4 digits of the payment instrument for billing records and recurring invoice generation.
               </p>
             </section>
@@ -284,11 +284,11 @@ export default function PrivacyPolicy() {
               </p>
               <div className="grid sm:grid-cols-2 gap-3 text-xs sm:text-sm">
                 <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <strong className="text-slate-900 dark:text-white block">Stripe Inc. (United States):</strong>
-                  Payment processing, subscription billing, and fraud mitigation.
+                  <strong className="text-slate-900 dark:text-white block">PCI-DSS Level 1 Payment Gateway (United States):</strong>
+                  Tokenized payment processing, subscription billing, and fraud mitigation.
                 </div>
                 <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <strong className="text-slate-900 dark:text-white block">Sophos &amp; Cisco Systems:</strong>
+                  <strong className="text-slate-900 dark:text-white block">Enterprise Perimeter Security Systems:</strong>
                   Hardware perimeter firewall defense and stateful intrusion prevention.
                 </div>
               </div>

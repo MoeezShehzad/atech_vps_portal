@@ -90,11 +90,24 @@ export async function getNotifications(req, res) {
 
     // Map Invoices
     recentInvoices.forEach((inv) => {
+      const isPaid = inv.status === 'PAID';
+      const isRefunded = inv.status === 'REFUNDED';
+      const isVoid = inv.status === 'VOID' || inv.status === 'CANCELLED';
       items.push({
         id: `inv-${inv.invoiceId}`,
-        title: `Invoice ${inv.invoiceNumber} Generated`,
-        message: `Monthly subscription invoice of $${Number(inv.total).toFixed(2)} USD paid in full.`,
-        type: 'success',
+        title: isPaid
+          ? `Invoice ${inv.invoiceNumber} Paid`
+          : isRefunded
+          ? `Invoice ${inv.invoiceNumber} Refunded`
+          : `Invoice ${inv.invoiceNumber} (${inv.status})`,
+        message: isPaid
+          ? `Subscription invoice of $${Number(inv.total).toFixed(2)} USD paid in full.`
+          : isRefunded
+          ? `Invoice of $${Number(inv.total).toFixed(2)} USD has been refunded.`
+          : isVoid
+          ? `Invoice of $${Number(inv.total).toFixed(2)} USD was voided.`
+          : `Invoice of $${Number(inv.total).toFixed(2)} USD is currently ${inv.status.toLowerCase()}.`,
+        type: isPaid ? 'success' : isRefunded ? 'info' : isVoid ? 'warning' : 'warning',
         category: 'billing',
         timestamp: inv.issueDate,
         isRead: new Date(inv.issueDate) <= lastReadAt,

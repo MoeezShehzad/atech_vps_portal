@@ -21,32 +21,47 @@ import { Link, useNavigate } from 'react-router-dom';
 
 const FEATURED_PLANS = [
   {
+    planId: 2,
     name: 'VPS S',
     cpu: '2 Cores',
+    cpuCores: 2,
     ram: '4 GB RAM',
+    ramGb: 4,
     storage: '80 GB NVMe',
+    storageGb: 80,
     bandwidth: '4 TB Bandwidth',
     price: 6.0,
+    monthlyPrice: 6.0,
     popular: false,
     color: 'from-blue-500 to-cyan-500',
   },
   {
+    planId: 4,
     name: 'VPS M+',
     cpu: '4 Cores',
+    cpuCores: 4,
     ram: '6 GB RAM',
+    ramGb: 6,
     storage: '160 GB NVMe',
+    storageGb: 160,
     bandwidth: '8 TB Bandwidth',
     price: 11.0,
+    monthlyPrice: 11.0,
     popular: true,
     color: 'from-blue-600 to-indigo-600',
   },
   {
+    planId: 5,
     name: 'VPS L',
     cpu: '8 Cores',
+    cpuCores: 8,
     ram: '16 GB RAM',
+    ramGb: 16,
     storage: '320 GB NVMe',
+    storageGb: 320,
     bandwidth: '12 TB Bandwidth',
     price: 24.0,
+    monthlyPrice: 24.0,
     popular: false,
     color: 'from-indigo-600 to-purple-600',
   },
@@ -136,7 +151,7 @@ export default function Home() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600" />
               </span>
-              <span>Enterprise Cloud Platform • 99.99% Uptime SLA</span>
+              <span>Enterprise Cloud Platform • 99.9% Uptime SLA</span>
             </div>
 
             {/* Main Headline with Dynamic Typewriter Animation */}
@@ -191,7 +206,7 @@ export default function Home() {
                 <span className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
                   <Check className="w-3.5 h-3.5 stroke-[3]" />
                 </span>
-                PCI-DSS & Stripe Checkout
+                PCI-DSS Level 1 Encrypted Checkout
               </span>
             </div>
           </div>
@@ -233,7 +248,7 @@ export default function Home() {
                     <Activity className="w-3.5 h-3.5 text-emerald-500" />
                   </div>
                   <p className="text-2xl font-black text-emerald-600 mt-1">99.9%</p>
-                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">SLA Guaranteed Availability</p>
+                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">Target Infrastructure Availability</p>
                 </div>
               </div>
 
@@ -245,7 +260,7 @@ export default function Home() {
                     <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
                     <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-                    <span className="text-[10px] text-slate-400 font-medium ml-2">cloud-node-us01.atech</span>
+                    <span className="text-[10px] text-slate-400 font-medium ml-2">cloud-node-us01.atc</span>
                   </div>
                   <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded-md">
                     ● PROVISIONED
@@ -256,7 +271,7 @@ export default function Home() {
                 <div className="space-y-1.5 text-[11px] leading-relaxed">
                   <div className="text-slate-400 flex items-center gap-1.5">
                     <span className="text-blue-400 font-bold">$</span>
-                    <span>atech-cli deploy --plan <strong className="text-white">vps-m</strong> --os <strong className="text-white">ubuntu-24</strong></span>
+                    <span>atc-cli deploy --plan <strong className="text-white">vps-m</strong> --os <strong className="text-white">ubuntu-24</strong></span>
                   </div>
                   <div className="text-emerald-400 flex items-center gap-1.5 pl-3">
                     <span>✓</span>
@@ -367,7 +382,7 @@ export default function Home() {
                       <span className="text-slate-500 text-xs font-bold"> / month</span>
                     </div>
                     {billingCycle === 'annually' && (
-                      <p className="text-[11px] text-emerald-600 font-semibold mt-1">Billed annually ($+{ (finalPrice * 12).toFixed(2) }/yr)</p>
+                      <p className="text-[11px] text-emerald-600 font-semibold mt-1">Billed annually (${(finalPrice * 12).toFixed(2)}/yr)</p>
                     )}
                   </div>
 
@@ -382,7 +397,7 @@ export default function Home() {
                     </li>
                     <li className="flex items-center gap-3">
                       <Server className="w-4 h-4 text-blue-600 shrink-0" /> 
-                      <span><strong className="text-slate-950 font-bold">{plan.storage}</strong> RAID-10 NVMe</span>
+                      <span><strong className="text-slate-950 font-bold">{plan.storage}</strong> Enterprise NVMe</span>
                     </li>
                     <li className="flex items-center gap-3">
                       <Globe className="w-4 h-4 text-blue-600 shrink-0" /> 
