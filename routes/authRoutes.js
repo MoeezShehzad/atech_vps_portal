@@ -11,6 +11,9 @@ import {
   resendVerificationHandler,
   forgotPasswordHandler,
   resetPasswordHandler,
+  sendOtpHandler,
+  verifyOtpHandler,
+  resetPasswordOtpHandler,
 } from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
@@ -22,6 +25,12 @@ router.post('/login', login);
 router.post('/resend-verification', resendVerificationHandler);
 router.post('/forgot-password', forgotPasswordHandler);
 router.post('/reset-password', resetPasswordHandler);
+
+// --- OTP AUTHENTICATION & VERIFICATION ROUTES ---
+router.post('/send-otp', sendOtpHandler);
+router.post('/verify-otp', verifyOtpHandler);
+router.post('/resend-otp', sendOtpHandler);
+router.post('/reset-password-otp', resetPasswordOtpHandler);
 
 // --- SESSION MANAGEMENT ROUTES ---
 router.post('/refresh', refreshTokenHandler);

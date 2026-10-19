@@ -454,4 +454,19 @@ model UMCountry {
   countryCurrency String?  @map("CountryCurrency") @db.NVarChar(20)
 
   @@map("UM_Countries")
-}
+}
+
+model EmailOTP {
+  id        Int      @id @default(autoincrement())
+  email     String   @db.VarChar(255)
+  otpCode   String   @map("otp_code") @db.VarChar(10)
+  purpose   String   @default("VERIFY_EMAIL") @db.VarChar(50) // VERIFY_EMAIL, PASSWORD_RESET, LOGIN
+  expiresAt DateTime @map("expires_at")
+  attempts  Int      @default(0)
+  isUsed    Boolean  @default(false) @map("is_used")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, purpose, isUsed], map: "ix_email_otps_lookup")
+  @@map("Email_OTPs")
+}
+

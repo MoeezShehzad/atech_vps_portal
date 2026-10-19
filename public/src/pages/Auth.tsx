@@ -2,12 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Mail, Lock, User, ArrowRight, ArrowLeft, Eye, EyeOff,
-  AlertCircle, ShieldCheck, Loader2, Sparkles,
+  AlertCircle, ShieldCheck, CheckCircle2, RefreshCw, Loader2, Sparkles,
   Server, HardDrive, Zap, Shield, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiCall, setAccessToken, API_BASE_URL } from '../services/api';
 import atcLogo from '../assets/ATC_Logo.png';
+import OtpInput from '../components/OtpInput';
 import {
   ModernFloatingInput,
   ModernCountrySelect,
@@ -93,6 +94,11 @@ export default function Auth({ initialMode }: AuthProps) {
   const [signupLoading, setSignupLoading] = useState(false);
   const [signupError, setSignupError] = useState('');
   const [verificationSent, setVerificationSent] = useState(false);
+  const [targetOtpEmail, setTargetOtpEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [otpSuccess, setOtpSuccess] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // Geo Countries list from MS SQL table
@@ -204,18 +210,23 @@ export default function Auth({ initialMode }: AuthProps) {
 
     setSignupLoading(true);
     try {
-      await apiCall('/auth/register', {
+      const normalized = signupEmail.trim().toLowerCase();
+      const res = await apiCall('/auth/register', {
         method: 'POST',
         body: JSON.stringify({
           fullName: fullName.trim(),
-          email: signupEmail.trim().toLowerCase(),
+          email: normalized,
           password: signupPassword,
           country: currentCountry.name,
           countryCode: currentCountry.code,
         }),
       });
 
+      setTargetOtpEmail(normalized);
       setVerificationSent(true);
+      setOtpCode('');
+      setOtpError('');
+      setOtpSuccess(res?.message || 'A 6-digit verification code has been sent to your email.');
       setResendCooldown(60);
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -228,28 +239,88 @@ export default function Auth({ initialMode }: AuthProps) {
     }
   };
 
-  const handleResendEmail = async () => {
-    if (resendCooldown > 0) return;
+  // Verify 6-digit OTP and complete session
+  const handleVerifyOtp = async (codeToVerify?: string) => {
+    const code = (codeToVerify || otpCode).trim();
+    const emailToVerify = targetOtpEmail || signupEmail.trim().toLowerCase();
+
+    if (!code || code.length !== 6) {
+      setOtpError('Please enter all 6 digits of your verification code.');
+      return;
+    }
+
+    setOtpError('');
+    setOtpLoading(true);
+
     try {
-      await apiCall('/auth/resend-verification', {
+      const data = await apiCall('/auth/verify-otp', {
         method: 'POST',
-        body: JSON.stringify({ email: signupEmail.trim().toLowerCase() }),
+        body: JSON.stringify({
+          email: emailToVerify,
+          otp: code,
+          purpose: 'VERIFY_EMAIL',
+        }),
+      });
+
+      const token = data.accessToken || data.token;
+      if (token) {
+        setAccessToken(token);
+        localStorage.setItem('token', token);
+      }
+      if (data.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+      login(token, data.user);
+      setOtpSuccess('Email verified successfully! Launching your cloud console...');
+      setTimeout(() => {
+        navigate(from, { replace: true });
+      }, 700);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setOtpError(err.message);
+      } else {
+        setOtpError('Failed to verify code. Please try again.');
+      }
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return;
+    const emailToResend = targetOtpEmail || signupEmail.trim().toLowerCase();
+    if (!emailToResend) return;
+
+    setOtpError('');
+    setOtpSuccess('');
+    try {
+      await apiCall('/auth/send-otp', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: emailToResend,
+          purpose: 'VERIFY_EMAIL',
+        }),
       });
       setResendCooldown(60);
+      setOtpSuccess('A fresh 6-digit code has been dispatched to your email.');
     } catch (e: unknown) {
-      console.warn('Resend error:', e);
+      if (e instanceof Error) setOtpError(e.message);
+      else setOtpError('Failed to resend verification code.');
     }
   };
 
   const handleResendFromLogin = async () => {
     if (resendCooldown > 0 || !loginEmail.trim()) return;
     try {
-      await apiCall('/auth/resend-verification', {
+      await apiCall('/auth/send-otp', {
         method: 'POST',
-        body: JSON.stringify({ email: loginEmail.trim().toLowerCase() }),
+        body: JSON.stringify({
+          email: loginEmail.trim().toLowerCase(),
+          purpose: 'VERIFY_EMAIL',
+        }),
       });
       setResendCooldown(60);
-      setLoginError('Verification email resent! Please check your inbox and spam folder.');
+      setLoginError('Verification code dispatched! Please check your inbox.');
     } catch (e: unknown) {
       console.warn('Resend error:', e);
     }
@@ -445,17 +516,28 @@ export default function Auth({ initialMode }: AuthProps) {
                       </p>
                     )}
                     {loginError.toLowerCase().includes('verify') && (
-                      <p className="text-[11px] text-rose-600/90 dark:text-rose-400/90 pl-6">
-                        Didn't receive the verification email?{' '}
+                      <div className="text-[11px] text-rose-600/90 dark:text-rose-400/90 pl-6 flex items-center gap-2 pt-1 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTargetOtpEmail(loginEmail.trim().toLowerCase());
+                            setVerificationSent(true);
+                            setMode('signup');
+                          }}
+                          className="font-bold underline hover:text-rose-800 dark:hover:text-rose-300 cursor-pointer"
+                        >
+                          Enter 6-digit Code
+                        </button>
+                        <span>•</span>
                         <button
                           type="button"
                           onClick={handleResendFromLogin}
                           disabled={resendCooldown > 0}
-                          className="font-bold underline hover:text-rose-800 dark:hover:text-rose-300 disabled:opacity-50"
+                          className="font-bold underline hover:text-rose-800 dark:hover:text-rose-300 disabled:opacity-50 cursor-pointer"
                         >
-                          {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
+                          {resendCooldown > 0 ? `Resend Code (${resendCooldown}s)` : 'Resend Code'}
                         </button>
-                      </p>
+                      </div>
                     )}
                   </div>
                 )}
@@ -551,58 +633,125 @@ export default function Auth({ initialMode }: AuthProps) {
             >
               <div className="max-w-md w-full mx-auto">
                 {verificationSent ? (
-                  /* VERIFICATION EMAIL SENT SCREEN */
-                  <div className="text-center py-6 space-y-5">
-                    <div className="w-16 h-16 bg-blue-50 dark:bg-blue-950/60 text-blue-600 border border-blue-200 dark:border-blue-800 rounded-2xl mx-auto flex items-center justify-center shadow-inner">
-                      <Mail className="w-8 h-8 animate-bounce" />
-                    </div>
+                  /* 6-DIGIT OTP VERIFICATION SCREEN */
+                  <div className="py-2 space-y-6">
+                    <div className="text-center space-y-2">
+                      <div className="w-16 h-16 bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-2xl mx-auto flex items-center justify-center shadow-inner relative">
+                        <ShieldCheck className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-blue-600"></span>
+                        </span>
+                      </div>
 
-                    <div className="space-y-2">
                       <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white font-poppins">
-                        Check your inbox
+                        Enter Security Code
                       </h3>
-                      <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                        We sent an activation link to{' '}
-                        <span className="font-bold text-slate-900 dark:text-white">{signupEmail}</span>.
+                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">
+                        We sent a 6-digit one-time code to{' '}
+                        <span className="font-bold text-slate-900 dark:text-white break-all">
+                          {targetOtpEmail || signupEmail}
+                        </span>
                       </p>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVerificationSent(false);
+                            setOtpCode('');
+                            setOtpError('');
+                          }}
+                          className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        >
+                          Change Email Address
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="p-4 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900 rounded-2xl text-xs text-blue-900 dark:text-blue-300 text-left space-y-1">
-                      <p className="font-bold flex items-center gap-1.5">
-                        <Zap className="w-4 h-4 text-blue-600 shrink-0" /> 30-Day Free Trial Unlocked
-                      </p>
-                      <p className="text-blue-700 dark:text-blue-300 leading-relaxed">
-                        Once verified, you can immediately deploy your <strong>2 vCPU / 2 GB RAM / 50 GB NVMe</strong> instance.
-                      </p>
+                    {/* Alerts */}
+                    {otpError && (
+                      <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2 shadow-sm">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span className="font-semibold">{otpError}</span>
+                      </div>
+                    )}
+
+                    {otpSuccess && (
+                      <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-xs flex items-center gap-2 shadow-sm">
+                        <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <span className="font-semibold">{otpSuccess}</span>
+                      </div>
+                    )}
+
+                    {/* 6-Box OTP Input */}
+                    <div className="py-2">
+                      <OtpInput
+                        length={6}
+                        value={otpCode}
+                        onChange={(val) => {
+                          setOtpCode(val);
+                          setOtpError('');
+                        }}
+                        onComplete={(code) => handleVerifyOtp(code)}
+                        disabled={otpLoading}
+                        autoFocus={true}
+                        hasError={Boolean(otpError)}
+                      />
                     </div>
 
-                    <div className="pt-2 space-y-3">
+                    {/* Verification Actions */}
+                    <div className="space-y-3">
+                      <button
+                        type="button"
+                        onClick={() => handleVerifyOtp()}
+                        disabled={otpLoading || otpCode.length !== 6}
+                        className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-bold text-sm transition-all shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {otpLoading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" /> Verifying Code...
+                          </>
+                        ) : (
+                          <>
+                            Verify & Launch Console <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+
+                      {/* Resend & Cooldown */}
+                      <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                        <span>Didn't get the code?</span>
+                        <button
+                          type="button"
+                          onClick={handleResendOtp}
+                          disabled={resendCooldown > 0 || otpLoading}
+                          className={`font-semibold flex items-center gap-1.5 ${
+                            resendCooldown > 0 || otpLoading
+                              ? 'text-slate-400 cursor-not-allowed'
+                              : 'text-blue-600 dark:text-blue-400 hover:underline cursor-pointer'
+                          }`}
+                        >
+                          <RefreshCw className={`w-3 h-3 ${otpLoading ? 'animate-spin' : ''}`} />
+                          {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Security Footnote */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
+                      <p className="text-[11px] text-slate-400">
+                        Code expires in 10 minutes • Up to 5 verification attempts allowed
+                      </p>
                       <button
                         type="button"
                         onClick={() => {
                           setVerificationSent(false);
                           switchMode('login');
                         }}
-                        className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm transition-all shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 cursor-pointer"
+                        className="mt-3 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-medium inline-flex items-center gap-1 cursor-pointer"
                       >
-                        Continue to Sign In <ArrowRight className="w-4 h-4" />
+                        <ArrowLeft className="w-3.5 h-3.5" /> Back to Sign In
                       </button>
-
-                      <div className="text-xs text-slate-500">
-                        Didn't receive the email?{' '}
-                        <button
-                          type="button"
-                          onClick={handleResendEmail}
-                          disabled={resendCooldown > 0}
-                          className={`font-semibold ${
-                            resendCooldown > 0
-                              ? 'text-slate-400 cursor-not-allowed'
-                              : 'text-blue-600 hover:text-blue-700 underline cursor-pointer'
-                          }`}
-                        >
-                          {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend verification email'}
-                        </button>
-                      </div>
                     </div>
                   </div>
                 ) : (

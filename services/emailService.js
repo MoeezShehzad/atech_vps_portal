@@ -217,9 +217,91 @@ export async function sendPasswordResetEmail(email, fullName, token) {
     return { success: true, messageId: info.messageId };
   } catch (err) {
     console.error(`[No-Reply Error] Password reset failed for ${email}:`, err.message);
+}
+}
+
+/**
+ * Professional One-Time Password (OTP) Email Dispatcher
+ */
+export async function sendOtpEmail({ email, fullName, otpCode, purpose = 'VERIFY_EMAIL', fallbackToken = null }) {
+  let title = 'Your Verification Code';
+  let subtitle = `Welcome to ATC Cloud, ${fullName || 'there'}!`;
+  let categoryBadge = 'One-Time Password';
+  let subject = `${otpCode} is your ATC Cloud verification code`;
+  let instruction = 'Enter the following 6-digit code in the portal to verify your email address and activate your cloud account:';
+
+  if (purpose === 'PASSWORD_RESET') {
+    title = 'Password Reset Code';
+    subtitle = `Hi ${fullName || 'there'},`;
+    categoryBadge = 'Account Security';
+    subject = `${otpCode} is your ATC Cloud password reset code`;
+    instruction = 'We received a request to reset your password. Use the following 6-digit code to complete your password reset:';
+  } else if (purpose === 'LOGIN_OTP') {
+    title = 'Sign-In Security Code';
+    subtitle = `Hi ${fullName || 'there'},`;
+    categoryBadge = 'Two-Factor Authentication';
+    subject = `${otpCode} is your ATC Cloud sign-in code`;
+    instruction = 'A login attempt requires verification. Use the following code to authorize your sign-in session:';
+  }
+
+  // Format code with slight spacing for maximum readability
+  const formattedCode = String(otpCode).split('').join(' ');
+  const fallbackUrl = fallbackToken 
+    ? (purpose === 'PASSWORD_RESET' ? `${APP_URL}/reset-password?token=${fallbackToken}` : `${APP_URL}/api/auth/verify-email?token=${fallbackToken}`)
+    : null;
+
+  const contentHtml = `
+    <p style="margin-top:0;font-size:15px;color:#334155;line-height:1.6;">
+      ${instruction}
+    </p>
+
+    <!-- Prominent OTP Code Container -->
+    <div style="text-align:center;margin:28px 0;padding:26px 20px;background-color:#f8fafc;border:2px dashed #cbd5e1;border-radius:14px;">
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">
+        SECURITY VERIFICATION CODE
+      </div>
+      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:38px;font-weight:800;letter-spacing:12px;color:#0f172a;padding:6px 0;">
+        ${formattedCode}
+      </div>
+      <p style="margin:10px 0 0 0;font-size:12px;color:#64748b;line-height:1.5;">
+        ⏱️ This code expires in <strong>10 minutes</strong>.<br/>
+        For your security, never share this code with anyone. ATC Cloud staff will never ask for your code.
+      </p>
+    </div>
+
+    ${fallbackUrl ? `
+    <div style="margin:24px 0 16px 0;padding-top:16px;border-top:1px solid #e2e8f0;font-size:13px;color:#64748b;">
+      <p style="margin:0 0 8px 0;">Prefer a direct link?</p>
+      <a href="${fallbackUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline;word-break:break-all;">
+        Click here to ${purpose === 'PASSWORD_RESET' ? 'reset your password directly' : 'verify your account in one click'} &rarr;
+      </a>
+    </div>
+    ` : ''}
+  `;
+
+  const html = wrapEmailTemplate({
+    title,
+    subtitle,
+    categoryBadge,
+    contentHtml,
+    footerNote: 'ATC Cloud Identity & Security Services • If you did not request this code, you can safely ignore this email.',
+  });
+
+  try {
+    const info = await transporterNoReply.sendMail({
+      from: `"ATC Cloud Security" <${NOREPLY_EMAIL}>`,
+      to: email,
+      subject,
+      html,
+    });
+    console.log(`[No-Reply OTP] Code sent to ${email} (Purpose: ${purpose}, Message ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[No-Reply OTP Error] Failed to send code to ${email}:`, err.message);
     return { success: false, error: err.message };
   }
 }
+
 
 /**
  * VM Provisioned & Credentials Ready Notification

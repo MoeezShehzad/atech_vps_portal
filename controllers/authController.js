@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 import { setupUserTrial } from '../services/trialService.js';
+import { generateAndSendOTP, verifyOTP } from '../services/otpService.js';
 
 // --- CENTRALIZED AUTH CONFIGURATION ---
 const JWT_SECRET = process.env.JWT_SECRET || 'atech_vps_default_jwt_secret_must_change';
@@ -371,31 +372,35 @@ export const register = async (req, res) => {
       });
     }
 
-    // Otherwise standard email verification flow
+    // Otherwise standard email verification flow with 6-digit OTP
     const verificationToken = jwt.sign(
       { userId: newUser.userId, email: newUser.email },
       JWT_VERIFY_SECRET,
       { expiresIn: '24h' }
     );
 
-    let emailSent = false;
+    let otpDispatched = false;
     try {
-      const mailResult = await sendVerificationEmail(newUser.email, newUser.fullName, verificationToken);
-      if (mailResult && mailResult.success) {
-        emailSent = true;
-      }
+      await generateAndSendOTP({
+        email: newUser.email,
+        purpose: 'VERIFY_EMAIL',
+        fullName: newUser.fullName,
+        fallbackToken: verificationToken,
+      });
+      otpDispatched = true;
     } catch (mailErr) {
-      console.warn('[Registration Email Dispatch Warning]:', mailErr.message);
+      console.warn('[Registration OTP Dispatch Warning]:', mailErr.message);
     }
 
-    if (!emailSent) {
-      // Auto-verify if mail offline
+    if (!otpDispatched) {
+      // Auto-verify if mail system is offline
       await prisma.user.update({
         where: { userId: newUser.userId },
         data: { emailVerified: true },
       });
       return res.status(201).json({
         message: 'Account created successfully! You can now log in with your credentials.',
+        requiresOtp: false,
         user: {
           userId: newUser.userId,
           fullName: newUser.fullName,
@@ -406,7 +411,10 @@ export const register = async (req, res) => {
     }
 
     return res.status(201).json({
-      message: 'Registration successful! Please check your email to verify your account.',
+      success: true,
+      requiresOtp: true,
+      message: 'Registration successful! A 6-digit verification code has been sent to your email.',
+      email: newUser.email,
       user: {
         userId: newUser.userId,
         fullName: newUser.fullName,
@@ -484,9 +492,18 @@ export const resendVerificationHandler = async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    await sendVerificationEmail(user.email, user.fullName, verificationToken);
-    return res.json({ success: true, message: 'Verification email sent successfully.' });
+    const result = await generateAndSendOTP({
+      email: user.email,
+      purpose: 'VERIFY_EMAIL',
+      fullName: user.fullName,
+      fallbackToken: verificationToken,
+    });
+
+    return res.json({ success: true, message: 'A 6-digit verification code has been sent to your email.' });
   } catch (error) {
+    if (error.statusCode === 429) {
+      return res.status(429).json({ error: error.message, remainingSeconds: error.remainingSeconds });
+    }
     console.error('[resendVerificationHandler Error]:', error);
     return res.status(500).json({ error: 'Failed to resend verification email.' });
   }
@@ -744,17 +761,24 @@ export const forgotPasswordHandler = async (req, res) => {
       });
     }
 
-    // Generate short-lived reset token (1 hour)
+    // Generate fallback short-lived reset token (1 hour)
     const resetToken = jwt.sign(
       { userId: user.userId, email: user.email, purpose: 'pwd_reset' },
       JWT_SECRET,
       { expiresIn: '1h' }
     );
 
-    await sendPasswordResetEmail(user.email, user.fullName, resetToken);
+    await generateAndSendOTP({
+      email: user.email,
+      purpose: 'PASSWORD_RESET',
+      fullName: user.fullName,
+      fallbackToken: resetToken,
+    });
 
     return res.json({
       success: true,
+      requiresOtp: true,
+      email: user.email,
       message: 'If an account exists with this email address, password reset instructions have been sent.',
     });
   } catch (error) {
@@ -813,4 +837,243 @@ export const resetPasswordHandler = async (req, res) => {
     console.error('resetPasswordHandler error:', error);
     return res.status(500).json({ error: 'Failed to reset password.' });
   }
-};
+};
+
+// ==============================================================================
+// OTP CONTROLLER HANDLERS
+// ==============================================================================
+
+/**
+ * POST /api/auth/send-otp
+ * Generates and sends a 6-digit OTP code to the provided email address
+ */
+export const sendOtpHandler = async (req, res) => {
+  try {
+    const { email, purpose = 'VERIFY_EMAIL' } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required.' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (purpose === 'VERIFY_EMAIL' && user?.emailVerified) {
+      return res.status(400).json({ error: 'This account email is already verified. Please sign in.' });
+    }
+
+    let fallbackToken = null;
+    if (user) {
+      if (purpose === 'VERIFY_EMAIL') {
+        fallbackToken = jwt.sign(
+          { userId: user.userId, email: user.email },
+          JWT_VERIFY_SECRET,
+          { expiresIn: '24h' }
+        );
+      } else if (purpose === 'PASSWORD_RESET') {
+        fallbackToken = jwt.sign(
+          { userId: user.userId, email: user.email, purpose: 'pwd_reset' },
+          JWT_SECRET,
+          { expiresIn: '1h' }
+        );
+      }
+    }
+
+    const result = await generateAndSendOTP({
+      email: normalizedEmail,
+      purpose,
+      fullName: user?.fullName || '',
+      fallbackToken,
+    });
+
+    return res.json(result);
+  } catch (error) {
+    if (error.statusCode === 429) {
+      return res.status(429).json({ error: error.message, remainingSeconds: error.remainingSeconds });
+    }
+    console.error('[sendOtpHandler Error]:', error);
+    return res.status(500).json({ error: error.message || 'Failed to dispatch verification code.' });
+  }
+};
+
+/**
+ * POST /api/auth/verify-otp
+ * Validates the 6-digit OTP code and completes verification or session initialization
+ */
+export const verifyOtpHandler = async (req, res) => {
+  try {
+    const { email, otp, purpose = 'VERIFY_EMAIL' } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const otpResult = await verifyOTP({
+      email: normalizedEmail,
+      otpCode: otp,
+      purpose,
+    });
+
+    if (!otpResult.success) {
+      return res.status(400).json({
+        error: otpResult.error,
+        remainingAttempts: otpResult.remainingAttempts,
+      });
+    }
+
+    // 1. If verifying registration email -> Mark verified and log user in immediately
+    if (purpose === 'VERIFY_EMAIL') {
+      let user = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        include: {
+          userRoles: {
+            include: { role: true },
+          },
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'Account not found for this email address.' });
+      }
+
+      user = await prisma.user.update({
+        where: { userId: user.userId },
+        data: {
+          emailVerified: true,
+          lastLoginAt: new Date(),
+        },
+        include: {
+          userRoles: {
+            include: { role: true },
+          },
+        },
+      });
+
+      const roles = user.userRoles.map((ur) => ur.role.roleName);
+      const accessToken = generateAccessToken(user.userId, user.email, roles);
+      const refreshToken = await createAndStoreRefreshToken(user.userId);
+      setRefreshTokenCookie(res, refreshToken);
+
+      return res.json({
+        success: true,
+        verified: true,
+        message: 'Email verified successfully! Welcome to ATC Cloud.',
+        accessToken,
+        token: accessToken,
+        user: {
+          userId: user.userId,
+          fullName: user.fullName,
+          email: user.email,
+          phone: user.phone,
+          address: user.address,
+          city: user.city,
+          country: user.country,
+          roles,
+          emailVerified: true,
+        },
+      });
+    }
+
+    // 2. If verifying for password reset -> Return short-lived token to unlock password reset form
+    if (purpose === 'PASSWORD_RESET') {
+      const user = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: 'Account not found for this email address.' });
+      }
+
+      const resetToken = jwt.sign(
+        { userId: user.userId, email: user.email, purpose: 'pwd_reset' },
+        JWT_SECRET,
+        { expiresIn: '15m' }
+      );
+
+      return res.json({
+        success: true,
+        message: 'Verification code confirmed. You may now set your new password.',
+        resetToken,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Verification code confirmed successfully.',
+    });
+  } catch (error) {
+    console.error('[verifyOtpHandler Error]:', error);
+    return res.status(500).json({ error: 'Failed to verify code.', details: error.message });
+  }
+};
+
+/**
+ * POST /api/auth/reset-password-otp
+ * Atomically verifies 6-digit OTP and sets new password in a single secure step
+ */
+export const resetPasswordOtpHandler = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ error: 'Email, verification code, and new password are required.' });
+    }
+
+    const passwordComplexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>_+\-=[\]\\/]).{8,}$/;
+    if (!passwordComplexityRegex.test(newPassword)) {
+      return res.status(400).json({
+        error: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Verify OTP
+    const otpResult = await verifyOTP({
+      email: normalizedEmail,
+      otpCode: otp,
+      purpose: 'PASSWORD_RESET',
+    });
+
+    if (!otpResult.success) {
+      return res.status(400).json({
+        error: otpResult.error,
+        remainingAttempts: otpResult.remainingAttempts,
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { userId: user.userId },
+      data: {
+        passwordHash,
+        emailVerified: true,
+      },
+    });
+
+    // Revoke old refresh tokens for security
+    await prisma.refreshToken.deleteMany({
+      where: { userId: user.userId },
+    });
+
+    return res.json({
+      success: true,
+      message: 'Your password has been successfully updated. You can now sign in with your new password.',
+    });
+  } catch (error) {
+    console.error('[resetPasswordOtpHandler Error]:', error);
+    return res.status(500).json({ error: 'Failed to reset password.', details: error.message });
+  }
+};
+
