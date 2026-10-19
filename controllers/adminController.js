@@ -16,6 +16,7 @@ import { sanitizeAuditDetails } from './securityController.js';
 import { createStripeRefund } from '../services/stripeService.js';
 import { startBroadcastCampaign, getBroadcastJobStatus as getJobStatus, listRecentBroadcasts } from '../services/safeBroadcastService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
+import { apiCache } from '../services/cacheService.js';
 
 /**
  * 1. GET /api/admin/overview
@@ -655,6 +656,7 @@ export async function createAdminPlan(req, res) {
       },
     });
 
+    apiCache.del('pricing:plans');
     res.json({ success: true, plan: created });
   } catch (error) {
     console.error('createAdminPlan error:', error);
@@ -691,6 +693,7 @@ export async function updatePlan(req, res) {
       },
     });
 
+    apiCache.del('pricing:plans');
     res.json({ success: true, plan: updated });
   } catch (error) {
     console.error('updatePlan error:', error);
@@ -715,6 +718,7 @@ export async function deletePlan(req, res) {
         where: { planId },
         data: { isActive: false },
       });
+      apiCache.del('pricing:plans');
       return res.json({
         success: true,
         message: `Plan has ${subCount + vmCount} active references. It has been deactivated so new users cannot purchase it.`,
@@ -723,6 +727,7 @@ export async function deletePlan(req, res) {
     }
 
     await prisma.vPSPlan.delete({ where: { planId } });
+    apiCache.del('pricing:plans');
 
     await prisma.activityLog.create({
       data: {

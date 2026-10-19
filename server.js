@@ -42,46 +42,65 @@ app.use(compression({
   level: 6,
 }));
 
-// 1. Security Headers Middleware (Helmet)
+import { apiCache } from './services/cacheService.js';
+
+// 1. Security Headers Middleware (Helmet) - XSS, MIME sniffing, Clickjacking Protection
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  xContentTypeOptions: true,
+  xXssProtection: true,
+  hidePoweredBy: true,
 }));
 
-// 2. CORS Configuration
+// 2. CORS Configuration (Tightened for Production)
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   process.env.CLIENT_URL,
   'http://localhost:5174',
   'http://localhost:5173',
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()) : []),
 ].filter(Boolean);
+
+const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+    // Allow non-browser requests (like mobile apps, curl, or internal microservices)
     if (!origin) {
       return callback(null, true);
     }
 
-    const isAllowed =
-      allowedOrigins.includes(origin) ||
-      allowedOrigins.includes(origin.replace(/\/$/, '')) ||
-      /^https?:\/\/(localhost|127\.0\.0\.1|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin);
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    const isExplicitlyAllowed = allowedOrigins.some((o) => o.replace(/\/$/, '') === normalizedOrigin);
 
-    if (isAllowed) {
+    if (isExplicitlyAllowed) {
       return callback(null, true);
     }
 
-    console.warn(`[CORS Blocked] Origin not allowed: ${origin}`);
+    // In development mode only: allow local development subnets
+    if (!isProduction && /^https?:\/\/(localhost|127\.0\.0\.1|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    console.warn(`[CORS Blocked] Unauthorized origin rejected: ${origin}`);
     return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-OTP-Session', 'X-Sudo-Token'],
+  maxAge: 86400, // Cache preflight response for 24 hours
 }));
 
 // 3. Body & Cookie Parsing Middlewares
 app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 4. Rate Limiting Configurations
@@ -142,18 +161,27 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/geo', geoRoutes);
 app.use('/api/sites', siteRoutes);
 
-// Public announcements route for website navbar ticker
+// Public announcements route for website navbar ticker (Cached for 5 minutes)
 app.get('/api/announcements', async (req, res) => {
   try {
+    const cached = apiCache.get('announcements:public');
+    if (cached) {
+      res.setHeader('X-Cache', 'HIT');
+      return res.json({ success: true, announcements: cached });
+    }
+
     const prismaModule = (await import('./lib/prisma.js')).default;
     const announcements = await prismaModule.systemAnnouncement.findMany({
       where: { isActive: true },
       orderBy: { createdAt: 'desc' },
       take: 10,
     });
+
+    apiCache.set('announcements:public', announcements, 5 * 60 * 1000);
+    res.setHeader('X-Cache', 'MISS');
     res.json({ success: true, announcements });
   } catch (error) {
-    console.error('Fetch public announcements error:', error);
+    console.error('Fetch public announcements error:', error.message);
     res.json({ success: true, announcements: [] });
   }
 });
@@ -175,6 +203,18 @@ app.get('/', (req, res) => {
     message: 'ATC Cloud VPS Portal API is running',
     frontend: frontendUrl,
     version: '1.0.0',
+  });
+});
+
+// Centralized Production Error Handling Middleware (Disables Production Debugging / Stack Trace Leaks)
+app.use((err, req, res, next) => {
+  console.error('[Unhandled API Error]:', err.message);
+  const isProd = process.env.NODE_ENV === 'production';
+  const status = err.status || 500;
+  res.status(status).json({
+    success: false,
+    error: isProd && status === 500 ? 'An internal server error occurred. Please try again later.' : (err.message || 'Internal Server Error'),
+    ...(isProd ? {} : { stack: err.stack }),
   });
 });
 

@@ -35,7 +35,7 @@ conn.on('ready', () => {
   console.error('SSH Connection error:', err.message);
   process.exit(1);
 }).connect({
-  host: process.env.VM_IP || '172.20.208.223',
+  host: process.env.VM_IP || '172.21.45.235',
   port: 22,
   username: 'ubuntu',
   password: 'root',

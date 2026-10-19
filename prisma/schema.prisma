@@ -139,6 +139,9 @@ model Subscription {
   virtualMachines VirtualMachine[]
   invoices        Invoice[]
 
+  @@index([userId], map: "idx_subscriptions_user_id")
+  @@index([status], map: "idx_subscriptions_status")
+  @@index([nextBillingDate], map: "idx_subscriptions_next_billing")
   @@map("Subscriptions")
 }
 
@@ -177,6 +180,9 @@ model VirtualMachine {
   provisioningJobs ProvisioningJob[]
   activityLogs     ActivityLog[]
 
+  @@index([userId], map: "idx_vms_user_id")
+  @@index([subscriptionId], map: "idx_vms_subscription_id")
+  @@index([status], map: "idx_vms_status")
   @@map("VirtualMachines")
 }
 
@@ -262,6 +268,9 @@ model Invoice {
   subscription Subscription @relation(fields: [subscriptionId], references: [subscriptionId], onUpdate: NoAction, onDelete: NoAction)
   payments     Payment[]
 
+  @@index([userId], map: "idx_invoices_user_id")
+  @@index([subscriptionId], map: "idx_invoices_subscription_id")
+  @@index([status], map: "idx_invoices_status")
   @@map("Invoices")
 }
 
@@ -280,6 +289,8 @@ model Payment {
   user    User    @relation(fields: [userId], references: [userId], onUpdate: NoAction, onDelete: NoAction)
   invoice Invoice @relation(fields: [invoiceId], references: [invoiceId], onUpdate: NoAction, onDelete: NoAction)
 
+  @@index([userId], map: "idx_payments_user_id")
+  @@index([invoiceId], map: "idx_payments_invoice_id")
   @@map("Payments")
 }
 
@@ -294,6 +305,8 @@ model SecurityLog {
 
   user User? @relation(fields: [userId], references: [userId], onUpdate: NoAction, onDelete: NoAction)
 
+  @@index([userId], map: "idx_security_logs_user_id")
+  @@index([timestamp], map: "idx_security_logs_timestamp")
   @@map("Security_Logs")
 }
 
@@ -309,6 +322,9 @@ model ActivityLog {
   user User?           @relation(fields: [userId], references: [userId], onUpdate: NoAction, onDelete: NoAction)
   vm   VirtualMachine? @relation(fields: [vmId], references: [vmId], onUpdate: NoAction, onDelete: NoAction)
 
+  @@index([userId], map: "idx_activity_logs_user_id")
+  @@index([vmId], map: "idx_activity_logs_vm_id")
+  @@index([createdAt], map: "idx_activity_logs_created_at")
   @@map("Activity_Logs")
 }
 
@@ -338,6 +354,7 @@ model SSHKey {
 
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
+  @@index([userId], map: "idx_ssh_keys_user_id")
   @@map("SSH_Keys")
 }
 
@@ -392,6 +409,9 @@ model SupportTicket {
   parentTicket        SupportTicket?  @relation("TicketLineage", fields: [parentTicketId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   followUpTickets     SupportTicket[] @relation("TicketLineage")
 
+  @@index([userId], map: "idx_tickets_user_id")
+  @@index([status], map: "idx_tickets_status")
+  @@index([createdAt], map: "idx_tickets_created_at")
   @@map("Support_Tickets")
 }
 
@@ -421,6 +441,7 @@ model ManagedWebsite {
 
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
+  @@index([userId], map: "idx_websites_user_id")
   @@map("Managed_Websites")
 }
 
@@ -440,6 +461,7 @@ model UserPaymentMethod {
 
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
+  @@index([userId], map: "idx_payment_methods_user_id")
   @@map("User_Payment_Methods")
 }
 

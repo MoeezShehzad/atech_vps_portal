@@ -1224,20 +1224,23 @@ export async function getVMSnapshots(req, res) {
     try {
       const hvSnaps = await hypervService.snapshotAction(vm.vmName, 'LIST');
       if (Array.isArray(hvSnaps) && hvSnaps.length > 0) {
-        for (const hv of hvSnaps) {
-          const exists = snapshots.find((s) => s.name === hv.snapshotName);
-          if (!exists) {
-            const created = await prisma.vMSnapshot.create({
-              data: {
-                vmId,
-                name: hv.snapshotName,
-                description: hv.snapshotType || 'Standard Checkpoint',
-                status: 'ACTIVE',
-                createdAt: hv.createdAt ? new Date(hv.createdAt) : new Date(),
-              },
-            });
-            snapshots.push(created);
-          }
+        const toCreate = hvSnaps
+          .filter((hv) => !snapshots.some((s) => s.name === hv.snapshotName))
+          .map((hv) => ({
+            vmId,
+            name: hv.snapshotName,
+            description: hv.snapshotType || 'Standard Checkpoint',
+            status: 'ACTIVE',
+            createdAt: hv.createdAt ? new Date(hv.createdAt) : new Date(),
+          }));
+
+        if (toCreate.length > 0) {
+          await prisma.vMSnapshot.createMany({ data: toCreate });
+          const refreshed = await prisma.vMSnapshot.findMany({
+            where: { vmId, deletedAt: null },
+            orderBy: { createdAt: 'desc' },
+          });
+          return res.json({ success: true, snapshots: refreshed });
         }
       }
     } catch (e) {

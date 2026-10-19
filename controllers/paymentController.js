@@ -5,6 +5,7 @@
 
 import prisma from '../lib/prisma.js';
 import {
+  stripe,
   createPaymentIntent,
   confirmPaymentIntent,
   processTestCardCharge,
@@ -541,5 +542,81 @@ export async function getSavedPaymentMethod(req, res) {
     console.error('[getSavedPaymentMethod Error]:', err);
     return res.status(500).json({ success: false, error: 'Failed to retrieve saved payment method.' });
   }
+}
+
+/**
+ * 6. POST /api/payments/webhook - Stripe Webhook Signature Verification and Event Handling
+ */
+export async function handleStripeWebhook(req, res) {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!sig || !webhookSecret) {
+    if (!webhookSecret) {
+      console.warn('[Stripe Webhook]: STRIPE_WEBHOOK_SECRET is not configured.');
+      return res.status(200).json({ received: true, note: 'Webhook received; signature verification skipped because STRIPE_WEBHOOK_SECRET is unset.' });
+    }
+    return res.status(400).json({ error: 'Missing stripe-signature header' });
+  }
+
+  let event;
+  try {
+    const rawBody = req.rawBody || req.body;
+    if (stripe) {
+      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    } else {
+      return res.status(500).json({ error: 'Stripe is not initialized.' });
+    }
+  } catch (err) {
+    console.error('[Stripe Webhook Signature Verification Failed]:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle verified events
+  switch (event.type) {
+    case 'payment_intent.succeeded': {
+      const paymentIntent = event.data.object;
+      console.log(`[Stripe Webhook] Verified PaymentIntent succeeded: ${paymentIntent.id}`);
+      try {
+        const paymentRecord = await prisma.payment.findFirst({
+          where: { transactionId: paymentIntent.id },
+          include: { invoice: true },
+        });
+        if (paymentRecord && paymentRecord.paymentStatus !== 'Completed') {
+          await prisma.$transaction([
+            prisma.payment.update({
+              where: { paymentId: paymentRecord.paymentId },
+              data: { paymentStatus: 'Completed' },
+            }),
+            prisma.invoice.update({
+              where: { invoiceId: paymentRecord.invoiceId },
+              data: { invoiceStatus: 'Paid', paidDate: new Date() },
+            }),
+          ]);
+          console.log(`[Stripe Webhook] Reconciled payment and invoice as Paid for ${paymentIntent.id}`);
+        }
+      } catch (dbErr) {
+        console.error('[Stripe Webhook DB Error]:', dbErr);
+      }
+      break;
+    }
+    case 'payment_intent.payment_failed': {
+      const paymentIntent = event.data.object;
+      console.warn(`[Stripe Webhook] Verified PaymentIntent failed: ${paymentIntent.id}`);
+      try {
+        await prisma.payment.updateMany({
+          where: { transactionId: paymentIntent.id },
+          data: { paymentStatus: 'Failed' },
+        });
+      } catch (dbErr) {
+        console.error('[Stripe Webhook DB Error]:', dbErr);
+      }
+      break;
+    }
+    default:
+      console.log(`[Stripe Webhook] Received verified event ${event.type}`);
+  }
+
+  return res.json({ received: true });
 }
 

@@ -51,19 +51,26 @@ const defaultPlans = [
   },
 ];
 
+import { apiCache } from '../services/cacheService.js';
+
 // GET /api/pricing/plans
 router.get('/plans', async (req, res) => {
   try {
+    const cached = apiCache.get('pricing:plans');
+    if (cached) {
+      res.setHeader('X-Cache', 'HIT');
+      return res.json(cached);
+    }
+
     const plans = await prisma.vPSPlan.findMany({
       where: { isActive: true },
       orderBy: { monthlyPrice: 'asc' },
     });
 
-    if (plans && plans.length > 0) {
-      return res.json(plans);
-    }
-
-    return res.json(defaultPlans);
+    const result = (plans && plans.length > 0) ? plans : defaultPlans;
+    apiCache.set('pricing:plans', result, 10 * 60 * 1000); // 10 minutes
+    res.setHeader('X-Cache', 'MISS');
+    return res.json(result);
   } catch (error) {
     console.warn('[PRICING] Database connection offline or unreachable. Returning fallback plans.');
     return res.json(defaultPlans);

@@ -10,10 +10,14 @@ import {
   processCardPayment,
   processBankPayment,
   getSavedPaymentMethod,
+  handleStripeWebhook,
 } from '../controllers/paymentController.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Stripe Webhook Endpoint (Raw Body Verified)
+router.post('/webhook', handleStripeWebhook);
 
 // Public route to retrieve publishable key & supported payment options
 router.get('/config', getPaymentConfig);

@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDebounce } from '../hooks/useDebounce';
 import {
   Server,
   Users,
@@ -134,6 +135,7 @@ export default function AdminDashboard() {
   // Users & Roles & Ghost Mode
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState('');
+  const debouncedUserSearch = useDebounce(userSearch, 350);
   const [impersonatingId, setImpersonatingId] = useState<number | null>(null);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('ALL');
   const [availableRoles, setAvailableRoles] = useState<string[]>(['Customer', 'Service_Provider', 'Support_Staff', 'Admin']);
@@ -258,9 +260,10 @@ export default function AdminDashboard() {
   };
 
   // 2. Users & Roles
-  const fetchUsers = async () => {
+  const fetchUsers = async (searchOverride?: string) => {
     try {
-      let query = `?search=${encodeURIComponent(userSearch)}`;
+      const activeSearch = typeof searchOverride === 'string' ? searchOverride : debouncedUserSearch;
+      let query = `?search=${encodeURIComponent(activeSearch)}`;
       if (userRoleFilter && userRoleFilter !== 'ALL') {
         query += `&role=${encodeURIComponent(userRoleFilter)}`;
       }
@@ -1205,7 +1208,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (activeTab === 'users') fetchUsers();
-  }, [userRoleFilter]);
+  }, [userRoleFilter, debouncedUserSearch]);
 
   useEffect(() => {
     if (activeTab === 'finance') fetchFinance();
@@ -1534,7 +1537,7 @@ export default function AdminDashboard() {
                 </div>
                 <button
                   type="button"
-                  onClick={fetchUsers}
+                  onClick={() => fetchUsers()}
                   className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs"
                 >
                   Search

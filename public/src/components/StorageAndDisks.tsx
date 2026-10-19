@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
+import { TableSkeleton } from './TableSkeleton';
 
 interface VirtualDisk {
   id: string;
@@ -247,9 +248,7 @@ export default function StorageAndDisks() {
         </div>
 
         {loading ? (
-          <div className="py-20 flex justify-center">
-            <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
-          </div>
+          <TableSkeleton rows={3} cols={5} />
         ) : disks.length === 0 ? (
           <div className="py-16 text-center text-slate-500 dark:text-slate-400">
             <HardDrive className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />

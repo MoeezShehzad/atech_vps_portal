@@ -26,6 +26,7 @@ import { apiCall } from '../services/api';
 import { useToast } from './Toast';
 import { jsPDF } from 'jspdf';
 import { formatDate } from '../utils/dateFormatter';
+import { TableSkeleton } from './TableSkeleton';
 
 interface Invoice {
   invoiceId: string;
@@ -528,7 +529,9 @@ export default function BillingAndInvoices() {
           </div>
         </div>
 
-        {invoices.length === 0 ? (
+        {loading ? (
+          <TableSkeleton rows={3} cols={6} />
+        ) : invoices.length === 0 ? (
           <div className="p-10 text-center text-slate-500 dark:text-slate-400 text-xs">
             No invoices generated yet.
           </div>
