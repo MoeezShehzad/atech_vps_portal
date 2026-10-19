@@ -2,7 +2,7 @@ const { Client } = require('ssh2');
 
 const conn = new Client();
 
-console.log('Connecting to Ubuntu Portal VM at 172.18.247.252...');
+console.log('Connecting to Ubuntu Portal VM...');
 
 conn.on('ready', () => {
   console.log('Connected! Executing deployment on VM...');
@@ -10,6 +10,7 @@ conn.on('ready', () => {
     cd /home/ubuntu/atech_vps_portal &&
     git fetch origin develop &&
     git reset --hard origin/develop &&
+    npx prisma generate &&
     pm2 restart all &&
     pm2 status
   `;
@@ -33,7 +34,7 @@ conn.on('ready', () => {
   console.error('SSH Connection error:', err.message);
   process.exit(1);
 }).connect({
-  host: '172.18.247.252',
+  host: process.env.VM_IP || '172.20.208.223',
   port: 22,
   username: 'ubuntu',
   password: 'root',

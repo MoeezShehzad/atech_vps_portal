@@ -14,6 +14,8 @@ import {
   sendOtpHandler,
   verifyOtpHandler,
   resetPasswordOtpHandler,
+  requestSudoOtpHandler,
+  verifySudoOtpHandler,
 } from '../controllers/authController.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 
@@ -31,6 +33,10 @@ router.post('/send-otp', sendOtpHandler);
 router.post('/verify-otp', verifyOtpHandler);
 router.post('/resend-otp', sendOtpHandler);
 router.post('/reset-password-otp', resetPasswordOtpHandler);
+
+// --- PRIVILEGED STEP-UP (SUDO) AUTHENTICATION ROUTES ---
+router.post('/sudo/request-otp', authenticateToken, requestSudoOtpHandler);
+router.post('/sudo/verify-otp', authenticateToken, verifySudoOtpHandler);
 
 // --- SESSION MANAGEMENT ROUTES ---
 router.post('/refresh', refreshTokenHandler);

@@ -380,14 +380,29 @@ export const register = async (req, res) => {
     );
 
     let otpDispatched = false;
+    let otpSessionToken = null;
     try {
-      await generateAndSendOTP({
+      const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
+      const clientUa = req.headers['user-agent'];
+      const otpRes = await generateAndSendOTP({
         email: newUser.email,
         purpose: 'VERIFY_EMAIL',
         fullName: newUser.fullName,
+        ipAddress: clientIp,
+        userAgent: clientUa,
+        userId: newUser.userId,
         fallbackToken: verificationToken,
       });
       otpDispatched = true;
+      otpSessionToken = otpRes?.sessionToken;
+      if (otpSessionToken) {
+        res.cookie('atc_otp_session', otpSessionToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 5 * 60 * 1000,
+        });
+      }
     } catch (mailErr) {
       console.warn('[Registration OTP Dispatch Warning]:', mailErr.message);
     }
@@ -768,17 +783,32 @@ export const forgotPasswordHandler = async (req, res) => {
       { expiresIn: '1h' }
     );
 
-    await generateAndSendOTP({
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
+    const clientUa = req.headers['user-agent'];
+    const otpRes = await generateAndSendOTP({
       email: user.email,
       purpose: 'PASSWORD_RESET',
       fullName: user.fullName,
+      ipAddress: clientIp,
+      userAgent: clientUa,
+      userId: user.userId,
       fallbackToken: resetToken,
     });
+
+    if (otpRes?.sessionToken) {
+      res.cookie('atc_otp_session', otpRes.sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 5 * 60 * 1000,
+      });
+    }
 
     return res.json({
       success: true,
       requiresOtp: true,
       email: user.email,
+      sessionToken: otpRes?.sessionToken,
       message: 'If an account exists with this email address, password reset instructions have been sent.',
     });
   } catch (error) {
@@ -846,6 +876,7 @@ export const resetPasswordHandler = async (req, res) => {
 /**
  * POST /api/auth/send-otp
  * Generates and sends a 6-digit OTP code to the provided email address
+ * Enforces 60-second cooldown, hourly velocity limiting, context binding, and salted hashing
  */
 export const sendOtpHandler = async (req, res) => {
   try {
@@ -862,6 +893,9 @@ export const sendOtpHandler = async (req, res) => {
     if (purpose === 'VERIFY_EMAIL' && user?.emailVerified) {
       return res.status(400).json({ error: 'This account email is already verified. Please sign in.' });
     }
+
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
+    const clientUa = req.headers['user-agent'];
 
     let fallbackToken = null;
     if (user) {
@@ -884,8 +918,20 @@ export const sendOtpHandler = async (req, res) => {
       email: normalizedEmail,
       purpose,
       fullName: user?.fullName || '',
+      ipAddress: clientIp,
+      userAgent: clientUa,
+      userId: user?.userId || null,
       fallbackToken,
     });
+
+    if (result.sessionToken) {
+      res.cookie('atc_otp_session', result.sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 5 * 60 * 1000,
+      });
+    }
 
     return res.json(result);
   } catch (error) {
@@ -899,21 +945,30 @@ export const sendOtpHandler = async (req, res) => {
 
 /**
  * POST /api/auth/verify-otp
- * Validates the 6-digit OTP code and completes verification or session initialization
+ * Validates the 6-digit OTP code against salted hash with timing-safe equality,
+ * device session verification, and single-use destruction.
  */
 export const verifyOtpHandler = async (req, res) => {
   try {
-    const { email, otp, purpose = 'VERIFY_EMAIL' } = req.body;
+    const { email, otp, purpose = 'VERIFY_EMAIL', sessionToken } = req.body;
     if (!email || !otp) {
       return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    const effectiveSessionToken =
+      sessionToken ||
+      req.cookies?.atc_otp_session ||
+      req.headers['x-otp-session'];
+
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
 
     const otpResult = await verifyOTP({
       email: normalizedEmail,
       otpCode: otp,
       purpose,
+      sessionToken: effectiveSessionToken,
+      ipAddress: clientIp,
     });
 
     if (!otpResult.success) {
@@ -922,6 +977,9 @@ export const verifyOtpHandler = async (req, res) => {
         remainingAttempts: otpResult.remainingAttempts,
       });
     }
+
+    // Clean up OTP session cookie upon successful verification
+    res.clearCookie('atc_otp_session');
 
     // 1. If verifying registration email -> Mark verified and log user in immediately
     if (purpose === 'VERIFY_EMAIL') {
@@ -976,7 +1034,7 @@ export const verifyOtpHandler = async (req, res) => {
       });
     }
 
-    // 2. If verifying for password reset -> Return short-lived token to unlock password reset form
+    // 2. If verifying for password reset -> Return short-lived token
     if (purpose === 'PASSWORD_RESET') {
       const user = await prisma.user.findUnique({
         where: { email: normalizedEmail },
@@ -1015,7 +1073,7 @@ export const verifyOtpHandler = async (req, res) => {
  */
 export const resetPasswordOtpHandler = async (req, res) => {
   try {
-    const { email, otp, newPassword } = req.body;
+    const { email, otp, newPassword, sessionToken } = req.body;
     if (!email || !otp || !newPassword) {
       return res.status(400).json({ error: 'Email, verification code, and new password are required.' });
     }
@@ -1028,12 +1086,20 @@ export const resetPasswordOtpHandler = async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    const effectiveSessionToken =
+      sessionToken ||
+      req.cookies?.atc_otp_session ||
+      req.headers['x-otp-session'];
 
-    // Verify OTP
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
+
+    // Verify OTP with Salted Hash and Device Session
     const otpResult = await verifyOTP({
       email: normalizedEmail,
       otpCode: otp,
       purpose: 'PASSWORD_RESET',
+      sessionToken: effectiveSessionToken,
+      ipAddress: clientIp,
     });
 
     if (!otpResult.success) {
@@ -1042,6 +1108,8 @@ export const resetPasswordOtpHandler = async (req, res) => {
         remainingAttempts: otpResult.remainingAttempts,
       });
     }
+
+    res.clearCookie('atc_otp_session');
 
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -1074,6 +1142,134 @@ export const resetPasswordOtpHandler = async (req, res) => {
   } catch (error) {
     console.error('[resetPasswordOtpHandler Error]:', error);
     return res.status(500).json({ error: 'Failed to reset password.', details: error.message });
+  }
+};
+
+/**
+ * POST /api/auth/sudo/request-otp
+ * Step-Up Authentication: Generates and dispatches an OTP for destructive/privileged actions
+ */
+export const requestSudoOtpHandler = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required for privileged action.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
+    const clientUa = req.headers['user-agent'];
+
+    const result = await generateAndSendOTP({
+      email: user.email,
+      purpose: 'SUDO_ACTION',
+      fullName: user.fullName,
+      ipAddress: clientIp,
+      userAgent: clientUa,
+      userId: user.userId,
+    });
+
+    if (result.sessionToken) {
+      res.cookie('atc_otp_session', result.sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 5 * 60 * 1000,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `A privileged action authorization code has been dispatched to ${user.email}.`,
+      expiresInMinutes: 5,
+      cooldownSeconds: 60,
+    });
+  } catch (error) {
+    if (error.statusCode === 429) {
+      return res.status(429).json({ error: error.message, remainingSeconds: error.remainingSeconds });
+    }
+    console.error('[requestSudoOtpHandler Error]:', error);
+    return res.status(500).json({ error: error.message || 'Failed to request privileged authorization code.' });
+  }
+};
+
+/**
+ * POST /api/auth/sudo/verify-otp
+ * Step-Up Authentication: Verifies SUDO OTP and grants a 15-minute privileged session window
+ */
+export const verifySudoOtpHandler = async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { otp, sessionToken } = req.body;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required.' });
+    }
+    if (!otp) {
+      return res.status(400).json({ error: '6-digit authorization code is required.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const effectiveSessionToken =
+      sessionToken ||
+      req.cookies?.atc_otp_session ||
+      req.headers['x-otp-session'];
+
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
+
+    const otpResult = await verifyOTP({
+      email: user.email,
+      otpCode: otp,
+      purpose: 'SUDO_ACTION',
+      sessionToken: effectiveSessionToken,
+      ipAddress: clientIp,
+      userId: user.userId,
+    });
+
+    if (!otpResult.success) {
+      return res.status(400).json({
+        error: otpResult.error,
+        remainingAttempts: otpResult.remainingAttempts,
+      });
+    }
+
+    res.clearCookie('atc_otp_session');
+
+    // Issue 15-minute privileged SUDO token
+    const sudoToken = jwt.sign(
+      {
+        userId: user.userId,
+        email: user.email,
+        sudo: true,
+        scope: 'PRIVILEGED_OPS',
+      },
+      JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    res.cookie('atc_sudo_token', sudoToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60 * 1000, // 15-minute stateful window
+    });
+
+    return res.json({
+      success: true,
+      message: 'Privileged administrative session granted for 15 minutes.',
+      sudoToken,
+      expiresInMinutes: 15,
+    });
+  } catch (error) {
+    console.error('[verifySudoOtpHandler Error]:', error);
+    return res.status(500).json({ error: 'Failed to verify privileged authorization code.' });
   }
 };
 

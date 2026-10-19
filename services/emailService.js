@@ -223,32 +223,49 @@ export async function sendPasswordResetEmail(email, fullName, token) {
 /**
  * Professional One-Time Password (OTP) Email Dispatcher
  */
-export async function sendOtpEmail({ email, fullName, otpCode, purpose = 'VERIFY_EMAIL', fallbackToken = null }) {
-  let title = 'Your Verification Code';
+export async function sendOtpEmail({
+  email,
+  fullName,
+  otpCode,
+  purpose = 'VERIFY_EMAIL',
+  fallbackToken = null,
+  clientMeta = {},
+}) {
+  let title = 'Your Security Verification Code';
   let subtitle = `Welcome to ATC Cloud, ${fullName || 'there'}!`;
-  let categoryBadge = 'One-Time Password';
+  let categoryBadge = 'One-Time Passcode';
   let subject = `${otpCode} is your ATC Cloud verification code`;
   let instruction = 'Enter the following 6-digit code in the portal to verify your email address and activate your cloud account:';
 
   if (purpose === 'PASSWORD_RESET') {
-    title = 'Password Reset Code';
+    title = 'Password Reset Security Code';
     subtitle = `Hi ${fullName || 'there'},`;
     categoryBadge = 'Account Security';
-    subject = `${otpCode} is your ATC Cloud password reset code`;
-    instruction = 'We received a request to reset your password. Use the following 6-digit code to complete your password reset:';
-  } else if (purpose === 'LOGIN_OTP') {
-    title = 'Sign-In Security Code';
+    subject = `${otpCode} is your ATC Cloud password recovery code`;
+    instruction = 'We received a request to reset your portal password. Enter the 6-digit code below to set new account credentials:';
+  } else if (purpose === 'LOGIN_OTP' || purpose === 'LOGIN_2FA') {
+    title = 'Sign-In Authentication Code';
     subtitle = `Hi ${fullName || 'there'},`;
     categoryBadge = 'Two-Factor Authentication';
     subject = `${otpCode} is your ATC Cloud sign-in code`;
-    instruction = 'A login attempt requires verification. Use the following code to authorize your sign-in session:';
+    instruction = 'A login attempt requires step-up verification. Enter this code to authorize your session:';
+  } else if (purpose === 'SUDO_ACTION') {
+    title = 'Privileged Action Verification (SUDO)';
+    subtitle = `Hi ${fullName || 'there'},`;
+    categoryBadge = 'Step-Up Authentication';
+    subject = `${otpCode} is your privileged action authorization code`;
+    instruction = 'A sensitive infrastructure operation requires administrative authorization. Enter this code to proceed:';
   }
 
-  // Format code with slight spacing for maximum readability
+  // Format code with wide spacing for maximum visual clarity
   const formattedCode = String(otpCode).split('').join(' ');
   const fallbackUrl = fallbackToken 
     ? (purpose === 'PASSWORD_RESET' ? `${APP_URL}/reset-password?token=${fallbackToken}` : `${APP_URL}/api/auth/verify-email?token=${fallbackToken}`)
     : null;
+
+  const reqIp = clientMeta.ip || 'Undisclosed';
+  const reqTime = clientMeta.timestamp || new Date().toUTCString();
+  const reqAgent = clientMeta.userAgent ? String(clientMeta.userAgent).slice(0, 100) : 'Standard Web Browser';
 
   const contentHtml = `
     <p style="margin-top:0;font-size:15px;color:#334155;line-height:1.6;">
@@ -256,22 +273,45 @@ export async function sendOtpEmail({ email, fullName, otpCode, purpose = 'VERIFY
     </p>
 
     <!-- Prominent OTP Code Container -->
-    <div style="text-align:center;margin:28px 0;padding:26px 20px;background-color:#f8fafc;border:2px dashed #cbd5e1;border-radius:14px;">
-      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;">
-        SECURITY VERIFICATION CODE
+    <div style="text-align:center;margin:28px 0;padding:26px 20px;background-color:#0f172a;border:1px solid #1e293b;border-radius:16px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">
+      <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">
+        ONE-TIME SECURITY CODE
       </div>
-      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:38px;font-weight:800;letter-spacing:12px;color:#0f172a;padding:6px 0;">
+      <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:38px;font-weight:800;letter-spacing:14px;color:#38bdf8;padding:8px 0;">
         ${formattedCode}
       </div>
-      <p style="margin:10px 0 0 0;font-size:12px;color:#64748b;line-height:1.5;">
-        ⏱️ This code expires in <strong>10 minutes</strong>.<br/>
-        For your security, never share this code with anyone. ATC Cloud staff will never ask for your code.
+      <p style="margin:8px 0 0 0;font-size:12px;color:#cbd5e1;line-height:1.5;">
+        ⏱️ This security code is valid for <strong>5 minutes</strong> only.
       </p>
+    </div>
+
+    <!-- Context & Anti-Phishing Details -->
+    <div style="margin:24px 0;padding:16px 18px;background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;font-size:12px;color:#475569;line-height:1.7;">
+      <div style="font-weight:700;color:#1e293b;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;font-size:11px;">
+        🛡️ Request Security Details
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <tr>
+          <td style="color:#64748b;padding:3px 0;width:120px;">Request Time:</td>
+          <td style="color:#0f172a;font-weight:600;padding:3px 0;">${escapeHtml(reqTime)}</td>
+        </tr>
+        <tr>
+          <td style="color:#64748b;padding:3px 0;">Originating IP:</td>
+          <td style="color:#0f172a;font-weight:600;font-family:monospace;padding:3px 0;">${escapeHtml(reqIp)}</td>
+        </tr>
+        <tr>
+          <td style="color:#64748b;padding:3px 0;">Client Agent:</td>
+          <td style="color:#0f172a;padding:3px 0;">${escapeHtml(reqAgent)}</td>
+        </tr>
+      </table>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #cbd5e1;color:#b91c1c;font-size:11.5px;line-height:1.5;">
+        <strong>⚠️ Security Warning:</strong> If you did not initiate this request, someone may be attempting to access your cloud resources. Immediately change your password and revoke all active sessions. Analytical Technical Consulting engineers will <em>never</em> ask for this code.
+      </div>
     </div>
 
     ${fallbackUrl ? `
     <div style="margin:24px 0 16px 0;padding-top:16px;border-top:1px solid #e2e8f0;font-size:13px;color:#64748b;">
-      <p style="margin:0 0 8px 0;">Prefer a direct link?</p>
+      <p style="margin:0 0 8px 0;">Prefer direct link verification?</p>
       <a href="${fallbackUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline;word-break:break-all;">
         Click here to ${purpose === 'PASSWORD_RESET' ? 'reset your password directly' : 'verify your account in one click'} &rarr;
       </a>
@@ -284,7 +324,7 @@ export async function sendOtpEmail({ email, fullName, otpCode, purpose = 'VERIFY
     subtitle,
     categoryBadge,
     contentHtml,
-    footerNote: 'ATC Cloud Identity & Security Services • If you did not request this code, you can safely ignore this email.',
+    footerNote: 'ATC Cloud Identity & Access Protection • Automated Security Dispatch',
   });
 
   try {
