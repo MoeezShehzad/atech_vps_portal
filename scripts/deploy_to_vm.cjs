@@ -11,6 +11,7 @@ conn.on('ready', () => {
     git fetch origin develop &&
     git reset --hard origin/develop &&
     npx prisma generate &&
+    npm --prefix public run build &&
     pm2 restart all &&
     pm2 status
   `;
