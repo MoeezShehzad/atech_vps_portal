@@ -429,7 +429,7 @@ export default function OneClickMarketplace({
   return (
     <div className="space-y-6 pb-12">
       {/* ==================================================================== */}
-      {/* 1. TOP HERO & TARGET VIRTUAL MACHINE SELECTOR (LINODE STYLE)         */}
+      {/* 1. TOP HERO & TARGET VIRTUAL MACHINE SELECTOR (ATC CLOUD ENGINE)     */}
       {/* ==================================================================== */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
         <div className="p-6 md:p-7 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white relative overflow-hidden">

@@ -1093,7 +1093,7 @@ export default function Dashboard() {
           body: JSON.stringify({ useSavedMethod: true }),
         });
 
-        toast.success('🎉 30-Day Free Trial activated! Your Ubuntu VPS has been provisioned and is now running on Hyper-V.');
+        toast.success('🎉 30-Day Free Trial activated! Your Ubuntu VPS has been provisioned and is now running on ATC Cloud.');
         setIsTrialModalOpen(false);
         await fetchVMs();
       } catch (err: any) {
@@ -1150,7 +1150,7 @@ export default function Dashboard() {
         body: JSON.stringify(payload),
       });
 
-      toast.success('🎉 30-Day Free Trial activated! Your Ubuntu VPS has been provisioned and is now running on Hyper-V.');
+      toast.success('🎉 30-Day Free Trial activated! Your Ubuntu VPS has been provisioned and is now running on ATC Cloud.');
       setIsTrialModalOpen(false);
       await fetchVMs();
     } catch (err: any) {
