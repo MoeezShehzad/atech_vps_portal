@@ -22,9 +22,9 @@ interface AuthProps {
 const SHOWCASE_SLIDES = [
   {
     image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1800&q=85',
-    badge: 'Bolingbrook, IL Infrastructure',
+    badge: 'Illinois, United States Infrastructure',
     title: 'Dedicated Compute. Cloud Flexibility.',
-    subtitle: 'Enterprise Generation-2 virtual machines powered by dedicated multi-core processors and high-speed NVMe storage.',
+    subtitle: 'Enterprise Generation-2 virtual machines powered by dedicated multi-core processors and high-speed SSD storage.',
     statLabel: 'Provisioning Time',
     statValue: '< 60 Seconds',
   },
@@ -42,7 +42,7 @@ const SHOWCASE_SLIDES = [
     title: 'Engineered for Production Workloads.',
     subtitle: 'Launch production Linux or Windows Server workloads with full root access, live web console, and instant snapshots.',
     statLabel: 'Dedicated Resources',
-    statValue: 'vCPU • ECC RAM • NVMe',
+    statValue: 'vCPU • ECC RAM • SSD',
   },
 ];
 
@@ -388,7 +388,7 @@ export default function Auth({ initialMode }: AuthProps) {
           </div>
           <div>
             <span className="text-white font-bold font-poppins text-sm sm:text-base block leading-none">
-              Analytical Technical Consulting
+              Analytical Technical Consulting (ATC)
             </span>
             <span className="text-[10px] font-mono text-cyan-400 tracking-widest uppercase">
               Enterprise Cloud Portal
@@ -665,10 +665,10 @@ export default function Auth({ initialMode }: AuthProps) {
                       </div>
 
                       <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white font-poppins">
-                        Enter Security Code
+                        Enter One-Time Passcode
                       </h3>
                       <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">
-                        We sent a 6-digit one-time code to{' '}
+                        We sent a 6-digit one-time passcode to{' '}
                         <span className="font-bold text-slate-900 dark:text-white break-all">
                           {targetOtpEmail || signupEmail}
                         </span>
@@ -796,7 +796,7 @@ export default function Auth({ initialMode }: AuthProps) {
                         Create your cloud account
                       </h2>
                       <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                        Deploy enterprise NVMe servers in seconds with zero setup fees.
+                        Deploy enterprise SSD servers in seconds with zero setup fees.
                       </p>
                     </div>
 
@@ -934,7 +934,7 @@ export default function Auth({ initialMode }: AuthProps) {
                           className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                         />
                         <label htmlFor="agree-terms" className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                          I agree to the Analytical Technical Consulting{' '}
+                          I agree to the Analytical Technical Consulting (ATC){' '}
                           <Link to="/terms" className="text-blue-600 font-semibold hover:underline">
                             Terms of Service
                           </Link>
@@ -1058,7 +1058,7 @@ export default function Auth({ initialMode }: AuthProps) {
                     <div className="flex items-center gap-1.5 text-blue-400 text-[11px] font-bold">
                       <HardDrive className="w-3.5 h-3.5" /> Storage
                     </div>
-                    <p className="text-sm font-extrabold text-white mt-1 font-poppins">NVMe Arrays</p>
+                    <p className="text-sm font-extrabold text-white mt-1 font-poppins">SSD Arrays</p>
                   </div>
                   <div className="p-3 rounded-2xl bg-slate-950/60 border border-white/15 backdrop-blur-md">
                     <div className="flex items-center gap-1.5 text-emerald-400 text-[11px] font-bold">
@@ -1075,7 +1075,7 @@ export default function Auth({ initialMode }: AuthProps) {
                   <>
                     <div className="space-y-0.5">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-400 block">
-                        New to Analytical Technical Consulting?
+                        New to Analytical Technical Consulting (ATC)?
                       </span>
                       <p className="text-sm font-bold text-white">
                         Deploy high-performance cloud instances today.
@@ -1120,7 +1120,7 @@ export default function Auth({ initialMode }: AuthProps) {
           BOTTOM MINIMAL FOOTER
           ========================================================================= */}
       <footer className="relative z-20 w-full max-w-[1220px] mx-auto px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
-        <p>© {new Date().getFullYear()} Analytical Technical Consulting Inc. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} Analytical Technical Consulting (ATC). All rights reserved.</p>
         <div className="flex items-center gap-5">
           <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
           <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>

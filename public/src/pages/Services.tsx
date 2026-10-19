@@ -21,7 +21,7 @@ export default function Services() {
     {
       icon: <Cpu className="w-6 h-6 text-blue-600" />,
       title: "Hardware Sizing & Optimization",
-      description: "Utilization analysis to optimize CPU, memory, and NVMe storage allocations across cloud clusters."
+      description: "Utilization analysis to optimize CPU, memory, and SSD storage allocations across cloud clusters."
     },
     {
       icon: <Database className="w-6 h-6 text-blue-600" />,

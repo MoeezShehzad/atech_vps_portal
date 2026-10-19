@@ -225,7 +225,7 @@ export default function ForgotPassword() {
         <div className="relative z-10">
           <Link to="/" className="inline-flex items-center gap-3">
             <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
-            <span className="font-bold font-poppins text-lg">Analytical Technical Consulting</span>
+            <span className="font-bold font-poppins text-lg">Analytical Technical Consulting (ATC)</span>
           </Link>
         </div>
 
@@ -262,7 +262,7 @@ export default function ForgotPassword() {
           </div>
         </div>
 
-        <p className="relative z-10 text-xs text-slate-500">© {new Date().getFullYear()} Analytical Technical Consulting Inc. All rights reserved.</p>
+        <p className="relative z-10 text-xs text-slate-500">© {new Date().getFullYear()} Analytical Technical Consulting (ATC). All rights reserved.</p>
       </div>
 
       {/* RIGHT: RESET FORM */}
@@ -272,14 +272,14 @@ export default function ForgotPassword() {
             <img src={atcLogo} alt="ATC Logo" className="h-10 w-auto object-contain" />
           </Link>
           <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white font-poppins">
-            {step === 'token' ? 'Set New Password' : step === 'otp' ? 'Enter Security Code' : 'Reset Password'}
+            {step === 'token' ? 'Set New Password' : step === 'otp' ? 'Enter One-Time Security Code' : 'Reset Password'}
           </h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             {step === 'token'
               ? 'Enter your new credentials below to update your account.'
               : step === 'otp'
-              ? `Enter the 6-digit verification code sent to ${email} and choose your new password.`
-              : 'Enter your account email address to receive a 6-digit verification code.'}
+              ? `Enter the 6-digit one-time security code sent to ${email} and choose your new password.`
+              : 'Enter your account email address to receive a 6-digit one-time security code.'}
           </p>
         </div>
 
@@ -398,7 +398,7 @@ export default function ForgotPassword() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                      6-Digit Security Code
+                      6-Digit One-Time Security Code
                     </label>
                     <button
                       type="button"
@@ -539,7 +539,7 @@ export default function ForgotPassword() {
                       <Loader2 className="w-4 h-4 animate-spin" /> Sending Security Code...
                     </>
                   ) : (
-                    'Send Verification Code'
+                    'Send One-Time Security Code'
                   )}
                 </button>
 

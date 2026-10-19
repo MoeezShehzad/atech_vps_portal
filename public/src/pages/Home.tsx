@@ -18,50 +18,51 @@ import {
   Database
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { fetchVpsPlans } from '../services/pricingApi';
 
-const FEATURED_PLANS = [
+const DEFAULT_HOME_PLANS = [
   {
-    planId: 2,
-    name: 'VPS S',
+    planId: 1,
+    name: 'VPS Basic',
     cpu: '2 Cores',
     cpuCores: 2,
-    ram: '4 GB RAM',
-    ramGb: 4,
-    storage: '80 GB NVMe',
-    storageGb: 80,
+    ram: '2 GB RAM',
+    ramGb: 2,
+    storage: '50 GB SSD',
+    storageGb: 50,
     bandwidth: '4 TB Bandwidth',
-    price: 6.0,
-    monthlyPrice: 6.0,
+    price: 4.97,
+    monthlyPrice: 4.97,
     popular: false,
     color: 'from-blue-500 to-cyan-500',
   },
   {
-    planId: 4,
-    name: 'VPS M+',
+    planId: 2,
+    name: 'VPS Pro',
     cpu: '4 Cores',
     cpuCores: 4,
-    ram: '6 GB RAM',
-    ramGb: 6,
-    storage: '160 GB NVMe',
-    storageGb: 160,
+    ram: '8 GB RAM',
+    ramGb: 8,
+    storage: '120 GB SSD',
+    storageGb: 120,
     bandwidth: '8 TB Bandwidth',
-    price: 11.0,
-    monthlyPrice: 11.0,
+    price: 14.99,
+    monthlyPrice: 14.99,
     popular: true,
     color: 'from-blue-600 to-indigo-600',
   },
   {
-    planId: 5,
-    name: 'VPS L',
+    planId: 3,
+    name: 'VPS Enterprise',
     cpu: '8 Cores',
     cpuCores: 8,
     ram: '16 GB RAM',
     ramGb: 16,
-    storage: '320 GB NVMe',
-    storageGb: 320,
+    storage: '250 GB SSD',
+    storageGb: 250,
     bandwidth: '12 TB Bandwidth',
-    price: 24.0,
-    monthlyPrice: 24.0,
+    price: 29.99,
+    monthlyPrice: 29.99,
     popular: false,
     color: 'from-indigo-600 to-purple-600',
   },
@@ -81,7 +82,7 @@ const ONE_CLICK_APPS = [
 
 const TYPEWRITER_PHRASES = [
   'Cloud Infrastructure',
-  'Ultra-Fast NVMe VPS',
+  'Ultra-Fast SSD VPS',
   '1-Click DevOps Apps',
   'Automated aaPanel Stacks',
   'Docker Cloud Instances',
@@ -91,11 +92,40 @@ const TYPEWRITER_PHRASES = [
 export default function Home() {
   const navigate = useNavigate();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('monthly');
+  const [plans, setPlans] = useState<any[]>(DEFAULT_HOME_PLANS);
 
   // Typewriter Animation State
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [displayText, setDisplayText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Dynamically load active plans from database
+  useEffect(() => {
+    fetchVpsPlans()
+      .then((dbPlans) => {
+        if (Array.isArray(dbPlans) && dbPlans.length > 0) {
+          const mapped = dbPlans.slice(0, 3).map((p, idx) => ({
+            planId: p.planId,
+            name: p.name,
+            cpu: `${p.cpuCores} Cores`,
+            cpuCores: p.cpuCores,
+            ram: `${p.ramGb} GB RAM`,
+            ramGb: p.ramGb,
+            storage: `${p.storageGb} GB SSD`,
+            storageGb: p.storageGb,
+            bandwidth: `${Math.round(((p.bandwidthMbps || 1000) / 1000) * 4) || 4} TB Bandwidth`,
+            price: Number(p.monthlyPrice) || 9.99,
+            monthlyPrice: Number(p.monthlyPrice) || 9.99,
+            popular: idx === 1 || p.name.toLowerCase().includes('pro'),
+            color: idx === 0 ? 'from-blue-500 to-cyan-500' : idx === 1 ? 'from-blue-600 to-indigo-600' : 'from-indigo-600 to-purple-600',
+          }));
+          setPlans(mapped);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load live plans for home page, using defaults:', err?.message);
+      });
+  }, []);
 
   useEffect(() => {
     const currentPhrase = TYPEWRITER_PHRASES[phraseIndex];
@@ -124,7 +154,7 @@ export default function Home() {
     return () => clearTimeout(timeout);
   }, [displayText, isDeleting, phraseIndex]);
 
-  const handleConfigure = (plan: typeof FEATURED_PLANS[0]) => {
+  const handleConfigure = (plan: any) => {
     navigate('/configure', { state: { selectedPlan: plan } });
   };
 
@@ -168,7 +198,7 @@ export default function Home() {
 
             {/* Description Subtext */}
             <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
-              Analytical Technical Consulting delivers next-generation data center virtualization, pure NVMe cloud servers, and instant 1-click DevOps deployments engineered for production workloads.
+              Analytical Technical Consulting (ATC) delivers next-generation data center virtualization, pure SSD cloud servers, and instant 1-click DevOps deployments engineered for production workloads.
             </p>
 
             {/* CTA Action Buttons */}
@@ -279,7 +309,7 @@ export default function Home() {
                   </div>
                   <div className="text-emerald-400 flex items-center gap-1.5 pl-3">
                     <span>✓</span>
-                    <span className="text-slate-300">Mounted 160 GB NVMe Storage Array</span>
+                    <span className="text-slate-300">Mounted 160 GB SSD Storage Array</span>
                   </div>
                   <div className="text-emerald-400 flex items-center gap-1.5 pl-3">
                     <span>✓</span>
@@ -331,7 +361,7 @@ export default function Home() {
             Predictable Cloud Pricing
           </h2>
           <p className="text-slate-600 text-sm sm:text-base font-normal">
-            Scalable instances backed by high-speed NVMe storage, dedicated hardware, and fast deployment.
+            Scalable instances backed by high-speed SSD storage, dedicated hardware, and fast deployment.
           </p>
 
           {/* Billing Switcher Toggle */}
@@ -350,7 +380,7 @@ export default function Home() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 items-stretch">
-          {FEATURED_PLANS.map((plan) => {
+          {plans.map((plan) => {
             const finalPrice = billingCycle === 'annually' ? +(plan.price * 0.85).toFixed(2) : plan.price;
 
             return (
@@ -397,7 +427,7 @@ export default function Home() {
                     </li>
                     <li className="flex items-center gap-3">
                       <Server className="w-4 h-4 text-blue-600 shrink-0" /> 
-                      <span><strong className="text-slate-950 font-bold">{plan.storage}</strong> Enterprise NVMe</span>
+                      <span><strong className="text-slate-950 font-bold">{plan.storage}</strong> Enterprise SSD</span>
                     </li>
                     <li className="flex items-center gap-3">
                       <Globe className="w-4 h-4 text-blue-600 shrink-0" /> 

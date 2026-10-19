@@ -7,7 +7,7 @@ export default function AboutUs() {
       <div className="max-w-4xl mx-auto space-y-12">
         <div>
           <span className="text-blue-600 font-bold text-xs uppercase tracking-wider">Who We Are</span>
-          <h1 className="text-4xl font-extrabold text-blue-950 mt-2 font-poppins">About Analytical Technical Consulting</h1>
+          <h1 className="text-4xl font-extrabold text-blue-950 mt-2 font-poppins">Analytical Technical Consulting (ATC)</h1>
           <p className="text-slate-600 text-lg mt-4 leading-relaxed">
             Analytical Technical Consulting (ATC) delivers IT solutions designed for maximum operational efficiency, reliability, and security across data center infrastructures.
           </p>

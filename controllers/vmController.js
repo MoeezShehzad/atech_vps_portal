@@ -735,7 +735,7 @@ export async function resizeVM(req, res) {
     const targetStorage = storageGb ? Number(storageGb) : vm.storageGb;
 
     if (targetStorage > 2000) {
-      return res.status(400).json({ error: 'Maximum NVMe storage allocation per instance is 2000 GB.' });
+      return res.status(400).json({ error: 'Maximum SSD storage allocation per instance is 2000 GB.' });
     }
 
     // Disallow disk shrinking
@@ -820,7 +820,7 @@ export async function resizeVM(req, res) {
         vmId,
         action: 'RESIZE_SPECS',
         status: 'SUCCESS',
-        details: `Hardware upgraded: ${targetCpu} vCPU, ${targetRam} GB RAM, ${targetStorage} GB NVMe. Due today: $${priceInfo.dueToday} (Prorated). New monthly rate: $${priceInfo.newPrice}/mo`,
+        details: `Hardware upgraded: ${targetCpu} vCPU, ${targetRam} GB RAM, ${targetStorage} GB SSD. Due today: $${priceInfo.dueToday} (Prorated). New monthly rate: $${priceInfo.newPrice}/mo`,
       },
     });
 
@@ -837,8 +837,8 @@ export async function resizeVM(req, res) {
           fullName: user.fullName,
           invoiceNumber: generatedInvoice ? generatedInvoice.invoiceNumber : `INV-${new Date().getFullYear()}-SPEC-ADJ`,
           vmName: vm.vmName,
-          previousSpecs: `${vm.cpuCores} vCPU, ${vm.ramGb} GB RAM, ${vm.storageGb} GB NVMe`,
-          newSpecs: `${targetCpu} vCPU, ${targetRam} GB RAM, ${targetStorage} GB NVMe`,
+          previousSpecs: `${vm.cpuCores} vCPU, ${vm.ramGb} GB RAM, ${vm.storageGb} GB SSD`,
+          newSpecs: `${targetCpu} vCPU, ${targetRam} GB RAM, ${targetStorage} GB SSD`,
           daysRemaining: priceInfo.daysRemaining,
           totalDays: priceInfo.totalDays,
           unusedCredit: priceInfo.unusedOldCredit,
@@ -855,7 +855,7 @@ export async function resizeVM(req, res) {
 
     return res.json({
       success: true,
-      message: `Hardware specs upgraded to ${targetCpu} vCPU, ${targetRam} GB RAM, and ${targetStorage} GB NVMe Storage.`,
+      message: `Hardware specs upgraded to ${targetCpu} vCPU, ${targetRam} GB RAM, and ${targetStorage} GB SSD Storage.`,
       vm: updatedVm,
       pricing: priceInfo,
       invoice: generatedInvoice,

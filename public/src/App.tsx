@@ -78,7 +78,7 @@ function AppContent() {
           <nav className="px-4 sm:px-10 py-4 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-3 font-bold text-blue-950 font-poppins">
               <img src={atcLogo} alt="ATC Logo" width="160" height="40" fetchPriority="high" className="h-9 sm:h-10 w-auto object-contain" />
-              <span className="text-sm sm:text-lg">Analytical Technical Consulting</span>
+              <span className="text-sm sm:text-lg">Analytical Technical Consulting (ATC)</span>
             </Link>
 
             <div className="hidden md:flex gap-8 items-center text-sm font-semibold text-slate-600">

@@ -569,7 +569,7 @@ export default function AdminDashboard() {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
       doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text('Analytical Technical Consulting', 20, 24);
+      doc.text('Analytical Technical Consulting (ATC)', 20, 24);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
@@ -728,7 +728,7 @@ export default function AdminDashboard() {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
-      doc.text('Thank you for choosing Analytical Technical Consulting Cloud Infrastructure.', 105, 275, { align: 'center' });
+      doc.text('Thank you for choosing Analytical Technical Consulting (ATC) Cloud Infrastructure.', 105, 275, { align: 'center' });
       doc.text('For questions, contact customer-support@atechconsult.com', 105, 280, { align: 'center' });
 
       doc.save(`${receiptData.invoiceNumber || inv.invoiceNumber || 'invoice'}.pdf`);
@@ -2731,7 +2731,7 @@ export default function AdminDashboard() {
                   Host Hardware Capacity & Allocation (ATC Cloud Cluster)
                 </h4>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Real physical cores, memory, and NVMe disk commitment across all customer virtual machines.
+                  Real physical cores, memory, and SSD disk commitment across all customer virtual machines.
                 </p>
               </div>
 
@@ -2826,7 +2826,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
-                        NVMe SSD Storage
+                        Enterprise SSD Storage
                       </span>
                       <p className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
                         {reportsData?.fleetCapacity?.allocatedDiskGb || 0} / {reportsData?.fleetCapacity?.totalHostStorageGb || 500} GB
@@ -2854,7 +2854,7 @@ export default function AdminDashboard() {
                     <span>{reportsData?.fleetCapacity?.totalHostStorageGb || 500} GB Capacity</span>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-normal pt-1 border-t border-slate-200 dark:border-slate-700/50">
-                    High-speed NVMe storage pool backing virtual hard disks (VHDX).
+                    High-speed SSD storage pool backing virtual hard disks (VHDX).
                   </p>
                 </div>
               </div>
@@ -3277,7 +3277,7 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 font-bold text-slate-900 dark:text-white text-xs">{p.name}</td>
                         <td className="px-4 py-3 text-xs">{p.cpuCores} Cores</td>
                         <td className="px-4 py-3 text-xs">{p.ramGb} GB RAM</td>
-                        <td className="px-4 py-3 text-xs">{p.storageGb} GB {p.storageType || 'NVMe'}</td>
+                        <td className="px-4 py-3 text-xs">{p.storageGb} GB {p.storageType || 'SSD'}</td>
                         <td className="px-4 py-3 text-xs font-mono font-semibold text-slate-700 dark:text-slate-300">
                           {p.bandwidthMbps >= 1000 ? `${(p.bandwidthMbps / 1000).toFixed(0)} TB` : `${p.bandwidthMbps || 80} GB`}
                         </td>
@@ -4596,7 +4596,7 @@ export default function AdminDashboard() {
                   Official Invoice Receipt
                 </span>
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white font-poppins">
-                  Analytical Technical Consulting
+                  Analytical Technical Consulting (ATC)
                 </h3>
                 <p className="text-xs text-slate-500">Enterprise Cloud Infrastructure & Systems</p>
               </div>

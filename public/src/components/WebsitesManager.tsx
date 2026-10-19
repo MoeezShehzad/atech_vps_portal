@@ -443,7 +443,7 @@ export default function WebsitesManager() {
                 <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Web Space Allocation</span>
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">{selectedSite.diskUsageMb} MB</span>
-                  <span className="text-xs text-slate-500">/ 10,000 MB NVMe</span>
+                  <span className="text-xs text-slate-500">/ 10,000 MB SSD</span>
                 </div>
                 <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
                   <div className="bg-blue-600 h-full rounded-full" style={{ width: `${(selectedSite.diskUsageMb / 10000) * 100}%` }} />
@@ -714,7 +714,7 @@ export default function WebsitesManager() {
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white font-poppins">Managed MariaDB / MySQL Center</h3>
-                <p className="text-xs text-slate-500">Dedicated schema running on ATC high-performance NVMe database cluster</p>
+                <p className="text-xs text-slate-500">Dedicated schema running on ATC high-performance SSD database cluster</p>
               </div>
               <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 font-semibold text-xs rounded-full">
                 ● Connection Active
@@ -1021,7 +1021,7 @@ export default function WebsitesManager() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-slate-500">
-                    <span>NVMe Storage:</span>
+                    <span>SSD Storage:</span>
                     <span className="font-mono font-medium text-slate-700 dark:text-slate-300">{site.diskUsageMb} MB</span>
                   </div>
                 </div>

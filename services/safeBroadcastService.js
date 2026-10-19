@@ -155,7 +155,7 @@ async function executeThrottledEmailDispatch(jobId, recipients, title, message) 
                   <p>You can manage your instances, subscriptions, and security alerts anytime directly in the <a href="${(process.env.FRONTEND_URL || 'http://localhost:5174').replace(/\/$/, '')}/dashboard" style="color: #2563eb; font-weight: 600;">ATC Cloud Dashboard</a>.</p>
                 </div>
                 <div class="footer">
-                  <p>© ${new Date().getFullYear()} Analytical Technical Consulting Inc. All rights reserved.</p>
+                  <p>© ${new Date().getFullYear()} Analytical Technical Consulting (ATC). All rights reserved.</p>
                   <p>This is an automated administrative notification sent to ${recipient.email}.</p>
                 </div>
               </div>

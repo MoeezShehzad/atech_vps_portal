@@ -524,7 +524,7 @@ server.listen(PORT, HOST, () => {
   console.log(`================================================================`);
 
   // Forward localhost:5000 and localhost:5174 to Ubuntu VM for Google OAuth & local portal access
-  const VM_IP = process.env.UBUNTU_VM_IP || '172.20.208.223';
+  const VM_IP = process.env.UBUNTU_VM_IP || '172.21.45.235';
   [5000, 5174].forEach((fwdPort) => {
     try {
       const bridge = net.createServer((socket) => {

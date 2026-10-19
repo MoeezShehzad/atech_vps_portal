@@ -1,12 +1,12 @@
 // ==============================================================================
 // Service: pricingService.js
-// Purpose: Dynamic VPS spec pricing calculator (RAM, vCPU, NVMe storage deltas)
+// Purpose: Dynamic VPS spec pricing calculator (RAM, vCPU, SSD storage deltas)
 // ==============================================================================
 
 export const SPEC_UNIT_RATES = {
   ramPerGbMonth: 1.50,       // $1.50 / GB / month
   cpuPerCoreMonth: 2.50,     // $2.50 / vCPU core / month
-  storagePerGbMonth: 0.10,   // $0.10 / GB NVMe / month
+  storagePerGbMonth: 0.10,   // $0.10 / GB SSD / month
 };
 
 /**

@@ -56,7 +56,7 @@ export default function RefundPolicy() {
           </div>
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
-            Analytical Technical Consulting Inc. (&quot;ATC&quot;, &quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides high-performance, 
+            Analytical Technical Consulting (ATC) (&quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides high-performance, 
             dedicated enterprise cloud infrastructure. Because cloud compute resources, physical memory allocation, storage arrays, and network routing 
             are reserved exclusively for your instance upon provisioning, this Policy establishes our precise commercial terms regarding cancellations, 
             final-sale provisioning, non-refundable assets, and our zero-tolerance protocol against payment chargebacks.
@@ -120,12 +120,12 @@ export default function RefundPolicy() {
               </h2>
               <p>
                 In accordance with standard enterprise cloud infrastructure governance, 
-                <strong> all cloud compute resources, virtual machines, block storage volumes, and bandwidth allocations provided by Analytical Technical Consulting Inc. (ATC) are billed on a 
+                <strong> all cloud compute resources, virtual machines, block storage volumes, and bandwidth allocations provided by Analytical Technical Consulting (ATC) are billed on a 
                 prepaid subscription model and are strictly non-refundable once provisioned</strong>.
               </p>
               <p>
                 <strong>Infrastructure Reservation Principle:</strong> When you deploy a virtual machine, our cluster dedicates physical CPU cores, 
-                locks dedicated server RAM in physical host memory, provisions NVMe storage arrays, and reserves dedicated IP routing through our switches. 
+                locks dedicated server RAM in physical host memory, provisions SSD storage arrays, and reserves dedicated IP routing through our switches. 
                 These resources remain dedicated to your instance whether the guest operating system is actively booted or powered off. 
                 Consequently, powered-off instances continue to accrue recurring hosting charges until permanently cancelled or destroyed by Customer.
               </p>
@@ -255,7 +255,7 @@ export default function RefundPolicy() {
               </p>
               <ul className="list-disc pl-6 space-y-1.5 text-xs sm:text-sm">
                 <li><strong>Commercial Debt Collections:</strong> The delinquent balance, accrued interest (at the maximum statutory rate of 1.5% per month), and dispute assessment fees will be referred to licensed commercial debt collection agencies and reported to major credit reporting bureaus;</li>
-                <li><strong>Legal Fees Recovery:</strong> Customer agrees to reimburse Analytical Technical Consulting Inc. for all reasonable attorneys&apos; fees, court costs, and collection expenses incurred by ATC in enforcing its legal rights under this Agreement;</li>
+                <li><strong>Legal Fees Recovery:</strong> Customer agrees to reimburse Analytical Technical Consulting (ATC) for all reasonable attorneys&apos; fees, court costs, and collection expenses incurred by ATC in enforcing its legal rights under this Agreement;</li>
                 <li><strong>Global Merchant Blacklisting:</strong> The customer&apos;s legal name, corporate domain, verified telephone number, credit card hash, and IP blocks will be permanently blacklisted across our payment gateway and industry anti-fraud merchant databases.</li>
               </ul>
             </section>
@@ -288,16 +288,16 @@ export default function RefundPolicy() {
               </p>
               <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl text-xs font-mono space-y-1">
                 <p className="font-bold text-slate-900 dark:text-white">Billing &amp; Financial Operations Department</p>
-                <p>Analytical Technical Consulting Inc.</p>
-                <p>1360 Brentwood Trl, Bolingbrook, IL 60490, United States</p>
-                <p>Direct Inquiries: billing@atechconsult.com • Telephone: +1 630-696-7721</p>
+                <p>Analytical Technical Consulting (ATC)</p>
+                <p>Illinois, United States</p>
+                <p>Direct Inquiries: billing@atechconsult.com</p>
               </div>
             </section>
 
             {/* CORPORATE FOOTER CONTACT */}
             <div className="pt-8 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-2">
-              <p className="font-bold text-slate-800 dark:text-slate-300">Analytical Technical Consulting Inc. Finance &amp; Accounting</p>
-              <p>1360 Brentwood Trl, Bolingbrook, IL 60490, United States</p>
+              <p className="font-bold text-slate-800 dark:text-slate-300">Analytical Technical Consulting (ATC) Finance &amp; Accounting</p>
+              <p>Illinois, United States</p>
               <p>Billing Portal: <a href="mailto:billing@atechconsult.com" className="text-blue-600 underline">billing@atechconsult.com</a></p>
             </div>
 

@@ -55,7 +55,7 @@ export default function TermsOfService() {
               </div>
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                  Analytical Technical Consulting Inc. • Master Services Agreement
+                  Analytical Technical Consulting (ATC) • Master Services Agreement
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-poppins">
                   Cloud Platform Terms of Service
@@ -76,15 +76,15 @@ export default function TermsOfService() {
             <strong className="font-bold uppercase tracking-wide block mb-1">Mandatory Dispute Resolution Notice:</strong>
             THIS AGREEMENT CONTAINS A <strong>MANDATORY BINDING INDIVIDUAL ARBITRATION CLAUSE</strong> (SECTION 14) AND A 
             <strong> WAIVER OF CLASS ACTION LAWSUITS AND JURY TRIALS</strong>. IT DICTATES HOW ANY DISPUTES BETWEEN YOU AND ANALYTICAL TECHNICAL 
-            CONSULTING INC. ARE RESOLVED. BY ACCEDING TO THIS AGREEMENT, YOU SURRENDER ANY RIGHT TO PARTICIPATE IN A CLASS ACTION OR REPRESENTATIVE ACTION IN COURT.
+            CONSULTING (ATC) ARE RESOLVED. BY ACCEDING TO THIS AGREEMENT, YOU SURRENDER ANY RIGHT TO PARTICIPATE IN A CLASS ACTION OR REPRESENTATIVE ACTION IN COURT.
           </div>
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
             This Cloud Platform Master Services Agreement (&quot;Agreement&quot;) is made and entered into by and between 
-            <strong> Analytical Technical Consulting Inc.</strong> (&quot;ATC&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), an Illinois corporation having its principal corporate office 
-            and data infrastructure operations at <strong>1360 Brentwood Trl, Bolingbrook, IL 60490, United States</strong>, and the entity or individual agreeing to these terms 
+            <strong> Analytical Technical Consulting (ATC)</strong> (&quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), an Illinois entity operating cloud infrastructure facilities 
+            in <strong>Illinois, United States</strong>, and the entity or individual agreeing to these terms 
             (&quot;Customer&quot;, &quot;you&quot;, or &quot;your&quot;). This Agreement governs your access to and use of all ATC cloud virtual machines, dedicated servers, hypervisor compute nodes, 
-            enterprise NVMe block storage volumes, networks, IP allocations, software images, and technical infrastructure.
+            enterprise SSD block storage volumes, networks, IP allocations, software images, and technical infrastructure.
           </p>
         </div>
 
@@ -134,7 +134,7 @@ export default function TermsOfService() {
               <p>
                 <strong>1.1 Facility &amp; Compute Provision:</strong> During the Term of this Agreement, ATC will provide the cloud compute infrastructure, 
                 Generation 2 enterprise hypervisor virtual machine partitions, dedicated CPU allocation threads, host physical memory reservation, 
-                high-IOPS NVMe storage volumes, dedicated IP routing, and self-service management portal APIs (collectively, the &quot;Services&quot;) 
+                high-IOPS SSD storage volumes, dedicated IP routing, and self-service management portal APIs (collectively, the &quot;Services&quot;) 
                 in accordance with this Agreement and our published Service Level Agreement.
               </p>
               <p>
@@ -210,9 +210,9 @@ export default function TermsOfService() {
                 <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-300 dark:border-slate-700">
                   <strong className="text-blue-600 dark:text-blue-400 block font-bold mb-1">ATC Responsibility: &quot;Security OF the Cloud&quot;</strong>
                   <ul className="list-disc pl-4 space-y-1 text-slate-600 dark:text-slate-400">
-                    <li>Physical security of Bolingbrook, IL data center facility;</li>
+                    <li>Physical security of Illinois, US data center facility;</li>
                     <li>Hypervisor host operating system patching &amp; memory isolation;</li>
-                    <li>Enterprise NVMe storage array hardware integrity;</li>
+                    <li>Enterprise SSD storage array hardware integrity;</li>
                     <li>Perimeter firewall switches &amp; upstream routing resilience.</li>
                   </ul>
                 </div>
@@ -361,7 +361,7 @@ export default function TermsOfService() {
               <p className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
                 TO THE MAXIMUM EXTENT PERMITTED UNDER APPLICABLE LAW, EXCEPT AS EXPRESSLY PROVIDED IN OUR SERVICE LEVEL AGREEMENT, 
                 ALL SERVICES, HARDWARE, VIRTUAL MACHINES, SERVERS, STORAGE ARRAYS, NETWORKING, OPERATING SYSTEM IMAGES, CONSOLES, AND DOCUMENTATION 
-                PROVIDED BY ANALYTICAL TECHNICAL CONSULTING INC. ARE PROVIDED STRICTLY ON AN &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; BASIS, WITHOUT WARRANTIES 
+                PROVIDED BY ANALYTICAL TECHNICAL CONSULTING (ATC) ARE PROVIDED STRICTLY ON AN &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; BASIS, WITHOUT WARRANTIES 
                 OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY, OR ARISING BY COURSE OF DEALING OR USAGE IN TRADE.
               </p>
               <p className="text-xs sm:text-sm leading-relaxed">
@@ -379,7 +379,7 @@ export default function TermsOfService() {
               </h2>
               <p className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
                 IN NO EVENT AND UNDER NO LEGAL OR EQUITABLE THEORY—WHETHER IN CONTRACT, TORT (INCLUDING NEGLIGENCE AND GROSS NEGLIGENCE TO THE EXTENT PERMITTED BY LAW), 
-                STRICT LIABILITY, INDEMNITY, BREACH OF STATUTORY DUTY, OR OTHERWISE—SHALL ANALYTICAL TECHNICAL CONSULTING INC., ITS DIRECTORS, OFFICERS, 
+                STRICT LIABILITY, INDEMNITY, BREACH OF STATUTORY DUTY, OR OTHERWISE—SHALL ANALYTICAL TECHNICAL CONSULTING (ATC), ITS DIRECTORS, OFFICERS, 
                 SHAREHOLDERS, EMPLOYEES, AFFILIATES, AGENTS, SUPPLIERS, OR LICENSORS BE LIABLE TO CUSTOMER OR ANY THIRD PARTY FOR:
               </p>
               <ul className="list-disc pl-6 space-y-1.5 text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200">
@@ -391,7 +391,7 @@ export default function TermsOfService() {
               </ul>
               <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-300 dark:border-slate-700 mt-3 text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
                 FINANCIAL LIABILITY CEILING: NOTWITHSTANDING ANYTHING TO THE CONTRARY IN THIS AGREEMENT, THE TOTAL AGGREGATE CUMULATIVE LIABILITY OF 
-                ANALYTICAL TECHNICAL CONSULTING INC. FOR ANY AND ALL CLAIMS, DISPUTES, OR CAUSES OF ACTION WHATSOEVER, REGARDLESS OF FORM, SHALL BE 
+                ANALYTICAL TECHNICAL CONSULTING (ATC) FOR ANY AND ALL CLAIMS, DISPUTES, OR CAUSES OF ACTION WHATSOEVER, REGARDLESS OF FORM, SHALL BE 
                 STRICTLY LIMITED TO AND SHALL NOT EXCEED THE TOTAL ACTUAL AMOUNT PAID BY CUSTOMER TO ATC UNDER THIS AGREEMENT DURING THE THREE (3) MONTHS 
                 IMMEDIATELY PRECEDING THE INCIDENT GIVING RISE TO LIABILITY, OR ONE HUNDRED UNITED STATES DOLLARS ($100.00 USD), WHICHEVER IS LESS.
               </div>
@@ -408,7 +408,7 @@ export default function TermsOfService() {
                 Comprehensive Customer Indemnification
               </h2>
               <p>
-                Customer shall defend, indemnify, and hold completely harmless Analytical Technical Consulting Inc., its corporate parent, affiliates, subsidiaries, 
+                Customer shall defend, indemnify, and hold completely harmless Analytical Technical Consulting (ATC), its corporate parent, affiliates, subsidiaries, 
                 directors, officers, employees, legal representatives, and licensors from and against any and all claims, lawsuits, administrative proceedings, 
                 demands, damages, losses, liabilities, fines, penalties, settlements, costs, and expenses (including reasonable attorneys&apos; fees and court costs) 
                 arising out of or related to:
@@ -491,8 +491,8 @@ export default function TermsOfService() {
               </p>
               <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl text-xs font-mono space-y-1">
                 <p className="font-bold text-slate-900 dark:text-white">DMCA Designated Agent — Legal Compliance Department</p>
-                <p>Analytical Technical Consulting Inc.</p>
-                <p>1360 Brentwood Trl, Bolingbrook, IL 60490, United States</p>
+                <p>Analytical Technical Consulting (ATC)</p>
+                <p>Illinois, United States</p>
                 <p>Email: dmca@atechconsult.com • legal@atechconsult.com</p>
               </div>
             </section>
@@ -541,8 +541,8 @@ export default function TermsOfService() {
 
             {/* CORPORATE FOOTER CONTACT */}
             <div className="pt-8 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-2">
-              <p className="font-bold text-slate-800 dark:text-slate-300">Analytical Technical Consulting Inc. Legal Operations</p>
-              <p>1360 Brentwood Trl, Bolingbrook, IL 60490, United States</p>
+              <p className="font-bold text-slate-800 dark:text-slate-300">Analytical Technical Consulting (ATC) Legal Operations</p>
+              <p>Illinois, United States</p>
               <p>Legal Inquiries: <a href="mailto:legal@atechconsult.com" className="text-blue-600 underline font-semibold">legal@atechconsult.com</a> • Support: <a href="mailto:info@atechconsult.com" className="text-blue-600 underline font-semibold ml-1">info@atechconsult.com</a></p>
             </div>
 

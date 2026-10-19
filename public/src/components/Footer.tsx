@@ -77,28 +77,21 @@ export default function Footer() {
               >
                 info@atechconsult.com
               </a>
-              <a 
-                href="tel:+16306967721" 
-                className="block text-slate-700 dark:text-slate-200 font-semibold hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              >
-                +1 630-696-7721
-              </a>
             </div>
 
             <div className="pt-2">
               <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                Address
+                Location
               </h4>
               <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                1360 Brentwood Trl,<br />
-                Bolingbrook, IL 60490, United States
+                Illinois, United States
               </p>
             </div>
 
             <div className="pt-2">
               <img 
                 src={atcLogo} 
-                alt="Analytical Technical Consulting" 
+                alt="Analytical Technical Consulting (ATC)" 
                 width="160"
                 height="32"
                 loading="lazy"
@@ -141,14 +134,14 @@ export default function Footer() {
 
           {/* COLUMN 3: LOCATION MAP CARD */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Location</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Infrastructure</h3>
             
             <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 group shadow-md">
               <div className="h-48 w-full bg-slate-100 dark:bg-slate-800 relative flex items-center justify-center overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
 
                 <a
-                  href="https://maps.google.com/?q=1360+Brentwood+Trl,+Bolingbrook,+IL+60490"
+                  href="https://maps.google.com/?q=Illinois,+United+States"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="absolute top-3 left-3 z-10 bg-white/95 dark:bg-slate-900/90 text-slate-900 dark:text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-white transition-all flex items-center gap-1.5 shadow-md border border-slate-200 dark:border-slate-700"
@@ -164,8 +157,8 @@ export default function Footer() {
               </div>
 
               <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                <span>Bolingbrook, IL Center</span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Data Center Hub</span>
+                <span>Illinois, United States</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">Cloud Hub</span>
               </div>
             </div>
           </div>
@@ -190,9 +183,12 @@ export default function Footer() {
 
         </div>
 
-        {/* BOTTOM COPYRIGHT */}
+        {/* BOTTOM COPYRIGHT & TRIAL DISCLAIMER */}
         <div className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} Analytical Technical Consulting. All rights reserved.</p>
+          <div>
+            <p>© {new Date().getFullYear()} Analytical Technical Consulting (ATC). All rights reserved.</p>
+            <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1">Platform services are currently on a trial basis as we continuously improve our infrastructure.</p>
+          </div>
           <div className="flex items-center gap-6">
             <Link to="/privacy" className="hover:text-blue-600 dark:hover:text-white transition-colors">Privacy Policy</Link>
             <Link to="/terms" className="hover:text-blue-600 dark:hover:text-white transition-colors">Terms of Service</Link>

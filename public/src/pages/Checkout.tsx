@@ -34,10 +34,10 @@ export default function Checkout() {
       cpuCores: 4,
       ramGb: 6,
       storageGb: 160,
-      storageType: 'NVMe',
+      storageType: 'SSD',
     },
     os: { name: 'Ubuntu 22.04 LTS', fee: 0 },
-    location: { name: 'Bolingbrook, IL (US Central)', flag: '🇺🇸' },
+    location: { name: 'Illinois, United States (US Central)', flag: '🇺🇸' },
     term: { label: '1 Month', id: '1m' },
     addons: [],
     monthlyTotal: 11.00,
@@ -622,7 +622,31 @@ export default function Checkout() {
                         placeholder="••••••••••••"
                       />
 
-                      <div className="sm:col-span-2 pt-2 border-t border-slate-100">
+                      <div className="pt-2 border-t border-slate-100">
+                        <ModernFloatingInput
+                          label="City"
+                          required
+                          value={customerInfo.city}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, city: e.target.value })}
+                          icon={<MapPin className="w-4 h-4" />}
+                          error={errors.city}
+                          placeholder="Chicago"
+                        />
+                      </div>
+
+                      <div className="pt-2 border-t border-slate-100">
+                        <ModernFloatingInput
+                          label="Postal / ZIP Code"
+                          required
+                          value={customerInfo.zip}
+                          onChange={(e) => setCustomerInfo({ ...customerInfo, zip: e.target.value })}
+                          icon={<MapPin className="w-4 h-4" />}
+                          error={errors.zip}
+                          placeholder="60007"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
                         <ModernFloatingInput
                           label="Street Address"
                           required
@@ -630,29 +654,9 @@ export default function Checkout() {
                           onChange={(e) => setCustomerInfo({ ...customerInfo, address: e.target.value })}
                           icon={<MapPin className="w-4 h-4" />}
                           error={errors.address}
-                          placeholder="1360 Brentwood Trl, Suite 200"
+                          placeholder="123 Main St, Suite 100"
                         />
                       </div>
-
-                      <ModernFloatingInput
-                        label="City"
-                        required
-                        value={customerInfo.city}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, city: e.target.value })}
-                        icon={<MapPin className="w-4 h-4" />}
-                        error={errors.city}
-                        placeholder="Bolingbrook"
-                      />
-
-                      <ModernFloatingInput
-                        label="Postal / ZIP Code"
-                        required
-                        value={customerInfo.zip}
-                        onChange={(e) => setCustomerInfo({ ...customerInfo, zip: e.target.value })}
-                        icon={<MapPin className="w-4 h-4" />}
-                        error={errors.zip}
-                        placeholder="60490"
-                      />
 
                       <div className="sm:col-span-2 pt-2">
                         <label className="flex items-center gap-2 cursor-pointer">
@@ -733,7 +737,7 @@ export default function Checkout() {
                     )}
                     <div className="flex justify-between border-b border-slate-100 pb-2">
                       <span className="text-slate-500">Datacenter Location</span>
-                      <span className="font-bold text-slate-900">{orderData.location?.name || 'Bolingbrook, IL (US Central)'}</span>
+                      <span className="font-bold text-slate-900">{orderData.location?.name || 'Illinois, United States (US Central)'}</span>
                     </div>
                     <div className="flex justify-between border-b border-slate-100 pb-2">
                       <span className="text-slate-500">Billing Term</span>
@@ -1236,7 +1240,7 @@ export default function Checkout() {
                 )}
 
                 <div className="flex justify-between text-slate-600">
-                  <span>Location: {orderData.location?.name || 'Bolingbrook, IL (US Central)'}</span>
+                  <span>Location: {orderData.location?.name || 'Illinois, United States (US Central)'}</span>
                   <span className="font-bold text-slate-900">Included</span>
                 </div>
 

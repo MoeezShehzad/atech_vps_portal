@@ -155,7 +155,7 @@ export async function getBillingOverview(req, res) {
           vmId: v.vmId,
           vmName: v.vmName,
           status: v.status,
-          specs: `${v.cpuCores} vCPU / ${v.ramGb} GB RAM / ${v.storageGb} GB NVMe`,
+          specs: `${v.cpuCores} vCPU / ${v.ramGb} GB RAM / ${v.storageGb} GB SSD`,
         })),
       };
     });
@@ -264,7 +264,7 @@ export async function getInvoiceDetails(req, res) {
           {
             description: `ATC Cloud Compute - ${invoice.subscription?.plan?.name || 'Custom Plan'}`,
             specs: invoice.subscription?.plan 
-              ? `${invoice.subscription.plan.cpuCores} vCPU, ${invoice.subscription.plan.ramGb}GB RAM, ${invoice.subscription.plan.storageGb}GB NVMe SSD`
+              ? `${invoice.subscription.plan.cpuCores} vCPU, ${invoice.subscription.plan.ramGb}GB RAM, ${invoice.subscription.plan.storageGb}GB Enterprise SSD`
               : 'Dedicated Cloud Virtual Machine',
             period: 'Monthly Subscription',
             amount: Number(invoice.subtotal),

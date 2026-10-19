@@ -51,7 +51,7 @@ export default function PrivacyPolicy() {
               </div>
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  Analytical Technical Consulting Inc. • Enterprise Privacy Architecture
+                  Analytical Technical Consulting (ATC) • Enterprise Privacy Architecture
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-poppins">
                   Cloud Privacy Notice
@@ -69,10 +69,10 @@ export default function PrivacyPolicy() {
           </div>
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
-            At <strong>Analytical Technical Consulting Inc.</strong> (&quot;ATC&quot;, &quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), 
+            At <strong>Analytical Technical Consulting (ATC)</strong> (&quot;Company&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;), 
             we operate our enterprise cloud infrastructure under rigorous data privacy, sovereignty, and trust commitments. 
             This Cloud Privacy Notice delineates how we handle, process, and secure Customer Data and Account Information across our enterprise 
-            virtualization clusters, NVMe block storage networks, APIs, and portals in compliance with GDPR, UK GDPR, CCPA/CPRA, and federal U.S. data protection statutes.
+            virtualization clusters, SSD block storage networks, APIs, and portals in compliance with GDPR, UK GDPR, CCPA/CPRA, and federal U.S. data protection statutes.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3 text-xs">
@@ -132,9 +132,9 @@ export default function PrivacyPolicy() {
                 Institutional Scope &amp; Regulatory Jurisdiction
               </h2>
               <p>
-                This Cloud Privacy Notice applies to all cloud infrastructure services provided by <strong>Analytical Technical Consulting Inc.</strong>, 
-                an Illinois corporation with its primary data center and operational facility located at 
-                <strong> 1360 Brentwood Trl, Bolingbrook, IL 60490, United States</strong>.
+                This Cloud Privacy Notice applies to all cloud infrastructure services provided by <strong>Analytical Technical Consulting (ATC)</strong>, 
+                an Illinois entity operating cloud infrastructure facilities located in 
+                <strong> Illinois, United States</strong>.
               </p>
               <p>
                 This policy establishes institutional transparency regarding our data handling pursuant to the European Union General Data Protection 
@@ -300,7 +300,7 @@ export default function PrivacyPolicy() {
                 9. Absolute Prohibition on the Sale or Rental of Personal Data
               </h2>
               <p className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
-                ANALYTICAL TECHNICAL CONSULTING INC. HAS NEVER SOLD, DOES NOT SELL, AND WILL NEVER SELL, RENT, LEASE, OR TRADE YOUR PERSONAL INFORMATION, 
+                ANALYTICAL TECHNICAL CONSULTING (ATC) HAS NEVER SOLD, DOES NOT SELL, AND WILL NEVER SELL, RENT, LEASE, OR TRADE YOUR PERSONAL INFORMATION, 
                 CUSTOMER DATA, TELEMETRY, OR IP USAGE TO THIRD PARTIES, DATA BROKERS, OR ADVERTISERS FOR MONETARY OR OTHER VALUABLE CONSIDERATION.
               </p>
               <p className="text-xs sm:text-sm leading-relaxed">
@@ -337,7 +337,7 @@ export default function PrivacyPolicy() {
               <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-300 dark:border-slate-700 mt-2 text-xs sm:text-sm">
                 <strong className="text-slate-900 dark:text-white block mb-1">Cryptographic &amp; Block-Level Sanitization:</strong>
                 When Customer destroys an instance or when an account is terminated, the underlying virtual hard disk files (VHDX) are permanently unlinked. 
-                De-allocated storage blocks across our NVMe arrays are zero-filled and cryptographically purged in compliance with 
+                De-allocated storage blocks across our SSD arrays are zero-filled and cryptographically purged in compliance with 
                 <strong> NIST Special Publication 800-88 Revision 1 (Guidelines for Media Sanitization)</strong>. Once erased, customer data cannot be retrieved by any party.
               </div>
             </section>
@@ -427,17 +427,17 @@ export default function PrivacyPolicy() {
               </p>
               <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl text-xs font-mono space-y-1">
                 <p className="font-bold text-slate-900 dark:text-white">Data Protection Officer — Privacy Compliance</p>
-                <p>Analytical Technical Consulting Inc.</p>
-                <p>1360 Brentwood Trl, Bolingbrook, IL 60490, United States</p>
+                <p>Analytical Technical Consulting (ATC)</p>
+                <p>Illinois, United States</p>
                 <p>Direct Email: privacy@atechconsult.com • General: info@atechconsult.com</p>
               </div>
             </section>
 
             {/* CORPORATE FOOTER CONTACT */}
             <div className="pt-8 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-2">
-              <p className="font-bold text-slate-800 dark:text-slate-300">Analytical Technical Consulting Inc. Data Privacy Office</p>
-              <p>1360 Brentwood Trl, Bolingbrook, IL 60490, United States</p>
-              <p>Telephone: +1 630-696-7721 • Email: privacy@atechconsult.com</p>
+              <p className="font-bold text-slate-800 dark:text-slate-300">Analytical Technical Consulting (ATC) Data Privacy Office</p>
+              <p>Illinois, United States</p>
+              <p>Email: privacy@atechconsult.com</p>
             </div>
 
           </div>

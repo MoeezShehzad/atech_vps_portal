@@ -668,7 +668,7 @@ export default function Dashboard() {
         method: 'PATCH',
         body: JSON.stringify({ cpuCores: resizeCpu, ramGb: resizeRam, storageGb: resizeStorage }),
       });
-      toast.success(`Specs scaled to ${resizeCpu} vCPU, ${resizeRam}GB RAM, ${resizeStorage}GB NVMe.`);
+      toast.success(`Specs scaled to ${resizeCpu} vCPU, ${resizeRam}GB RAM, ${resizeStorage}GB SSD.`);
       setResizingInstance(null);
       await fetchVMs();
       if (selectedInstance && selectedInstance.vmId === resizingInstance.vmId) {
@@ -1416,7 +1416,7 @@ export default function Dashboard() {
                       <span>•</span>
                       <span>💾 {activeSlot.specs?.ramGb} GB RAM</span>
                       <span>•</span>
-                      <span>🚀 {activeSlot.specs?.storageGb} GB NVMe</span>
+                      <span>🚀 {activeSlot.specs?.storageGb} GB SSD</span>
                       <span>•</span>
                       <span>🌐 1 Static IPv4</span>
                     </div>
@@ -1458,7 +1458,7 @@ export default function Dashboard() {
                     <p className="text-slate-300 text-sm md:text-base leading-relaxed">
                       {activeSlot
                         ? `Your ${activeSlot.planName} package is active and your dedicated cloud resources are reserved on our cluster. Whenever you're ready, click below to pick your OS, set admin credentials, or choose 1-Click Apps.`
-                        : `Deploy high-performance virtual cloud infrastructure at zero cost today. You get 2 vCPU Cores, 2 GB RAM, and 50 GB NVMe Storage completely free for 30 days.`}
+                        : `Deploy high-performance virtual cloud infrastructure at zero cost today. You get 2 vCPU Cores, 2 GB RAM, and 50 GB SSD Storage completely free for 30 days.`}
                     </p>
                     <div className="pt-2 flex flex-wrap gap-4">
                       {activeSlot ? (
@@ -1546,7 +1546,7 @@ export default function Dashboard() {
                               </div>
                               <div className="flex items-center gap-2">
                                 <HardDrive className="w-3.5 h-3.5 text-blue-600" />
-                                <span><strong>{plan.storageGb} GB</strong> Fast NVMe Disk</span>
+                                <span><strong>{plan.storageGb} GB</strong> Fast SSD Disk</span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <Shield className="w-3.5 h-3.5 text-emerald-600" />
@@ -1767,7 +1767,7 @@ export default function Dashboard() {
                                   <MemoryStick className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> {inst.ramGB} GB RAM
                                 </span>
                                 <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-normal">
-                                  <HardDrive className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> {inst.diskGB} GB NVMe
+                                  <HardDrive className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> {inst.diskGB} GB SSD
                                   <span className="text-slate-300 dark:text-slate-600">•</span>
                                   <ArrowUpDown className="w-3 h-3 text-cyan-600 dark:text-cyan-400" /> {inst.bandwidthGb || 80} GB Transfer
                                 </span>
@@ -2009,12 +2009,12 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* 3. NVME STORAGE & PERFORMANCE GRAPH */}
+                      {/* 3. SSD STORAGE & PERFORMANCE GRAPH */}
                       <div className="p-4 bg-gradient-to-br from-amber-50/50 to-slate-50 dark:from-slate-800/80 dark:to-slate-900/80 rounded-2xl border border-amber-100/90 dark:border-amber-900/30 shadow-xs flex flex-col justify-between space-y-3">
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                              <HardDrive className="w-4 h-4 text-amber-600 dark:text-amber-400" /> NVMe Virtual Storage
+                              <HardDrive className="w-4 h-4 text-amber-600 dark:text-amber-400" /> SSD Virtual Storage
                             </span>
                             <span className="text-lg font-mono font-extrabold text-amber-600 dark:text-amber-400">
                               {liveMetrics ? `${liveMetrics.diskPercent}%` : '20%'}
@@ -2059,7 +2059,7 @@ export default function Dashboard() {
                         {activeMonitoringVm.name} is Powered Off
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1">
-                        Power on this virtual machine to start streaming real-time CPU usage, memory demand, and NVMe disk throughput directly to this dashboard.
+                        Power on this virtual machine to start streaming real-time CPU usage, memory demand, and SSD disk throughput directly to this dashboard.
                       </p>
                     </div>
                   )}
@@ -2155,13 +2155,13 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* NVME STORAGE SLIDER */}
+              {/* SSD STORAGE SLIDER */}
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-semibold">
                   <span className="text-slate-700 flex items-center gap-1.5">
-                    <HardDrive className="w-4 h-4 text-amber-600" /> NVMe Storage Disk
+                    <HardDrive className="w-4 h-4 text-amber-600" /> SSD Storage Disk
                   </span>
-                  <span className="text-amber-600 font-bold text-sm">{resizeStorage} GB NVMe</span>
+                  <span className="text-amber-600 font-bold text-sm">{resizeStorage} GB SSD</span>
                 </div>
                 <input
                   type="range"
@@ -2306,7 +2306,7 @@ export default function Dashboard() {
                 </div>
                 <div className="p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center">
                   <span className="block text-[10px] text-slate-400 uppercase font-bold">Storage</span>
-                  <span className="font-bold text-slate-900 dark:text-white">50 GB NVMe</span>
+                  <span className="font-bold text-slate-900 dark:text-white">50 GB SSD</span>
                 </div>
                 <div className="p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center">
                   <span className="block text-[10px] text-slate-400 uppercase font-bold">OS Image</span>
@@ -2812,7 +2812,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      Using Active Plan Slot: <strong className="text-emerald-700 dark:text-emerald-400">{activeSlot.planName}</strong> ({activeSlot.specs?.cpuCores} vCPU, {activeSlot.specs?.ramGb}GB RAM, {activeSlot.specs?.storageGb}GB NVMe)
+                      Using Active Plan Slot: <strong className="text-emerald-700 dark:text-emerald-400">{activeSlot.planName}</strong> ({activeSlot.specs?.cpuCores} vCPU, {activeSlot.specs?.ramGb}GB RAM, {activeSlot.specs?.storageGb}GB SSD)
                     </span>
                   </div>
                   <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">$0.00 / Prepaid</span>
@@ -2830,7 +2830,7 @@ export default function Dashboard() {
                     >
                       {catalogPlans.map((p) => (
                         <option key={p.planId} value={p.planId}>
-                          {p.name} — {p.cpuCores} vCPU / {p.ramGb}GB RAM / {p.storageGb}GB NVMe (${p.monthlyPrice}/mo)
+                          {p.name} — {p.cpuCores} vCPU / {p.ramGb}GB RAM / {p.storageGb}GB SSD (${p.monthlyPrice}/mo)
                         </option>
                       ))}
                     </select>
@@ -2865,7 +2865,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        NVMe Disk (GB)
+                        SSD Disk (GB)
                       </label>
                       <input
                         type="number"
@@ -2897,7 +2897,7 @@ export default function Dashboard() {
                         </div>
                         {delta > 0 && (
                           <div className="flex items-center justify-between text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-                            <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM{extraStorage > 0 ? `, +${extraStorage}GB NVMe` : ''})</span>
+                            <span>Resource Scaling (+{extraCpu} vCPU, +{extraRam}GB RAM{extraStorage > 0 ? `, +${extraStorage}GB SSD` : ''})</span>
                             <span>+${delta.toFixed(2)}/mo</span>
                           </div>
                         )}
@@ -3590,7 +3590,7 @@ export default function Dashboard() {
                   <div className="p-3.5 bg-slate-50/70 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
                     <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs">
                       <HardDrive className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      <span>NVMe Storage</span>
+                      <span>SSD Storage</span>
                     </div>
                     <p className="font-bold text-slate-900 dark:text-white text-sm font-mono">{selectedInstance.diskGB} GB</p>
                   </div>

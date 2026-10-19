@@ -639,7 +639,7 @@ export async function createAdminPlan(req, res) {
         cpuCores: Number(cpuCores) || 2,
         ramGb: Number(ramGb) || 4,
         storageGb: Number(storageGb) || 50,
-        storageType: storageType || 'NVMe',
+        storageType: storageType || 'SSD',
         bandwidthMbps: Number(bandwidthMbps) || 1000,
         monthlyPrice: Number(monthlyPrice),
         isActive: true,
@@ -1493,7 +1493,7 @@ export async function getAdminInvoiceDetails(req, res) {
 
     const plan = invoice.subscription?.plan;
     const vmSpecs = plan
-      ? `${plan.cpuCores || 2} vCPU / ${plan.ramGb || 4} GB RAM / ${plan.storageGb || 40} GB NVMe SSD`
+      ? `${plan.cpuCores || 2} vCPU / ${plan.ramGb || 4} GB RAM / ${plan.storageGb || 40} GB Enterprise SSD`
       : 'Dedicated Cloud Virtual Machine Node';
 
     return res.json({

@@ -66,7 +66,7 @@ export default function StorageAndDisks() {
           vmId: vm.vmId,
           vmName: vm.name,
           capacityGb: vm.storageGb || vm.diskGB || 40,
-          type: 'Enterprise NVMe SSD',
+          type: 'Enterprise SSD',
           bus: 'SCSI Controller (0:0)',
           status: isOnline ? 'ONLINE' : 'OFFLINE',
           path: `/dev/cloud-storage/vol-${vm.vmId}`,
@@ -152,7 +152,7 @@ export default function StorageAndDisks() {
       });
 
       const chargedAmount = result?.pricing?.dueToday ? `$${result.pricing.dueToday.toFixed(2)}` : 'prorated amount';
-      toast.success(`Virtual Disk expanded to ${newCapacity} GB NVMe. Charged ${chargedAmount} today.`);
+      toast.success(`Virtual Disk expanded to ${newCapacity} GB SSD. Charged ${chargedAmount} today.`);
       setIsExpandOpen(false);
       fetchStorageData();
     } catch (err: any) {
@@ -172,7 +172,7 @@ export default function StorageAndDisks() {
               Storage & Virtual Disks
             </h1>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400">
-              Enterprise NVMe Storage
+              Enterprise SSD Storage
             </span>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -202,7 +202,7 @@ export default function StorageAndDisks() {
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
-            {totalAllocatedGb} <span className="text-sm font-sans font-medium text-slate-500 dark:text-slate-400">GB NVMe</span>
+            {totalAllocatedGb} <span className="text-sm font-sans font-medium text-slate-500 dark:text-slate-400">GB SSD</span>
           </div>
           <p className="text-[11px] text-slate-400 dark:text-slate-500">Provisioned across active instances</p>
         </div>
@@ -228,7 +228,7 @@ export default function StorageAndDisks() {
             </div>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
-            Enterprise NVMe
+            Enterprise SSD
           </div>
           <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Dedicated VHDX block isolation</p>
         </div>
@@ -254,7 +254,7 @@ export default function StorageAndDisks() {
           <div className="py-16 text-center text-slate-500 dark:text-slate-400">
             <HardDrive className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
             <p className="font-semibold text-slate-700 dark:text-slate-300">No active storage volumes detected</p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Deploy a virtual machine to allocate NVMe storage.</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Deploy a virtual machine to allocate SSD storage.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -355,10 +355,10 @@ export default function StorageAndDisks() {
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { addGb: 25, label: '+25 GB NVMe', monthly: '$2.50/mo' },
-                    { addGb: 50, label: '+50 GB NVMe', monthly: '$5.00/mo' },
-                    { addGb: 100, label: '+100 GB NVMe', monthly: '$10.00/mo' },
-                    { addGb: 250, label: '+250 GB NVMe', monthly: '$25.00/mo' },
+                    { addGb: 25, label: '+25 GB SSD', monthly: '$2.50/mo' },
+                    { addGb: 50, label: '+50 GB SSD', monthly: '$5.00/mo' },
+                    { addGb: 100, label: '+100 GB SSD', monthly: '$10.00/mo' },
+                    { addGb: 250, label: '+250 GB SSD', monthly: '$25.00/mo' },
                   ].map((tier) => {
                     const isSelected = newCapacity === selectedDisk.capacityGb + tier.addGb;
                     return (
@@ -384,7 +384,7 @@ export default function StorageAndDisks() {
               <div className="pt-1">
                 <div className="flex justify-between text-xs font-semibold mb-2">
                   <span className="text-slate-700 dark:text-slate-300">Custom Target Capacity</span>
-                  <span className="text-blue-600 dark:text-blue-400 font-bold font-mono text-sm">{newCapacity} GB NVMe</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-bold font-mono text-sm">{newCapacity} GB SSD</span>
                 </div>
                 <input
                   type="range"

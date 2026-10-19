@@ -158,7 +158,7 @@ export default function BillingAndInvoices() {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
       doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text('Analytical Technical Consulting', 20, 24);
+      doc.text('Analytical Technical Consulting (ATC)', 20, 24);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
@@ -294,7 +294,7 @@ export default function BillingAndInvoices() {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
-      doc.text('Analytical Technical Consulting • Thank you for your business!', 105, 275, { align: 'center' });
+      doc.text('Analytical Technical Consulting (ATC) • Thank you for your business!', 105, 275, { align: 'center' });
       doc.text('For questions or support, contact customer-support@atechconsult.com', 105, 280, { align: 'center' });
 
       doc.save(`Invoice-${inv.invoiceNumber}.pdf`);
@@ -641,7 +641,7 @@ export default function BillingAndInvoices() {
               <div className="flex justify-between items-start">
                 <div>
                   <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-extrabold text-xl font-poppins">
-                    <Server className="w-6 h-6" /> Analytical Technical Consulting
+                    <Server className="w-6 h-6" /> Analytical Technical Consulting (ATC)
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     Cloud Infrastructure & Enterprise Hosting Services<br />

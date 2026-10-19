@@ -140,7 +140,7 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
     });
   }
 
-  // 2. Find VPS Basic Plan (2 vCPU Cores, 2 GB RAM, 50 GB NVMe)
+  // 2. Find VPS Basic Plan (2 vCPU Cores, 2 GB RAM, 50 GB SSD)
   let basicPlan = await prisma.vPSPlan.findFirst({
     where: { planId: 1 },
   });

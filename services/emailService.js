@@ -275,7 +275,7 @@ export async function sendOtpEmail({
     <!-- Prominent OTP Code Container -->
     <div style="text-align:center;margin:28px 0;padding:26px 20px;background-color:#0f172a;border:1px solid #1e293b;border-radius:16px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">
       <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">
-        ONE-TIME SECURITY CODE
+        ${purpose === 'PASSWORD_RESET' || purpose === 'SUDO_ACTION' ? 'ONE-TIME SECURITY CODE' : 'ONE-TIME PASSCODE'}
       </div>
       <div style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:38px;font-weight:800;letter-spacing:14px;color:#38bdf8;padding:8px 0;">
         ${formattedCode}
@@ -296,16 +296,12 @@ export async function sendOtpEmail({
           <td style="color:#0f172a;font-weight:600;padding:3px 0;">${escapeHtml(reqTime)}</td>
         </tr>
         <tr>
-          <td style="color:#64748b;padding:3px 0;">Originating IP:</td>
-          <td style="color:#0f172a;font-weight:600;font-family:monospace;padding:3px 0;">${escapeHtml(reqIp)}</td>
-        </tr>
-        <tr>
           <td style="color:#64748b;padding:3px 0;">Client Agent:</td>
           <td style="color:#0f172a;padding:3px 0;">${escapeHtml(reqAgent)}</td>
         </tr>
       </table>
       <div style="margin-top:10px;padding-top:10px;border-top:1px dashed #cbd5e1;color:#b91c1c;font-size:11.5px;line-height:1.5;">
-        <strong>⚠️ Security Warning:</strong> If you did not initiate this request, someone may be attempting to access your cloud resources. Immediately change your password and revoke all active sessions. Analytical Technical Consulting engineers will <em>never</em> ask for this code.
+        <strong>⚠️ Security Warning:</strong> If you did not initiate this request, someone may be attempting to access your cloud resources. Immediately change your password and revoke all active sessions. Analytical Technical Consulting (ATC) engineers will <em>never</em> ask for this code.
       </div>
     </div>
 
@@ -851,7 +847,7 @@ export async function sendTrialStartedEmail({ email, fullName, planName, trialEn
         Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
       </p>
       <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
-        Welcome to ATC Cloud! Your <strong>30-Day Free Trial</strong> has officially started. You now have full access to deploy and run your virtual machine with high-performance NVMe storage, dedicated compute, and 1 Gbps networking.
+        Welcome to ATC Cloud! Your <strong>30-Day Free Trial</strong> has officially started. You now have full access to deploy and run your virtual machine with high-performance SSD storage, dedicated compute, and 1 Gbps networking.
       </p>
       <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:24px;">
         <table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;line-height:1.8;">
@@ -861,7 +857,7 @@ export async function sendTrialStartedEmail({ email, fullName, planName, trialEn
           </tr>
           <tr>
             <td style="color:#64748b;padding-bottom:6px;">Specs:</td>
-            <td align="right" style="color:#0f172a;font-weight:600;padding-bottom:6px;">2 vCPU Cores • 2 GB RAM • 50 GB NVMe</td>
+            <td align="right" style="color:#0f172a;font-weight:600;padding-bottom:6px;">2 vCPU Cores • 2 GB RAM • 50 GB SSD</td>
           </tr>
           <tr>
             <td style="color:#64748b;padding-bottom:6px;">Amount Charged Today:</td>
@@ -883,7 +879,7 @@ export async function sendTrialStartedEmail({ email, fullName, planName, trialEn
     `,
     ctaText: 'Launch Your Trial VM',
     ctaUrl: `${APP_URL}/dashboard`,
-    footerNote: 'Thank you for choosing Analytical Technical Consulting Cloud Services.',
+    footerNote: 'Thank you for choosing Analytical Technical Consulting (ATC) Cloud Services.',
   });
 
   return await transporterNoReply.sendMail({
@@ -931,7 +927,7 @@ export async function sendTrialWarningEmail({ email, fullName, daysRemaining, tr
     `,
     ctaText: 'Rate Service & Manage Trial',
     ctaUrl: `${APP_URL}/dashboard?tab=billing`,
-    footerNote: 'Analytical Technical Consulting • Automated Trial Lifecycle Engine',
+    footerNote: 'Analytical Technical Consulting (ATC) • Automated Trial Lifecycle Engine',
   });
 
   return await transporterBilling.sendMail({
@@ -984,7 +980,7 @@ export async function sendTrialConvertedPaidEmail({ email, fullName, invoiceNumb
     `,
     ctaText: 'View Invoice & Server Dashboard',
     ctaUrl: `${APP_URL}/dashboard?tab=billing`,
-    footerNote: 'Thank you for your ongoing partnership with Analytical Technical Consulting.',
+    footerNote: 'Thank you for your ongoing partnership with Analytical Technical Consulting (ATC).',
   });
 
   return await transporterBilling.sendMail({
@@ -1019,7 +1015,7 @@ export async function sendTrialCancelledEmail({ email, fullName, planName }) {
     `,
     ctaText: 'Visit ATC Cloud',
     ctaUrl: `${APP_URL}/pricing`,
-    footerNote: 'Analytical Technical Consulting Cloud Customer Success',
+    footerNote: 'Analytical Technical Consulting (ATC) Cloud Customer Success',
   });
 
   return await transporterBilling.sendMail({

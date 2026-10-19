@@ -14,7 +14,7 @@ const OS_OPTIONS = [
 ];
 
 const DATACENTER_LOCATIONS = [
-  { id: 'us-central', name: 'Bolingbrook, IL (US Central)', flag: '🇺🇸' },
+  { id: 'us-central', name: 'Illinois, United States (US Central)', flag: '🇺🇸' },
 ];
 
 const BILLING_TERMS = [
@@ -37,7 +37,7 @@ export default function ServerConfigure() {
     cpuCores: 6,
     ramGb: 8,
     storageGb: 240,
-    storageType: 'NVMe',
+    storageType: 'SSD',
     monthlyPrice: 21,
     promoPriceMonthly: 6,
   };
@@ -246,7 +246,7 @@ export default function ServerConfigure() {
                 </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-slate-400 block font-medium">Storage</span>
-                  <span className="font-bold text-slate-900">{selectedPlan.storageGb ? `${selectedPlan.storageGb} GB ${selectedPlan.storageType || 'NVMe'}` : selectedPlan.storage}</span>
+                  <span className="font-bold text-slate-900">{selectedPlan.storageGb ? `${selectedPlan.storageGb} GB ${selectedPlan.storageType || 'SSD'}` : selectedPlan.storage}</span>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-slate-400 block font-medium">Network</span>

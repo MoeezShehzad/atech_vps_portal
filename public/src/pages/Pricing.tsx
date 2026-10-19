@@ -40,7 +40,7 @@ const DEFAULT_FALLBACK_PLANS: ExtendedPlan[] = [
     cpuCores: 2,
     ramGb: 2,
     storageGb: 50,
-    storageType: 'NVMe',
+    storageType: 'SSD',
     bandwidthMbps: 1000,
     ipv4Addresses: 1,
     backupEnabled: false,
@@ -55,7 +55,7 @@ const DEFAULT_FALLBACK_PLANS: ExtendedPlan[] = [
     cpuCores: 4,
     ramGb: 8,
     storageGb: 120,
-    storageType: 'NVMe',
+    storageType: 'SSD',
     bandwidthMbps: 2000,
     ipv4Addresses: 1,
     backupEnabled: true,
@@ -70,7 +70,7 @@ const DEFAULT_FALLBACK_PLANS: ExtendedPlan[] = [
     cpuCores: 8,
     ramGb: 16,
     storageGb: 250,
-    storageType: 'NVMe',
+    storageType: 'SSD',
     bandwidthMbps: 5000,
     ipv4Addresses: 2,
     backupEnabled: true,
@@ -85,7 +85,7 @@ const DEFAULT_FALLBACK_PLANS: ExtendedPlan[] = [
     cpuCores: 16,
     ramGb: 32,
     storageGb: 500,
-    storageType: 'NVMe',
+    storageType: 'SSD',
     bandwidthMbps: 10000,
     ipv4Addresses: 2,
     backupEnabled: true,
@@ -145,7 +145,7 @@ export default function Pricing() {
       cpuCores: cpu,
       ramGb: ram,
       storageGb: storage,
-      storageType: 'NVMe',
+      storageType: 'SSD',
       bandwidthMbps: bandwidth * 1000,
       ipv4Addresses: 1,
       backupEnabled: includeBackup,
@@ -177,7 +177,7 @@ export default function Pricing() {
             Affordable & Secure VPS Hosting
           </h1>
           <p className="text-slate-500 max-w-2xl mx-auto text-base">
-            Full virtualization, unmetered bandwidth, and high-speed NVMe SSD storage.
+            Full virtualization, unmetered bandwidth, and high-speed SSD storage.
           </p>
 
           {/* SMOOTH PILL SWITCH TOGGLE */}
@@ -285,7 +285,7 @@ export default function Pricing() {
                       <span className="font-bold text-slate-900">{plan.ramGb} GB</span> RAM
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{plan.storageGb} GB</span> {plan.storageType || 'NVMe'} SSD
+                      <span className="font-bold text-slate-900">{plan.storageGb} GB</span> {plan.storageType || 'SSD'}
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="font-bold text-slate-900">{plan.bandwidthMbps >= 1000 ? `${plan.bandwidthMbps / 1000} Gbps` : `${plan.bandwidthMbps} Mbps`}</span> High-Speed Uplink
@@ -339,7 +339,7 @@ export default function Pricing() {
 
             <div>
               <div className="flex justify-between font-semibold mb-1">
-                <span>NVMe Storage</span>
+                <span>SSD Storage</span>
                 <span className="text-blue-600">{storage} GB</span>
               </div>
               <input

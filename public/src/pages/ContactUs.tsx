@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send, Loader2 } from 'lucide-react';
+import { Mail, MapPin, Send, Loader2 } from 'lucide-react';
 import { API_BASE_URL } from '../services/api';
 
 export default function ContactUs() {
@@ -46,8 +46,8 @@ export default function ContactUs() {
     <div className="min-h-screen bg-white text-slate-900 font-sans py-16 px-8">
       <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12">
         <div>
-          <span className="text-blue-600 font-bold text-xs uppercase tracking-wider">Get In Touch</span>
-          <h1 className="text-4xl font-extrabold text-blue-950 mt-2 font-poppins">Contact ATC</h1>
+          <span className="text-blue-600 font-bold text-xs uppercase tracking-wider">Get in Touch</span>
+          <h1 className="text-4xl font-extrabold text-blue-950 mt-2 font-poppins">Contact Analytical Technical Consulting (ATC)</h1>
           <p className="text-slate-600 mt-4 text-sm leading-relaxed mb-8">
             Reach out to our engineering team for consultations, infrastructure design, or technical assistance.
           </p>
@@ -65,21 +65,11 @@ export default function ContactUs() {
 
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 flex-shrink-0">
-                <Phone className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 font-semibold uppercase">Phone</p>
-                <p className="text-sm font-bold text-blue-950">+1 630-696-7721</p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 flex-shrink-0">
                 <MapPin className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs text-slate-400 font-semibold uppercase">Address</p>
-                <p className="text-sm font-bold text-blue-950">1360 Brentwood Trl, Bolingbrook, IL 60490, United States</p>
+                <p className="text-xs text-slate-400 font-semibold uppercase">Location</p>
+                <p className="text-sm font-bold text-blue-950">Illinois, United States</p>
               </div>
             </div>
           </div>
