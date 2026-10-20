@@ -184,13 +184,20 @@ class HyperVService {
         },
       });
 
+      let extractedVmId = result?.VMId || result?.vmId || (result?.output && typeof result.output === 'object' && result.output.VMId);
+      if (!extractedVmId && typeof result?.output === 'string') {
+        const idMatch = result.output.match(/"VMId"\s*:\s*"([a-f0-9-]+)"/i);
+        if (idMatch) extractedVmId = idMatch[1];
+      }
+      if (!extractedVmId) extractedVmId = `hyp-${Date.now()}`;
+
       // Update VM status in DB
       await prisma.virtualMachine.update({
         where: { vmId: Number(vmId) },
         data: {
           status: 'RUNNING',
           provisioningStatus: 'COMPLETED',
-          hypervVmId: result.VMId || `hyp-${Date.now()}`,
+          hypervVmId: extractedVmId,
           startedAt: new Date(),
         },
       });

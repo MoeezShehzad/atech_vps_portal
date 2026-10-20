@@ -89,31 +89,9 @@ export async function getUserVMs(req, res) {
               continue;
             }
 
-            // Only terminate if the VM was specifically linked to a Hyper-V ID
-            if (vm.hypervVmId) {
-              const isFresh = vm.status === 'PROVISIONING' && ageMs < 60000;
-              if (!isFresh) {
-                await prisma.virtualMachine.update({
-                  where: { vmId: vm.vmId },
-                  data: {
-                    status: 'TERMINATED',
-                    terminatedAt: new Date(),
-                  },
-                }).catch(() => {});
-
-                await prisma.iPPool.updateMany({
-                  where: { assignedVmId: vm.vmId },
-                  data: { status: 'AVAILABLE', assignedVmId: null },
-                }).catch(() => {});
-
-                // Exclude terminated VM from the dashboard's active VM list
-                continue;
-              }
-            } else {
-              // Cloud-provisioned or trial VM without direct Hyper-V host ID: keep intact
-              synced.push(vm);
-              continue;
-            }
+            // Never terminate customer VMs in a read query (reconciliation keeps DB safe)
+            synced.push(vm);
+            continue;
           }
 
           // If state changed in Hyper-V (e.g. stopped/started/paused outside portal)

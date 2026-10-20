@@ -186,7 +186,16 @@ function runPowerShell(scriptName, params = {}) {
         return reject({ error: err.message, stderr, stdout });
       }
 
-      // Try parsing JSON from script output (array or object)
+      // Try parsing JSON from script output (lines from bottom up)
+      const lines = stdout.trim().split(/\r?\n/);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i].trim();
+        if ((line.startsWith('{') && line.endsWith('}')) || (line.startsWith('[') && line.endsWith(']'))) {
+          try {
+            return resolve(JSON.parse(line));
+          } catch (e) {}
+        }
+      }
       try {
         const jsonMatch = stdout.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
         if (jsonMatch) {
@@ -330,6 +339,7 @@ const server = http.createServer(async (req, res) => {
         appId: data.appId || '',
       }).catch((e) => console.error('[GUEST PROVISION ASYNC ERROR]:', e));
 
+      invalidateAgentCaches();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(result));
     }
