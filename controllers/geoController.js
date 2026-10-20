@@ -254,7 +254,7 @@ export const getCounties = async (req, res) => {
 export const getCities = async (req, res) => {
   try {
     const { provinceId, countryCode, stateCode, search, limit } = req.query;
-    const maxLimit = limit && !isNaN(Number(limit)) ? Math.max(1, Math.min(Number(limit), 10000)) : 5000;
+    const maxLimit = limit && !isNaN(Number(limit)) ? Math.max(1, Math.min(Number(limit), 100000)) : 100000;
 
     let cities = [];
 

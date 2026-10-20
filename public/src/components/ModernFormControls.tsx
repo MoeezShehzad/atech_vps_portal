@@ -690,6 +690,11 @@ export function ModernCitySelect({
     return cities.filter((c) => c.name.toLowerCase().includes(q));
   }, [cities, searchTerm]);
 
+  // Display top matches for instantaneous 60fps rendering across 20,000+ cities
+  const displayedCities = useMemo(() => {
+    return filteredCities.slice(0, 300);
+  }, [filteredCities]);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -778,27 +783,34 @@ export function ModernCitySelect({
           </div>
 
           <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-800/50">
-            {filteredCities.length > 0 ? (
-              filteredCities.map((ct) => {
-                const isSelected = ct.name === selectedCity;
-                return (
-                  <div
-                    key={`${ct.id}-${ct.name}`}
-                    onClick={() => {
-                      onSelect(ct.name, ct);
-                      setIsOpen(false);
-                    }}
-                    className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
-                      isSelected
-                        ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-950 dark:text-blue-300 font-medium'
-                        : 'hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-800 dark:text-slate-200'
-                    }`}
-                  >
-                    <span className="truncate">{ct.name}</span>
-                    {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 ml-2" />}
+            {displayedCities.length > 0 ? (
+              <>
+                {displayedCities.map((ct) => {
+                  const isSelected = ct.name === selectedCity;
+                  return (
+                    <div
+                      key={`${ct.id}-${ct.name}`}
+                      onClick={() => {
+                        onSelect(ct.name, ct);
+                        setIsOpen(false);
+                      }}
+                      className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
+                        isSelected
+                          ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-950 dark:text-blue-300 font-medium'
+                          : 'hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-800 dark:text-slate-200'
+                      }`}
+                    >
+                      <span className="truncate">{ct.name}</span>
+                      {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 ml-2" />}
+                    </div>
+                  );
+                })}
+                {filteredCities.length > displayedCities.length && (
+                  <div className="p-2 text-center text-[11px] text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800">
+                    Showing top {displayedCities.length} of {filteredCities.length} cities. Type in search to narrow down.
                   </div>
-                );
-              })
+                )}
+              </>
             ) : (
               <div className="p-3 text-center">
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">No predefined cities matching "{searchTerm}"</p>
