@@ -44,7 +44,7 @@ export default function AnnouncementTicker() {
 
   // Choose styling tone based on first announcement's severity
   const primary = announcements[0];
-  const isDanger = primary.type === 'danger';
+  const isDanger = primary.type === 'danger' || primary.type === 'critical';
   const isWarning = primary.type === 'warning';
 
   const bgClasses = isDanger

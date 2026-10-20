@@ -282,7 +282,7 @@ export default function AdminDashboard() {
       setChangingRoleUserId(userId);
       const res = await apiCall(`/admin/users/${userId}/role`, {
         method: 'PATCH',
-        body: JSON.stringify({ role: newRoleName }),
+        body: JSON.stringify({ roleName: newRoleName, role: newRoleName }),
       });
       if (res && res.success) {
         toast.success(res.message || 'User role updated.');
@@ -960,9 +960,12 @@ export default function AdminDashboard() {
         method: 'PATCH',
         body: JSON.stringify({
           name: editingPlan.name,
+          description: editingPlan.description,
           cpuCores: editingPlan.cpuCores,
           ramGb: editingPlan.ramGb,
           storageGb: editingPlan.storageGb,
+          storageType: editingPlan.storageType || 'SSD',
+          bandwidthMbps: editingPlan.bandwidthMbps,
           monthlyPrice: editingPlan.monthlyPrice,
           isActive: editingPlan.isActive,
         }),
@@ -1252,7 +1255,7 @@ export default function AdminDashboard() {
 
       {/* COLLAPSIBLE & EXPANDABLE ADMIN SIDEBAR */}
       <aside
-        className={`relative fixed md:sticky top-0 h-screen z-50 flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out shrink-0 select-none ${
+        className={`fixed inset-y-0 left-0 md:sticky md:top-[73px] md:h-[calc(100vh-73px)] z-40 flex flex-col justify-between bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out shrink-0 select-none ${
           sidebarCollapsed ? 'w-20' : 'w-64'
         } ${
           mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
@@ -2564,14 +2567,14 @@ export default function AdminDashboard() {
                             {item.title}
                           </span>
                           <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 font-mono text-slate-700 dark:text-slate-300">
-                            {item.audience}
+                            {item.targetAudience || item.audience || 'All Users'}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                           {item.message}
                         </p>
                         <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-                          <span>{formatDateTime(item.createdAt)}</span>
+                          <span>{formatDateTime(item.startedAt || item.createdAt)}</span>
                           <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                             ✓ {item.sentCount || 'All'} Delivered
                           </span>

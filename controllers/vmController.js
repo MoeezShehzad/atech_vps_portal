@@ -1127,37 +1127,39 @@ export async function getConsoleSession(req, res) {
       });
     }
 
-    let targetIp = (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress !== 'DHCP Pending' && vm.ipPool[0].ipAddress !== 'DHCP Leasing...') 
+    let targetIp = (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress && vm.ipPool[0].ipAddress !== 'DHCP Pending' && vm.ipPool[0].ipAddress !== 'DHCP Leasing...') 
       ? vm.ipPool[0].ipAddress 
       : null;
 
-    // Check live status from Hyper-V host
-    try {
-      const live = await hypervService.getStatus(vm.vmName);
-      if (live && live.IPAddresses && live.IPAddresses.length > 0) {
-        const liveIp = live.IPAddresses.find((ip) => ip && ip !== '127.0.0.1' && !ip.includes(':'));
-        if (liveIp) {
-          targetIp = liveIp;
-          if (vm.ipPool && vm.ipPool.length > 0) {
-            await prisma.iPPool.update({
-              where: { ipId: vm.ipPool[0].ipId },
-              data: { ipAddress: liveIp },
-            }).catch(() => {});
-          } else {
-            await prisma.iPPool.create({
-              data: {
-                ipAddress: liveIp,
-                subnetMask: '255.255.240.0',
-                gateway: '172.27.32.1',
-                ipType: 'PUBLIC_IPV4',
-                status: 'ASSIGNED',
-                assignedVmId: vm.vmId,
-              },
-            }).catch((err) => console.error('[iPPool create error]:', err.message));
+    // Only probe Hyper-V agent if IP is not yet resolved in database
+    if (!targetIp) {
+      try {
+        const live = await hypervService.getStatus(vm.vmName);
+        if (live && live.IPAddresses && live.IPAddresses.length > 0) {
+          const liveIp = live.IPAddresses.find((ip) => ip && ip !== '127.0.0.1' && !ip.includes(':'));
+          if (liveIp) {
+            targetIp = liveIp;
+            if (vm.ipPool && vm.ipPool.length > 0) {
+              await prisma.iPPool.update({
+                where: { ipId: vm.ipPool[0].ipId },
+                data: { ipAddress: liveIp },
+              }).catch(() => {});
+            } else {
+              await prisma.iPPool.create({
+                data: {
+                  ipAddress: liveIp,
+                  subnetMask: '255.255.240.0',
+                  gateway: '172.27.32.1',
+                  ipType: 'PUBLIC_IPV4',
+                  status: 'ASSIGNED',
+                  assignedVmId: vm.vmId,
+                },
+              }).catch((err) => console.error('[iPPool create error]:', err.message));
+            }
           }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     if (!targetIp) {
       targetIp = '192.168.2.192'; // Fallback to verified local guest IP if momentarily polling

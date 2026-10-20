@@ -6,6 +6,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import Footer from './components/Footer';
+import AnnouncementTicker from './components/AnnouncementTicker';
 import { Menu, X } from 'lucide-react';
 
 // Route Code-Splitting with Lazy Loading
@@ -72,13 +73,16 @@ function AppContent() {
       {/* Resets scroll position on every page navigation */}
       <ScrollToTop />
 
+      {/* GLOBAL ANNOUNCEMENT TICKER BANNER (Shows above navbar) */}
+      {!isAuthPage && <AnnouncementTicker />}
+
       {/* NAVBAR (Hidden on Auth Pages & Callback) */}
       {!isAuthPage && (
         <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
           <nav className="px-4 sm:px-10 py-4 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-3 font-bold text-blue-950 font-poppins">
               <img src={atcLogo} alt="ATC Logo" width="160" height="40" fetchPriority="high" className="h-9 sm:h-10 w-auto object-contain" />
-              <span className="text-sm sm:text-lg">Analytical Technical Consulting (ATC)</span>
+              <span className="text-sm sm:text-lg">Analytical Technical Consulting</span>
             </Link>
 
             <div className="hidden md:flex gap-8 items-center text-sm font-semibold text-slate-600">

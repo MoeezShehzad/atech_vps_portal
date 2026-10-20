@@ -189,21 +189,8 @@ export function setupTerminalWebSocket(server) {
       return ws.close();
     }
 
-    // Live probe to Hyper-V host to verify actual VM state before initiating SSH connection
-    try {
-      const liveStatus = await hypervService.getStatus(vm.vmName);
-      if (liveStatus && liveStatus.Found) {
-        const rawState = String(liveStatus.State || '').toUpperCase();
-        if (rawState === 'OFF' || rawState === 'STOPPED' || rawState === 'PAUSED') {
-          const newStatus = rawState === 'PAUSED' ? 'PAUSED' : 'STOPPED';
-          await prisma.virtualMachine.update({
-            where: { vmId: vm.vmId },
-            data: { status: newStatus },
-          }).catch(() => {});
-          vm.status = newStatus;
-        }
-      }
-    } catch (_) {}
+    // Quick check: If database already marks VM as stopped, reject immediately without waiting
+    // (Live hypervService probe is deferred to SSH error handler if connection fails, preventing 6-second startup delay)
 
     if (vm.status === 'STOPPED') {
       ws.send(`\r\n\x1b[33m====================================================\x1b[0m\r\n`);

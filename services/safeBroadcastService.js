@@ -28,15 +28,16 @@ export async function startBroadcastCampaign({
   // 1. Resolve target audience recipients
   let userQuery = { isActive: true };
 
-  if (targetAudience === 'ACTIVE_VPS_USERS') {
+  const audKey = String(targetAudience || 'ALL_USERS').toUpperCase();
+  if (audKey === 'ACTIVE_VPS_USERS' || audKey === 'VPS_OWNERS') {
     userQuery.virtualMachines = {
       some: { status: { not: 'TERMINATED' } },
     };
-  } else if (targetAudience === 'SERVICE_PROVIDERS') {
+  } else if (audKey === 'SERVICE_PROVIDERS') {
     userQuery.userRoles = {
       some: { role: { roleName: 'Service_Provider' } },
     };
-  } else if (targetAudience === 'UNPAID_INVOICES') {
+  } else if (audKey === 'UNPAID_INVOICES' || audKey === 'UNPAID') {
     userQuery.invoices = {
       some: { status: 'PENDING' },
     };
@@ -52,6 +53,7 @@ export async function startBroadcastCampaign({
   });
 
   const jobRecord = {
+    id: jobId,
     jobId,
     title,
     message,
@@ -81,6 +83,10 @@ export async function startBroadcastCampaign({
           createdBy: adminEmail,
         },
       });
+      try {
+        const { apiCache } = await import('./cacheService.js');
+        apiCache.del('announcements:public');
+      } catch (_) {}
     } catch (err) {
       console.warn('[Broadcast In-App Announcement Error]:', err.message);
     }
@@ -98,6 +104,8 @@ export async function startBroadcastCampaign({
   return {
     success: true,
     jobId,
+    id: jobId,
+    ...jobRecord,
     totalRecipients: recipients.length,
     status: jobRecord.status,
     message: `Broadcast initialized for ${recipients.length} user(s).`,

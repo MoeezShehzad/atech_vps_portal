@@ -288,7 +288,7 @@ export default function Pricing() {
                       <span className="font-bold text-slate-900">{plan.storageGb} GB</span> {plan.storageType || 'SSD'}
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{plan.bandwidthMbps >= 1000 ? `${plan.bandwidthMbps / 1000} Gbps` : `${plan.bandwidthMbps} Mbps`}</span> High-Speed Uplink
+                      <span className="font-bold text-slate-900">{plan.bandwidthMbps >= 1000 ? `${(plan.bandwidthMbps / 1000).toFixed(plan.bandwidthMbps % 1000 === 0 ? 0 : 1)} TB` : `${plan.bandwidthMbps} GB`}</span> Bandwidth Transfer
                     </li>
                   </ul>
                 </div>

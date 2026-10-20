@@ -1463,7 +1463,7 @@ export default function Dashboard() {
                       <span>•</span>
                       <span>🚀 {activeSlot.specs?.storageGb} GB SSD</span>
                       <span>•</span>
-                      <span>🌐 1 Static IPv4</span>
+                      <span>🌐 {((activeSlot.specs as any)?.bandwidthMbps || (activeSlot.specs as any)?.bandwidthGb) ? (((activeSlot.specs as any)?.bandwidthMbps || (activeSlot.specs as any)?.bandwidthGb) >= 1000 ? `${(((activeSlot.specs as any)?.bandwidthMbps || (activeSlot.specs as any)?.bandwidthGb) / 1000).toFixed(0)} TB Bandwidth` : `${((activeSlot.specs as any)?.bandwidthMbps || (activeSlot.specs as any)?.bandwidthGb)} GB Bandwidth`) : 'Bandwidth Included'}</span>
                     </div>
                   </div>
                   <div className="shrink-0">

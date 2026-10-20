@@ -234,10 +234,21 @@ export async function toggleUserStatus(req, res) {
 export async function updateUserRole(req, res) {
   try {
     const targetUserId = Number(req.params.userId);
-    const { roleName } = req.body;
+    let roleName = req.body.roleName || req.body.role;
 
     if (!roleName) {
       return res.status(400).json({ error: 'Role name is required' });
+    }
+
+    const lower = String(roleName).trim().toLowerCase();
+    if (lower === 'admin' || lower === 'administrator') {
+      roleName = 'Admin';
+    } else if (lower === 'customer') {
+      roleName = 'Customer';
+    } else if (lower === 'service_provider' || lower === 'service provider') {
+      roleName = 'Service_Provider';
+    } else if (lower === 'support_staff' || lower === 'support staff' || lower === 'support') {
+      roleName = 'Support_Staff';
     }
 
     const role = await prisma.role.findUnique({
@@ -588,6 +599,8 @@ export async function createAnnouncement(req, res) {
       },
     });
 
+    try { apiCache.del('announcements:public'); } catch (e) {}
+
     res.json({ success: true, announcement: created });
   } catch (error) {
     console.error('createAnnouncement error:', error);
@@ -599,6 +612,7 @@ export async function deleteAnnouncement(req, res) {
   try {
     const id = Number(req.params.id);
     await prisma.systemAnnouncement.delete({ where: { id } });
+    try { apiCache.del('announcements:public'); } catch (e) {}
     res.json({ success: true, message: 'Announcement removed' });
   } catch (error) {
     console.error('deleteAnnouncement error:', error);
@@ -678,7 +692,7 @@ export async function updatePlan(req, res) {
         ...(ramGb && { ramGb: Number(ramGb) }),
         ...(storageGb && { storageGb: Number(storageGb) }),
         ...(storageType && { storageType }),
-        ...(bandwidthMbps && { bandwidthMbps: Number(bandwidthMbps) }),
+        ...(bandwidthMbps !== undefined && { bandwidthMbps: Number(bandwidthMbps) }),
         ...(monthlyPrice && { monthlyPrice: Number(monthlyPrice) }),
         ...(isActive !== undefined && { isActive: Boolean(isActive) }),
       },

@@ -39,6 +39,7 @@ export default function WebConsoleModal({
   const xtermInstance = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const pendingInputQueue = useRef<string[]>([]);
 
   const displayName = siteName || vmName || 'Web Terminal';
 
@@ -103,13 +104,23 @@ export default function WebConsoleModal({
         try {
           fitAddonRef.current?.fit();
           term.focus();
+          terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
         } catch {}
+
+        // Flush any early typed keystrokes while ticket was granting or WS was connecting
+        while (pendingInputQueue.current.length > 0) {
+          const item = pendingInputQueue.current.shift();
+          if (item && ws.readyState === WebSocket.OPEN) {
+            ws.send(item);
+          }
+        }
 
         setTimeout(() => {
           if (!isMountedRef.current) return;
           try {
             fitAddonRef.current?.fit();
             term.focus();
+            terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
             if (term.cols && term.rows && ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
             }
@@ -117,8 +128,24 @@ export default function WebConsoleModal({
         }, 80);
       };
 
+      let initialPromptFocused = false;
       ws.onmessage = (event) => {
         term.write(event.data);
+        if (!initialPromptFocused) {
+          initialPromptFocused = true;
+          try {
+            fitAddonRef.current?.fit();
+            term.focus();
+            terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
+          } catch {}
+          setTimeout(() => {
+            try {
+              fitAddonRef.current?.fit();
+              term.focus();
+              terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
+            } catch {}
+          }, 60);
+        }
       };
 
       ws.onerror = (err) => {
@@ -176,6 +203,7 @@ export default function WebConsoleModal({
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
+    currentContainer.innerHTML = '';
     term.open(currentContainer);
 
     xtermInstance.current = term;
@@ -190,10 +218,12 @@ export default function WebConsoleModal({
       } catch {}
     };
 
-    // Forward keystrokes to remote SSH stdin
+    // Forward keystrokes to remote SSH stdin or buffer if still connecting
     const onDataDisposable = term.onData((data) => {
       if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
         socketRef.current.send(data);
+      } else {
+        pendingInputQueue.current.push(data);
       }
     });
 
@@ -300,11 +330,25 @@ export default function WebConsoleModal({
     setTimeout(triggerFitAndFocus, 250);
     setTimeout(triggerFitAndFocus, 500);
 
+    // Continuous focus guard while ticket is granted and SSH establishes
+    const focusInterval = setInterval(() => {
+      if (!isMountedRef.current) return;
+      const ta = currentContainer.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
+      if (ta && document.activeElement !== ta) {
+        triggerFitAndFocus();
+      }
+    }, 200);
+    const stopFocusTimer = setTimeout(() => {
+      clearInterval(focusInterval);
+    }, 4000);
+
     // Initial connection
     connectSession();
 
     return () => {
       isMountedRef.current = false;
+      clearInterval(focusInterval);
+      clearTimeout(stopFocusTimer);
       window.removeEventListener('resize', handleWindowResize);
       window.removeEventListener('paste', handleNativePaste);
       currentContainer.removeEventListener('paste', handleNativePaste);
@@ -445,9 +489,15 @@ export default function WebConsoleModal({
           {/* TERMINAL CANVAS CONTAINER */}
           <div 
             ref={terminalRef} 
-            tabIndex={0}
-            onClick={() => xtermInstance.current?.focus()}
-            className="flex-1 w-full p-3 overflow-hidden font-mono cursor-text outline-none focus:outline-none"
+            onClick={() => {
+              xtermInstance.current?.focus();
+              terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
+            }}
+            onMouseDown={() => {
+              xtermInstance.current?.focus();
+              terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
+            }}
+            className="flex-1 w-full p-3 overflow-hidden font-mono cursor-text outline-none"
             style={{ minHeight: 0 }}
           />
 
