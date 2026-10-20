@@ -54,6 +54,10 @@ app.use(helmet({
 
 // 2. CORS Configuration (Tightened for Production)
 const allowedOrigins = [
+  'https://www.atechconsult.com',
+  'https://atechconsult.com',
+  'http://www.atechconsult.com',
+  'http://atechconsult.com',
   process.env.FRONTEND_URL,
   process.env.CLIENT_URL,
   'http://localhost:5174',
