@@ -415,16 +415,21 @@ export async function deployVM(req, res) {
     const isSlotReused = Boolean(subscription);
     console.log(`[Deploy VM] Reusing active subscription slot #${subscription.subscriptionId} (${subscription.plan.name}) for user #${userId}`);
 
-    // 2. Assign IP: only claim a public IP if purchased, otherwise allocate local DHCP lease
-    ipRecord = await prisma.iPPool.create({
-      data: {
-        ipAddress: 'DHCP Leasing...',
-        subnetMask: '255.255.240.0',
-        gateway: '172.27.32.1',
-        ipType: 'LOCAL_IPV4',
-        status: 'AVAILABLE',
-      },
+    // 2. Assign IP: pick available IP from pool or generate unique pending DHCP lease
+    ipRecord = await prisma.iPPool.findFirst({
+      where: { status: 'AVAILABLE' },
     });
+    if (!ipRecord) {
+      ipRecord = await prisma.iPPool.create({
+        data: {
+          ipAddress: `DHCP-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+          subnetMask: '255.255.255.0',
+          gateway: '172.16.16.1',
+          ipType: 'LOCAL_IPV4',
+          status: 'AVAILABLE',
+        },
+      });
+    }
 
     // 3. Create VM in MS SQL Server
     newVm = await prisma.virtualMachine.create({
