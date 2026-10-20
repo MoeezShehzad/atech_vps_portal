@@ -318,7 +318,7 @@ const server = http.createServer(async (req, res) => {
         AdminPassword: data.adminPassword || '',
         SSHPublicKey: data.sshPublicKey || '',
         TemplatePath: data.templatePath || DEFAULT_TEMPLATE,
-        SwitchName: data.switchName || 'Default Switch',
+        SwitchName: data.switchName || 'External_vSwitch',
       });
 
       // Asynchronously provision guest OS in background

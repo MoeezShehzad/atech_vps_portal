@@ -11,8 +11,8 @@ param (
     [Parameter(Mandatory=$false)][string]$AdminUsername = "ubuntu",
     [Parameter(Mandatory=$false)][string]$AdminPassword = "",
     [Parameter(Mandatory=$false)][string]$SSHPublicKey = "",
-    [Parameter(Mandatory=$false)][string]$TemplatePath = "D:\00_Master_Template\Ubuntu Server 24.04 LTS.vhdx",
-    [Parameter(Mandatory=$false)][string]$SwitchName = "Default Switch",
+    [Parameter(Mandatory=$false)][string]$TemplatePath = "D:\00-MASTER-TEMPLATES\Ubuntu_Server_24.04_LTS.vhdx",
+    [Parameter(Mandatory=$false)][string]$SwitchName = "External_vSwitch",
     [Parameter(Mandatory=$false)][string]$CustomerVMsRoot = "D:\CUSTOMER-VMS",
     [Parameter(Mandatory=$false)][string]$SystemLogsRoot = "D:\SYSTEM-LOGS\provisioning"
 )
