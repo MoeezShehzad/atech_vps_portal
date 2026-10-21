@@ -52,12 +52,31 @@ interface Subscription {
   status: string;
   isSuspended?: boolean;
   retentionDaysRemaining?: number | null;
+  retentionExpiresAt?: string | null;
   dataPreserved?: boolean;
   startDate: string;
   nextBillingDate: string;
   daysRemaining: number;
   vmCount: number;
   vms: { vmId: number; vmName: string; specs: string }[];
+}
+
+function formatRetentionCountdown(endDateStr: string | null | undefined, fallbackDays: number | null | undefined): string {
+  if (!endDateStr && (fallbackDays === null || fallbackDays === undefined)) return '90 Days Retention Active';
+  if (!endDateStr && fallbackDays !== null && fallbackDays !== undefined) return `${fallbackDays} Days Retention Left`;
+  const diffMs = new Date(endDateStr!).getTime() - Date.now();
+  if (diffMs <= 0) return 'Expired (Decommissioning Imminent)';
+  const totalMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const totalDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (totalMinutes < 60) {
+    return `⚠️ ${totalMinutes}m remaining before deletion!`;
+  } else if (totalHours < 24) {
+    return `⚠️ ${totalHours}h remaining before deletion`;
+  } else {
+    return `${totalDays} Days Retention Left`;
+  }
 }
 
 export default function BillingAndInvoices() {
@@ -535,7 +554,7 @@ export default function BillingAndInvoices() {
                         {sub.status === 'SUSPENDED' ? (
                           <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-mono font-bold text-xs bg-amber-50 dark:bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800">
                             <Clock className="w-3.5 h-3.5 text-amber-500" />
-                            {sub.retentionDaysRemaining !== null ? `${sub.retentionDaysRemaining}d retention left` : '90d Retention'}
+                            {formatRetentionCountdown(sub.retentionExpiresAt, sub.retentionDaysRemaining)}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 font-mono">

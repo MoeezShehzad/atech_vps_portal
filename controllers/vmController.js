@@ -213,6 +213,7 @@ export async function getUserVMs(req, res) {
         retentionDaysRemaining: (vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED') && vm.subscription?.endDate
           ? Math.max(0, Math.ceil((new Date(vm.subscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
           : ((vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED') ? 90 : null),
+        retentionExpiresAt: vm.subscription?.endDate || null,
         dataPreserved: vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED',
         subscriptionId: vm.subscriptionId,
         cpuUsage: vm.status === 'RUNNING' ? (vm._liveCpu !== undefined ? vm._liveCpu : 0) : 0,

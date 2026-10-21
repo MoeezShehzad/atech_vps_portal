@@ -81,6 +81,7 @@ interface Instance {
   status: 'running' | 'stopped' | 'provisioning' | 'paused' | 'suspended' | string;
   isSuspended?: boolean;
   retentionDaysRemaining?: number | null;
+  retentionExpiresAt?: string | null;
   dataPreserved?: boolean;
   subscriptionId?: number;
   cpuUsage: number;
@@ -164,6 +165,24 @@ interface ResizePricing {
   dueToday?: number;
   hourlyRate?: number;
   nextBillingDate?: string;
+}
+
+function formatRetentionCountdown(endDateStr: string | null | undefined, fallbackDays: number | null | undefined): string {
+  if (!endDateStr && (fallbackDays === null || fallbackDays === undefined)) return '90 Days Retention Active';
+  if (!endDateStr && fallbackDays !== null && fallbackDays !== undefined) return `${fallbackDays} Days Retention Left`;
+  const diffMs = new Date(endDateStr!).getTime() - Date.now();
+  if (diffMs <= 0) return 'Expired (Decommissioning Imminent)';
+  const totalMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const totalDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (totalMinutes < 60) {
+    return `⚠️ ${totalMinutes}m remaining before deletion!`;
+  } else if (totalHours < 24) {
+    return `⚠️ ${totalHours}h remaining before deletion`;
+  } else {
+    return `${totalDays} Days Retention Left`;
+  }
 }
 
 export default function Dashboard() {
@@ -1836,7 +1855,7 @@ export default function Dashboard() {
                               {inst.isSuspended || inst.status === 'suspended' ? (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 shadow-xs">
                                   <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-                                  <span>Suspended (Data Safe)</span>
+                                  <span>Suspended ({formatRetentionCountdown(inst.retentionExpiresAt, inst.retentionDaysRemaining)})</span>
                                 </span>
                               ) : (
                                 <span
@@ -3506,7 +3525,7 @@ export default function Dashboard() {
                           Service Suspended • Data Safe & Preserved
                         </h4>
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700">
-                          {selectedInstance.retentionDaysRemaining !== null ? `${selectedInstance.retentionDaysRemaining} Days Retention Left` : '90-Day Retention Active'}
+                          {formatRetentionCountdown(selectedInstance.retentionExpiresAt, selectedInstance.retentionDaysRemaining)}
                         </span>
                       </div>
                       <p className="text-xs text-amber-800/90 dark:text-amber-300/90 leading-relaxed">

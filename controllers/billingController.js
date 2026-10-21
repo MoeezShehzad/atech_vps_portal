@@ -155,6 +155,7 @@ export async function getBillingOverview(req, res) {
         status: s.status,
         isSuspended,
         retentionDaysRemaining,
+        retentionExpiresAt: s.endDate || null,
         dataPreserved: isSuspended,
         startDate: s.startDate,
         nextBillingDate: targetDate,
