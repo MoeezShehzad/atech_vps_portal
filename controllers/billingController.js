@@ -5,6 +5,7 @@
 
 import prisma from '../lib/prisma.js';
 import { cancelUserTrial, setupUserTrial } from '../services/trialService.js';
+import { reactivateSubscription, gracefulSuspendSubscription } from '../services/billingRetentionService.js';
 import { decryptSensitive } from '../services/stripeService.js';
 
 /**
@@ -141,12 +142,20 @@ export async function getBillingOverview(req, res) {
       const diffMs = targetDate.getTime() - now.getTime();
       const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
 
+      const isSuspended = s.status === 'SUSPENDED';
+      const retentionDaysRemaining = isSuspended && s.endDate
+        ? Math.max(0, Math.ceil((new Date(s.endDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+        : null;
+
       return {
         subscriptionId: s.subscriptionId,
         planName: s.plan?.name || 'Custom Plan',
         monthlyPrice: Number(s.monthlyPrice),
         currency: s.currency || 'USD',
         status: s.status,
+        isSuspended,
+        retentionDaysRemaining,
+        dataPreserved: isSuspended,
         startDate: s.startDate,
         nextBillingDate: targetDate,
         daysRemaining,
@@ -162,7 +171,7 @@ export async function getBillingOverview(req, res) {
 
     // Filter active and trial subscriptions for slots committed to customer compute
     const activeSubs = formattedSubscriptions.filter(
-      (sub) => sub.status === 'ACTIVE' || sub.status === 'active' || sub.status === 'TRIAL' || sub.status === 'trial'
+      (sub) => sub.status === 'ACTIVE' || sub.status === 'active' || sub.status === 'TRIAL' || sub.status === 'trial' || sub.status === 'SUSPENDED' || sub.status === 'suspended'
     );
 
     const primaryNextBillingDate = activeSubs.length > 0 
@@ -183,6 +192,8 @@ export async function getBillingOverview(req, res) {
       summary: {
         monthlySpend: Number(monthlySpend.toFixed(2)),
         activeSubscriptionsCount: activeSubs.length,
+        hasSuspendedSubscriptions: formattedSubscriptions.some((s) => s.status === 'SUSPENDED'),
+        suspendedSubscriptionsCount: formattedSubscriptions.filter((s) => s.status === 'SUSPENDED').length,
         currency: 'USD',
         nextBillingDate: primaryNextBillingDate,
         paymentMethod: {
@@ -385,3 +396,50 @@ export async function activateTrialSubscription(req, res) {
 }
 
 
+
+/**
+ * 6. POST /api/billing/reactivate-subscription - One-Click Instant Reactivate
+ */
+export async function reactivateSubscriptionEndpoint(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const { subscriptionId } = req.body;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!subscriptionId) return res.status(400).json({ error: 'subscriptionId is required' });
+
+    const result = await reactivateSubscription(subscriptionId, userId);
+    return res.json({
+      success: true,
+      message: result.message || 'Subscription successfully reactivated.',
+      result,
+    });
+  } catch (err) {
+    console.error('[reactivateSubscriptionEndpoint Error]:', err.message);
+    return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * 7. POST /api/billing/simulate-suspension - Test/Demo graceful shutdown & 90-day retention
+ */
+export async function simulateSuspensionEndpoint(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const { subscriptionId } = req.body;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    if (!subscriptionId) return res.status(400).json({ error: 'subscriptionId is required' });
+
+    const result = await gracefulSuspendSubscription(subscriptionId, {
+      reason: 'MANUAL_SIMULATED_OVERDUE',
+      adminEmail: req.user?.email || null,
+    });
+    return res.json({
+      success: true,
+      message: 'Subscription has been suspended and 90-day data preservation initiated.',
+      result,
+    });
+  } catch (err) {
+    console.error('[simulateSuspensionEndpoint Error]:', err.message);
+    return res.status(400).json({ error: err.message });
+  }
+}

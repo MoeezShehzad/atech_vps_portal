@@ -14,6 +14,7 @@ import { sendTicketReplyNotification, sendInvoiceReceiptEmail } from '../service
 import { calculateTicketMetrics } from '../services/ticketAutomationService.js';
 import { sanitizeAuditDetails } from './securityController.js';
 import { createStripeRefund } from '../services/stripeService.js';
+import { gracefulSuspendSubscription, reactivateSubscription } from '../services/billingRetentionService.js';
 import { startBroadcastCampaign, getBroadcastJobStatus as getJobStatus, listRecentBroadcasts } from '../services/safeBroadcastService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
 import { apiCache } from '../services/cacheService.js';
@@ -1261,6 +1262,11 @@ export async function getUserFullProfile(req, res) {
       ...s,
       id: s.subscriptionId,
       currentPeriodEnd: s.nextBillingDate || s.endDate,
+      isSuspended: s.status === 'SUSPENDED',
+      retentionDaysRemaining: s.status === 'SUSPENDED' && s.endDate
+        ? Math.max(0, Math.ceil((new Date(s.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+        : null,
+      dataPreserved: s.status === 'SUSPENDED',
     }));
 
     const normalizedInvoices = invoices.map((i) => ({
@@ -1876,16 +1882,34 @@ export async function adminUpdateSubscription(req, res) {
       return res.status(404).json({ error: 'Subscription not found' });
     }
 
+    if (action === 'SUSPEND') {
+      const result = await gracefulSuspendSubscription(sub.subscriptionId, {
+        reason: 'ADMIN_OVERDUE_SUSPENSION',
+        adminEmail: req.adminUser.email,
+      });
+      return res.json({
+        success: true,
+        message: 'Subscription suspended. 90-day data preservation initiated and VM gracefully stopped.',
+        subscription: result.subscription,
+        retentionDays: result.retentionDays,
+      });
+    }
+
+    if (action === 'RESUME' || action === 'REACTIVATE') {
+      const result = await reactivateSubscription(sub.subscriptionId, sub.userId);
+      return res.json({
+        success: true,
+        message: 'Subscription reactivated successfully. All VM controls unlocked and data restored.',
+        subscription: result.subscription,
+      });
+    }
+
     let updateData = {};
     if (action === 'EXTEND_30_DAYS') {
       const currentEnd = sub.nextBillingDate ? new Date(sub.nextBillingDate) : sub.endDate ? new Date(sub.endDate) : new Date();
       const extendedDate = new Date(currentEnd.getTime() + 30 * 24 * 60 * 60 * 1000);
       updateData.nextBillingDate = extendedDate;
       updateData.endDate = extendedDate;
-      updateData.status = 'ACTIVE';
-    } else if (action === 'SUSPEND') {
-      updateData.status = 'SUSPENDED';
-    } else if (action === 'RESUME') {
       updateData.status = 'ACTIVE';
     } else if (action === 'CANCEL') {
       updateData.status = 'CANCELLED';
@@ -1899,8 +1923,7 @@ export async function adminUpdateSubscription(req, res) {
       data: updateData,
     });
 
-    // Stop associated VMs if subscription is suspended or cancelled
-    if ((action === 'SUSPEND' || action === 'CANCEL') && sub.virtualMachines?.length > 0) {
+    if (action === 'CANCEL' && sub.virtualMachines?.length > 0) {
       await prisma.virtualMachine.updateMany({
         where: { subscriptionId: sub.subscriptionId, status: { notIn: ['TERMINATED', 'terminated'] } },
         data: { status: 'STOPPED' },

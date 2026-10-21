@@ -11,6 +11,8 @@ import {
   cancelTrialSubscription,
   getRevealedPaymentMethod,
   activateTrialSubscription,
+  reactivateSubscriptionEndpoint,
+  simulateSuspensionEndpoint,
 } from '../controllers/billingController.js';
 
 const router = express.Router();
@@ -22,5 +24,7 @@ router.get('/invoices/:id', getInvoiceDetails);
 router.post('/cancel-trial', cancelTrialSubscription);
 router.post('/activate-trial', activateTrialSubscription);
 router.get('/payment-method/reveal', getRevealedPaymentMethod);
+router.post('/reactivate-subscription', reactivateSubscriptionEndpoint);
+router.post('/simulate-suspension', simulateSuspensionEndpoint);
 
 export default router;

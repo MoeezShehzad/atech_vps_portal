@@ -20,7 +20,11 @@ import {
   Eye,
   EyeOff,
   Sparkles,
-  AlertTriangle
+  AlertTriangle,
+  Zap,
+  ShieldAlert,
+  Clock,
+  Lock
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
@@ -46,6 +50,9 @@ interface Subscription {
   monthlyPrice: number;
   currency: string;
   status: string;
+  isSuspended?: boolean;
+  retentionDaysRemaining?: number | null;
+  dataPreserved?: boolean;
   startDate: string;
   nextBillingDate: string;
   daysRemaining: number;
@@ -63,6 +70,24 @@ export default function BillingAndInvoices() {
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [revealedCard, setRevealedCard] = useState<any>(null);
   const [cancellingTrialId, setCancellingTrialId] = useState<number | null>(null);
+  const [reactivatingSubId, setReactivatingSubId] = useState<number | null>(null);
+
+  const handleReactivateSubscription = async (subscriptionId: number) => {
+    try {
+      setReactivatingSubId(subscriptionId);
+      const res = await apiCall('/billing/reactivate-subscription', {
+        method: 'POST',
+        body: JSON.stringify({ subscriptionId }),
+      });
+      toast.success(res.message || '🎉 Subscription reactivated successfully! All VM controls unlocked.');
+      await fetchBilling();
+    } catch (err: any) {
+      console.error('Reactivation error:', err);
+      toast.error(err.message || 'Failed to reactivate subscription.');
+    } finally {
+      setReactivatingSubId(null);
+    }
+  };
 
   const fetchBilling = async () => {
     try {
@@ -314,9 +339,16 @@ export default function BillingAndInvoices() {
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-poppins">
               Billing & Invoices
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-              Account in Good Standing
-            </span>
+            {summary?.hasSuspendedSubscriptions || subscriptions.some((s) => s.status === 'SUSPENDED') ? (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-400 border border-amber-300 dark:border-amber-800 flex items-center gap-1.5 shadow-xs">
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                Suspension Active (Data Safe)
+              </span>
+            ) : (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                Account in Good Standing
+              </span>
+            )}
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Review active cloud subscriptions, monthly spend burn rate, and download official payment receipts.
@@ -407,6 +439,32 @@ export default function BillingAndInvoices() {
         </div>
       </div>
 
+      {/* 90-DAY DATA PRESERVATION & SUSPENSION BANNER */}
+      {(summary?.hasSuspendedSubscriptions || subscriptions.some((s) => s.status === 'SUSPENDED')) && (
+        <div className="bg-amber-500/10 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-600 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl shrink-0">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <div className="space-y-1.5 flex-1">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-base font-bold text-amber-900 dark:text-amber-200 font-poppins flex items-center gap-2">
+                  Overdue Balance Suspension — Linode-Style 90-Day Data Preservation
+                </h3>
+                <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+                  Data Safe Guarantee Active
+                </span>
+              </div>
+              <p className="text-xs text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
+                One or more instances have been gracefully stopped due to an overdue balance. 
+                In accordance with ATC Cloud's 90-Day Data Preservation Policy, all storage disks, configs, snapshots, and IP allocations remain <strong>100% safe and preserved</strong>. 
+                Use the one-click reactivate button below to settle the overdue balance and instantly unlock your virtual machines.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Subscriptions Table */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -474,13 +532,25 @@ export default function BillingAndInvoices() {
                         )}
                       </td>
                       <td className="py-4 px-6">
-                        <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 font-mono">
-                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          {isTrial ? `Trial ends in ${sub.daysRemaining} days` : `Renews in ${sub.daysRemaining} days`}
-                        </span>
+                        {sub.status === 'SUSPENDED' ? (
+                          <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-mono font-bold text-xs bg-amber-50 dark:bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <Clock className="w-3.5 h-3.5 text-amber-500" />
+                            {sub.retentionDaysRemaining !== null ? `${sub.retentionDaysRemaining}d retention left` : '90d Retention'}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 font-mono">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            {isTrial ? `Trial ends in ${sub.daysRemaining} days` : `Renews in ${sub.daysRemaining} days`}
+                          </span>
+                        )}
                       </td>
                       <td className="py-4 px-6">
-                        {isTrial ? (
+                        {sub.status === 'SUSPENDED' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 shadow-xs">
+                            <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+                            Suspended (Data Safe)
+                          </span>
+                        ) : isTrial ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                             30-Day Trial
@@ -498,7 +568,18 @@ export default function BillingAndInvoices() {
                         )}
                       </td>
                       <td className="py-4 px-6 text-right">
-                        {isTrial ? (
+                        {sub.status === 'SUSPENDED' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleReactivateSubscription(sub.subscriptionId)}
+                            disabled={reactivatingSubId === sub.subscriptionId}
+                            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-linear-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
+                            title="One-Click Instant Reactivation - Settle overdue invoice & restore VPS"
+                          >
+                            <Zap className={`w-3.5 h-3.5 ${reactivatingSubId === sub.subscriptionId ? 'animate-spin' : ''}`} />
+                            {reactivatingSubId === sub.subscriptionId ? 'Reactivating...' : 'Reactivate VPS'}
+                          </button>
+                        ) : isTrial ? (
                           <button
                             type="button"
                             onClick={() => handleCancelTrial(sub.subscriptionId)}

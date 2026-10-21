@@ -1026,6 +1026,193 @@ export async function sendTrialCancelledEmail({ email, fullName, planName }) {
   });
 }
 
+
+/**
+ * 14. Billing Overdue Suspension Notice (Linode-style 90-Day Data Preservation Model)
+ */
+export async function sendBillingSuspendedEmail({ email, fullName, vmName, planName, overdueAmount = 0, retentionDays = 90 }) {
+  const reactivateUrl = `${APP_URL}/dashboard?tab=billing`;
+  const html = wrapEmailTemplate({
+    title: 'Service Suspended: Overdue Balance Notice',
+    subtitle: `Your VPS has been gracefully shut down — Data is 100% Safe & Preserved`,
+    categoryBadge: 'Billing Suspension',
+    contentHtml: `
+      <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
+        Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
+      </p>
+      <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
+        Your subscription for <strong>${escapeHtml(planName || 'Cloud VPS')}</strong> associated with instance <strong>${escapeHtml(vmName || 'Virtual Machine')}</strong> has an overdue balance of <strong>$${Number(overdueAmount).toFixed(2)} USD</strong>.
+      </p>
+
+      <div style="background-color:#fffbeb;border:1px solid #fef3c7;border-left:4px solid #f59e0b;border-radius:8px;padding:16px;margin-bottom:20px;">
+        <h4 style="margin:0 0 8px 0;color:#92400e;font-size:14px;font-weight:700;">🛡️ 90-Day Data Preservation Guarantee</h4>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#b45309;">
+          In accordance with ATC Cloud's Linode-style 90-Day Data Preservation Policy, your instance was <strong>gracefully powered off</strong>. 
+          Your <strong>virtual hard disks, snapshots, data, and IP allocations are preserved safe and intact</strong> for <strong>${retentionDays} days</strong>.
+        </p>
+      </div>
+
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:24px;font-size:13px;color:#475569;">
+        <table width="100%" cellpadding="6" cellspacing="0" style="font-size:13px;">
+          <tr>
+            <td style="color:#64748b;">Instance Name:</td>
+            <td style="font-weight:600;color:#0f172a;">${escapeHtml(vmName || 'VPS Instance')}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Overdue Balance:</td>
+            <td style="font-weight:700;color:#dc2626;">$${Number(overdueAmount).toFixed(2)} USD</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Data Status:</td>
+            <td style="font-weight:600;color:#16a34a;">🔒 Preserved & Safe (Locked)</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Data Retention Remaining:</td>
+            <td style="font-weight:700;color:#f59e0b;">${retentionDays} Days</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:20px;">
+        To instantly unlock your instance and resume normal compute operations without losing any data, simply click the one-click reactivate button below:
+      </p>
+    `,
+    ctaText: '⚡ One-Click Reactivate VPS',
+    ctaUrl: reactivateUrl,
+    footerNote: 'ATC Cloud Billing • For billing assistance, reply to this email or contact billing@atechconsult.com',
+  });
+
+  try {
+    const info = await transporterBilling.sendMail({
+      from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
+      to: email,
+      subject: `[Action Required] Service Suspended: Overdue Balance for ${vmName || 'VPS'} (Data Safe - 90 Days Retention)`,
+      html,
+    });
+    console.log(`[Billing Suspension] Email dispatched to ${email} (ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Billing Suspension Error] Email failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * 15. Retention Expiration Warning (Day 60, 30, 14, 7, 3, 1 Reminders)
+ */
+export async function sendRetentionWarningEmail({ email, fullName, vmName, planName, daysRemaining, overdueAmount = 0 }) {
+  const reactivateUrl = `${APP_URL}/dashboard?tab=billing`;
+  const html = wrapEmailTemplate({
+    title: `Data Decommission Warning: ${daysRemaining} Days Left`,
+    subtitle: `Preserved data on ${escapeHtml(vmName || 'your instance')} will be purged in ${daysRemaining} days`,
+    categoryBadge: 'Retention Warning',
+    contentHtml: `
+      <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
+        Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
+      </p>
+      <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
+        This is an urgent reminder regarding your suspended instance <strong>${escapeHtml(vmName || 'Virtual Machine')}</strong> (${escapeHtml(planName || 'Cloud VPS')}).
+      </p>
+
+      <div style="background-color:#fef2f2;border:1px solid #fee2e2;border-left:4px solid #ef4444;border-radius:8px;padding:16px;margin-bottom:20px;">
+        <h4 style="margin:0 0 8px 0;color:#991b1b;font-size:14px;font-weight:700;">⚠️ Final Retention Period Countdown: ${daysRemaining} Days Remaining</h4>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#b91c1c;">
+          Your 90-day data preservation window is approaching expiration. If your overdue balance ($${Number(overdueAmount).toFixed(2)} USD) is not settled within the next <strong>${daysRemaining} days</strong>, all associated storage disks, files, and configurations will be permanently decommissioned.
+        </p>
+      </div>
+
+      <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:20px;">
+        Settle your balance now with one click to keep all your data safe and immediately restore access.
+      </p>
+    `,
+    ctaText: '⚡ Settle Balance & Reactivate VPS',
+    ctaUrl: reactivateUrl,
+    footerNote: 'ATC Cloud Support & Billing • Contact support@atechconsult.com for assistance',
+  });
+
+  try {
+    const info = await transporterBilling.sendMail({
+      from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
+      to: email,
+      subject: `[Urgent] ${daysRemaining} Days Remaining: Data Preservation Warning for ${vmName || 'VPS'}`,
+      html,
+    });
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Retention Warning Error] Email failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * 16. Service Reactivated Notice (Data Safe Restored)
+ */
+export async function sendReactivationSuccessEmail({ email, fullName, vmName, planName, amountPaid = 0, nextRenewalDate }) {
+  const dashboardUrl = `${APP_URL}/dashboard`;
+  const formattedRenewal = nextRenewalDate ? new Date(nextRenewalDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '30 days from today';
+  const html = wrapEmailTemplate({
+    title: 'Service Reactivated Successfully! 🎉',
+    subtitle: `All disks and data for ${escapeHtml(vmName || 'your VPS')} are 100% intact`,
+    categoryBadge: 'Service Reactivated',
+    contentHtml: `
+      <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
+        Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
+      </p>
+      <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
+        We have received your payment of <strong>$${Number(amountPaid).toFixed(2)} USD</strong>. Your cloud compute subscription for <strong>${escapeHtml(planName || 'Cloud VPS')}</strong> has been successfully reactivated!
+      </p>
+
+      <div style="background-color:#f0fdf4;border:1px solid #dcfce7;border-left:4px solid #22c55e;border-radius:8px;padding:16px;margin-bottom:20px;">
+        <h4 style="margin:0 0 8px 0;color:#166534;font-size:14px;font-weight:700;">✅ Data Preserved & Controls Restored</h4>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#15803d;">
+          All virtual disks, user files, installed services, and networking configurations were safely preserved during the suspension period. Your instance controls (Power, Console, Snapshots, Backups) are now fully unlocked.
+        </p>
+      </div>
+
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:24px;font-size:13px;color:#475569;">
+        <table width="100%" cellpadding="6" cellspacing="0" style="font-size:13px;">
+          <tr>
+            <td style="color:#64748b;">Instance Name:</td>
+            <td style="font-weight:600;color:#0f172a;">${escapeHtml(vmName || 'VPS Instance')}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Payment Settled:</td>
+            <td style="font-weight:700;color:#16a34a;">$${Number(amountPaid).toFixed(2)} USD</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Next Renewal Date:</td>
+            <td style="font-weight:600;color:#0f172a;">${formattedRenewal}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Instance State:</td>
+            <td style="font-weight:600;color:#2563eb;">Ready to Power On</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:20px;">
+        You can now power on your instance and launch the Web Terminal console from your dashboard:
+      </p>
+    `,
+    ctaText: 'Open VPS Dashboard',
+    ctaUrl: dashboardUrl,
+    footerNote: 'Analytical Technical Consulting (ATC) Cloud Infrastructure',
+  });
+
+  try {
+    const info = await transporterBilling.sendMail({
+      from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
+      to: email,
+      subject: `🎉 Service Reactivated: ${vmName || 'VPS'} Ready (Data Preserved)`,
+      html,
+    });
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Reactivation Email Error] Email failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 export default {
   transporterSupport,
   transporterNoReply,
@@ -1045,5 +1232,7 @@ export default {
   sendTrialWarningEmail,
   sendTrialConvertedPaidEmail,
   sendTrialCancelledEmail,
+  sendBillingSuspendedEmail,
+  sendRetentionWarningEmail,
+  sendReactivationSuccessEmail,
 };
-

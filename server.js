@@ -32,6 +32,7 @@ import siteRoutes from './routes/siteRoutes.js';
 import { setupTerminalWebSocket } from './services/terminalService.js';
 import { startTicketAutomationWorker } from './services/ticketAutomationService.js';
 import { startTrialAutomationWorker } from './services/trialService.js';
+import { startBillingRetentionWorker } from './services/billingRetentionService.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -233,4 +234,5 @@ server.listen(PORT, () => {
   console.log(`Web Terminal WebSocket server attached to /ws/terminal`);
   startTicketAutomationWorker();
   startTrialAutomationWorker();
+  startBillingRetentionWorker();
 });

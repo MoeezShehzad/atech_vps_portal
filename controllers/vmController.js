@@ -5,6 +5,7 @@
 
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
+import { reactivateSubscription } from '../services/billingRetentionService.js';
 import hypervService from '../services/hypervService.js';
 import { calculateResizePrice, calculateCustomPrice } from '../services/pricingService.js';
 import { 
@@ -98,7 +99,9 @@ export async function getUserVMs(req, res) {
           if (liveInfo && liveInfo.State) {
             const raw = String(liveInfo.State).toUpperCase();
             const liveStatus = raw === 'RUNNING' ? 'RUNNING' : (raw === 'PAUSED' ? 'PAUSED' : 'STOPPED');
-            if (liveStatus !== vm.status) {
+            if (vm.status === 'SUSPENDED' && (liveStatus === 'STOPPED' || raw === 'OFF')) {
+              // Maintain SUSPENDED status to preserve 90-day retention lock while VM is off
+            } else if (liveStatus !== vm.status) {
               await prisma.virtualMachine.update({
                 where: { vmId: vm.vmId },
                 data: { status: liveStatus },
@@ -206,6 +209,12 @@ export async function getUserVMs(req, res) {
         adminPassword: vm.adminPassword || 'root',
         os: vm.image?.name || 'Ubuntu 24.04 LTS',
         status: vm.status ? vm.status.toLowerCase() : 'stopped',
+        isSuspended: vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED',
+        retentionDaysRemaining: (vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED') && vm.subscription?.endDate
+          ? Math.max(0, Math.ceil((new Date(vm.subscription.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+          : ((vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED') ? 90 : null),
+        dataPreserved: vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED',
+        subscriptionId: vm.subscriptionId,
         cpuUsage: vm.status === 'RUNNING' ? (vm._liveCpu !== undefined ? vm._liveCpu : 0) : 0,
         ramUsage: vm.status === 'RUNNING'
           ? (vm._liveRamMb ? `${(vm._liveRamMb / 1024).toFixed(1)} / ${vm.ramGb} GB` : `0.0 / ${vm.ramGb} GB`)
@@ -582,10 +591,24 @@ export async function powerAction(req, res) {
 
     const vm = await prisma.virtualMachine.findFirst({
       where: { vmId, userId },
+      include: { subscription: true },
     });
 
     if (!vm) {
       return res.status(404).json({ error: 'Virtual machine not found.' });
+    }
+
+    if (vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED') {
+      const subEndDate = vm.subscription?.endDate;
+      const daysRemaining = subEndDate
+        ? Math.max(0, Math.ceil((new Date(subEndDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+        : 90;
+      return res.status(403).json({
+        error: `This virtual machine is suspended due to an overdue balance. All disks and configurations are preserved safe under our 90-day retention guarantee (${daysRemaining} days remaining). Please reactivate your service to restore instant power controls.`,
+        isSuspended: true,
+        retentionDaysRemaining: daysRemaining,
+        subscriptionId: vm.subscriptionId,
+      });
     }
 
     if (vm.status === 'FAILED') {
@@ -708,6 +731,13 @@ export async function resizeVM(req, res) {
 
     if (!vm) {
       return res.status(404).json({ error: 'Virtual machine not found.' });
+    }
+
+    if (vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED') {
+      return res.status(403).json({
+        error: 'Hardware specification upgrades are locked while this instance is in billing suspension. Please reactivate to restore access.',
+        isSuspended: true,
+      });
     }
 
     if (vm.subscription?.status === 'TRIAL') {
@@ -1104,6 +1134,14 @@ export async function getConsoleSession(req, res) {
       return res.status(404).json({ error: 'Virtual machine not found or unauthorized.' });
     }
 
+    if (vm.status === 'SUSPENDED') {
+      return res.status(403).json({
+        error: "Web Terminal console access is locked while this instance is in billing suspension. All disk data is safely preserved under our 90-day retention guarantee. Please settle your overdue balance to reactivate.",
+        isSuspended: true,
+        subscriptionId: vm.subscriptionId,
+      });
+    }
+
     if (vm.status === 'STOPPED') {
       return res.status(400).json({
         error: `Server '${vm.vmName}' is currently powered off. Please start the server from your dashboard before accessing Web Console.`,
@@ -1433,6 +1471,13 @@ export async function rebuildVMInstance(req, res) {
       include: { image: true },
     });
     if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+
+    if (vm.status === 'SUSPENDED') {
+      return res.status(403).json({
+        error: 'Instance rebuild is locked while in billing suspension.',
+        isSuspended: true,
+      });
+    }
 
     let targetImage = vm.image;
     if (imageId) {
@@ -1869,3 +1914,32 @@ export async function deleteVMFirewallRule(req, res) {
 
 
 
+
+/**
+ * 24. POST /api/vms/:id/reactivate - One-Click Instant VPS Reactivation
+ */
+export async function reactivateVMInstance(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const vmId = Number(req.params.id);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const vm = await prisma.virtualMachine.findFirst({
+      where: { vmId, userId },
+      include: { subscription: true },
+    });
+
+    if (!vm) return res.status(404).json({ error: 'Virtual machine not found.' });
+    if (!vm.subscriptionId) return res.status(400).json({ error: 'No subscription linked to this VM.' });
+
+    const result = await reactivateSubscription(vm.subscriptionId, userId);
+    return res.json({
+      success: true,
+      message: result.message || 'VPS instance reactivated successfully.',
+      result,
+    });
+  } catch (err) {
+    console.error('[reactivateVMInstance Error]:', err.message);
+    return res.status(400).json({ error: err.message });
+  }
+}
