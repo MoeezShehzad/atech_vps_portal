@@ -24,7 +24,8 @@ import {
   Zap,
   ShieldAlert,
   Clock,
-  Lock
+  Lock,
+  Power
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
@@ -89,6 +90,26 @@ export default function BillingAndInvoices() {
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [revealedCard, setRevealedCard] = useState<any>(null);
   const [cancellingTrialId, setCancellingTrialId] = useState<number | null>(null);
+  const [deactivatingSubId, setDeactivatingSubId] = useState<number | null>(null);
+
+  const handleDeactivateSub = async (subscriptionId: number) => {
+    if (!window.confirm('Are you sure you want to deactivate your subscription? Your server will be gracefully shut down, you will not be billed, and all files/disks are preserved for 90 days.')) {
+      return;
+    }
+    try {
+      setDeactivatingSubId(subscriptionId);
+      const res = await apiCall('/billing/deactivate-subscription', {
+        method: 'POST',
+        body: JSON.stringify({ subscriptionId }),
+      });
+      toast.success(res.message || 'Subscription deactivated. 90-day data preservation active.');
+      fetchBilling();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to deactivate subscription.');
+    } finally {
+      setDeactivatingSubId(null);
+    }
+  };
   const [reactivatingSubId, setReactivatingSubId] = useState<number | null>(null);
 
   const handleReactivateSubscription = async (subscriptionId: number) => {
@@ -608,7 +629,16 @@ export default function BillingAndInvoices() {
                             {cancellingTrialId === sub.subscriptionId ? 'Cancelling...' : 'Cancel Free Trial'}
                           </button>
                         ) : (
-                          <span className="text-slate-400 text-xs">—</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeactivateSub(sub.subscriptionId)}
+                            disabled={deactivatingSubId === sub.subscriptionId}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 dark:border-rose-800 transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                            title="Deactivate subscription & gracefully shut down servers with 90-day data preservation"
+                          >
+                            <Power className="w-3 h-3" />
+                            {deactivatingSubId === sub.subscriptionId ? 'Deactivating...' : 'Deactivate'}
+                          </button>
                         )}
                       </td>
                     </tr>

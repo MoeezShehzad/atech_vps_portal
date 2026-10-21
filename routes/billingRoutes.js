@@ -13,6 +13,7 @@ import {
   activateTrialSubscription,
   reactivateSubscriptionEndpoint,
   simulateSuspensionEndpoint,
+  deactivateSubscriptionEndpoint,
 } from '../controllers/billingController.js';
 
 const router = express.Router();
@@ -26,5 +27,6 @@ router.post('/activate-trial', activateTrialSubscription);
 router.get('/payment-method/reveal', getRevealedPaymentMethod);
 router.post('/reactivate-subscription', reactivateSubscriptionEndpoint);
 router.post('/simulate-suspension', simulateSuspensionEndpoint);
+router.post('/deactivate-subscription', deactivateSubscriptionEndpoint);
 
 export default router;
