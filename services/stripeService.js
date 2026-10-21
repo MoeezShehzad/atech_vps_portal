@@ -5,13 +5,31 @@
 
 import Stripe from 'stripe';
 import crypto from 'crypto';
+import dotenv from 'dotenv';
+dotenv.config();
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
-export const stripe = stripeSecretKey
-  ? new Stripe(stripeSecretKey, {
-      apiVersion: '2024-12-18.acacia',
-    })
-  : null;
+let _stripeClient = null;
+export function getStripe() {
+  if (!_stripeClient) {
+    const key = process.env.STRIPE_SECRET_KEY || '';
+    if (key) {
+      _stripeClient = new Stripe(key, {
+        apiVersion: '2024-12-18.acacia',
+      });
+      console.log('[Stripe Gateway] Initialized Stripe SDK with key:', key.slice(0, 12) + '...');
+    }
+  }
+  return _stripeClient;
+}
+
+export const stripe = new Proxy({}, {
+  get(target, prop) {
+    const s = getStripe();
+    if (!s) return undefined;
+    const val = s[prop];
+    return typeof val === 'function' ? val.bind(s) : val;
+  }
+});
 
 // ==============================================================================
 // AES-256-GCM Military-Grade Cryptography for Sensitive Financial References
@@ -86,7 +104,7 @@ export async function createPaymentIntent({ amount, currency = 'usd', customerEm
 
   const cents = Math.max(50, Math.round(Number(amount) * 100)); // Minimum Stripe amount is $0.50
 
-  const paymentIntent = await stripe.paymentIntents.create({
+  const paymentIntent = await (getStripe() || stripe).paymentIntents.create({
     amount: cents,
     currency: currency.toLowerCase(),
     receipt_email: customerEmail,
@@ -130,8 +148,9 @@ export async function confirmPaymentIntent(paymentIntentId, paymentMethodId = nu
  * Create a Test Charge directly using token or test cards (Visa, Mastercard, Amex)
  */
 export async function processTestCardCharge({ amount, currency = 'usd', cardBrand, last4, expMonth, expYear, customerEmail, customerName, metadata = {} }) {
-  if (!stripe) {
-    throw new Error('Stripe is not configured.');
+  const stripeClient = getStripe();
+  if (!stripeClient) {
+    throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY in your .env configuration.');
   }
 
   const cents = Math.max(50, Math.round(Number(amount) * 100));
