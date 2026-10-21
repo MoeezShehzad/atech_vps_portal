@@ -1028,7 +1028,7 @@ export async function sendTrialCancelledEmail({ email, fullName, planName }) {
 
 
 /**
- * 14. Billing Overdue Suspension Notice (Linode-style 90-Day Data Preservation Model)
+ * 14. Billing Overdue Suspension Notice (90-Day Data Preservation Model)
  */
 export async function sendBillingSuspendedEmail({ email, fullName, vmName, planName, overdueAmount = 0, retentionDays = 90 }) {
   const reactivateUrl = `${APP_URL}/dashboard?tab=billing`;
@@ -1047,7 +1047,7 @@ export async function sendBillingSuspendedEmail({ email, fullName, vmName, planN
       <div style="background-color:#fffbeb;border:1px solid #fef3c7;border-left:4px solid #f59e0b;border-radius:8px;padding:16px;margin-bottom:20px;">
         <h4 style="margin:0 0 8px 0;color:#92400e;font-size:14px;font-weight:700;">🛡️ 90-Day Data Preservation Guarantee</h4>
         <p style="margin:0;font-size:13px;line-height:1.5;color:#b45309;">
-          In accordance with ATC Cloud's Linode-style 90-Day Data Preservation Policy, your instance was <strong>gracefully powered off</strong>. 
+          In accordance with ATC Cloud's 90-Day Data Preservation Policy, your instance was <strong>gracefully powered off</strong>. 
           Your <strong>virtual hard disks, snapshots, data, and IP allocations are preserved safe and intact</strong> for <strong>${retentionDays} days</strong>.
         </p>
       </div>

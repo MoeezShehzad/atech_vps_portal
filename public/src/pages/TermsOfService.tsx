@@ -19,7 +19,7 @@ export default function TermsOfService() {
     { id: 'atc-6', title: '6. Absolute Backup Disclaimer & Data Loss Immunity' },
     { id: 'atc-7', title: '7. Service Level Agreement (SLA) & Remedies' },
     { id: 'atc-8', title: '8. Fees, Invoicing, Billing & Taxes' },
-    { id: 'atc-9', title: '9. Suspension & Emergency Security Actions' },
+    { id: 'atc-9', title: '9. Service Suspension, Voluntary Deactivation & 90-Day Data Preservation' },
     { id: 'atc-10', title: '10. Term, Termination & Data Sanitization' },
     { id: 'atc-11', title: '11. Complete Disclaimer of Warranties ("AS IS")' },
     { id: 'atc-12', title: '12. Strict Limitation of Liability & Damages Cap' },
@@ -311,10 +311,10 @@ export default function TermsOfService() {
                 charge such payment method for recurring renewals, bandwidth overage tiers, and additional IP allocations.
               </p>
               <p>
-                <strong>8.2 Default &amp; Reclamation:</strong> Invoices must be settled in full upon generation. If an automatic charge fails, ATC provides a 
-                three (3) calendar day grace period. Upon the fourth (4th) calendar day of non-payment, the instance will be automatically suspended. 
-                If default remains uncured on the seventh (7th) calendar day following invoice due date, 
-                <strong> the instance will be permanently deleted and all virtual disks sanitized</strong>. ATC bears zero liability for data lost via default reclamation.
+                <strong>8.2 Default &amp; Grace Period:</strong> Invoices must be settled in full upon generation. If an automatic charge fails, ATC provides a 
+                three (3) calendar day grace period. Upon the fourth (4th) calendar day of non-payment, the instance will be gracefully suspended. 
+                As governed by Section 9, Customer data is not deleted immediately; rather, all virtual disks, snapshots, and configurations enter our 
+                <strong>90-Day Data Preservation Retention Period</strong>. Full reclamation and media sanitization only occur after expiration of the 90-day window.
               </p>
               <p>
                 <strong>8.3 Taxes:</strong> All listed prices are exclusive of federal, state, municipal, value-added (VAT), goods and services (GST), 
@@ -326,16 +326,45 @@ export default function TermsOfService() {
             <section id="atc-9" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">9</span>
-                Emergency Security Actions &amp; Immediate Suspension
+                Service Suspension, Voluntary Deactivation &amp; 90-Day Data Preservation Policy
               </h2>
               <p>
-                <strong>Emergency Suspension:</strong> ATC may immediately suspend Customer&apos;s use of the Services or isolate 
-                Customer&apos;s virtual machines without prior notice (&quot;Emergency Suspension&quot;) if ATC reasonably determines that: 
-                (a) there is an active security breach or vulnerability affecting Customer&apos;s instance; 
-                (b) Customer&apos;s instance is generating abusive network traffic that disrupts our cluster or upstream transit providers; 
-                (c) there is suspected unauthorized third-party access to Customer&apos;s account; or 
-                (d) suspension is required to comply with an emergency law enforcement order or court directive. 
-                ATC will lift the Emergency Suspension once the circumstances giving rise to it have been fully resolved to ATC&apos;s satisfaction.
+                <strong>9.1 Voluntary Subscription Deactivation:</strong> Customer may deactivate or pause recurring compute subscriptions at any time directly 
+                through Account Settings. Upon voluntary deactivation:
+              </p>
+              <ul className="list-disc pl-6 space-y-1.5 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                <li><strong>Immediate Billing Cessation:</strong> Recurring renewal charges are halted immediately with zero future automatic charges.</li>
+                <li><strong>Graceful Power Off:</strong> The associated virtual machine instance is cleanly shut down to release compute host memory and CPU resources.</li>
+                <li><strong>90-Day Data Preservation Guarantee:</strong> All Customer virtual hard disk drives (VHDX), snapshots, configuration profiles, and networking allocations are securely preserved in cold retention for up to <strong>ninety (90) calendar days</strong> from the date of deactivation.</li>
+                <li><strong>One-Click Instant Reactivation:</strong> Customer may reactivate their subscription at any time within the 90-day window to immediately resume full service with all files, databases, and environments intact.</li>
+              </ul>
+
+              <p>
+                <strong>9.2 Overdue Balance &amp; Non-Payment Suspension:</strong> If Customer fails to settle an invoice past the grace period, ATC will gracefully 
+                power off Customer&apos;s virtual machine instances to prevent runaway compute costs. In accordance with ATC Cloud&apos;s 90-Day Data Preservation Policy:
+              </p>
+              <ul className="list-disc pl-6 space-y-1.5 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                <li>Customer&apos;s virtual disks, snapshots, and data are retained intact for <strong>ninety (90) calendar days</strong> from the date of suspension.</li>
+                <li>Automated notification emails are dispatched at regular retention milestones (60, 30, 14, 7, 3, and 1 day remaining) providing notice before any final reclamation.</li>
+                <li>Customer may settle the outstanding balance at any point within the 90-day period via the Portal to restore and power on their instance instantly.</li>
+              </ul>
+
+              <p>
+                <strong>9.3 Expiration &amp; Permanent Reclamation:</strong> If a suspended or deactivated service remains inactive upon the conclusion of the 
+                ninety (90) calendar day retention period, the associated virtual hard disk files, snapshots, and reserved resources will be permanently reclaimed and 
+                cryptographically erased in accordance with <strong>NIST SP 800-88 Rev. 1 media sanitization standards</strong>. After the 90-day window has expired, 
+                data recovery is impossible, and ATC bears zero liability for data purged following the expiration of the preservation window.
+              </p>
+
+              <p>
+                <strong>9.4 Immediate Account Termination Exception:</strong> If Customer explicitly requests complete, immediate account closure and deletion, 
+                or is terminated for severe Acceptable Use Policy violations (e.g. malicious attacks, botnets, illegal material), the 90-day preservation period does not apply, 
+                and all data is permanently and immediately destroyed.
+              </p>
+
+              <p>
+                <strong>9.5 Emergency Security Actions:</strong> ATC reserves the right to immediately isolate or suspend Customer&apos;s instance without prior notice 
+                if ATC reasonably determines that the instance is compromised, engaged in active DDoS or port-scanning abuse, or if required by law enforcement directive.
               </p>
             </section>
 

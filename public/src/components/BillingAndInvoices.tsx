@@ -90,26 +90,6 @@ export default function BillingAndInvoices() {
   const [showCardDetails, setShowCardDetails] = useState(false);
   const [revealedCard, setRevealedCard] = useState<any>(null);
   const [cancellingTrialId, setCancellingTrialId] = useState<number | null>(null);
-  const [deactivatingSubId, setDeactivatingSubId] = useState<number | null>(null);
-
-  const handleDeactivateSub = async (subscriptionId: number) => {
-    if (!window.confirm('Are you sure you want to deactivate your subscription? Your server will be gracefully shut down, you will not be billed, and all files/disks are preserved for 90 days.')) {
-      return;
-    }
-    try {
-      setDeactivatingSubId(subscriptionId);
-      const res = await apiCall('/billing/deactivate-subscription', {
-        method: 'POST',
-        body: JSON.stringify({ subscriptionId }),
-      });
-      toast.success(res.message || 'Subscription deactivated. 90-day data preservation active.');
-      fetchBilling();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to deactivate subscription.');
-    } finally {
-      setDeactivatingSubId(null);
-    }
-  };
   const [reactivatingSubId, setReactivatingSubId] = useState<number | null>(null);
 
   const handleReactivateSubscription = async (subscriptionId: number) => {
@@ -489,7 +469,7 @@ export default function BillingAndInvoices() {
             <div className="space-y-1.5 flex-1">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <h3 className="text-base font-bold text-amber-900 dark:text-amber-200 font-poppins flex items-center gap-2">
-                  Overdue Balance Suspension — Linode-Style 90-Day Data Preservation
+                  Overdue Balance Suspension — 90-Day Data Preservation
                 </h3>
                 <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
                   Data Safe Guarantee Active
@@ -629,16 +609,7 @@ export default function BillingAndInvoices() {
                             {cancellingTrialId === sub.subscriptionId ? 'Cancelling...' : 'Cancel Free Trial'}
                           </button>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleDeactivateSub(sub.subscriptionId)}
-                            disabled={deactivatingSubId === sub.subscriptionId}
-                            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-200 dark:border-rose-800 transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
-                            title="Deactivate subscription & gracefully shut down servers with 90-day data preservation"
-                          >
-                            <Power className="w-3 h-3" />
-                            {deactivatingSubId === sub.subscriptionId ? 'Deactivating...' : 'Deactivate'}
-                          </button>
+                          <span className="text-slate-400 text-xs">—</span>
                         )}
                       </td>
                     </tr>

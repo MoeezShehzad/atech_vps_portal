@@ -259,7 +259,7 @@ export default function AccountSettings() {
       });
       setMessage({
         type: 'success',
-        text: res.message || 'Subscription successfully deactivated. Your servers are cleanly powered down and data is preserved for 90 days.',
+        text: res.message || 'Subscription successfully deactivated. Recurring billing has been stopped.',
       });
       setShowDeactivateModal(false);
       await fetchSubscriptionInfo();
@@ -962,10 +962,10 @@ export default function AccountSettings() {
             {/* Explanatory Policy Callout */}
             <div className="p-3.5 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl text-xs text-slate-700 dark:text-slate-300 space-y-1.5">
               <div className="font-bold flex items-center gap-1.5 text-blue-900 dark:text-blue-300 text-xs">
-                <Shield className="w-3.5 h-3.5 text-blue-600" /> Linode-Style 90-Day Data Preservation Policy
+                <Shield className="w-3.5 h-3.5 text-blue-600" /> 90-Day Data Preservation & Subscription Policy
               </div>
               <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                Need to pause your project or take a break? You can deactivate your subscription at any time. When deactivated, your server is cleanly shut down, no further card charges will occur, and your disks, code, and databases are safely preserved for up to 90 days. You can reactivate with 1 click anytime to resume immediately.
+                Need to pause your services? You can deactivate your recurring subscription at any time. Your recurring charges will stop immediately and your data will remain securely preserved in accordance with our 90-Day Data Preservation Policy. To review full details, please refer to our Terms & Conditions.
               </p>
             </div>
           </div>
@@ -992,24 +992,13 @@ export default function AccountSettings() {
               Are you sure you want to deactivate your <strong>{subInfo?.planName || 'Cloud VPS'}</strong> subscription?
             </p>
 
-            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-100 dark:border-slate-800 text-xs space-y-2 mb-5">
-              <div className="font-semibold text-slate-800 dark:text-slate-200">What happens when you deactivate:</div>
-              <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300 text-[11px]">
-                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong>Zero future charges:</strong> Your payment method will not be billed again.</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300 text-[11px]">
-                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong>Clean shutdown:</strong> Your instances will be gracefully stopped to free RAM and CPU.</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300 text-[11px]">
-                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong>90-Day Data Safe:</strong> All your disk data (.vhdx), files, and databases are 100% preserved for 90 days.</span>
-              </div>
-              <div className="flex items-start gap-2 text-slate-600 dark:text-slate-300 text-[11px]">
-                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong>1-Click Reactivation:</strong> You can return anytime and resume with all your work intact.</span>
-              </div>
+            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 space-y-2 mb-5">
+              <p className="leading-relaxed">
+                Recurring billing for this plan will be cancelled immediately. All your data will remain safely stored and preserved under ATC Cloud's <strong>90-Day Data Preservation Policy</strong>.
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                You can return and reactivate your subscription at any time within the 90-day window. For full policy terms, please refer to our Terms & Conditions.
+              </p>
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">

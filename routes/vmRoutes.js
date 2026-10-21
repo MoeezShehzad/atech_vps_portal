@@ -49,7 +49,7 @@ router.post('/deploy', deployVM);
 // 3. Power management (START, STOP, RESTART, FORCE_STOP)
 router.post('/:id/power', powerAction);
 
-// 3b. One-Click Reactivate (Linode-style 90-Day Data Preservation)
+// 3b. One-Click Reactivate (90-Day Data Preservation)
 router.post('/:id/reactivate', reactivateVMInstance);
 
 // 4. Preview price calculation for resize

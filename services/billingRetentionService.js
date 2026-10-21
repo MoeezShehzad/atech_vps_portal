@@ -1,6 +1,6 @@
 // ==============================================================================
 // Service: billingRetentionService.js
-// Purpose: Linode-style 90-Day Data Preservation & Suspension Lifecycle Engine
+// Purpose: ATC Cloud 90-Day Data Preservation & Suspension Lifecycle Engine
 // Features:
 //   1. Graceful shutdown on overdue balance / failed renewal
 //   2. 90-Day Data Preservation guarantee (disks, configs, IP preserved safe)
@@ -96,7 +96,7 @@ export async function gracefulSuspendSubscription(subscriptionId, { reason = 'OV
       vmId: primaryVm ? primaryVm.vmId : null,
       action: 'BILLING_SUSPENSION_DATA_PRESERVED',
       status: 'WARNING',
-      details: `Service gracefully suspended due to ${reason}. Linode-style 90-Day Data Preservation active until ${retentionExpiresAt.toISOString().split('T')[0]}. Disks and configurations safely preserved. ${adminEmail ? `Initiated by admin ${adminEmail}.` : 'Triggered by automated billing monitor.'}`,
+      details: `Service gracefully suspended due to ${reason}. ATC Cloud 90-Day Data Preservation active until ${retentionExpiresAt.toISOString().split('T')[0]}. Disks and configurations safely preserved. ${adminEmail ? `Initiated by admin ${adminEmail}.` : 'Triggered by automated billing monitor.'}`,
     },
   }).catch(() => {});
 

@@ -3529,7 +3529,7 @@ export default function Dashboard() {
                         </span>
                       </div>
                       <p className="text-xs text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
-                        This instance was gracefully shut down due to an overdue balance. Under ATC Cloud's Linode-style 90-Day Data Preservation Policy, all storage disks, files, snapshots, and networking configurations are <strong>100% safely preserved and intact</strong>.
+                        This instance was gracefully shut down due to an overdue balance. Under ATC Cloud's 90-Day Data Preservation Policy, all storage disks, files, snapshots, and networking configurations are <strong>100% safely preserved and intact</strong>.
                       </p>
                     </div>
                   </div>
