@@ -216,7 +216,8 @@ export async function reactivateSubscription(subscriptionId, userId = null, { pa
       },
     });
   } else {
-    const invoiceNumber = `INV-${now.getFullYear()}-REC-${String(sub.subscriptionId).padStart(4, '0')}`;
+    const uniqueSuffix = Math.floor(100000 + Math.random() * 900000);
+    const invoiceNumber = `INV-${now.getFullYear()}-REC-${String(sub.subscriptionId).padStart(4, '0')}-${uniqueSuffix}`;
     invoice = await prisma.invoice.create({
       data: {
         userId: sub.userId,

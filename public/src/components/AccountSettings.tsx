@@ -942,10 +942,10 @@ export default function AccountSettings() {
                   type="button"
                   onClick={handleReactivateSubscription}
                   disabled={subActionLoading}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <Zap className={`w-3.5 h-3.5 ${subActionLoading ? 'animate-spin' : ''}`} />
-                  {subActionLoading ? 'Reactivating...' : 'Reactivate Subscription'}
+                  {subActionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Reactivate
                 </button>
               ) : (
                 <button

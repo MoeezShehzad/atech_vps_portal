@@ -25,7 +25,8 @@ import {
   ShieldAlert,
   Clock,
   Lock,
-  Power
+  Power,
+  Loader2
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
@@ -583,11 +584,11 @@ export default function BillingAndInvoices() {
                             type="button"
                             onClick={() => handleReactivateSubscription(sub.subscriptionId)}
                             disabled={reactivatingSubId === sub.subscriptionId}
-                            className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-linear-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
-                            title="One-Click Instant Reactivation - Settle overdue invoice & restore VPS"
+                            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
+                            
                           >
-                            <Zap className={`w-3.5 h-3.5 ${reactivatingSubId === sub.subscriptionId ? 'animate-spin' : ''}`} />
-                            {reactivatingSubId === sub.subscriptionId ? 'Reactivating...' : 'Reactivate VPS'}
+                            {reactivatingSubId === sub.subscriptionId && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                            Reactivate
                           </button>
                         ) : isTrial ? (
                           <button

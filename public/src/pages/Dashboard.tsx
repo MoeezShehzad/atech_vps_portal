@@ -1853,9 +1853,9 @@ export default function Dashboard() {
                             </td>
                             <td className="px-6 py-4">
                               {inst.isSuspended || inst.status === 'suspended' ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 shadow-xs">
-                                  <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-                                  <span>Suspended ({formatRetentionCountdown(inst.retentionExpiresAt, inst.retentionDaysRemaining)})</span>
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                  suspended
                                 </span>
                               ) : (
                                 <span
@@ -1902,24 +1902,15 @@ export default function Dashboard() {
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 {inst.isSuspended || inst.status === 'suspended' ? (
-                                  <div className="flex items-center gap-1.5">
                                     <button
                                       onClick={(e) => handleReactivateVM(inst.vmId, e)}
                                       disabled={reactivatingVmId === inst.vmId}
-                                      className="px-3 py-1.5 rounded-xl font-bold text-xs bg-linear-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white shadow-xs flex items-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
-                                      title="One-Click Instant Reactivation - Settle overdue balance and restore VM controls"
+                                      className="px-3 py-1.5 rounded-xl font-semibold text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-xs flex items-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
                                     >
-                                      <Zap className={`w-3.5 h-3.5 ${reactivatingVmId === inst.vmId ? 'animate-spin' : ''}`} />
-                                      <span>{reactivatingVmId === inst.vmId ? 'Reactivating...' : 'Reactivate'}</span>
+                                      {reactivatingVmId === inst.vmId && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                                      Reactivate
                                     </button>
-                                    <div 
-                                      className="p-1.5 rounded-lg border border-amber-200 dark:border-amber-800 text-amber-500 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30"
-                                      title="Controls locked: Overdue balance. Please reactivate your instance."
-                                    >
-                                      <Lock className="w-3.5 h-3.5" />
-                                    </div>
-                                  </div>
-                                ) : (
+                                  ) : (
                                   <>
                                 {/* POWER BUTTON */}
                                 <button
@@ -4199,10 +4190,10 @@ export default function Dashboard() {
                 <button
                   onClick={(e) => handleReactivateVM(selectedInstance.vmId, e)}
                   disabled={reactivatingVmId === selectedInstance.vmId}
-                  className="flex-1 py-2.5 px-4 bg-linear-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                  className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <Zap className={`w-4 h-4 ${reactivatingVmId === selectedInstance.vmId ? 'animate-spin' : ''}`} />
-                  <span>{reactivatingVmId === selectedInstance.vmId ? 'Reactivating Service...' : `One-Click Reactivate VPS ($ ${selectedInstance.monthlyPrice.toFixed(2)})`}</span>
+                  {reactivatingVmId === selectedInstance.vmId && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Reactivate ($ ${selectedInstance.monthlyPrice.toFixed(2)})</span>
                 </button>
               ) : (
                 <>
