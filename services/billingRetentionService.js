@@ -303,7 +303,7 @@ export async function reactivateSubscription(subscriptionId, userId = null, { pa
 
   return {
     success: true,
-    message: '🎉 Instance reactivated successfully! All data preserved. Your VM controls are now unlocked.',
+    message: 'Instance reactivated successfully.',
     subscription: updatedSub,
     amountPaid: chargeAmount,
     nextRenewalDate: renewalDate,

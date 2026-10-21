@@ -264,7 +264,7 @@ export default function Dashboard() {
       const res = await apiCall(`/vms/${vmId}/reactivate`, {
         method: 'POST',
       });
-      toast.success(res.message || '🎉 VPS instance reactivated successfully! All data preserved.');
+      toast.success(res.message || 'Instance reactivated successfully.');
       await fetchVMs();
       if (selectedInstance && selectedInstance.vmId === vmId) {
         setSelectedInstance((prev) => prev ? { ...prev, status: 'stopped', isSuspended: false } : null);
@@ -1914,7 +1914,7 @@ export default function Dashboard() {
                                     </button>
                                     <div 
                                       className="p-1.5 rounded-lg border border-amber-200 dark:border-amber-800 text-amber-500 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30"
-                                      title="Controls locked: Overdue balance. Data safe under 90-day preservation."
+                                      title="Controls locked: Overdue balance. Please reactivate your instance."
                                     >
                                       <Lock className="w-3.5 h-3.5" />
                                     </div>
@@ -3522,29 +3522,29 @@ export default function Dashboard() {
                     <div className="space-y-1 flex-1">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm font-poppins flex items-center gap-1.5">
-                          Service Suspended • Data Safe & Preserved
+                          Instance Suspended
                         </h4>
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700">
                           {formatRetentionCountdown(selectedInstance.retentionExpiresAt, selectedInstance.retentionDaysRemaining)}
                         </span>
                       </div>
                       <p className="text-xs text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
-                        This instance was gracefully shut down due to an overdue balance. Under ATC Cloud's 90-Day Data Preservation Policy, all storage disks, files, snapshots, and networking configurations are <strong>100% safely preserved and intact</strong>.
+                        This instance is suspended due to an overdue balance. Reactivate below to settle the invoice and resume service.
                       </p>
                     </div>
                   </div>
 
                   <div className="pt-2 flex items-center justify-between gap-3 border-t border-amber-200 dark:border-amber-800/60">
                     <div className="text-xs text-amber-800 dark:text-amber-400 font-medium">
-                      Reactivate instantly with one click:
+                      Settle balance to resume service:
                     </div>
                     <button
                       onClick={(e) => handleReactivateVM(selectedInstance.vmId, e)}
                       disabled={reactivatingVmId === selectedInstance.vmId}
-                      className="px-4 py-2 bg-linear-to-r from-amber-500 to-emerald-600 hover:from-amber-600 hover:to-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/25 flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
-                      <Zap className={`w-3.5 h-3.5 ${reactivatingVmId === selectedInstance.vmId ? 'animate-spin' : ''}`} />
-                      <span>{reactivatingVmId === selectedInstance.vmId ? 'Reactivating...' : `One-Click Reactivate ($ ${selectedInstance.monthlyPrice.toFixed(2)})`}</span>
+                      {reactivatingVmId === selectedInstance.vmId && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Reactivate ($ ${selectedInstance.monthlyPrice.toFixed(2)})
                     </button>
                   </div>
                 </div>

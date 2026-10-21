@@ -63,20 +63,20 @@ interface Subscription {
 }
 
 function formatRetentionCountdown(endDateStr: string | null | undefined, fallbackDays: number | null | undefined): string {
-  if (!endDateStr && (fallbackDays === null || fallbackDays === undefined)) return '90 Days Retention Active';
-  if (!endDateStr && fallbackDays !== null && fallbackDays !== undefined) return `${fallbackDays} Days Retention Left`;
+  if (!endDateStr && (fallbackDays === null || fallbackDays === undefined)) return '90 days remaining';
+  if (!endDateStr && fallbackDays !== null && fallbackDays !== undefined) return `${fallbackDays} days remaining`;
   const diffMs = new Date(endDateStr!).getTime() - Date.now();
-  if (diffMs <= 0) return 'Expired (Decommissioning Imminent)';
+  if (diffMs <= 0) return 'Expired';
   const totalMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
   const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
   const totalDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
   if (totalMinutes < 60) {
-    return `⚠️ ${totalMinutes}m remaining before deletion!`;
+    return `${totalMinutes}m remaining`;
   } else if (totalHours < 24) {
-    return `⚠️ ${totalHours}h remaining before deletion`;
+    return `${totalHours}h remaining`;
   } else {
-    return `${totalDays} Days Retention Left`;
+    return `${totalDays} days remaining`;
   }
 }
 
@@ -362,7 +362,7 @@ export default function BillingAndInvoices() {
             {summary?.hasSuspendedSubscriptions || subscriptions.some((s) => s.status === 'SUSPENDED') ? (
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-400 border border-amber-300 dark:border-amber-800 flex items-center gap-1.5 shadow-xs">
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
-                Suspension Active (Data Safe)
+                Suspended
               </span>
             ) : (
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
@@ -459,26 +459,16 @@ export default function BillingAndInvoices() {
         </div>
       </div>
 
-      {/* 90-DAY DATA PRESERVATION & SUSPENSION BANNER */}
       {(summary?.hasSuspendedSubscriptions || subscriptions.some((s) => s.status === 'SUSPENDED')) && (
-        <div className="bg-amber-500/10 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-600 rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl shrink-0">
-              <ShieldAlert className="w-6 h-6" />
+        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-4 shadow-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 rounded-xl shrink-0">
+              <ShieldAlert className="w-5 h-5" />
             </div>
-            <div className="space-y-1.5 flex-1">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <h3 className="text-base font-bold text-amber-900 dark:text-amber-200 font-poppins flex items-center gap-2">
-                  Overdue Balance Suspension — 90-Day Data Preservation
-                </h3>
-                <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
-                  Data Safe Guarantee Active
-                </span>
-              </div>
-              <p className="text-xs text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
-                One or more instances have been gracefully stopped due to an overdue balance. 
-                In accordance with ATC Cloud's 90-Day Data Preservation Policy, all storage disks, configs, snapshots, and IP allocations remain <strong>100% safe and preserved</strong>. 
-                Use the one-click reactivate button below to settle the overdue balance and instantly unlock your virtual machines.
+            <div>
+              <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">Subscription Suspended</h4>
+              <p className="text-xs text-amber-800/80 dark:text-amber-300/80">
+                One or more subscriptions are suspended due to an overdue balance. Reactivate below to resume service.
               </p>
             </div>
           </div>
@@ -566,9 +556,9 @@ export default function BillingAndInvoices() {
                       </td>
                       <td className="py-4 px-6">
                         {sub.status === 'SUSPENDED' ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 shadow-xs">
-                            <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
-                            Suspended (Data Safe)
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                            Suspended
                           </span>
                         ) : isTrial ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800">

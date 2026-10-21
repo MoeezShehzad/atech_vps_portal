@@ -4294,7 +4294,7 @@ export default function AdminDashboard() {
                                 {sub.status === 'SUSPENDED' ? (
                                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 inline-flex items-center gap-1 shadow-xs">
                                     <ShieldAlert className="w-3 h-3 text-amber-600" />
-                                    Suspended ({sub.retentionDaysRemaining !== null ? `${sub.retentionDaysRemaining}d left` : 'Data Safe'})
+                                    Suspended ({sub.retentionDaysRemaining !== null ? `${sub.retentionDaysRemaining}d left` : 'Suspended'})
                                   </span>
                                 ) : (
                                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${

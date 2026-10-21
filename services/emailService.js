@@ -1034,7 +1034,7 @@ export async function sendBillingSuspendedEmail({ email, fullName, vmName, planN
   const reactivateUrl = `${APP_URL}/dashboard?tab=billing`;
   const html = wrapEmailTemplate({
     title: 'Service Suspended: Overdue Balance Notice',
-    subtitle: `Your VPS has been gracefully shut down — Data is 100% Safe & Preserved`,
+    subtitle: `Your instance has been suspended due to an overdue invoice`,
     categoryBadge: 'Billing Suspension',
     contentHtml: `
       <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
@@ -1044,13 +1044,7 @@ export async function sendBillingSuspendedEmail({ email, fullName, vmName, planN
         Your subscription for <strong>${escapeHtml(planName || 'Cloud VPS')}</strong> associated with instance <strong>${escapeHtml(vmName || 'Virtual Machine')}</strong> has an overdue balance of <strong>$${Number(overdueAmount).toFixed(2)} USD</strong>.
       </p>
 
-      <div style="background-color:#fffbeb;border:1px solid #fef3c7;border-left:4px solid #f59e0b;border-radius:8px;padding:16px;margin-bottom:20px;">
-        <h4 style="margin:0 0 8px 0;color:#92400e;font-size:14px;font-weight:700;">🛡️ 90-Day Data Preservation Guarantee</h4>
-        <p style="margin:0;font-size:13px;line-height:1.5;color:#b45309;">
-          In accordance with ATC Cloud's 90-Day Data Preservation Policy, your instance was <strong>gracefully powered off</strong>. 
-          Your <strong>virtual hard disks, snapshots, data, and IP allocations are preserved safe and intact</strong> for <strong>${retentionDays} days</strong>.
-        </p>
-      </div>
+      
 
       <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:24px;font-size:13px;color:#475569;">
         <table width="100%" cellpadding="6" cellspacing="0" style="font-size:13px;">
@@ -1064,20 +1058,20 @@ export async function sendBillingSuspendedEmail({ email, fullName, vmName, planN
           </tr>
           <tr>
             <td style="color:#64748b;">Data Status:</td>
-            <td style="font-weight:600;color:#16a34a;">🔒 Preserved & Safe (Locked)</td>
+            <td style="font-weight:600;color:#f59e0b;">Suspended</td>
           </tr>
           <tr>
-            <td style="color:#64748b;">Data Retention Remaining:</td>
+            <td style="color:#64748b;">Retention Remaining:</td>
             <td style="font-weight:700;color:#f59e0b;">${retentionDays} Days</td>
           </tr>
         </table>
       </div>
 
       <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:20px;">
-        To instantly unlock your instance and resume normal compute operations without losing any data, simply click the one-click reactivate button below:
+        To reactivate your instance and resume operations, click below to settle your balance:
       </p>
     `,
-    ctaText: '⚡ One-Click Reactivate VPS',
+    ctaText: 'Reactivate Instance',
     ctaUrl: reactivateUrl,
     footerNote: 'ATC Cloud Billing • For billing assistance, reply to this email or contact billing@atechconsult.com',
   });
@@ -1086,7 +1080,7 @@ export async function sendBillingSuspendedEmail({ email, fullName, vmName, planN
     const info = await transporterBilling.sendMail({
       from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
       to: email,
-      subject: `[Action Required] Service Suspended: Overdue Balance for ${vmName || 'VPS'} (Data Safe - 90 Days Retention)`,
+      subject: `[Action Required] Service Suspended: Overdue Balance for ${vmName || 'VPS'}`,
       html,
     });
     console.log(`[Billing Suspension] Email dispatched to ${email} (ID: ${info.messageId})`);
@@ -1104,7 +1098,7 @@ export async function sendRetentionWarningEmail({ email, fullName, vmName, planN
   const reactivateUrl = `${APP_URL}/dashboard?tab=billing`;
   const html = wrapEmailTemplate({
     title: `Data Decommission Warning: ${daysRemaining} Days Left`,
-    subtitle: `Preserved data on ${escapeHtml(vmName || 'your instance')} will be purged in ${daysRemaining} days`,
+    subtitle: `Your instance will be decommissioned in ${daysRemaining} days if unpaid`,
     categoryBadge: 'Retention Warning',
     contentHtml: `
       <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
@@ -1122,10 +1116,10 @@ export async function sendRetentionWarningEmail({ email, fullName, vmName, planN
       </div>
 
       <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:20px;">
-        Settle your balance now with one click to keep all your data safe and immediately restore access.
+        Settle your balance to reactivate your instance.
       </p>
     `,
-    ctaText: '⚡ Settle Balance & Reactivate VPS',
+    ctaText: 'Reactivate Subscription',
     ctaUrl: reactivateUrl,
     footerNote: 'ATC Cloud Support & Billing • Contact support@atechconsult.com for assistance',
   });
@@ -1145,14 +1139,14 @@ export async function sendRetentionWarningEmail({ email, fullName, vmName, planN
 }
 
 /**
- * 16. Service Reactivated Notice (Data Safe Restored)
+ * 16. Service Reactivated Notice
  */
 export async function sendReactivationSuccessEmail({ email, fullName, vmName, planName, amountPaid = 0, nextRenewalDate }) {
   const dashboardUrl = `${APP_URL}/dashboard`;
   const formattedRenewal = nextRenewalDate ? new Date(nextRenewalDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '30 days from today';
   const html = wrapEmailTemplate({
     title: 'Service Reactivated Successfully! 🎉',
-    subtitle: `All disks and data for ${escapeHtml(vmName || 'your VPS')} are 100% intact`,
+    subtitle: `Your subscription has been restored`,
     categoryBadge: 'Service Reactivated',
     contentHtml: `
       <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
@@ -1162,12 +1156,7 @@ export async function sendReactivationSuccessEmail({ email, fullName, vmName, pl
         We have received your payment of <strong>$${Number(amountPaid).toFixed(2)} USD</strong>. Your cloud compute subscription for <strong>${escapeHtml(planName || 'Cloud VPS')}</strong> has been successfully reactivated!
       </p>
 
-      <div style="background-color:#f0fdf4;border:1px solid #dcfce7;border-left:4px solid #22c55e;border-radius:8px;padding:16px;margin-bottom:20px;">
-        <h4 style="margin:0 0 8px 0;color:#166534;font-size:14px;font-weight:700;">✅ Data Preserved & Controls Restored</h4>
-        <p style="margin:0;font-size:13px;line-height:1.5;color:#15803d;">
-          All virtual disks, user files, installed services, and networking configurations were safely preserved during the suspension period. Your instance controls (Power, Console, Snapshots, Backups) are now fully unlocked.
-        </p>
-      </div>
+      
 
       <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:24px;font-size:13px;color:#475569;">
         <table width="100%" cellpadding="6" cellspacing="0" style="font-size:13px;">
@@ -1203,7 +1192,7 @@ export async function sendReactivationSuccessEmail({ email, fullName, vmName, pl
     const info = await transporterBilling.sendMail({
       from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
       to: email,
-      subject: `🎉 Service Reactivated: ${vmName || 'VPS'} Ready (Data Preserved)`,
+      subject: `Service Reactivated: ${vmName || 'VPS'} Ready`,
       html,
     });
     return { success: true, messageId: info.messageId };

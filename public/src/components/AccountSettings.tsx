@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
 import { User, Phone, Lock, CheckCircle, AlertCircle, Loader2, Camera, MapPin, ShieldCheck, Key, Plus, Trash2, Copy, Check, Download, Terminal, Mail, Eye, EyeOff, CreditCard, Power, Clock, AlertTriangle, Zap, Shield } from 'lucide-react';
 import { apiCall } from '../services/api';
@@ -898,7 +899,7 @@ export default function AccountSettings() {
             <div>
               {subInfo.status?.toUpperCase() === 'SUSPENDED' ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                  <Clock className="w-3 h-3" /> Suspended (Data Preserved)
+                  <Clock className="w-3 h-3" /> Suspended
                 </span>
               ) : subInfo.status?.toUpperCase() === 'TRIAL' ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
@@ -931,7 +932,7 @@ export default function AccountSettings() {
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   {subInfo.status?.toUpperCase() === 'SUSPENDED'
-                    ? `90-Day Preservation active. Retained for ${subInfo.retentionDaysRemaining ?? 90} more days.`
+                    ? `Suspended. ${subInfo.retentionDaysRemaining ?? 90} days remaining.`
                     : `Renews on ${subInfo.nextBillingDate ? formatDate(subInfo.nextBillingDate) : 'End of Cycle'}`}
                 </p>
               </div>
@@ -954,20 +955,17 @@ export default function AccountSettings() {
                   className="px-4 py-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <Power className="w-3.5 h-3.5 text-rose-600" />
-                  Deactivate Subscription
+                  Deactivate
                 </button>
               )}
             </div>
 
-            {/* Explanatory Policy Callout */}
-            <div className="p-3.5 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/40 rounded-xl text-xs text-slate-700 dark:text-slate-300 space-y-1.5">
-              <div className="font-bold flex items-center gap-1.5 text-blue-900 dark:text-blue-300 text-xs">
-                <Shield className="w-3.5 h-3.5 text-blue-600" /> 90-Day Data Preservation & Subscription Policy
-              </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                Need to pause your services? You can deactivate your recurring subscription at any time. Your recurring charges will stop immediately and your data will remain securely preserved in accordance with our 90-Day Data Preservation Policy. To review full details, please refer to our Terms & Conditions.
-              </p>
-            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 pt-1">
+              Cancellation and retention terms are governed by our{' '}
+              <Link to="/terms#atc-9" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">
+                Terms of Service
+              </Link>.
+            </p>
           </div>
         ) : (
           <div className="py-6 px-4 text-center rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
@@ -983,41 +981,32 @@ export default function AccountSettings() {
       {/* Deactivate Subscription Confirmation Modal */}
       {showDeactivateModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-bold text-base mb-2">
               <AlertTriangle className="w-5 h-5 shrink-0" />
               <h3>Deactivate Subscription</h3>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
-              Are you sure you want to deactivate your <strong>{subInfo?.planName || 'Cloud VPS'}</strong> subscription?
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-5">
+              Are you sure you want to deactivate your <strong>{subInfo?.planName || 'Cloud VPS'}</strong> subscription? Recurring billing will stop immediately.
             </p>
 
-            <div className="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 space-y-2 mb-5">
-              <p className="leading-relaxed">
-                Recurring billing for this plan will be cancelled immediately. All your data will remain safely stored and preserved under ATC Cloud's <strong>90-Day Data Preservation Policy</strong>.
-              </p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                You can return and reactivate your subscription at any time within the 90-day window. For full policy terms, please refer to our Terms & Conditions.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setShowDeactivateModal(false)}
                 disabled={subActionLoading}
                 className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl transition-all cursor-pointer"
               >
-                Keep Subscription Active
+                Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDeactivateSubscription}
                 disabled={subActionLoading}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 {subActionLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Yes, Deactivate Subscription
+                Deactivate
               </button>
             </div>
           </div>
