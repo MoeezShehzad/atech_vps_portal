@@ -26,81 +26,60 @@ import { fetchVpsPlans } from '../services/pricingApi';
 const GOOGLE_MAPS_REVIEWS_URL =
   'https://www.google.com/maps/place/Analytical+Technical+Consulting/@41.6493404,-88.1755207,17z/data=!3m1!4b1!4m6!3m5!1s0x258bf3e100baa53b:0xdad95528ab037483!8m2!3d41.6493364!4d-88.1729458!16s%2Fg%2F11y56zr_t0?entry=ttu&g_ep=EgoyMDI2MTAxOS4wIKXMDSoASAFQAw%3D%3D';
 
-const GoogleIcon = () => (
-  <svg className="w-4 h-4 shrink-0 inline-block" viewBox="0 0 24 24" aria-hidden="true">
-    <path
-      fill="#4285F4"
-      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z"
-    />
-    <path
-      fill="#34A853"
-      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"
-    />
-    <path
-      fill="#FBBC05"
-      d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.13z"
-    />
-    <path
-      fill="#EA4335"
-      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z"
-    />
-  </svg>
-);
-
-const CUSTOMER_REVIEWS = [
+const CLIENT_REVIEWS = [
   {
-    name: 'Marcus Vance',
-    role: 'Director of IT, Apex Systems',
+    name: 'Marcus V.',
+    role: 'Senior DevOps Engineer',
     rating: 5,
     initials: 'MV',
     color: 'from-blue-600 to-indigo-600',
     review:
-      'Analytical Technical Consulting provided fantastic service setting up our cloud instances. SSD read/write speeds and network responsiveness are blazing fast. Exceptional technical support when configuring our private subnets.',
+      'ATC provided exceptional service setting up our cloud instances. SSD read and write speeds are fast, latency is minimal, and technical support was responsive when configuring our private subnets.',
   },
   {
-    name: 'Elena Rostova',
-    role: 'CTO, DataBridge Labs',
+    name: 'Elena R.',
+    role: 'Software Architect',
     rating: 5,
     initials: 'ER',
     color: 'from-emerald-600 to-teal-600',
     review:
-      'We migrated our production database and microservices from a legacy provider to ATC. Server provisioning was practically instant, and uptime stability has been rock solid. Highly recommend ATC for any developer team.',
+      'Migrated our backend services and database nodes to ATC. Server provisioning was fast, performance has been rock-solid, and we get clean root control without unnecessary overhead.',
   },
   {
-    name: 'David K. Miller',
-    role: 'Senior Infrastructure Engineer',
+    name: 'David M.',
+    role: 'Systems Administrator',
     rating: 5,
     initials: 'DM',
     color: 'from-purple-600 to-pink-600',
     review:
-      'Top-tier reliability and true root level control. ATC gives us clean bare-metal-backed virtualization without the bloat and surprise pricing of AWS. Their support team responds with actual engineering insight.',
+      'Top-tier reliability and true bare-metal-backed virtualization. Server resources are dedicated and predictable. When we needed help with networking, their engineers answered promptly.',
   },
   {
-    name: 'Sophia Chen',
-    role: 'Founder, CloudPeak Software',
+    name: 'Sophia C.',
+    role: 'Full-Stack Developer',
     rating: 5,
     initials: 'SC',
     color: 'from-amber-500 to-orange-600',
     review:
-      "ATC's customer support is truly exceptional. We needed customized disk partitioning and custom security firewall rules on our VPS; they resolved our setup in minutes. Deserves every bit of a 5-star rating!",
+      'Customer support is genuinely helpful and knowledgeable. Needed custom storage partitioning and firewall adjustments; everything was handled smoothly. Very satisfied with the hosting experience.',
   },
   {
-    name: 'James Thornton',
-    role: 'DevOps Architect, NexaTech',
+    name: 'James T.',
+    role: 'Infrastructure Lead',
     rating: 5,
     initials: 'JT',
     color: 'from-cyan-600 to-blue-600',
     review:
-      'Solid network throughput and zero hiccups during our peak traffic season. Having dedicated SSD allocations without noisy neighbors has made our web applications noticeably faster.',
+      'Solid network throughput and consistent compute stability during our highest traffic periods. Dedicated storage without noisy neighbors has kept our web applications running fast.',
   },
   {
-    name: 'Brian O\'Connor',
-    role: 'Managing Director, Synergy Consulting',
+    name: 'Brian O.',
+    role: 'IT Operations Consultant',
     rating: 5,
     initials: 'BO',
     color: 'from-indigo-600 to-violet-600',
     review:
-      'We have worked with ATC for both virtualization and infrastructure consulting. Honest pricing, exceptional uptime, and true technical competence. The team in Bolingbrook is world-class.',
+      'Clean virtualization, honest pricing, and high server reliability. The infrastructure performance and quick provisioning make managing production environments straightforward.',
   },
 ];
 
@@ -177,45 +156,7 @@ const TYPEWRITER_PHRASES = [
 export default function Home() {
   const navigate = useNavigate();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('monthly');
-  const [reviewIndex, setReviewIndex] = useState(0);
-  const [isReviewPaused, setIsReviewPaused] = useState(false);
-  const [reviewVisibleCount, setReviewVisibleCount] = useState(3);
-
-  useEffect(() => {
-    const updateVisibleCount = () => {
-      if (typeof window === 'undefined') return;
-      if (window.innerWidth < 640) {
-        setReviewVisibleCount(1);
-      } else if (window.innerWidth < 1024) {
-        setReviewVisibleCount(2);
-      } else {
-        setReviewVisibleCount(3);
-      }
-    };
-    updateVisibleCount();
-    window.addEventListener('resize', updateVisibleCount);
-    return () => window.removeEventListener('resize', updateVisibleCount);
-  }, []);
-
-  useEffect(() => {
-    if (isReviewPaused) return;
-    const maxIndex = Math.max(0, CUSTOMER_REVIEWS.length - reviewVisibleCount);
-    const timer = setInterval(() => {
-      setReviewIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [isReviewPaused, reviewVisibleCount]);
-
-  const handlePrevReview = () => {
-    const maxIndex = Math.max(0, CUSTOMER_REVIEWS.length - reviewVisibleCount);
-    setReviewIndex((prev) => (prev <= 0 ? maxIndex : prev - 1));
-  };
-
-  const handleNextReview = () => {
-    const maxIndex = Math.max(0, CUSTOMER_REVIEWS.length - reviewVisibleCount);
-    setReviewIndex((prev) => (prev >= maxIndex ? 0 : prev + 1));
-  };
-  const [plans, setPlans] = useState<any[]>(DEFAULT_HOME_PLANS);
+    const [plans, setPlans] = useState<any[]>(DEFAULT_HOME_PLANS);
 
   // Typewriter Animation State
   const [phraseIndex, setPhraseIndex] = useState(0);
@@ -580,16 +521,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. GOOGLE MAPS CUSTOMER REVIEWS MOVING CAROUSEL */}
+      {/* 4. CLIENT REVIEWS MOVING CAROUSEL */}
       <section className="bg-slate-50/80 border-t border-slate-200/80 py-20 overflow-hidden relative">
         <div className="max-w-7xl mx-auto px-6">
           
-          {/* Header with Google Badge and Navigation Controls */}
+          {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
             <div>
-              <div className="inline-flex items-center gap-2 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-3.5 py-1.5 rounded-full mb-3 shadow-xs">
-                <GoogleIcon />
-                <span className="font-semibold text-slate-800">5.0 Star Rating on Google</span>
+              <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-3.5 py-1.5 rounded-full mb-3 shadow-xs">
+                <span className="font-semibold text-slate-800">Verified Client Feedback</span>
                 <div className="flex items-center gap-0.5 text-amber-400 ml-1">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -597,156 +537,68 @@ export default function Home() {
                 </div>
               </div>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
-                Trusted by Businesses & Developers
+                Trusted by Developers & System Administrators
               </h2>
               <p className="text-slate-600 text-sm sm:text-base mt-2 max-w-xl font-normal">
-                Real feedback from verified clients running their production cloud workloads and mission-critical servers with Analytical Technical Consulting.
+                Real feedback from engineers and administrators hosting their cloud workloads on Analytical Technical Consulting servers.
               </p>
             </div>
 
-            {/* Controls: Prev / Next Buttons & View on Google Maps Link */}
-            <div className="flex items-center gap-3 shrink-0">
-              <a
-                href={GOOGLE_MAPS_REVIEWS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-blue-600 hover:border-blue-300 hover:shadow-xs transition-all"
-              >
-                <span>View on Google Maps</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-
-              <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl p-1 shadow-xs">
-                <button
-                  type="button"
-                  onClick={handlePrevReview}
-                  aria-label="Previous review"
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextReview}
-                  aria-label="Next review"
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
+            {/* Subtle live indicator badge */}
+            <div className="hidden sm:inline-flex items-center gap-2 text-xs text-slate-500 font-medium bg-white border border-slate-200/80 px-4 py-2 rounded-xl shadow-xs shrink-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Continuous Telemetry & Feedback</span>
             </div>
           </div>
 
-          {/* Carousel Track (Auto-moving, pause on hover) */}
-          <div
-            className="relative"
-            onMouseEnter={() => setIsReviewPaused(true)}
-            onMouseLeave={() => setIsReviewPaused(false)}
-            onTouchStart={() => setIsReviewPaused(true)}
-            onTouchEnd={() => setIsReviewPaused(false)}
-          >
-            <div className="overflow-hidden">
-              <div
-                className="flex transition-transform duration-500 ease-out -mx-3"
-                style={{
-                  transform: `translateX(-${reviewIndex * (100 / reviewVisibleCount)}%)`,
-                }}
-              >
-                {CUSTOMER_REVIEWS.map((review, idx) => (
-                  <div
-                    key={idx}
-                    className="px-3 shrink-0"
-                    style={{ width: `${100 / reviewVisibleCount}%` }}
-                  >
-                    <div className="h-full bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-xs hover:shadow-xl hover:border-blue-400/80 transition-all duration-300 flex flex-col justify-between group relative">
-                      
-                      {/* Top Bar: Stars + Google Badge */}
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-1 text-amber-400">
-                            {[...Array(review.rating)].map((_, i) => (
-                              <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                            ))}
-                          </div>
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-200/80 text-[11px] font-semibold text-slate-600">
-                            <GoogleIcon />
-                            <span>Google Review</span>
-                          </div>
-                        </div>
+          {/* Smooth Continuous Infinite Marquee Track (Smooth Hardware Accelerated CSS, Pauses on Hover) */}
+          <div className="relative overflow-hidden py-4 -mx-6 px-6">
+            {/* Left & Right Smooth Edge Fade Overlays */}
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-r from-slate-50 via-slate-50/90 to-transparent z-10" />
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-l from-slate-50 via-slate-50/90 to-transparent z-10" />
 
-                        {/* Review text */}
-                        <p className="text-slate-700 text-xs sm:text-sm leading-relaxed font-normal mb-6">
-                          "{review.review}"
+            <div className="animate-infinite-carousel">
+              {[...CLIENT_REVIEWS, ...CLIENT_REVIEWS].map((review, idx) => (
+                <div
+                  key={idx}
+                  className="w-[320px] sm:w-[380px] shrink-0 p-3"
+                >
+                  <div className="h-full bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-xs hover:shadow-xl hover:border-blue-400/80 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+                    <div>
+                      {/* 5 Stars */}
+                      <div className="flex items-center gap-1 text-amber-400 mb-4">
+                        {[...Array(review.rating)].map((_, i) => (
+                          <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                        ))}
+                      </div>
+
+                      {/* Review text */}
+                      <p className="text-slate-700 text-xs sm:text-sm leading-relaxed font-normal mb-6">
+                        "{review.review}"
+                      </p>
+                    </div>
+
+                    {/* Author Info */}
+                    <div className="pt-4 border-t border-slate-100 flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-xl bg-gradient-to-br ${review.color} text-white font-bold text-xs flex items-center justify-center shadow-xs shrink-0`}
+                      >
+                        {review.initials}
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                          {review.name}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          {review.role}
                         </p>
                       </div>
-
-                      {/* Author Info + Verified Link */}
-                      <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-10 h-10 rounded-xl bg-gradient-to-br ${review.color} text-white font-bold text-xs flex items-center justify-center shadow-xs shrink-0`}
-                          >
-                            {review.initials}
-                          </div>
-                          <div>
-                            <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                              {review.name}
-                            </h4>
-                            <p className="text-[11px] text-slate-500 font-medium">
-                              {review.role}
-                            </p>
-                          </div>
-                        </div>
-
-                        <a
-                          href={GOOGLE_MAPS_REVIEWS_URL}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Open review on Google Maps"
-                          className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-blue-600 border border-slate-200/80 flex items-center justify-center transition-colors shrink-0"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </a>
-                      </div>
-
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Pagination Indicator Dots */}
-            <div className="flex items-center justify-center gap-2 mt-8">
-              {Array.from({
-                length: Math.max(1, CUSTOMER_REVIEWS.length - reviewVisibleCount + 1),
-              }).map((_, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setReviewIndex(idx)}
-                  aria-label={`Go to review slide ${idx + 1}`}
-                  className={`h-2 rounded-full transition-all cursor-pointer ${
-                    reviewIndex === idx
-                      ? 'w-8 bg-blue-600'
-                      : 'w-2 bg-slate-300 hover:bg-slate-400'
-                  }`}
-                />
+                  </div>
+                </div>
               ))}
             </div>
-
-          </div>
-
-          {/* Mobile direct link CTA */}
-          <div className="mt-6 text-center sm:hidden">
-            <a
-              href={GOOGLE_MAPS_REVIEWS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:text-blue-600 shadow-xs"
-            >
-              <span>View all 5.0 Google Reviews</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
           </div>
 
         </div>

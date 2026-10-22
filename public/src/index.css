@@ -244,3 +244,26 @@ html.dark ::-webkit-scrollbar-thumb:hover,
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* ==============================================================================
+   Continuous Hardware-Accelerated Smooth Reviews Carousel
+   ============================================================================== */
+@keyframes infinite-carousel-slide {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-infinite-carousel {
+  display: flex;
+  width: max-content;
+  animation: infinite-carousel-slide 34s linear infinite;
+  will-change: transform;
+}
+
+.animate-infinite-carousel:hover {
+  animation-play-state: paused;
+}
