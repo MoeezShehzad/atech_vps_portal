@@ -95,7 +95,7 @@ const DEFAULT_HOME_PLANS = [
     ramGb: 2,
     storage: '50 GB SSD',
     storageGb: 50,
-    bandwidth: '4 TB Bandwidth',
+    bandwidth: '40 GB Bandwidth',
     price: 4.97,
     monthlyPrice: 4.97,
     popular: false,
@@ -135,11 +135,9 @@ const DEFAULT_HOME_PLANS = [
 
 const ONE_CLICK_APPS = [
   { name: 'Docker Compose', category: 'DevOps', icon: '🐳' },
-  { name: 'aaPanel', category: 'Control Panel', icon: '⚡' },
   { name: 'Ubuntu 24.04', category: 'Linux OS', icon: '🐧' },
   { name: 'Debian 12', category: 'Linux OS', icon: '🌀' },
   { name: 'AlmaLinux 9', category: 'Enterprise OS', icon: '🛡️' },
-  { name: 'Windows Server', category: 'Windows OS', icon: '🪟' },
   { name: 'Nginx Engine', category: 'Web Server', icon: '🚀' },
   { name: 'Node.js LTS', category: 'Runtime', icon: '🟢' },
   { name: 'PostgreSQL', category: 'Database', icon: '🐘' },
@@ -250,7 +248,7 @@ export default function Home() {
             </div>
 
             {/* Main Headline with Dynamic Typewriter Animation */}
-            <h1 className="text-4xl sm:text-6xl font-extrabold text-slate-950 leading-[1.12] tracking-tight min-h-[135px] sm:min-h-[175px]">
+            <h1 className="text-4xl sm:text-6xl font-thin text-slate-950 leading-[1.12] tracking-tight min-h-[135px] sm:min-h-[175px]">
               Deploy Scalable <br className="hidden sm:inline" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 font-black">
                 {displayText}
@@ -262,8 +260,8 @@ export default function Home() {
             </h1>
 
             {/* Description Subtext */}
-            <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
-              Analytical Technical Consulting (ATC) delivers next-generation data center virtualization, pure SSD cloud servers, and instant 1-click DevOps deployments engineered for production workloads.
+            <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-thin">
+              ATC delivers next-generation data center virtualization, pure SSD cloud servers, and instant 1-click DevOps deployments engineered for production workloads.
             </p>
 
             {/* CTA Action Buttons */}
@@ -385,7 +383,7 @@ export default function Home() {
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3.5 py-1 rounded-full uppercase tracking-wider">
             <Zap className="w-3.5 h-3.5" /> High Performance VPS Hosting
           </div>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-950 tracking-tight">
+          <h2 className="text-3xl sm:text-5xl font-normal text-slate-950 tracking-tight">
             Predictable Cloud Pricing
           </h2>
           <p className="text-slate-600 text-sm sm:text-base font-normal">
@@ -500,11 +498,11 @@ export default function Home() {
                   ))}
                 </div>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
+              <h2 className="text-3xl sm:text-4xl font-normal text-slate-950 tracking-tight">
                 Trusted by Developers & System Administrators
               </h2>
               <p className="text-slate-600 text-sm sm:text-base mt-2 max-w-xl font-normal">
-                Real feedback from engineers and administrators hosting their cloud workloads on Analytical Technical Consulting servers.
+                Here’s what clients say about their experience with Analytical Technical Consulting services.
               </p>
             </div>
 
@@ -575,7 +573,7 @@ export default function Home() {
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3.5 py-1 rounded-full uppercase tracking-wider">
               <Shield className="w-3.5 h-3.5" /> Engineered For Stability
             </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-normal text-slate-950 tracking-tight">
               Enterprise Infrastructure Capabilities
             </h2>
             <p className="text-slate-600 text-sm font-normal">
@@ -622,7 +620,7 @@ export default function Home() {
         <div className="bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 rounded-3xl p-10 sm:p-16 text-white text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-8 shadow-2xl relative overflow-hidden border border-slate-800">
           <div className="space-y-3 relative z-10 max-w-xl">
             <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Custom Enterprise Hosting</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Need a custom dedicated setup?</h2>
+            <h2 className="text-3xl sm:text-4xl font-normal tracking-tight">Need a custom dedicated setup?</h2>
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
               Our engineering team provides tailored server configurations, multi-node private cloud clusters, and direct IT consulting.
             </p>
