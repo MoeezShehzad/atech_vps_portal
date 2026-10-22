@@ -30,6 +30,31 @@ import nexaSphereImg from '../assets/nexa_liquid_sphere.jpg';
 import nexaCloudsImg from '../assets/nexa_atmospheric_clouds.jpg';
 import datacenterBgImg from '../assets/datacenter_infrastructure_bg.jpg';
 import serverRacksImg from '../assets/datacenter_server_racks.jpg';
+import fiberNetworkImg from '../assets/bg_fiber_network.jpg';
+import serverHallImg from '../assets/bg_server_hall.jpg';
+import serverHardwareImg from '../assets/bg_server_hardware.jpg';
+import nocRoomImg from '../assets/bg_noc_room.jpg';
+
+// Reusable high-resolution infrastructure background layer with edge fades for seamless section blending
+function SectionBg({ src, opacity = 0.55, position = 'center' }: { src: string; opacity?: number; position?: string }) {
+  return (
+    <>
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+        style={{ opacity, objectPosition: position }}
+      />
+      {/* Top & bottom fades so sections blend into each other */}
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#030611] via-transparent to-[#030611]" />
+      {/* Soft readability veil */}
+      <div className="absolute inset-0 pointer-events-none bg-[#030611]/35" />
+    </>
+  );
+}
 
 const CLIENT_REVIEWS = [
   {
@@ -382,8 +407,17 @@ export default function Home() {
       {/* ==============================================================================
           2. ONE-CLICK OS & DEVOPS SHOWCASE STRIP
           ============================================================================== */}
-      <section className="bg-[#050B18]/95 border-b border-white/10 py-6 backdrop-blur-xl relative z-10">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="bg-[#050B18] border-b border-white/10 py-10 relative z-10 overflow-hidden">
+        <img
+          src={fiberNetworkImg}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none opacity-60"
+          style={{ objectPosition: 'center 55%' }}
+        />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#030611]/95 via-[#030611]/60 to-[#030611]/30" />
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2.5 text-xs font-bold text-[#A4AEC3] uppercase tracking-wider shrink-0">
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping mr-1" />
@@ -411,6 +445,9 @@ export default function Home() {
           ============================================================================== */}
       <section id="services" className="py-24 sm:py-32 border-b border-white/10 bg-[#030611] relative z-10 overflow-hidden">
         
+        {/* High-resolution hyperscale data center hall background */}
+        <SectionBg src={serverHallImg} opacity={0.6} />
+
         {/* Soft atmospheric blue glow */}
         <div className="absolute top-1/2 left-0 w-[550px] h-[550px] bg-[#4263FF]/15 rounded-full blur-[150px] pointer-events-none" />
 
@@ -478,12 +515,8 @@ export default function Home() {
           ============================================================================== */}
       <section className="py-24 sm:py-32 bg-[#050B18] border-b border-white/10 relative z-10 overflow-hidden">
         
-        {/* High-Density Enterprise Server Racks Background Layer */}
-        <div 
-          className="absolute inset-0 pointer-events-none opacity-25 dark:opacity-35 bg-cover bg-center transition-opacity duration-700 mix-blend-luminosity scale-105"
-          style={{ backgroundImage: `url(${serverRacksImg})` }}
-        />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#050B18] via-[#050B18]/85 to-[#050B18]" />
+        {/* High-resolution server hardware macro background */}
+        <SectionBg src={serverHardwareImg} opacity={0.55} />
 
         {/* Soft atmospheric gradient glow */}
         <div className="absolute top-0 right-1/4 w-[480px] h-[480px] bg-[#4263FF]/20 rounded-full blur-[140px] pointer-events-none" />
@@ -584,7 +617,10 @@ export default function Home() {
       {/* ==============================================================================
           5. PREDICTABLE CLOUD VPS PRICING SECTION
           ============================================================================== */}
-      <section className="py-24 sm:py-32 bg-[#030611] relative z-10 border-b border-white/10">
+      <section className="py-24 sm:py-32 bg-[#030611] relative z-10 border-b border-white/10 overflow-hidden">
+        
+        {/* High-resolution enterprise server rack blades background */}
+        <SectionBg src={serverRacksImg} opacity={0.5} />
         
         {/* Ambient glow behind cards */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-blue-600/10 rounded-full blur-[160px] pointer-events-none" />
@@ -702,7 +738,9 @@ export default function Home() {
           6. VERIFIED CLIENT FEEDBACK CONTINUOUS MARQUEE
           ============================================================================== */}
       <section className="bg-[#050B18] border-t border-white/10 py-20 overflow-hidden relative z-10">
-        <div className="max-w-7xl mx-auto px-6">
+        {/* High-resolution network operations center background */}
+        <SectionBg src={nocRoomImg} opacity={0.55} position="center right" />
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
           
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
             <div>
@@ -782,11 +820,15 @@ export default function Home() {
       <section className="max-w-7xl mx-auto px-6 py-24 relative z-10">
         <div className="bg-gradient-to-r from-[#030611] via-[#081229] to-[#030611] border border-cyan-500/30 rounded-3xl p-10 sm:p-16 text-white text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-8 shadow-2xl shadow-cyan-950/40 relative overflow-hidden">
           
-          {/* Data Center Server Blade Texture inside Card */}
-          <div 
-            className="absolute inset-0 pointer-events-none opacity-25 bg-cover bg-center mix-blend-overlay scale-110"
-            style={{ backgroundImage: `url(${serverRacksImg})` }}
+          {/* High-resolution data center corridor inside the CTA card */}
+          <img
+            src={datacenterBgImg}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none opacity-50"
           />
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#030611]/95 via-[#030611]/70 to-[#030611]/30" />
 
           <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:3rem_3rem] opacity-35 pointer-events-none" />
 
