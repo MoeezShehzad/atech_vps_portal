@@ -2,14 +2,14 @@ const { Client } = require('ssh2');
 const path = require('path');
 
 const filesToUpload = [
-  'public/src/pages/Home.tsx',
   'public/src/components/Navbar.tsx',
-  'public/src/components/Footer.tsx'
+  'public/src/context/ThemeContext.tsx',
+  'public/index.html'
 ];
 
 const conn = new Client();
 
-console.log('Connecting to Ubuntu server 172.21.39.51 to push full dark data center theme...');
+console.log('Connecting to Ubuntu server 172.21.39.51 to push navbar datacenter theme...');
 
 conn.on('ready', () => {
   console.log('SSH connection established! Initializing SFTP...');
