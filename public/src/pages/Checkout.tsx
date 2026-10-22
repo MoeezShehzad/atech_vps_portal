@@ -295,6 +295,7 @@ export default function Checkout() {
         if (res.success) {
           if (deployPreference === 'immediate') {
             try {
+              const isWinOS = orderData.os?.osFamily?.toLowerCase() === 'windows' || orderData.os?.name?.toLowerCase().includes('windows');
               const deployPayload = {
                 vmName: orderData.hostname?.trim() || `srv-vps-${Math.floor(1000 + Math.random() * 9000)}`,
                 planId: orderData.plan?.planId || 1,
@@ -302,11 +303,11 @@ export default function Checkout() {
                 customCpu: orderData.plan?.cpuCores,
                 customRam: orderData.plan?.ramGb,
                 customStorage: orderData.plan?.storageGb,
-                username: orderData.adminUsername || 'ubuntu',
-                password: orderData.rootPassword || 'root',
+                username: orderData.adminUsername || (isWinOS ? 'Administrator' : 'ubuntu'),
+                password: orderData.rootPassword || (isWinOS ? 'P@ssw0rd2026!' : 'root'),
                 authMethod: 'password',
                 enableBackups: orderData.addons?.some((a: any) => a.name?.toLowerCase().includes('backup')),
-                appId: orderData.appId || undefined,
+                appId: isWinOS ? undefined : (orderData.appId || undefined),
               };
               await apiCall('/vms/deploy', {
                 method: 'POST',

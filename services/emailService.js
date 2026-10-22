@@ -344,29 +344,43 @@ export async function sendOtpEmail({
  */
 export async function sendVmProvisionedEmail({ email, fullName, vmName, ipAddress, username, password, os }) {
   const portalUrl = `${APP_URL}/dashboard`;
+  const isWindows = (os && os.toLowerCase().includes('windows')) || (username && username.toLowerCase() === 'administrator');
+
+  const connectionBlock = isWindows
+    ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b;color:#94a3b8;font-size:12px;">
+          Quick Connect (RDP & Web Desktop):<br/>
+          <div style="margin-top:4px;">• <strong>In-Browser Web Desktop:</strong> Click <em>"Desktop"</em> on your VM in the ATC Dashboard.</div>
+          <div>• <strong>Native Remote Desktop:</strong> Connect via Microsoft Remote Desktop to <code>${escapeHtml(ipAddress)}:3389</code></div>
+        </div>
+      `
+    : `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b;color:#94a3b8;font-size:12px;">
+          Quick Connect:<br/>
+          <code style="color:#38bdf8;">ssh ${escapeHtml(username || 'ubuntu')}@${escapeHtml(ipAddress)}</code>
+        </div>
+      `;
+
   const html = wrapEmailTemplate({
     title: `Your server "${escapeHtml(vmName)}" is ready`,
     subtitle: `Hi ${escapeHtml(fullName || 'Customer')}, your virtual machine is deployed and online.`,
-    categoryBadge: 'Cloud Compute',
+    categoryBadge: isWindows ? 'Windows Cloud' : 'Cloud Compute',
     contentHtml: `
       <p style="margin-top:0;">Your new cloud instance has been successfully allocated on the ATC infrastructure with dedicated resources.</p>
       
       <div style="background-color:#0f172a;color:#f8fafc;padding:18px 22px;border-radius:10px;margin:22px 0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.7;">
         <div style="color:#38bdf8;font-weight:700;font-family:-apple-system,sans-serif;font-size:12px;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Access Credentials</div>
         <div>Hostname: <span style="color:#ffffff;">${escapeHtml(vmName)}</span></div>
-        <div>Public IP: <span style="color:#4ade80;font-weight:600;">${escapeHtml(ipAddress)}</span></div>
-        <div>OS: <span style="color:#ffffff;">${escapeHtml(os || 'Linux')}</span></div>
-        <div>Username: <span style="color:#ffffff;">${escapeHtml(username || 'root')}</span></div>
+        <div>Public / Gateway IP: <span style="color:#4ade80;font-weight:600;">${escapeHtml(ipAddress)}</span></div>
+        <div>OS: <span style="color:#ffffff;">${escapeHtml(os || (isWindows ? 'Windows 10 Pro' : 'Linux'))}</span></div>
+        <div>Username: <span style="color:#ffffff;">${escapeHtml(username || (isWindows ? 'Administrator' : 'ubuntu'))}</span></div>
         <div>Initial Password: <span style="color:#facc15;">${escapeHtml(password)}</span></div>
-        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b;color:#94a3b8;font-size:12px;">
-          Quick Connect:<br/>
-          <code style="color:#38bdf8;">ssh ${escapeHtml(username || 'root')}@${escapeHtml(ipAddress)}</code>
-        </div>
+        ${connectionBlock}
       </div>
 
-      <p style="font-size:13px;color:#64748b;margin-bottom:0;">You can manage power, snapshots, and web console directly from your dashboard.</p>
+      <p style="font-size:13px;color:#64748b;margin-bottom:0;">You can manage power, snapshots, and web ${isWindows ? 'desktop' : 'console'} directly from your dashboard.</p>
     `,
-    ctaText: 'Open Cloud Console',
+    ctaText: isWindows ? 'Open Web Desktop' : 'Open Cloud Console',
     ctaUrl: portalUrl,
   });
 

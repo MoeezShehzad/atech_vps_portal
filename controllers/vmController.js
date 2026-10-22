@@ -280,7 +280,6 @@ export async function deployVM(req, res) {
     }
 
     const { planId, imageId, vmName, customCpu, customRam, customStorage, username, password, authMethod, sshKeyId, sshPublicKey, appId, enableBackups } = req.body;
-    const adminUsername = (username && username.trim()) ? username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') : 'ubuntu';
     const adminPassword = (password && password.trim()) ? password.trim() : '';
 
     let resolvedPublicKey = '';
@@ -342,6 +341,18 @@ export async function deployVM(req, res) {
     if (!plan || !image) {
       return res.status(404).json({ error: 'Selected VPS plan or operating system not found.' });
     }
+
+    const isWindows = Boolean(
+      image && (
+        image.osFamily?.toLowerCase() === 'windows' ||
+        image.name?.toLowerCase().includes('windows') ||
+        (image.templatePath && image.templatePath.toLowerCase().includes('windows'))
+      )
+    );
+
+    const adminUsername = (username && username.trim())
+      ? (isWindows ? username.trim() : username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ''))
+      : (isWindows ? 'Administrator' : 'ubuntu');
 
     // Get an active HyperV host
     let host = await prisma.hyperVHost.findFirst({
@@ -485,7 +496,8 @@ export async function deployVM(req, res) {
         adminUsername,
         adminPassword,
         sshPublicKey: resolvedPublicKey,
-        appId,
+        osFamily: isWindows ? 'Windows' : 'Linux',
+        appId: isWindows ? '' : appId,
       });
 
       await prisma.activityLog.create({
@@ -511,13 +523,13 @@ export async function deployVM(req, res) {
         ipAddress: readyVm?.ipAddress || ipRecord?.ipAddress || 'Allocated via DHCP',
         username: adminUsername,
         password: adminPassword,
-        os: image?.imageName || 'Linux',
+        os: image?.name || (isWindows ? 'Windows 10 Pro' : 'Linux'),
       }).catch((mailErr) => {
         console.warn('[VM Provision Email Warning]:', mailErr.message);
       });
 
-      // Trigger automated 1-Click App installation if requested
-      if (appId) {
+      // Trigger automated 1-Click App installation if requested (Linux only)
+      if (appId && !isWindows) {
         import('../services/appStoreService.js').then(({ installAppOnVM }) => {
           installAppOnVM({ vmId: newVm.vmId, userId, appId }).catch((appErr) => {
             console.warn(`[Auto 1-Click App Install Notice on ${cleanVmName}]:`, appErr.message);

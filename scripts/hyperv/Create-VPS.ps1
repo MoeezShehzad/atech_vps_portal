@@ -120,13 +120,16 @@ try {
     } catch {}
 
     # 9. Asynchronously run guest configuration (disk filesystem expansion & credential setup for Linux)
-    if (-not $IsISO) {
+    $IsWindows = $TemplatePath.ToLower().Contains("windows") -or ($AdminUsername -eq "Administrator")
+    if (-not $IsISO -and -not $IsWindows) {
         $GuestScript = Join-Path $PSScriptRoot "Configure-Guest.ps1"
         if (Test-Path $GuestScript) {
             $ProcArgs = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$GuestScript`" -VMName `"$VMName`" -AdminUsername `"$AdminUsername`" -AdminPassword `"$AdminPassword`" -SSHPublicKey `"$SSHPublicKey`" -TimeoutSeconds 120"
             Start-Process powershell.exe -ArgumentList $ProcArgs -WindowStyle Hidden -ErrorAction SilentlyContinue | Out-Null
             Write-Output "[GUEST] Spawned independent process for guest initialization and filesystem expansion."
         }
+    } else {
+        Write-Output "[GUEST] Windows or ISO template detected - skipping Linux guest configuration."
     }
 
     # 10. Audit Logging
