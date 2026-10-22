@@ -10,7 +10,7 @@ const OS_OPTIONS = [
   { id: 'debian-12', name: 'Debian 12', category: 'Linux', icon: '🌀', fee: 0, imageId: 2 },
   { id: 'alma-9', name: 'AlmaLinux 9', category: 'Linux', icon: '💿', fee: 0, imageId: 2 },
   { id: 'rocky-9', name: 'Rocky Linux 9', category: 'Linux', icon: '⛰️', fee: 0, imageId: 2 },
-  { id: 'win-2022', name: 'Windows Server 2022', category: 'Windows', icon: '🪟', fee: 10, imageId: 2 },
+  { id: 'win-10', name: 'Windows 10 Pro', category: 'Windows', icon: '🪟', fee: 0, imageId: 3 },
 ];
 
 const DATACENTER_LOCATIONS = [

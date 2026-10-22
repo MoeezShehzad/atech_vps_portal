@@ -40,7 +40,7 @@ const SHOWCASE_SLIDES = [
     image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1800&q=85',
     badge: 'ATC Cloud Platform',
     title: 'Engineered for Production Workloads.',
-    subtitle: 'Launch production Linux or Windows Server workloads with full root access, live web console, and instant snapshots.',
+    subtitle: 'Launch production Linux or Windows 10 Pro workloads with full administrator access, live web desktop console, and instant snapshots.',
     statLabel: 'Dedicated Resources',
     statValue: 'vCPU • ECC RAM • SSD',
   },
