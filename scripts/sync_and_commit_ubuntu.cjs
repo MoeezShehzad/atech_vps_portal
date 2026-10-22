@@ -18,7 +18,10 @@ const filesToSync = [
   'public/src/assets/bg_fiber_network.jpg',
   'public/src/assets/bg_server_hall.jpg',
   'public/src/assets/bg_server_hardware.jpg',
-  'public/src/assets/bg_noc_room.jpg'
+  'public/src/assets/bg_noc_room.jpg',
+  'public/src/assets/server_rack_bokeh.jpg',
+  'public/src/assets/server_drives_macro.jpg',
+  'public/src/assets/server_rack_wide.jpg'
 ];
 
 const conn = new Client();
@@ -64,7 +67,7 @@ conn.on('ready', () => {
         git status
         echo "=== 2. GIT ADD & COMMIT ON UBUNTU ==="
         git add public/index.html public/src/index.css public/src/pages/Home.tsx public/src/components/Navbar.tsx public/src/components/Footer.tsx public/src/components/AnimatedCloudTerminal.tsx public/src/components/LiquidGlassSphere.tsx public/src/context/ThemeContext.tsx public/src/assets/
-        git commit -m "Add high-resolution server and infrastructure backgrounds to all homepage sections" || echo "Already committed or clean"
+        git commit -m "Transform homepage to clean white theme with subtle authentic server and infrastructure photography backgrounds" || echo "Already committed or clean"
         echo "=== 3. GIT STATUS AFTER ==="
         git status
         echo "=== 4. FRONTEND BUILD ==="

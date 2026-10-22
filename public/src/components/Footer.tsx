@@ -62,13 +62,13 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="bg-[#02050E] text-[#A4AEC3] font-sans border-t border-white/10 transition-colors relative z-10">
+    <footer className="bg-slate-50 dark:bg-[#02050E] text-slate-600 dark:text-[#A4AEC3] font-sans border-t border-slate-200/80 dark:border-white/10 transition-colors relative z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8 items-start">
           
           {/* COLUMN 1: CONTACT */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white font-poppins">Contact</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Contact</h3>
             
             <div className="space-y-1 text-sm">
               <a 
@@ -102,7 +102,7 @@ export default function Footer() {
 
           {/* COLUMN 2: COMPANY LINKS */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white font-poppins">Company</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Company</h3>
             <ul className="space-y-3 text-sm">
               <li>
                 <Link to="/" className="text-[#A4AEC3] hover:text-[#55DFFF] transition-colors">
@@ -134,17 +134,17 @@ export default function Footer() {
 
           {/* COLUMN 3: LOCATION MAP CARD */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white font-poppins">Infrastructure</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Infrastructure</h3>
             
-            <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#070D1D] group shadow-xl">
-              <div className="h-48 w-full bg-[#0C1428] relative flex items-center justify-center overflow-hidden">
+            <div className="relative rounded-2xl overflow-hidden border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#070D1D] group shadow-xs">
+              <div className="h-48 w-full bg-slate-100 dark:bg-[#0C1428] relative flex items-center justify-center overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
 
                 <a
                   href="https://maps.google.com/?q=Illinois,+United+States"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="absolute top-3 left-3 z-10 bg-[#070D1D]/90 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-white transition-all flex items-center gap-1.5 shadow-md border border-white/10 hover:border-cyan-400"
+                  className="absolute top-3 left-3 z-10 bg-white/95 dark:bg-[#070D1D]/90 text-slate-900 dark:text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-white transition-all flex items-center gap-1.5 shadow-md border border-slate-200 dark:border-white/10 hover:border-blue-500"
                 >
                   Open in Maps <ExternalLink className="w-3 h-3 text-blue-600" />
                 </a>
@@ -156,7 +156,7 @@ export default function Footer() {
                 </div>
               </div>
 
-              <div className="p-3 bg-[#070D1D] border-t border-white/10 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+              <div className="p-3 bg-white dark:bg-[#070D1D] border-t border-slate-200 dark:border-white/10 flex items-center justify-between text-[11px] text-slate-600 dark:text-[#A4AEC3]">
                 <span>Illinois, United States</span>
                 <span className="text-cyan-400 font-medium">Cloud Hub</span>
               </div>
@@ -165,14 +165,14 @@ export default function Footer() {
 
           {/* COLUMN 4: SOCIAL ACCOUNTS */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white font-poppins">Social Accounts</h3>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Social Accounts</h3>
             
             <div className="flex flex-col gap-2.5">
               {socialLinks.map((social) => (
                 <a
                   key={social.name}
                   href={social.href}
-                  className="w-10 h-10 rounded-full border border-white/10 bg-[#070D1D] hover:bg-[#55DFFF] hover:text-black text-[#A4AEC3] transition-all flex items-center justify-center shadow-xs"
+                  className="w-10 h-10 rounded-full border border-slate-200 dark:border-white/10 bg-white dark:bg-[#070D1D] hover:bg-blue-600 hover:text-white dark:hover:bg-[#55DFFF] dark:hover:text-black text-slate-600 dark:text-[#A4AEC3] transition-all flex items-center justify-center shadow-xs"
                   title={social.name}
                 >
                   {social.icon}
@@ -184,7 +184,7 @@ export default function Footer() {
         </div>
 
         {/* BOTTOM COPYRIGHT & TRIAL DISCLAIMER */}
-        <div className="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div className="mt-12 pt-6 border-t border-slate-200 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div>
             <p>© {new Date().getFullYear()} Analytical Technical Consulting (ATC). All rights reserved.</p>
             <p className="text-[10px] text-slate-400 dark:text-slate-600 mt-1">Platform services are currently on a trial basis as we continuously improve our infrastructure.</p>
