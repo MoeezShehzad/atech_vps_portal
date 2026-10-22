@@ -4,25 +4,28 @@ import {
   Server, 
   Shield, 
   Cpu, 
-  Award, 
   Check, 
   Zap, 
   Globe, 
   ShieldCheck, 
-  ChevronRight,
-  ChevronLeft,
+  ChevronRight, 
   Star,
-  ExternalLink,
+  Layers,
   Terminal,
   Activity,
   Sparkles,
-  Layers,
   Lock,
-  Database
+  Database,
+  PhoneCall,
+  HardDrive,
+  Workflow,
+  Network,
+  Gauge
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchVpsPlans } from '../services/pricingApi';
 import AnimatedCloudTerminal from '../components/AnimatedCloudTerminal';
+import LiquidGlassSphere from '../components/LiquidGlassSphere';
 
 const GOOGLE_MAPS_REVIEWS_URL =
   'https://www.google.com/maps/place/Analytical+Technical+Consulting/@41.6493404,-88.1755207,17z/data=!3m1!4b1!4m6!3m5!1s0x258bf3e100baa53b:0xdad95528ab037483!8m2!3d41.6493364!4d-88.1729458!16s%2Fg%2F11y56zr_t0?entry=ttu&g_ep=EgoyMDI2MTAxOS4wIKXMDSoASAFQAw%3D%3D';
@@ -84,6 +87,44 @@ const CLIENT_REVIEWS = [
   },
 ];
 
+const EDITORIAL_SERVICES = [
+  {
+    number: '01',
+    title: 'Enterprise ERP & Systems',
+    category: 'Business Infrastructure',
+    description:
+      'Scalable enterprise resource planning, database architecture, and production workflows deployed on dedicated virtualization matrices for uninterrupted operations.',
+    points: ['ERP Migration & Optimization', 'Clustered Database Deployments', 'Custom Integration Topologies'],
+    icon: Database,
+  },
+  {
+    number: '02',
+    title: 'Data Center Virtualization',
+    category: 'Cloud Engineering',
+    description:
+      'High-availability data center hosting with pure enterprise SSD arrays, automated backup schedules, and private cloud failover architectures.',
+    points: ['Private Virtual Data Centers', 'Live Hypervisor Failover', 'Dedicated Hardware Isolation'],
+    icon: Server,
+  },
+  {
+    number: '03',
+    title: 'System Architecture & Security',
+    category: 'Cybersecurity & Auditing',
+    description:
+      'Systematic boundary defense, zero-trust network segmentation, active firewall configuration, and multi-tenant security boundary auditing.',
+    points: ['Boundary Defense & Firewalls', 'Isolated Subnet Routing', 'PCI-DSS Compliance Alignment'],
+    icon: ShieldCheck,
+  },
+  {
+    number: '04',
+    title: 'Hardware Sizing & Workload Tuning',
+    category: 'Performance Engineering',
+    description:
+      'Precision bare-metal profiling and active workload balancing to eliminate resource contention and unlock maximum NVMe throughput for demanding workloads.',
+    points: ['Dedicated Compute Allocation', 'NVMe Read/Write Tuning', 'Latency Throttling Elimination'],
+    icon: Cpu,
+  },
+];
 
 const DEFAULT_HOME_PLANS = [
   {
@@ -123,9 +164,9 @@ const DEFAULT_HOME_PLANS = [
     cpuCores: 8,
     ram: '16 GB RAM',
     ramGb: 16,
-    storage: '250 GB SSD',
-    storageGb: 250,
-    bandwidth: '12 TB Bandwidth',
+    storage: '240 GB SSD',
+    storageGb: 240,
+    bandwidth: '16 TB Bandwidth',
     price: 29.99,
     monthlyPrice: 29.99,
     popular: false,
@@ -141,21 +182,22 @@ const ONE_CLICK_APPS = [
   { name: 'Nginx Engine', category: 'Web Server', icon: '🚀' },
   { name: 'Node.js LTS', category: 'Runtime', icon: '🟢' },
   { name: 'PostgreSQL', category: 'Database', icon: '🐘' },
+  { name: 'Redis Cache', category: 'In-Memory DB', icon: '⚡' },
+  { name: 'Next.js App', category: 'Frontend', icon: '▲' },
 ];
 
 const TYPEWRITER_PHRASES = [
-  'Cloud Infrastructure',
-  'Ultra-Fast SSD VPS',
-  '1-Click DevOps Apps',
-  'Automated aaPanel Stacks',
-  'Docker Cloud Instances',
+  'Virtual Private Servers',
+  'Enterprise Data Centers',
+  'Mission-Critical Workloads',
+  'Dedicated Cloud Instances',
   'Enterprise Virtualization',
 ];
 
 export default function Home() {
   const navigate = useNavigate();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('monthly');
-    const [plans, setPlans] = useState<any[]>(DEFAULT_HOME_PLANS);
+  const [plans, setPlans] = useState<any[]>(DEFAULT_HOME_PLANS);
 
   // Typewriter Animation State
   const [phraseIndex, setPhraseIndex] = useState(0);
@@ -195,16 +237,13 @@ export default function Home() {
     let timeout: ReturnType<typeof setTimeout>;
 
     if (!isDeleting && displayText === currentPhrase) {
-      // Pause at full word for 2.2 seconds before deleting
-      timeout = setTimeout(() => setIsDeleting(true), 2200);
+      timeout = setTimeout(() => setIsDeleting(true), 2400);
     } else if (isDeleting && displayText === '') {
-      // Pause briefly before typing next word
       setIsDeleting(false);
       setPhraseIndex((prev) => (prev + 1) % TYPEWRITER_PHRASES.length);
       timeout = setTimeout(() => {}, 300);
     } else {
-      // Typing speed: 85ms forward, 40ms deleting
-      const speed = isDeleting ? 40 : 85;
+      const speed = isDeleting ? 38 : 80;
       timeout = setTimeout(() => {
         setDisplayText((prev) =>
           isDeleting
@@ -222,151 +261,129 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-poppins selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-[#FAFAF8] dark:bg-[#050816] text-[#152033] dark:text-[#F5F7FF] font-sans selection:bg-blue-600 selection:text-white transition-colors duration-500 overflow-x-hidden">
       
-      {/* 1. HERO SECTION */}
-      <section className="relative overflow-hidden bg-white border-b border-slate-200/80 pt-16 sm:pt-20 pb-24 sm:pb-32">
-        {/* Ambient Gradient Glow Orbs */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none -translate-y-1/2" />
-        <div className="absolute top-1/3 right-10 w-96 h-96 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none" />
+      {/* ==============================================================================
+          1. SIGNATURE HERO SECTION — GOLDEN RATIO ASYMMETRY (61.8% / 38.2%)
+          Inspiration: Nexa AI Solutions Liquid Glass + CiTEC Editorial Composition
+          ============================================================================== */}
+      <section className="relative overflow-hidden pt-12 sm:pt-20 pb-20 sm:pb-32 border-b border-slate-200/80 dark:border-slate-800/80">
         
-        {/* Subtle background grid pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-70 pointer-events-none" />
+        {/* Atmospheric Backlight Orbs */}
+        <div className="absolute top-1/4 left-10 w-[500px] h-[500px] bg-blue-500/10 dark:bg-[#4263FF]/15 rounded-full blur-[120px] pointer-events-none -translate-y-1/2" />
+        <div className="absolute top-1/2 right-0 w-[450px] h-[450px] bg-cyan-400/10 dark:bg-[#52D9FF]/10 rounded-full blur-[140px] pointer-events-none" />
+        
+        {/* Subtle Mathematical Grid Overlay */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#111a30_1px,transparent_1px),linear-gradient(to_bottom,#111a30_1px,transparent_1px)] bg-[size:4.5rem_4.5rem] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_10%,#000_65%,transparent_100%)] opacity-40 dark:opacity-50 pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-6 relative z-10 grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
           
-          {/* LEFT: TEXT & CALL TO ACTIONS */}
-          <div className="lg:col-span-7 space-y-7 text-center lg:text-left">
+          {/* Asymmetric 61.8% / 38.2% Grid Guided by the Golden Ratio */}
+          <div className="grid lg:grid-cols-12 gap-12 lg:gap-14 items-center">
             
-            {/* Top pill badge */}
-            <div className="inline-flex items-center gap-2 text-xs font-semibold text-blue-700 bg-blue-50/90 border border-blue-200/80 px-4 py-1.5 rounded-full shadow-xs backdrop-blur-xs">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600" />
-              </span>
-              <span>Enterprise Cloud Platform • 99% Target Availability</span>
-            </div>
-
-            {/* Main Headline with Dynamic Typewriter Animation */}
-            <h1 className="text-4xl sm:text-6xl font-thin text-slate-950 leading-[1.12] tracking-tight min-h-[135px] sm:min-h-[175px]">
-              Deploy Scalable <br className="hidden sm:inline" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 font-black">
-                {displayText}
-              </span>
-              {/* Typewriter Cursor */}
-              <span className="inline-block w-1 sm:w-1.5 h-8 sm:h-12 ml-1.5 bg-blue-600 rounded-xs animate-pulse align-middle" />
-              <br />
-              Built for Scale.
-            </h1>
-
-            {/* Description Subtext */}
-            <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-thin">
-              ATC delivers next-generation data center virtualization, pure SSD cloud servers, and instant 1-click DevOps deployments engineered for production workloads.
-            </p>
-
-            {/* CTA Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
-              <Link
-                to="/configure"
-                className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm tracking-wide shadow-xl shadow-blue-600/25 hover:from-blue-700 hover:to-indigo-700 hover:shadow-blue-600/35 transition-all flex items-center justify-center gap-2 group cursor-pointer"
-              >
-                <span>Deploy Cloud Server</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link
-                to="/pricing"
-                className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white border border-slate-300 font-bold text-sm tracking-wide text-slate-800 hover:bg-slate-50 hover:border-slate-400 transition-all text-center shadow-xs cursor-pointer"
-              >
-                View VPS Plans
-              </Link>
-            </div>
-
-            {/* Quick Feature Trust Badges */}
-            <div className="pt-6 border-t border-slate-100 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-xs font-semibold text-slate-500">
-              <span className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                </span>
-                Spin up in &lt; 60 seconds
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                </span>
-                Full Root & Admin Control
-              </span>
-              <span className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                </span>
-                PCI-DSS Level 1 Encrypted Checkout
-              </span>
-            </div>
-          </div>
-
-          {/* RIGHT: INTERACTIVE SERVER TERMINAL & TELEMETRY PREVIEW */}
-          <div className="lg:col-span-5">
-            <div className="bg-gradient-to-b from-white to-slate-50 border border-slate-200/90 rounded-3xl p-7 shadow-2xl shadow-blue-950/10 relative overflow-hidden backdrop-blur-xs">
+            {/* LEFT: 61.8% Golden Ratio Content Column */}
+            <div className="lg:col-span-7 space-y-8 text-center lg:text-left">
               
-              {/* Header: Verified 5.0 Google Rating link */}
-              <a
-                href={GOOGLE_MAPS_REVIEWS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="View Analytical Technical Consulting reviews on Google Maps"
-                className="group block border-b border-slate-100 pb-5 mb-5 hover:bg-blue-50/40 -mx-2 px-3 py-2 rounded-2xl transition-all cursor-pointer"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center border border-amber-200/80 shadow-xs group-hover:scale-105 group-hover:bg-amber-100/70 transition-all">
-                      <Star className="w-6 h-6 fill-amber-400 text-amber-400" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl font-black text-slate-950 tracking-tight group-hover:text-blue-600 transition-colors">
-                          5.0
-                        </span>
-                        <div className="flex items-center gap-1 text-amber-400" aria-label="5 out of 5 stars">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-500 font-medium mt-0.5">
-                        Customer Rating on Google Reviews
-                      </p>
-                    </div>
-                  </div>
+              {/* Refined Pill Badge with Verified Status */}
+              <div className="inline-flex items-center gap-2.5 text-xs font-semibold text-blue-700 dark:text-[#52D9FF] bg-blue-50/90 dark:bg-[#111A30]/80 border border-blue-200/80 dark:border-blue-500/30 px-4 py-1.5 rounded-full shadow-xs backdrop-blur-md">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600 dark:bg-[#52D9FF]" />
+                </span>
+                <span className="tracking-wide">Enterprise Infrastructure & Systems Consulting</span>
+              </div>
 
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xs shrink-0">
-                    <span>Google Reviews</span>
-                    <ExternalLink className="w-3 h-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              {/* Editorial Signature Headline */}
+              <div className="space-y-3">
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] text-slate-950 dark:text-[#F5F7FF]">
+                  Technology That Moves <br className="hidden sm:inline" />
+                  Your Business Forward.
+                </h1>
+                
+                {/* Dynamic Typewriter Sub-headline */}
+                <p className="text-xl sm:text-2xl font-medium text-slate-700 dark:text-[#A6B0C3] flex items-center justify-center lg:justify-start gap-1 pt-1">
+                  <span>Powering scalable</span>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-[#52D9FF] dark:from-[#52D9FF] dark:to-blue-400 font-bold">
+                    {displayText}
                   </span>
-                </div>
-              </a>
+                  <span className="inline-block w-1 h-6 bg-blue-600 dark:bg-[#52D9FF] animate-pulse ml-0.5" />
+                </p>
+              </div>
 
-              {/* Animated Cloud Terminal Window */}
-              <AnimatedCloudTerminal />
+              {/* Factual Supporting Copy */}
+              <p className="text-slate-600 dark:text-[#A6B0C3] text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
+                From enterprise infrastructure and data center virtualization to system architecture and business technology, Analytical Technical Consulting (ATC) helps organizations build reliable, scalable digital foundations.
+              </p>
+
+              {/* Primary & Secondary Dual CTAs */}
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
+                <Link
+                  to="/contact"
+                  className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold text-sm tracking-wide shadow-xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 group cursor-pointer"
+                >
+                  <span>Book a Consultation</span>
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+                
+                <a
+                  href="#services"
+                  className="w-full sm:w-auto px-8 py-4 rounded-xl bg-white dark:bg-[#111A30] border border-slate-300 dark:border-slate-700/80 font-bold text-sm tracking-wide text-slate-800 dark:text-[#F5F7FF] hover:bg-slate-50 dark:hover:bg-[#182442] hover:border-slate-400 dark:hover:border-blue-500/50 transition-all text-center shadow-xs cursor-pointer"
+                >
+                  Explore Our Services
+                </a>
+              </div>
+
+              {/* Golden Ratio Metric Points */}
+              <div className="pt-8 border-t border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800">
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  </span>
+                  Sub-60s Provisioning
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800">
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  </span>
+                  Full Root & Hypervisor Control
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800">
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  </span>
+                  Dedicated IPv4 Included
+                </span>
+              </div>
 
             </div>
+
+            {/* RIGHT: 38.2% Golden Ratio Signature Visual (Liquid Glass Sculpture) */}
+            <div className="lg:col-span-5 flex flex-col items-center justify-center">
+              <div className="w-full flex items-center justify-center py-6 sm:py-8">
+                <LiquidGlassSphere />
+              </div>
+            </div>
+
           </div>
 
         </div>
       </section>
 
-      {/* 2. ONE-CLICK APPS & OPERATING SYSTEMS SHOWCASE STRIP */}
-      <section className="bg-slate-900 border-b border-slate-800 py-6 text-white overflow-hidden">
+      {/* ==============================================================================
+          2. ONE-CLICK STACKS & OS SHOWCASE STRIP
+          ============================================================================== */}
+      <section className="bg-slate-100/80 dark:bg-[#0A1024] border-b border-slate-200 dark:border-slate-800 py-6 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5 text-xs font-bold text-slate-300 uppercase tracking-wider shrink-0">
-              <Layers className="w-4 h-4 text-blue-400" />
+            <div className="flex items-center gap-2.5 text-xs font-bold text-slate-700 dark:text-[#A6B0C3] uppercase tracking-wider shrink-0">
+              <Layers className="w-4 h-4 text-blue-600 dark:text-[#52D9FF]" />
               <span>Instant 1-Click Stacks & OS:</span>
             </div>
             <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2.5">
               {ONE_CLICK_APPS.map((app) => (
                 <div 
                   key={app.name} 
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-800/80 border border-slate-700/80 text-xs font-medium text-slate-200 hover:border-blue-500/80 transition-all"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white dark:bg-[#111A30] border border-slate-200 dark:border-slate-750 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-blue-500/80 transition-all shadow-xs"
                 >
                   <span>{app.icon}</span>
                   <span>{app.name}</span>
@@ -377,30 +394,217 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 3. FEATURED VPS PRICING CARDS */}
-      <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
-          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3.5 py-1 rounded-full uppercase tracking-wider">
-            <Zap className="w-3.5 h-3.5" /> High Performance VPS Hosting
+      {/* ==============================================================================
+          3. CITEC-INSPIRED EDITORIAL SERVICES SECTION
+          Refined numbered layout (01, 02, 03, 04) with elegant separators & structured hierarchy
+          ============================================================================== */}
+      <section id="services" className="py-24 sm:py-32 border-b border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#050816] transition-colors duration-300">
+        <div className="max-w-7xl mx-auto px-6">
+          
+          {/* Editorial Section Header */}
+          <div className="max-w-3xl mb-16 space-y-4">
+            <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 dark:text-[#52D9FF] uppercase tracking-widest">
+              <span>01 / Solutions & Architecture</span>
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-950 dark:text-[#F5F7FF]">
+              Engineered Capabilities for Resilient Enterprise Growth
+            </h2>
+            <p className="text-slate-600 dark:text-[#A6B0C3] text-base leading-relaxed font-normal">
+              ATC delivers disciplined infrastructure consulting, virtualization engineering, and system design tailored for organizations requiring verifiable uptime and rock-solid stability.
+            </p>
           </div>
-          <h2 className="text-3xl sm:text-5xl font-normal text-slate-950 tracking-tight">
+
+          {/* Numbered Editorial Services Grid */}
+          <div className="grid md:grid-cols-2 gap-8 lg:gap-10">
+            {EDITORIAL_SERVICES.map((service) => {
+              const ServiceIcon = service.icon;
+              return (
+                <div
+                  key={service.number}
+                  className="group relative bg-[#FAFAF8] dark:bg-[#0A1024] border border-slate-200/90 dark:border-slate-800/80 rounded-3xl p-8 sm:p-10 hover:border-blue-500/70 dark:hover:border-blue-500/60 hover:shadow-2xl hover:shadow-blue-950/10 dark:hover:shadow-blue-500/5 transition-all duration-300 flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Top Row: Refined Number & Category */}
+                    <div className="flex items-center justify-between pb-6 mb-6 border-b border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-3xl font-black text-blue-600 dark:text-[#52D9FF]">
+                          {service.number}
+                        </span>
+                        <span className="text-xs uppercase tracking-widest font-bold text-slate-400 dark:text-slate-500">
+                          {service.category}
+                        </span>
+                      </div>
+                      <div className="w-10 h-10 rounded-2xl bg-white dark:bg-[#111A30] border border-slate-200 dark:border-slate-700/80 text-blue-600 dark:text-[#52D9FF] flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                        <ServiceIcon className="w-5 h-5" />
+                      </div>
+                    </div>
+
+                    {/* Service Title & Detailed Description */}
+                    <h3 className="text-2xl font-bold text-slate-950 dark:text-[#F5F7FF] mb-3 group-hover:text-blue-600 dark:group-hover:text-[#52D9FF] transition-colors">
+                      {service.title}
+                    </h3>
+                    <p className="text-slate-600 dark:text-[#A6B0C3] text-sm leading-relaxed mb-6 font-normal">
+                      {service.description}
+                    </p>
+
+                    {/* Bullet Highlights */}
+                    <ul className="space-y-2.5 text-xs text-slate-700 dark:text-slate-300 font-medium mb-8">
+                      {service.points.map((pt, i) => (
+                        <li key={i} className="flex items-center gap-2.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-[#52D9FF]" />
+                          <span>{pt}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Consultation Action Link */}
+                  <div className="pt-5 border-t border-slate-200/70 dark:border-slate-800/70 flex items-center justify-between">
+                    <Link
+                      to="/contact"
+                      className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-[#52D9FF] group-hover:translate-x-1 transition-transform"
+                    >
+                      <span>Inquire about this capability</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+      </section>
+
+      {/* ==============================================================================
+          4. NEXA-INSPIRED ATMOSPHERIC INFRASTRUCTURE SHOWCASE
+          Interactive live CLI terminal + Hardware telemetry
+          ============================================================================== */}
+      <section className="py-24 sm:py-32 bg-[#F0F3F8] dark:bg-[#0A1024] border-b border-slate-200/80 dark:border-slate-800/80 transition-colors duration-300 relative overflow-hidden">
+        {/* Soft atmospheric gradient glow */}
+        <div className="absolute top-0 right-1/4 w-[480px] h-[480px] bg-blue-600/10 dark:bg-[#4263FF]/15 rounded-full blur-[140px] pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          
+          <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+            <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-[#52D9FF] bg-blue-50 dark:bg-[#111A30] border border-blue-200 dark:border-blue-500/30 px-3.5 py-1.5 rounded-full uppercase tracking-wider">
+              <Terminal className="w-3.5 h-3.5" /> Live Hypervisor Telemetry
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-950 dark:text-[#F5F7FF] tracking-tight">
+              Next-Generation Cloud Architecture
+            </h2>
+            <p className="text-slate-600 dark:text-[#A6B0C3] text-sm sm:text-base font-normal">
+              High-performance compute nodes optimized for continuous developer workloads, mission-critical databases, and automated infrastructure deployments.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-12 gap-8 items-stretch">
+            
+            {/* LEFT: Interactive Simulated Typewriter Terminal */}
+            <div className="lg:col-span-7 flex flex-col justify-between">
+              <div className="bg-white dark:bg-[#111A30] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                      Interactive Cloud Provisioning Node
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                    SSH: PORT 22
+                  </span>
+                </div>
+
+                <AnimatedCloudTerminal />
+              </div>
+            </div>
+
+            {/* RIGHT: Architecture Telemetry Cards */}
+            <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
+              
+              <div className="bg-white dark:bg-[#111A30] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-[#52D9FF] flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/50">
+                  <HardDrive className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-950 dark:text-[#F5F7FF]">Enterprise NVMe Storage</h4>
+                  <p className="text-xs text-slate-500 dark:text-[#A6B0C3] mt-1 leading-relaxed">
+                    Dedicated storage arrays delivering 1,400+ MB/s read speeds and 0.2ms I/O latency for zero database throttling.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#111A30] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/50">
+                  <Network className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-950 dark:text-[#F5F7FF]">1 Gbps Dedicated Uplinks</h4>
+                  <p className="text-xs text-slate-500 dark:text-[#A6B0C3] mt-1 leading-relaxed">
+                    Carrier-neutral redundant backbones with automated DDoS filtering and isolated IPv4 routing.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#111A30] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-100 dark:border-purple-900/50">
+                  <Cpu className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-950 dark:text-[#F5F7FF]">Uncontended ECC Memory</h4>
+                  <p className="text-xs text-slate-500 dark:text-[#A6B0C3] mt-1 leading-relaxed">
+                    Error-Correcting Code RAM with strict physical hardware mapping ensures zero noisy neighbor interference.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#111A30] border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-[#52D9FF] flex items-center justify-center shrink-0 border border-cyan-100 dark:border-cyan-900/50">
+                  <Gauge className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-950 dark:text-[#F5F7FF]">99% Availability Commitment</h4>
+                  <p className="text-xs text-slate-500 dark:text-[#A6B0C3] mt-1 leading-relaxed">
+                    Honest target hypervisor availability backed by real-time hardware monitoring and automated health telemetry.
+                  </p>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* ==============================================================================
+          5. PREDICTABLE CLOUD VPS PRICING SECTION
+          ============================================================================== */}
+      <section className="max-w-7xl mx-auto px-6 py-24 sm:py-32">
+        <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
+          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-[#52D9FF] bg-blue-50 dark:bg-[#111A30] border border-blue-200 dark:border-blue-500/30 px-3.5 py-1.5 rounded-full uppercase tracking-wider">
+            <Zap className="w-3.5 h-3.5" /> High Performance Cloud Servers
+          </div>
+          <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-950 dark:text-[#F5F7FF] tracking-tight">
             Predictable Cloud Pricing
           </h2>
-          <p className="text-slate-600 text-sm sm:text-base font-normal">
-            Scalable instances backed by high-speed SSD storage, dedicated hardware, and fast deployment.
+          <p className="text-slate-600 dark:text-[#A6B0C3] text-sm sm:text-base font-normal">
+            Scalable VPS instances backed by enterprise SSD storage arrays, dedicated hardware cores, and rapid provisioning.
           </p>
 
           {/* Billing Switcher Toggle */}
           <div className="pt-4 flex items-center justify-center gap-3">
-            <span className={`text-xs font-bold ${billingCycle === 'monthly' ? 'text-slate-900' : 'text-slate-400'}`}>Monthly</span>
+            <span className={`text-xs font-bold ${billingCycle === 'monthly' ? 'text-slate-950 dark:text-[#F5F7FF]' : 'text-slate-400'}`}>Monthly</span>
             <button
+              type="button"
               onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annually' : 'monthly')}
-              className="w-12 h-6 bg-slate-200 rounded-full p-1 relative transition-colors focus:outline-hidden cursor-pointer"
+              className="w-12 h-6 bg-slate-200 dark:bg-slate-700 rounded-full p-1 relative transition-colors focus:outline-hidden cursor-pointer"
+              aria-label="Toggle billing cycle"
             >
-              <div className={`w-4 h-4 bg-blue-600 rounded-full transition-transform ${billingCycle === 'annually' ? 'translate-x-6' : ''}`} />
+              <div className={`w-4 h-4 bg-blue-600 dark:bg-[#52D9FF] rounded-full transition-transform ${billingCycle === 'annually' ? 'translate-x-6' : ''}`} />
             </button>
-            <span className={`text-xs font-bold ${billingCycle === 'annually' ? 'text-slate-900' : 'text-slate-400'}`}>
-              Annually <span className="text-emerald-700 text-[10px] bg-emerald-50 border border-emerald-200 font-bold px-2 py-0.5 rounded-full ml-1">Save 15%</span>
+            <span className={`text-xs font-bold ${billingCycle === 'annually' ? 'text-slate-950 dark:text-[#F5F7FF]' : 'text-slate-400'}`}>
+              Annually <span className="text-emerald-700 dark:text-emerald-400 text-[10px] bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 font-bold px-2 py-0.5 rounded-full ml-1">Save 15%</span>
             </span>
           </div>
         </div>
@@ -412,10 +616,10 @@ export default function Home() {
             return (
               <div
                 key={plan.name}
-                className={`bg-white rounded-3xl p-8 border transition-all duration-300 flex flex-col justify-between relative hover:-translate-y-1.5 ${
+                className={`bg-white dark:bg-[#0A1024] rounded-3xl p-8 border transition-all duration-300 flex flex-col justify-between relative hover:-translate-y-1.5 ${
                   plan.popular
-                    ? 'border-blue-600 shadow-2xl shadow-blue-900/10 ring-2 ring-blue-600/30 md:scale-105 z-10'
-                    : 'border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-xl'
+                    ? 'border-blue-600 dark:border-[#52D9FF] shadow-2xl shadow-blue-900/10 dark:shadow-blue-500/10 ring-2 ring-blue-600/30 dark:ring-[#52D9FF]/30 md:scale-105 z-10'
+                    : 'border-slate-200 dark:border-slate-800 shadow-sm hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-xl'
                 }`}
               >
                 {plan.popular && (
@@ -426,52 +630,53 @@ export default function Home() {
 
                 <div>
                   <div className="flex justify-between items-baseline mb-3">
-                    <h3 className="text-2xl font-black text-slate-950">{plan.name}</h3>
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 text-slate-600">
+                    <h3 className="text-2xl font-black text-slate-950 dark:text-[#F5F7FF]">{plan.name}</h3>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 dark:bg-[#111A30] text-slate-600 dark:text-[#A6B0C3]">
                       General Purpose
                     </span>
                   </div>
 
-                  <div className="mb-6 pb-6 border-b border-slate-100">
+                  <div className="mb-6 pb-6 border-b border-slate-100 dark:border-slate-800">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl sm:text-5xl font-black text-slate-950 tracking-tight">${finalPrice.toFixed(2)}</span>
-                      <span className="text-slate-500 text-xs font-bold"> / month</span>
+                      <span className="text-4xl sm:text-5xl font-black text-slate-950 dark:text-[#F5F7FF] tracking-tight">${finalPrice.toFixed(2)}</span>
+                      <span className="text-slate-500 dark:text-[#A6B0C3] text-xs font-bold"> / month</span>
                     </div>
                     {billingCycle === 'annually' && (
-                      <p className="text-[11px] text-emerald-600 font-semibold mt-1">Billed annually (${(finalPrice * 12).toFixed(2)}/yr)</p>
+                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Billed annually (${(finalPrice * 12).toFixed(2)}/yr)</p>
                     )}
                   </div>
 
-                  <ul className="space-y-3.5 text-xs text-slate-600 font-medium mb-8">
+                  <ul className="space-y-3.5 text-xs text-slate-600 dark:text-[#A6B0C3] font-medium mb-8">
                     <li className="flex items-center gap-3">
-                      <Cpu className="w-4 h-4 text-blue-600 shrink-0" /> 
-                      <span><strong className="text-slate-950 font-bold">{plan.cpu}</strong> vCPU Cores</span>
+                      <Cpu className="w-4 h-4 text-blue-600 dark:text-[#52D9FF] shrink-0" /> 
+                      <span><strong className="text-slate-950 dark:text-[#F5F7FF] font-bold">{plan.cpu}</strong> vCPU Cores</span>
                     </li>
                     <li className="flex items-center gap-3">
-                      <Zap className="w-4 h-4 text-blue-600 shrink-0" /> 
-                      <span><strong className="text-slate-950 font-bold">{plan.ram}</strong> High-Speed Memory</span>
+                      <Zap className="w-4 h-4 text-blue-600 dark:text-[#52D9FF] shrink-0" /> 
+                      <span><strong className="text-slate-950 dark:text-[#F5F7FF] font-bold">{plan.ram}</strong> High-Speed Memory</span>
                     </li>
                     <li className="flex items-center gap-3">
-                      <Server className="w-4 h-4 text-blue-600 shrink-0" /> 
-                      <span><strong className="text-slate-950 font-bold">{plan.storage}</strong> Enterprise SSD</span>
+                      <Server className="w-4 h-4 text-blue-600 dark:text-[#52D9FF] shrink-0" /> 
+                      <span><strong className="text-slate-950 dark:text-[#F5F7FF] font-bold">{plan.storage}</strong> Enterprise SSD</span>
                     </li>
                     <li className="flex items-center gap-3">
-                      <Globe className="w-4 h-4 text-blue-600 shrink-0" /> 
-                      <span><strong className="text-slate-950 font-bold">{plan.bandwidth}</strong> Premium Traffic</span>
+                      <Globe className="w-4 h-4 text-blue-600 dark:text-[#52D9FF] shrink-0" /> 
+                      <span><strong className="text-slate-950 dark:text-[#F5F7FF] font-bold">{plan.bandwidth}</strong> Premium Traffic</span>
                     </li>
                     <li className="flex items-center gap-3">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" /> 
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" /> 
                       <span>Dedicated IPv4 & Full Root Access</span>
                     </li>
                   </ul>
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => handleConfigure(plan)}
                   className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
                     plan.popular
                       ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-600/25'
-                      : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
+                      : 'bg-slate-100 dark:bg-[#111A30] text-slate-800 dark:text-[#F5F7FF] hover:bg-slate-200 dark:hover:bg-[#182442]'
                   }`}
                 >
                   <span>Configure Server</span>
@@ -483,41 +688,43 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. CLIENT REVIEWS MOVING CAROUSEL */}
-      <section className="bg-slate-50/80 border-t border-slate-200/80 py-20 overflow-hidden relative">
+      {/* ==============================================================================
+          6. VERIFIED CLIENT FEEDBACK CONTINUOUS MARQUEE
+          ============================================================================== */}
+      <section className="bg-slate-50/80 dark:bg-[#0A1024] border-t border-slate-200/80 dark:border-slate-800/80 py-20 overflow-hidden relative transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-6">
           
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
             <div>
-              <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200/80 px-3.5 py-1.5 rounded-full mb-3 shadow-xs">
-                <span className="font-semibold text-slate-800">Verified Client Feedback</span>
+              <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 dark:text-[#52D9FF] bg-blue-50 dark:bg-[#111A30] border border-blue-200/80 dark:border-blue-500/30 px-3.5 py-1.5 rounded-full mb-3 shadow-xs">
+                <span className="font-semibold text-slate-800 dark:text-[#F5F7FF]">Verified Client Experiences</span>
                 <div className="flex items-center gap-0.5 text-amber-400 ml-1">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                   ))}
                 </div>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-normal text-slate-950 tracking-tight">
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 dark:text-[#F5F7FF] tracking-tight">
                 Trusted by Developers & System Administrators
               </h2>
-              <p className="text-slate-600 text-sm sm:text-base mt-2 max-w-xl font-normal">
-                Here’s what clients say about their experience with Analytical Technical Consulting services.
+              <p className="text-slate-600 dark:text-[#A6B0C3] text-sm sm:text-base mt-2 max-w-xl font-normal">
+                Here’s what engineers and administrators say about their experience with Analytical Technical Consulting infrastructure.
               </p>
             </div>
 
             {/* Subtle live indicator badge */}
-            <div className="hidden sm:inline-flex items-center gap-2 text-xs text-slate-500 font-medium bg-white border border-slate-200/80 px-4 py-2 rounded-xl shadow-xs shrink-0">
+            <div className="hidden sm:inline-flex items-center gap-2 text-xs text-slate-500 dark:text-[#A6B0C3] font-medium bg-white dark:bg-[#111A30] border border-slate-200/80 dark:border-slate-800 px-4 py-2 rounded-xl shadow-xs shrink-0">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Continuous Telemetry & Feedback</span>
+              <span>Hover card to pause</span>
             </div>
           </div>
 
-          {/* Smooth Continuous Infinite Marquee Track (Smooth Hardware Accelerated CSS, Pauses on Hover) */}
+          {/* Smooth Continuous Infinite Marquee Track */}
           <div className="relative overflow-hidden py-4 -mx-6 px-6">
             {/* Left & Right Smooth Edge Fade Overlays */}
-            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-r from-slate-50 via-slate-50/90 to-transparent z-10" />
-            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-l from-slate-50 via-slate-50/90 to-transparent z-10" />
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-r from-[#FAFAF8] dark:from-[#0A1024] via-[#FAFAF8]/90 dark:via-[#0A1024]/90 to-transparent z-10" />
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-l from-[#FAFAF8] dark:from-[#0A1024] via-[#FAFAF8]/90 dark:via-[#0A1024]/90 to-transparent z-10" />
 
             <div className="animate-infinite-carousel">
               {[...CLIENT_REVIEWS, ...CLIENT_REVIEWS].map((review, idx) => (
@@ -525,7 +732,7 @@ export default function Home() {
                   key={idx}
                   className="w-[320px] sm:w-[380px] shrink-0 p-3"
                 >
-                  <div className="h-full bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 shadow-xs hover:shadow-xl hover:border-blue-400/80 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+                  <div className="h-full bg-white dark:bg-[#111A30] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-6 sm:p-7 shadow-xs hover:shadow-xl hover:border-blue-400/80 dark:hover:border-[#52D9FF]/60 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
                     <div>
                       {/* 5 Stars */}
                       <div className="flex items-center gap-1 text-amber-400 mb-4">
@@ -535,23 +742,23 @@ export default function Home() {
                       </div>
 
                       {/* Review text */}
-                      <p className="text-slate-700 text-xs sm:text-sm leading-relaxed font-normal mb-6">
+                      <p className="text-slate-700 dark:text-[#A6B0C3] text-xs sm:text-sm leading-relaxed font-normal mb-6">
                         "{review.review}"
                       </p>
                     </div>
 
                     {/* Author Info */}
-                    <div className="pt-4 border-t border-slate-100 flex items-center gap-3">
+                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center gap-3">
                       <div
                         className={`w-10 h-10 rounded-xl bg-gradient-to-br ${review.color} text-white font-bold text-xs flex items-center justify-center shadow-xs shrink-0`}
                       >
                         {review.initials}
                       </div>
                       <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-[#F5F7FF] group-hover:text-blue-600 dark:group-hover:text-[#52D9FF] transition-colors">
                           {review.name}
                         </h4>
-                        <p className="text-[11px] text-slate-500 font-medium">
+                        <p className="text-[11px] text-slate-500 dark:text-[#A6B0C3] font-medium">
                           {review.role}
                         </p>
                       </div>
@@ -566,70 +773,27 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 5. CORE CAPABILITIES SECTION */}
-      <section className="bg-white border-y border-slate-200/90 py-24">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3.5 py-1 rounded-full uppercase tracking-wider">
-              <Shield className="w-3.5 h-3.5" /> Engineered For Stability
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-normal text-slate-950 tracking-tight">
-              Enterprise Infrastructure Capabilities
-            </h2>
-            <p className="text-slate-600 text-sm font-normal">
-              High-performance compute clusters optimized for developer workloads, databases, and continuous uptime.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-slate-50/80 border border-slate-200/90 rounded-3xl p-8 hover:border-blue-500/80 hover:shadow-xl transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-blue-600 flex items-center justify-center mb-6 shadow-xs group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                <Server className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-950 mb-2">Data Center Management</h3>
-              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed font-normal">
-                Design, deploy, and maintain cloud infrastructure with high availability, automated backup schedules, and failover clustering.
-              </p>
-            </div>
-
-            <div className="bg-slate-50/80 border border-slate-200/90 rounded-3xl p-8 hover:border-blue-500/80 hover:shadow-xl transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-blue-600 flex items-center justify-center mb-6 shadow-xs group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                <Shield className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-950 mb-2">Infrastructure Security</h3>
-              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed font-normal">
-                Systematic auditing, boundary defense, active firewall configurations, and isolated virtual network segmentation.
-              </p>
-            </div>
-
-            <div className="bg-slate-50/80 border border-slate-200/90 rounded-3xl p-8 hover:border-blue-500/80 hover:shadow-xl transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-blue-600 flex items-center justify-center mb-6 shadow-xs group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                <Cpu className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-950 mb-2">Hardware Optimization</h3>
-              <p className="text-slate-600 text-xs sm:text-sm leading-relaxed font-normal">
-                Precision hardware sizing and active workload balancing to eliminate resource throttling and ensure consistent performance.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. CALL TO ACTION BANNER */}
+      {/* ==============================================================================
+          7. SIGNATURE CONSULTATION CTA BANNER
+          ============================================================================== */}
       <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 rounded-3xl p-10 sm:p-16 text-white text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-8 shadow-2xl relative overflow-hidden border border-slate-800">
+        <div className="bg-gradient-to-r from-slate-950 via-[#0A1024] to-slate-900 border border-slate-800 rounded-3xl p-10 sm:p-16 text-white text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-8 shadow-2xl relative overflow-hidden">
+          
+          {/* Subtle Technical Grid Background */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:3rem_3rem] opacity-30 pointer-events-none" />
+
           <div className="space-y-3 relative z-10 max-w-xl">
-            <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Custom Enterprise Hosting</span>
-            <h2 className="text-3xl sm:text-4xl font-normal tracking-tight">Need a custom dedicated setup?</h2>
-            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Our engineering team provides tailored server configurations, multi-node private cloud clusters, and direct IT consulting.
+            <span className="text-xs font-bold uppercase tracking-widest text-[#52D9FF]">Enterprise IT Consulting</span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Need a custom dedicated setup?</h2>
+            <p className="text-slate-300 text-xs sm:text-sm leading-relaxed font-normal">
+              Our engineering team provides tailored server configurations, multi-node private cloud clusters, and direct IT consulting for your business.
             </p>
           </div>
 
           <div className="relative z-10 flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
             <Link
               to="/contact"
-              className="px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-blue-500/30 transition-all text-center whitespace-nowrap"
+              className="px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-[#4263FF] hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all text-center whitespace-nowrap"
             >
               Contact Infrastructure Team
             </Link>
