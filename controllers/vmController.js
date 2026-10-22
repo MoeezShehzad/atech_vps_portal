@@ -15,6 +15,7 @@ import {
   sendVmFailureAlertToSupport
 } from '../services/emailService.js';
 import firewallService from '../services/firewallService.js';
+import { generateGuacamoleToken, buildRdpConnectionPayload } from '../services/guacamoleService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
 
 /**
@@ -1187,6 +1188,41 @@ export async function getConsoleSession(req, res) {
       targetIp = '192.168.2.192'; // Fallback to verified local guest IP if momentarily polling
     }
 
+    const osFamily = (vm.image?.osFamily || '').toLowerCase();
+    const imageName = (vm.image?.name || '').toLowerCase();
+    const isWindows = osFamily.includes('win') || imageName.includes('win');
+
+    if (isWindows) {
+      const rdpPayload = buildRdpConnectionPayload({
+        ip: targetIp,
+        username: vm.adminUser || 'Administrator',
+        password: vm.adminPassword || '',
+      });
+      const guacToken = generateGuacamoleToken(rdpPayload);
+
+      await prisma.securityLog.create({
+        data: {
+          userId,
+          action: 'WEB_DESKTOP_ACCESS',
+          ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+          result: 'SUCCESS',
+          details: `Established Guacamole HTML5 RDP Desktop bridge for VM '${vm.vmName}' (${targetIp})`,
+        },
+      }).catch(() => {});
+
+      return res.json({
+        success: true,
+        isWindows: true,
+        token: guacToken,
+        ticket: guacToken,
+        vmId,
+        vmName: vm.vmName,
+        ip: targetIp,
+        adminUser: vm.adminUser || 'Administrator',
+        adminPassword: vm.adminPassword,
+      });
+    }
+
     const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
     const ticket = jwt.sign(
       {
@@ -1215,6 +1251,7 @@ export async function getConsoleSession(req, res) {
 
     return res.json({
       success: true,
+      isWindows: false,
       ticket,
       vmId,
       vmName: vm.vmName,

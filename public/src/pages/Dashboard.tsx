@@ -61,6 +61,7 @@ import { formatDate, formatDateTime } from '../utils/dateFormatter';
 import TableSkeleton from '../components/TableSkeleton';
 
 const WebConsoleModal = React.lazy(() => import('../components/WebConsoleModal'));
+const WebDesktopModal = React.lazy(() => import('../components/WebDesktopModal'));
 const SecurityAndLogs = React.lazy(() => import('../components/SecurityAndLogs'));
 const StorageAndDisks = React.lazy(() => import('../components/StorageAndDisks'));
 const BillingAndInvoices = React.lazy(() => import('../components/BillingAndInvoices'));
@@ -4266,18 +4267,30 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* INTERACTIVE WEB TERMINAL CONSOLE MODAL */}
+      {/* INTERACTIVE WEB TERMINAL / WINDOWS DESKTOP CONSOLE MODAL */}
       {consoleVm && (
         <React.Suspense fallback={null}>
-          <WebConsoleModal
-            vmId={consoleVm.vmId}
-            vmName={consoleVm.name}
-            vmIp={consoleVm.ip}
-            adminUser={consoleVm.adminUser}
-            adminPassword={consoleVm.adminPassword}
-            onClose={() => setConsoleVm(null)}
-            onSessionEnd={fetchVMs}
-          />
+          {consoleVm.os?.toLowerCase().includes('win') ? (
+            <WebDesktopModal
+              vmId={consoleVm.vmId}
+              vmName={consoleVm.name}
+              vmIp={consoleVm.ip}
+              adminUser={consoleVm.adminUser}
+              adminPassword={consoleVm.adminPassword}
+              onClose={() => setConsoleVm(null)}
+              onSessionEnd={fetchVMs}
+            />
+          ) : (
+            <WebConsoleModal
+              vmId={consoleVm.vmId}
+              vmName={consoleVm.name}
+              vmIp={consoleVm.ip}
+              adminUser={consoleVm.adminUser}
+              adminPassword={consoleVm.adminPassword}
+              onClose={() => setConsoleVm(null)}
+              onSessionEnd={fetchVMs}
+            />
+          )}
         </React.Suspense>
       )}
 

@@ -30,6 +30,7 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import geoRoutes from './routes/geoRoutes.js';
 import siteRoutes from './routes/siteRoutes.js';
 import { setupTerminalWebSocket } from './services/terminalService.js';
+import { setupGuacamoleWebSocket } from './services/guacamoleService.js';
 import { startTicketAutomationWorker } from './services/ticketAutomationService.js';
 import { startTrialAutomationWorker } from './services/trialService.js';
 import { startBillingRetentionWorker } from './services/billingRetentionService.js';
@@ -228,6 +229,8 @@ const server = http.createServer(app);
 
 // Attach in-browser Web Terminal WebSocket server
 setupTerminalWebSocket(server);
+// Attach in-browser Windows Remote Desktop (Guacamole) WebSocket server
+setupGuacamoleWebSocket(server);
 
 server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);

@@ -21,7 +21,7 @@ export function setupTerminalWebSocket(server) {
           }
           wss.emit('connection', ws, request, url);
         });
-      } else {
+      } else if (!url.pathname.includes('guacamole')) {
         socket.destroy();
       }
     } catch (e) {
