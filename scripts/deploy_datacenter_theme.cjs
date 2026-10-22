@@ -2,14 +2,14 @@ const { Client } = require('ssh2');
 const path = require('path');
 
 const filesToUpload = [
-  'public/src/assets/datacenter_infrastructure_bg.jpg',
-  'public/src/assets/datacenter_server_racks.jpg',
-  'public/src/pages/Home.tsx'
+  'public/src/pages/Home.tsx',
+  'public/src/components/Navbar.tsx',
+  'public/src/components/Footer.tsx'
 ];
 
 const conn = new Client();
 
-console.log('Connecting to Ubuntu server 172.21.39.51 to upload data center assets & Home.tsx...');
+console.log('Connecting to Ubuntu server 172.21.39.51 to push full dark data center theme...');
 
 conn.on('ready', () => {
   console.log('SSH connection established! Initializing SFTP...');
@@ -42,7 +42,7 @@ conn.on('ready', () => {
       for (const file of filesToUpload) {
         await uploadFile(file);
       }
-      console.log('All datacenter visual assets and pages uploaded successfully!');
+      console.log('All files uploaded successfully!');
 
       const remoteCmd = `
         set -e

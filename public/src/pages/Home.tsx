@@ -232,8 +232,11 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAFAF8] dark:bg-[#030611] text-[#152033] dark:text-[#F5F7FF] font-sans selection:bg-blue-600 selection:text-white transition-colors duration-500 overflow-x-hidden">
+    <div className="min-h-screen bg-[#030611] text-[#F5F7FF] font-sans selection:bg-cyan-500 selection:text-black transition-colors duration-500 overflow-x-hidden relative">
       
+      {/* Background Cybernetic Matrix & Subtle Data Center Floor Grid */}
+      <div className="fixed inset-0 pointer-events-none bg-[linear-gradient(to_right,#0c1a35_1px,transparent_1px),linear-gradient(to_bottom,#0c1a35_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-20 z-0" />
+
       {/* ==============================================================================
           1. 100% NEXA-INSPIRED SIGNATURE HERO SECTION
           Composition directly modeled from reference:
@@ -244,40 +247,41 @@ export default function Home() {
           - Floating curved pill stack connected via organic bezier lines
           - Bottom-right callout: "Solve your tasks and speed up deployments by 99% ^"
           ============================================================================== */}
-      <section className="relative overflow-hidden pt-12 sm:pt-16 pb-24 sm:pb-32 border-b border-slate-200/80 dark:border-white/5 bg-[#FAFAF8] dark:bg-[#030611]">
+      <section className="relative overflow-hidden pt-12 sm:pt-16 pb-24 sm:pb-32 border-b border-white/10 bg-[#030611] z-10">
         
         {/* High-Tech Enterprise Data Center Infrastructure Background Layer */}
         <div 
-          className="absolute inset-0 pointer-events-none opacity-20 dark:opacity-40 bg-cover bg-center transition-opacity duration-700 mix-blend-luminosity scale-105"
+          className="absolute inset-0 pointer-events-none opacity-25 dark:opacity-40 bg-cover bg-center transition-opacity duration-700 mix-blend-luminosity scale-105"
           style={{ backgroundImage: `url(${datacenterBgImg})` }}
         />
         {/* Soft Vignette Mask for Data Center Layer so text and sphere pop out crisp */}
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#FAFAF8]/95 via-transparent to-[#FAFAF8] dark:from-[#030611]/85 dark:via-transparent dark:to-[#030611]" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#030611]/90 via-transparent to-[#030611]" />
 
         {/* Atmospheric Organic Clouds Framing Layer (From Nexa Reference) */}
         <div 
-          className="absolute inset-0 pointer-events-none opacity-30 dark:opacity-75 mix-blend-screen bg-cover bg-center transition-opacity duration-700"
+          className="absolute inset-0 pointer-events-none opacity-45 dark:opacity-80 mix-blend-screen bg-cover bg-center transition-opacity duration-700"
           style={{ backgroundImage: `url(${nexaCloudsImg})` }}
         />
 
         {/* Ambient Electric-Blue Deep Space Bloom */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[650px] bg-blue-600/15 dark:bg-[#4263FF]/25 rounded-full blur-[140px] pointer-events-none" />
-        <div className="absolute bottom-10 right-10 w-[400px] h-[400px] bg-cyan-400/10 dark:bg-[#55DFFF]/15 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-[#4263FF]/25 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute bottom-10 right-10 w-[450px] h-[450px] bg-[#55DFFF]/15 rounded-full blur-[120px] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-6 relative z-10 flex flex-col items-center">
           
           {/* Centered Brand Intro Label (Nexa: "Nexa AI Solutions") */}
           <div className="text-center space-y-3 mb-6">
-            <span className="text-xs sm:text-sm font-medium tracking-[0.25em] text-slate-500 dark:text-[#A4AEC3] uppercase">
+            <span className="text-xs sm:text-sm font-medium tracking-[0.25em] text-[#A4AEC3] uppercase flex items-center justify-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
               Analytical Technical Consulting
             </span>
             
             {/* Centered Large Headline (Nexa: "Craft Your Intelligence") */}
-            <h1 className="text-4xl sm:text-6xl md:text-7xl font-light tracking-tight text-slate-950 dark:text-[#F5F7FF] leading-[1.08] max-w-4xl mx-auto">
-              Craft Your <span className="font-medium text-slate-900 dark:text-white">Infrastructure</span>
+            <h1 className="text-4xl sm:text-6xl md:text-7xl font-light tracking-tight text-[#F5F7FF] leading-[1.08] max-w-4xl mx-auto">
+              Craft Your <span className="font-semibold text-white drop-shadow-[0_0_35px_rgba(85,223,255,0.3)]">Infrastructure</span>
             </h1>
             
-            <p className="text-slate-600 dark:text-[#A4AEC3] text-sm sm:text-base max-w-xl mx-auto font-normal pt-1">
+            <p className="text-[#A4AEC3] text-sm sm:text-base max-w-xl mx-auto font-normal pt-1">
               Enterprise technology, cloud virtualization, and high-performance server architectures engineered around your production workloads.
             </p>
           </div>
@@ -289,13 +293,13 @@ export default function Home() {
             <div className="relative w-[320px] sm:w-[460px] md:w-[500px] aspect-square rounded-full flex items-center justify-center group">
               
               {/* Outer Radial Glow */}
-              <div className="absolute inset-0 rounded-full bg-blue-500/20 dark:bg-[#4263FF]/30 blur-3xl transform scale-110 pointer-events-none animate-pulse" />
+              <div className="absolute inset-0 rounded-full bg-[#4263FF]/30 blur-3xl transform scale-110 pointer-events-none animate-pulse" />
               
               {/* The Photorealistic 3D Liquid Glass Sphere Image */}
               <img
                 src={nexaSphereImg}
                 alt="Nexa 3D Liquid Glass Sphere"
-                className="relative w-full h-full object-cover rounded-full shadow-2xl shadow-blue-950/60 dark:shadow-blue-500/25 border border-white/20 dark:border-white/10 select-none pointer-events-none transition-transform duration-700 group-hover:scale-102"
+                className="relative w-full h-full object-cover rounded-full shadow-2xl shadow-blue-500/25 border border-white/15 select-none pointer-events-none transition-transform duration-700 group-hover:scale-102"
               />
 
               {/* Specular Glint Highlight Animation */}
@@ -307,7 +311,7 @@ export default function Home() {
               
               {/* Connecting Organic Line (SVG Bezier Path visible on desktop) */}
               <svg 
-                className="hidden lg:block absolute -left-28 top-8 w-28 h-28 pointer-events-none text-blue-400/40 dark:text-[#55DFFF]/40" 
+                className="hidden lg:block absolute -left-28 top-8 w-28 h-28 pointer-events-none text-[#55DFFF]/50" 
                 viewBox="0 0 110 110" 
                 fill="none"
               >
@@ -317,7 +321,7 @@ export default function Home() {
                   strokeWidth="1.5" 
                   strokeDasharray="3 3"
                 />
-                <circle cx="110" cy="20" r="3" fill="#55DFFF" />
+                <circle cx="110" cy="20" r="3.5" fill="#55DFFF" />
               </svg>
 
               {heroPills.map((pill, idx) => {
@@ -330,12 +334,12 @@ export default function Home() {
                     onMouseEnter={() => setActiveHeroPill(idx)}
                     className={`px-5 py-3 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 flex items-center justify-between gap-4 cursor-pointer text-left shadow-lg ${
                       isActive
-                        ? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950 scale-105 shadow-xl shadow-blue-600/20'
-                        : 'bg-white/70 dark:bg-[#070D1D]/75 text-slate-700 dark:text-[#A4AEC3] hover:text-slate-950 dark:hover:text-white border border-slate-200 dark:border-white/10 backdrop-blur-md hover:border-blue-400/60'
+                        ? 'bg-white text-slate-950 scale-105 shadow-xl shadow-cyan-400/25 ring-2 ring-cyan-400'
+                        : 'bg-[#070D1D]/85 text-[#A4AEC3] hover:text-white border border-white/10 backdrop-blur-md hover:border-cyan-400/60'
                     }`}
                   >
                     <span>{pill.label}</span>
-                    <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-blue-500 dark:bg-blue-600' : 'bg-slate-400 dark:bg-slate-600'}`} />
+                    <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-cyan-500 shadow-[0_0_8px_#06b6d4]' : 'bg-slate-600'}`} />
                   </button>
                 );
               })}
@@ -343,10 +347,10 @@ export default function Home() {
 
             {/* Nexa Bottom-Right Metric Callout ("Solve your tasks and speed up processes by 99% ^") */}
             <div className="lg:absolute lg:bottom-4 lg:right-4 xl:right-12 mt-8 lg:mt-0 text-center lg:text-right space-y-1">
-              <p className="text-xs text-slate-500 dark:text-[#A4AEC3] font-medium max-w-[210px] leading-snug mx-auto lg:ml-auto">
+              <p className="text-xs text-[#A4AEC3] font-medium max-w-[210px] leading-snug mx-auto lg:ml-auto">
                 Accelerate deployments and scale infrastructure by
               </p>
-              <div className="flex items-center justify-center lg:justify-end gap-1 text-3xl sm:text-4xl font-extrabold text-blue-600 dark:text-[#55DFFF]">
+              <div className="flex items-center justify-center lg:justify-end gap-1 text-3xl sm:text-4xl font-extrabold text-[#55DFFF] drop-shadow-[0_0_15px_rgba(85,223,255,0.4)]">
                 <span>99%</span>
                 <ChevronUp className="w-6 h-6 stroke-[3]" />
               </div>
@@ -358,7 +362,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Link
               to="/contact"
-              className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold uppercase tracking-widest rounded-full shadow-lg shadow-blue-600/30 hover:shadow-blue-600/40 hover:scale-102 transition-all flex items-center gap-2"
+              className="px-8 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-xs font-bold uppercase tracking-widest rounded-full shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-102 transition-all flex items-center gap-2"
             >
               <span>Book a Consultation</span>
               <ArrowRight className="w-4 h-4" />
@@ -366,7 +370,7 @@ export default function Home() {
             
             <Link
               to="/pricing"
-              className="px-8 py-3.5 bg-white dark:bg-[#0C1428] text-slate-800 dark:text-[#F5F7FF] border border-slate-300 dark:border-white/15 text-xs font-bold uppercase tracking-widest rounded-full hover:bg-slate-50 dark:hover:bg-[#111A30] transition-all shadow-xs"
+              className="px-8 py-3.5 bg-[#0C1428]/90 text-[#F5F7FF] border border-white/15 text-xs font-bold uppercase tracking-widest rounded-full hover:bg-[#111A30] hover:border-cyan-400/50 transition-all shadow-md"
             >
               View Cloud VPS Plans
             </Link>
@@ -378,18 +382,19 @@ export default function Home() {
       {/* ==============================================================================
           2. ONE-CLICK OS & DEVOPS SHOWCASE STRIP
           ============================================================================== */}
-      <section className="bg-slate-100/80 dark:bg-[#070D1D] border-b border-slate-200 dark:border-white/5 py-6 transition-colors duration-300">
+      <section className="bg-[#050B18]/95 border-b border-white/10 py-6 backdrop-blur-xl relative z-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5 text-xs font-bold text-slate-700 dark:text-[#A4AEC3] uppercase tracking-wider shrink-0">
-              <Layers className="w-4 h-4 text-blue-600 dark:text-[#55DFFF]" />
+            <div className="flex items-center gap-2.5 text-xs font-bold text-[#A4AEC3] uppercase tracking-wider shrink-0">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping mr-1" />
+              <Layers className="w-4 h-4 text-[#55DFFF]" />
               <span>Instant 1-Click Stacks & OS:</span>
             </div>
             <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2.5">
               {ONE_CLICK_APPS.map((app) => (
                 <div 
                   key={app.name} 
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white dark:bg-[#0C1428] border border-slate-200 dark:border-white/10 text-xs font-medium text-slate-800 dark:text-slate-200 hover:border-blue-500/80 transition-all shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0C152B]/90 border border-white/10 hover:border-cyan-400/60 text-xs font-medium text-[#F5F7FF] hover:text-cyan-300 transition-all shadow-md shadow-black/40 hover:-translate-y-0.5"
                 >
                   <span>{app.icon}</span>
                   <span>{app.name}</span>
@@ -404,22 +409,22 @@ export default function Home() {
           3. 100% NEXA-INSPIRED SERVICES SECTION
           Dark atmospheric cards, electric-blue lighting, clean minimalist composition
           ============================================================================== */}
-      <section id="services" className="py-24 sm:py-32 border-b border-slate-200/80 dark:border-white/5 bg-[#FAFAF8] dark:bg-[#030611] transition-colors duration-300 relative overflow-hidden">
+      <section id="services" className="py-24 sm:py-32 border-b border-white/10 bg-[#030611] relative z-10 overflow-hidden">
         
         {/* Soft atmospheric blue glow */}
-        <div className="absolute top-1/2 left-0 w-[500px] h-[500px] bg-blue-600/10 dark:bg-[#4263FF]/15 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute top-1/2 left-0 w-[550px] h-[550px] bg-[#4263FF]/15 rounded-full blur-[150px] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           
           <div className="max-w-2xl mb-16 space-y-3">
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600 dark:text-[#55DFFF]">
-              Core Specializations
+            <span className="text-xs font-bold uppercase tracking-[0.2em] text-[#55DFFF] flex items-center gap-2">
+              <span className="w-2 h-0.5 bg-[#55DFFF]" /> Core Specializations
             </span>
-            <h2 className="text-3xl sm:text-5xl font-light text-slate-950 dark:text-[#F5F7FF] tracking-tight">
+            <h2 className="text-3xl sm:text-5xl font-light text-[#F5F7FF] tracking-tight">
               Enterprise Technology <br />
-              <span className="font-semibold text-slate-900 dark:text-white">Built for High Resilience</span>
+              <span className="font-semibold text-white drop-shadow-[0_0_25px_rgba(85,223,255,0.25)]">Built for High Resilience</span>
             </h2>
-            <p className="text-slate-600 dark:text-[#A4AEC3] text-sm sm:text-base leading-relaxed">
+            <p className="text-[#A4AEC3] text-sm sm:text-base leading-relaxed">
               Analytical Technical Consulting (ATC) engineers reliable digital foundations—spanning cloud virtualization, system architecture, database clusters, and hardware performance tuning.
             </p>
           </div>
@@ -430,31 +435,31 @@ export default function Home() {
               return (
                 <div
                   key={srv.id}
-                  className="group relative bg-white dark:bg-[#070D1D] border border-slate-200/90 dark:border-white/10 rounded-3xl p-8 sm:p-10 hover:border-blue-500/70 dark:hover:border-[#55DFFF]/50 hover:shadow-2xl hover:shadow-blue-950/20 dark:hover:shadow-blue-500/10 transition-all duration-300 flex flex-col justify-between"
+                  className="group relative bg-[#070D1D]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-8 sm:p-10 hover:border-[#55DFFF]/60 hover:shadow-2xl hover:shadow-blue-500/15 hover:-translate-y-1.5 transition-all duration-400 flex flex-col justify-between"
                 >
                   <div>
-                    <div className="flex items-center justify-between pb-6 mb-6 border-b border-slate-100 dark:border-white/5">
-                      <span className="font-mono text-sm font-bold text-blue-600 dark:text-[#55DFFF]">
+                    <div className="flex items-center justify-between pb-6 mb-6 border-b border-white/5">
+                      <span className="font-mono text-sm font-bold text-[#55DFFF]">
                         {srv.id} // {srv.subtitle}
                       </span>
-                      <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-[#0C1428] border border-blue-100 dark:border-white/10 text-blue-600 dark:text-[#55DFFF] flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                      <div className="w-11 h-11 rounded-2xl bg-[#0C1428] border border-white/10 text-[#55DFFF] flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:bg-gradient-to-br group-hover:from-blue-600 group-hover:to-cyan-500 group-hover:text-white transition-all duration-300">
                         <IconComp className="w-5 h-5" />
                       </div>
                     </div>
 
-                    <h3 className="text-2xl font-bold text-slate-950 dark:text-white mb-3 group-hover:text-blue-600 dark:group-hover:text-[#55DFFF] transition-colors">
+                    <h3 className="text-2xl font-bold text-white mb-3 group-hover:text-[#55DFFF] transition-colors">
                       {srv.title}
                     </h3>
                     
-                    <p className="text-slate-600 dark:text-[#A4AEC3] text-sm leading-relaxed mb-6">
+                    <p className="text-[#A4AEC3] text-sm leading-relaxed mb-6 font-normal">
                       {srv.description}
                     </p>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
+                  <div className="pt-4 border-t border-white/5 flex items-center justify-between">
                     <Link
                       to="/contact"
-                      className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-[#55DFFF] group-hover:translate-x-1 transition-transform"
+                      className="inline-flex items-center gap-2 text-xs font-bold text-[#55DFFF] group-hover:translate-x-1.5 transition-transform"
                     >
                       <span>Inquire about this service</span>
                       <ArrowRight className="w-3.5 h-3.5" />
@@ -471,28 +476,28 @@ export default function Home() {
       {/* ==============================================================================
           4. INTERACTIVE ATMOSPHERIC INFRASTRUCTURE SHOWCASE
           ============================================================================== */}
-      <section className="py-24 sm:py-32 bg-[#F0F3F8] dark:bg-[#070D1D] border-b border-slate-200/80 dark:border-white/5 transition-colors duration-300 relative overflow-hidden">
+      <section className="py-24 sm:py-32 bg-[#050B18] border-b border-white/10 relative z-10 overflow-hidden">
         
         {/* High-Density Enterprise Server Racks Background Layer */}
         <div 
-          className="absolute inset-0 pointer-events-none opacity-15 dark:opacity-30 bg-cover bg-center transition-opacity duration-700 mix-blend-luminosity scale-105"
+          className="absolute inset-0 pointer-events-none opacity-25 dark:opacity-35 bg-cover bg-center transition-opacity duration-700 mix-blend-luminosity scale-105"
           style={{ backgroundImage: `url(${serverRacksImg})` }}
         />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#F0F3F8] via-[#F0F3F8]/90 to-[#F0F3F8] dark:from-[#070D1D] dark:via-[#070D1D]/85 dark:to-[#070D1D]" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#050B18] via-[#050B18]/85 to-[#050B18]" />
 
         {/* Soft atmospheric gradient glow */}
-        <div className="absolute top-0 right-1/4 w-[480px] h-[480px] bg-blue-600/10 dark:bg-[#4263FF]/20 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute top-0 right-1/4 w-[480px] h-[480px] bg-[#4263FF]/20 rounded-full blur-[140px] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           
           <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
-            <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-600 dark:text-[#55DFFF] bg-blue-50 dark:bg-[#0C1428] border border-blue-200 dark:border-white/10 px-3.5 py-1.5 rounded-full uppercase tracking-wider">
-              <Terminal className="w-3.5 h-3.5" /> Live Cloud Node Provisioning
+            <div className="inline-flex items-center gap-2 text-xs font-bold text-[#55DFFF] bg-[#0C1428] border border-white/10 px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-md">
+              <Terminal className="w-3.5 h-3.5 text-cyan-400" /> Live Cloud Node Provisioning
             </div>
-            <h2 className="text-3xl sm:text-5xl font-light text-slate-950 dark:text-[#F5F7FF] tracking-tight">
-              Next-Generation <span className="font-semibold text-slate-900 dark:text-white">Cloud Architecture</span>
+            <h2 className="text-3xl sm:text-5xl font-light text-[#F5F7FF] tracking-tight">
+              Next-Generation <span className="font-semibold text-white drop-shadow-[0_0_25px_rgba(85,223,255,0.25)]">Cloud Architecture</span>
             </h2>
-            <p className="text-slate-600 dark:text-[#A4AEC3] text-sm sm:text-base font-normal">
+            <p className="text-[#A4AEC3] text-sm sm:text-base font-normal">
               High-performance compute nodes optimized for continuous developer workloads, mission-critical databases, and automated infrastructure deployments.
             </p>
           </div>
@@ -501,15 +506,15 @@ export default function Home() {
             
             {/* LEFT: Interactive Simulated Typewriter Terminal */}
             <div className="lg:col-span-7 flex flex-col justify-between">
-              <div className="bg-white dark:bg-[#0C1428] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 shadow-xl">
-                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 dark:border-white/5">
+              <div className="bg-[#070D1D]/95 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-cyan-950/40">
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
                   <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#10b981]" />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">
                       Interactive Hypervisor CLI Session
                     </span>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                  <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 px-2 py-0.5 rounded">
                     SSH: PORT 22
                   </span>
                 </div>
@@ -521,49 +526,49 @@ export default function Home() {
             {/* RIGHT: Architecture Telemetry Cards */}
             <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
               
-              <div className="bg-white dark:bg-[#0C1428] border border-slate-200 dark:border-white/10 rounded-2xl p-5 shadow-xs flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-[#55DFFF] flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/50">
+              <div className="bg-[#0C1428]/90 border border-white/10 hover:border-cyan-400/50 rounded-2xl p-5 shadow-lg transition-all flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-950/70 text-[#55DFFF] flex items-center justify-center shrink-0 border border-blue-800/60 shadow-inner">
                   <HardDrive className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-950 dark:text-[#F5F7FF]">Enterprise NVMe Storage</h4>
-                  <p className="text-xs text-slate-500 dark:text-[#A4AEC3] mt-1 leading-relaxed">
+                  <h4 className="text-sm font-bold text-[#F5F7FF]">Enterprise NVMe Storage</h4>
+                  <p className="text-xs text-[#A4AEC3] mt-1 leading-relaxed">
                     Dedicated storage arrays delivering 1,400+ MB/s read speeds and 0.2ms I/O latency for zero database throttling.
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-[#0C1428] border border-slate-200 dark:border-white/10 rounded-2xl p-5 shadow-xs flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-900/50">
+              <div className="bg-[#0C1428]/90 border border-white/10 hover:border-emerald-400/50 rounded-2xl p-5 shadow-lg transition-all flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-950/70 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-800/60 shadow-inner">
                   <Network className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-950 dark:text-[#F5F7FF]">1 Gbps Dedicated Uplinks</h4>
-                  <p className="text-xs text-slate-500 dark:text-[#A4AEC3] mt-1 leading-relaxed">
+                  <h4 className="text-sm font-bold text-[#F5F7FF]">1 Gbps Dedicated Uplinks</h4>
+                  <p className="text-xs text-[#A4AEC3] mt-1 leading-relaxed">
                     Carrier-neutral redundant backbones with automated DDoS filtering and isolated IPv4 routing.
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-[#0C1428] border border-slate-200 dark:border-white/10 rounded-2xl p-5 shadow-xs flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-100 dark:border-purple-900/50">
+              <div className="bg-[#0C1428]/90 border border-white/10 hover:border-purple-400/50 rounded-2xl p-5 shadow-lg transition-all flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-purple-950/70 text-purple-400 flex items-center justify-center shrink-0 border border-purple-800/60 shadow-inner">
                   <Cpu className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-950 dark:text-[#F5F7FF]">Uncontended ECC Memory</h4>
-                  <p className="text-xs text-slate-500 dark:text-[#A4AEC3] mt-1 leading-relaxed">
+                  <h4 className="text-sm font-bold text-[#F5F7FF]">Uncontended ECC Memory</h4>
+                  <p className="text-xs text-[#A4AEC3] mt-1 leading-relaxed">
                     Error-Correcting Code RAM with strict physical hardware mapping ensures zero noisy neighbor interference.
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-[#0C1428] border border-slate-200 dark:border-white/10 rounded-2xl p-5 shadow-xs flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/60 text-cyan-600 dark:text-[#55DFFF] flex items-center justify-center shrink-0 border border-cyan-100 dark:border-cyan-900/50">
+              <div className="bg-[#0C1428]/90 border border-white/10 hover:border-cyan-400/50 rounded-2xl p-5 shadow-lg transition-all flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-cyan-950/70 text-[#55DFFF] flex items-center justify-center shrink-0 border border-cyan-800/60 shadow-inner">
                   <Gauge className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-slate-950 dark:text-[#F5F7FF]">99% Availability Commitment</h4>
-                  <p className="text-xs text-slate-500 dark:text-[#A4AEC3] mt-1 leading-relaxed">
+                  <h4 className="text-sm font-bold text-[#F5F7FF]">99% Availability Commitment</h4>
+                  <p className="text-xs text-[#A4AEC3] mt-1 leading-relaxed">
                     Honest target hypervisor availability backed by real-time hardware monitoring and automated health telemetry.
                   </p>
                 </div>
@@ -579,147 +584,153 @@ export default function Home() {
       {/* ==============================================================================
           5. PREDICTABLE CLOUD VPS PRICING SECTION
           ============================================================================== */}
-      <section className="max-w-7xl mx-auto px-6 py-24 sm:py-32">
-        <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
-          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-[#55DFFF] bg-blue-50 dark:bg-[#0C1428] border border-blue-200 dark:border-white/10 px-3.5 py-1.5 rounded-full uppercase tracking-wider">
-            <Zap className="w-3.5 h-3.5" /> High Performance Cloud Servers
-          </div>
-          <h2 className="text-3xl sm:text-5xl font-light text-slate-950 dark:text-[#F5F7FF] tracking-tight">
-            Predictable <span className="font-semibold text-slate-900 dark:text-white">Cloud Pricing</span>
-          </h2>
-          <p className="text-slate-600 dark:text-[#A4AEC3] text-sm sm:text-base font-normal">
-            Scalable VPS instances backed by enterprise SSD storage arrays, dedicated hardware cores, and rapid provisioning.
-          </p>
+      <section className="py-24 sm:py-32 bg-[#030611] relative z-10 border-b border-white/10">
+        
+        {/* Ambient glow behind cards */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-blue-600/10 rounded-full blur-[160px] pointer-events-none" />
 
-          {/* Billing Switcher Toggle */}
-          <div className="pt-4 flex items-center justify-center gap-3">
-            <span className={`text-xs font-bold ${billingCycle === 'monthly' ? 'text-slate-950 dark:text-[#F5F7FF]' : 'text-slate-400'}`}>Monthly</span>
-            <button
-              type="button"
-              onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annually' : 'monthly')}
-              className="w-12 h-6 bg-slate-200 dark:bg-slate-700 rounded-full p-1 relative transition-colors focus:outline-hidden cursor-pointer"
-              aria-label="Toggle billing cycle"
-            >
-              <div className={`w-4 h-4 bg-blue-600 dark:bg-[#55DFFF] rounded-full transition-transform ${billingCycle === 'annually' ? 'translate-x-6' : ''}`} />
-            </button>
-            <span className={`text-xs font-bold ${billingCycle === 'annually' ? 'text-slate-950 dark:text-[#F5F7FF]' : 'text-slate-400'}`}>
-              Annually <span className="text-emerald-700 dark:text-emerald-400 text-[10px] bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 font-bold px-2 py-0.5 rounded-full ml-1">Save 15%</span>
-            </span>
-          </div>
-        </div>
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-[#55DFFF] bg-[#0C1428] border border-white/10 px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-md">
+              <Zap className="w-3.5 h-3.5 text-cyan-400" /> High Performance Cloud Servers
+            </div>
+            <h2 className="text-3xl sm:text-5xl font-light text-[#F5F7FF] tracking-tight">
+              Predictable <span className="font-semibold text-white drop-shadow-[0_0_25px_rgba(85,223,255,0.25)]">Cloud Pricing</span>
+            </h2>
+            <p className="text-[#A4AEC3] text-sm sm:text-base font-normal">
+              Scalable VPS instances backed by enterprise SSD storage arrays, dedicated hardware cores, and rapid provisioning.
+            </p>
 
-        <div className="grid md:grid-cols-3 gap-8 items-stretch">
-          {plans.map((plan) => {
-            const finalPrice = billingCycle === 'annually' ? +(plan.price * 0.85).toFixed(2) : plan.price;
-
-            return (
-              <div
-                key={plan.name}
-                className={`bg-white dark:bg-[#070D1D] rounded-3xl p-8 border transition-all duration-300 flex flex-col justify-between relative hover:-translate-y-1.5 ${
-                  plan.popular
-                    ? 'border-blue-600 dark:border-[#55DFFF] shadow-2xl shadow-blue-900/10 dark:shadow-blue-500/10 ring-2 ring-blue-600/30 dark:ring-[#55DFFF]/30 md:scale-105 z-10'
-                    : 'border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:border-white/20 hover:shadow-xl'
-                }`}
+            {/* Billing Switcher Toggle */}
+            <div className="pt-4 flex items-center justify-center gap-3">
+              <span className={`text-xs font-bold ${billingCycle === 'monthly' ? 'text-white' : 'text-slate-500'}`}>Monthly</span>
+              <button
+                type="button"
+                onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'annually' : 'monthly')}
+                className="w-12 h-6 bg-[#0C1428] border border-white/20 rounded-full p-1 relative transition-colors focus:outline-hidden cursor-pointer"
+                aria-label="Toggle billing cycle"
               >
-                {plan.popular && (
-                  <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full shadow-md">
-                    Most Popular Choice
-                  </span>
-                )}
+                <div className={`w-4 h-4 bg-[#55DFFF] shadow-[0_0_8px_#55DFFF] rounded-full transition-transform ${billingCycle === 'annually' ? 'translate-x-6' : ''}`} />
+              </button>
+              <span className={`text-xs font-bold ${billingCycle === 'annually' ? 'text-white' : 'text-slate-500'}`}>
+                Annually <span className="text-emerald-400 text-[10px] bg-emerald-950/60 border border-emerald-800 font-bold px-2 py-0.5 rounded-full ml-1">Save 15%</span>
+              </span>
+            </div>
+          </div>
 
-                <div>
-                  <div className="flex justify-between items-baseline mb-3">
-                    <h3 className="text-2xl font-black text-slate-950 dark:text-[#F5F7FF]">{plan.name}</h3>
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 dark:bg-[#0C1428] text-slate-600 dark:text-[#A4AEC3]">
-                      General Purpose
-                    </span>
-                  </div>
+          <div className="grid md:grid-cols-3 gap-8 items-stretch">
+            {plans.map((plan) => {
+              const finalPrice = billingCycle === 'annually' ? +(plan.price * 0.85).toFixed(2) : plan.price;
 
-                  <div className="mb-6 pb-6 border-b border-slate-100 dark:border-white/10">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl sm:text-5xl font-black text-slate-950 dark:text-[#F5F7FF] tracking-tight">${finalPrice.toFixed(2)}</span>
-                      <span className="text-slate-500 dark:text-[#A4AEC3] text-xs font-bold"> / month</span>
-                    </div>
-                    {billingCycle === 'annually' && (
-                      <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">Billed annually (${(finalPrice * 12).toFixed(2)}/yr)</p>
-                    )}
-                  </div>
-
-                  <ul className="space-y-3.5 text-xs text-slate-600 dark:text-[#A4AEC3] font-medium mb-8">
-                    <li className="flex items-center gap-3">
-                      <Cpu className="w-4 h-4 text-blue-600 dark:text-[#55DFFF] shrink-0" /> 
-                      <span><strong className="text-slate-950 dark:text-[#F5F7FF] font-bold">{plan.cpu}</strong> vCPU Cores</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Zap className="w-4 h-4 text-blue-600 dark:text-[#55DFFF] shrink-0" /> 
-                      <span><strong className="text-slate-950 dark:text-[#F5F7FF] font-bold">{plan.ram}</strong> High-Speed Memory</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Server className="w-4 h-4 text-blue-600 dark:text-[#55DFFF] shrink-0" /> 
-                      <span><strong className="text-slate-950 dark:text-[#F5F7FF] font-bold">{plan.storage}</strong> Enterprise SSD</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <Globe className="w-4 h-4 text-blue-600 dark:text-[#55DFFF] shrink-0" /> 
-                      <span><strong className="text-slate-950 dark:text-[#F5F7FF] font-bold">{plan.bandwidth}</strong> Premium Traffic</span>
-                    </li>
-                    <li className="flex items-center gap-3">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" /> 
-                      <span>Dedicated IPv4 & Full Root Access</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleConfigure(plan)}
-                  className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              return (
+                <div
+                  key={plan.name}
+                  className={`rounded-3xl p-8 border transition-all duration-300 flex flex-col justify-between relative hover:-translate-y-1.5 ${
                     plan.popular
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-600/25'
-                      : 'bg-slate-100 dark:bg-[#0C1428] text-slate-800 dark:text-[#F5F7FF] hover:bg-slate-200 dark:hover:bg-[#111A30]'
+                      ? 'bg-gradient-to-b from-[#091533] to-[#070D1D] border-2 border-cyan-400 shadow-2xl shadow-cyan-500/20 ring-4 ring-cyan-500/15 md:scale-105 z-10'
+                      : 'bg-[#070D1D]/90 backdrop-blur-2xl border-white/10 hover:border-white/25 shadow-xl'
                   }`}
                 >
-                  <span>Configure Server</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            );
-          })}
+                  {plan.popular && (
+                    <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full shadow-lg shadow-cyan-500/30">
+                      Most Popular Choice
+                    </span>
+                  )}
+
+                  <div>
+                    <div className="flex justify-between items-baseline mb-3">
+                      <h3 className="text-2xl font-black text-white">{plan.name}</h3>
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-[#0C1428] border border-white/10 text-[#A4AEC3]">
+                        General Purpose
+                      </span>
+                    </div>
+
+                    <div className="mb-6 pb-6 border-b border-white/10">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">${finalPrice.toFixed(2)}</span>
+                        <span className="text-[#A4AEC3] text-xs font-bold"> / month</span>
+                      </div>
+                      {billingCycle === 'annually' && (
+                        <p className="text-[11px] text-emerald-400 font-semibold mt-1">Billed annually (${(finalPrice * 12).toFixed(2)}/yr)</p>
+                      )}
+                    </div>
+
+                    <ul className="space-y-3.5 text-xs text-[#A4AEC3] font-medium mb-8">
+                      <li className="flex items-center gap-3">
+                        <Cpu className="w-4 h-4 text-[#55DFFF] shrink-0" /> 
+                        <span><strong className="text-white font-bold">{plan.cpu}</strong> vCPU Cores</span>
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <Zap className="w-4 h-4 text-[#55DFFF] shrink-0" /> 
+                        <span><strong className="text-white font-bold">{plan.ram}</strong> High-Speed Memory</span>
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <Server className="w-4 h-4 text-[#55DFFF] shrink-0" /> 
+                        <span><strong className="text-white font-bold">{plan.storage}</strong> Enterprise SSD</span>
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <Globe className="w-4 h-4 text-[#55DFFF] shrink-0" /> 
+                        <span><strong className="text-white font-bold">{plan.bandwidth}</strong> Premium Traffic</span>
+                      </li>
+                      <li className="flex items-center gap-3">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" /> 
+                        <span>Dedicated IPv4 & Full Root Access</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleConfigure(plan)}
+                    className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      plan.popular
+                        ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white shadow-lg shadow-cyan-500/30'
+                        : 'bg-[#0C1428] text-white border border-white/10 hover:bg-[#111A30] hover:border-cyan-400/50'
+                    }`}
+                  >
+                    <span>Configure Server</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
       {/* ==============================================================================
           6. VERIFIED CLIENT FEEDBACK CONTINUOUS MARQUEE
           ============================================================================== */}
-      <section className="bg-slate-50/80 dark:bg-[#070D1D] border-t border-slate-200/80 dark:border-white/5 py-20 overflow-hidden relative transition-colors duration-300">
+      <section className="bg-[#050B18] border-t border-white/10 py-20 overflow-hidden relative z-10">
         <div className="max-w-7xl mx-auto px-6">
           
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
             <div>
-              <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 dark:text-[#55DFFF] bg-blue-50 dark:bg-[#0C1428] border border-blue-200/80 dark:border-white/10 px-3.5 py-1.5 rounded-full mb-3 shadow-xs">
-                <span className="font-semibold text-slate-800 dark:text-[#F5F7FF]">Verified Client Experiences</span>
+              <div className="inline-flex items-center gap-2 text-xs font-bold text-[#55DFFF] bg-[#0C1428] border border-white/10 px-3.5 py-1.5 rounded-full mb-3 shadow-md">
+                <span className="font-semibold text-white">Verified Client Experiences</span>
                 <div className="flex items-center gap-0.5 text-amber-400 ml-1">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                   ))}
                 </div>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-light text-slate-950 dark:text-[#F5F7FF] tracking-tight">
-                Trusted by Developers & <span className="font-semibold text-slate-900 dark:text-white">System Administrators</span>
+              <h2 className="text-3xl sm:text-4xl font-light text-[#F5F7FF] tracking-tight">
+                Trusted by Developers & <span className="font-semibold text-white drop-shadow-[0_0_25px_rgba(85,223,255,0.25)]">System Administrators</span>
               </h2>
-              <p className="text-slate-600 dark:text-[#A4AEC3] text-sm sm:text-base mt-2 max-w-xl font-normal">
+              <p className="text-[#A4AEC3] text-sm sm:text-base mt-2 max-w-xl font-normal">
                 Here’s what engineers and administrators say about their experience with Analytical Technical Consulting infrastructure.
               </p>
             </div>
 
-            <div className="hidden sm:inline-flex items-center gap-2 text-xs text-slate-500 dark:text-[#A4AEC3] font-medium bg-white dark:bg-[#0C1428] border border-slate-200/80 dark:border-white/10 px-4 py-2 rounded-xl shadow-xs shrink-0">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="hidden sm:inline-flex items-center gap-2 text-xs text-[#A4AEC3] font-medium bg-[#0C1428] border border-white/10 px-4 py-2 rounded-xl shadow-md shrink-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>Hover card to pause</span>
             </div>
           </div>
 
           <div className="relative overflow-hidden py-4 -mx-6 px-6">
-            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-r from-[#FAFAF8] dark:from-[#070D1D] via-[#FAFAF8]/90 dark:via-[#070D1D]/90 to-transparent z-10" />
-            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-l from-[#FAFAF8] dark:from-[#070D1D] via-[#FAFAF8]/90 dark:via-[#070D1D]/90 to-transparent z-10" />
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-r from-[#050B18] via-[#050B18]/90 to-transparent z-10" />
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-16 sm:w-32 bg-gradient-to-l from-[#050B18] via-[#050B18]/90 to-transparent z-10" />
 
             <div className="animate-infinite-carousel">
               {[...CLIENT_REVIEWS, ...CLIENT_REVIEWS].map((review, idx) => (
@@ -727,7 +738,7 @@ export default function Home() {
                   key={idx}
                   className="w-[320px] sm:w-[380px] shrink-0 p-3"
                 >
-                  <div className="h-full bg-white dark:bg-[#0C1428] border border-slate-200/90 dark:border-white/10 rounded-2xl p-6 sm:p-7 shadow-xs hover:shadow-xl hover:border-blue-400/80 dark:hover:border-[#55DFFF]/60 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
+                  <div className="h-full bg-[#070D1D]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-7 shadow-xl hover:shadow-2xl hover:border-[#55DFFF]/60 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group">
                     <div>
                       <div className="flex items-center gap-1 text-amber-400 mb-4">
                         {[...Array(review.rating)].map((_, i) => (
@@ -735,22 +746,22 @@ export default function Home() {
                         ))}
                       </div>
 
-                      <p className="text-slate-700 dark:text-[#A4AEC3] text-xs sm:text-sm leading-relaxed font-normal mb-6">
+                      <p className="text-[#A4AEC3] text-xs sm:text-sm leading-relaxed font-normal mb-6">
                         "{review.review}"
                       </p>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex items-center gap-3">
+                    <div className="pt-4 border-t border-white/5 flex items-center gap-3">
                       <div
-                        className={`w-10 h-10 rounded-xl bg-gradient-to-br ${review.color} text-white font-bold text-xs flex items-center justify-center shadow-xs shrink-0`}
+                        className={`w-10 h-10 rounded-xl bg-gradient-to-br ${review.color} text-white font-bold text-xs flex items-center justify-center shadow-md shrink-0`}
                       >
                         {review.initials}
                       </div>
                       <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-[#F5F7FF] group-hover:text-blue-600 dark:group-hover:text-[#55DFFF] transition-colors">
+                        <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-[#55DFFF] transition-colors">
                           {review.name}
                         </h4>
-                        <p className="text-[11px] text-slate-500 dark:text-[#A4AEC3] font-medium">
+                        <p className="text-[11px] text-[#A4AEC3] font-medium">
                           {review.role}
                         </p>
                       </div>
@@ -768,21 +779,24 @@ export default function Home() {
       {/* ==============================================================================
           7. NEXA-STYLE SIGNATURE CONSULTATION BANNER
           ============================================================================== */}
-      <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="bg-gradient-to-r from-slate-950 via-[#070D1D] to-slate-900 border border-slate-800 dark:border-white/10 rounded-3xl p-10 sm:p-16 text-white text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-8 shadow-2xl relative overflow-hidden">
+      <section className="max-w-7xl mx-auto px-6 py-24 relative z-10">
+        <div className="bg-gradient-to-r from-[#030611] via-[#081229] to-[#030611] border border-cyan-500/30 rounded-3xl p-10 sm:p-16 text-white text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-8 shadow-2xl shadow-cyan-950/40 relative overflow-hidden">
           
-          {/* Subtle Data Center Server Blade Texture inside Card */}
+          {/* Data Center Server Blade Texture inside Card */}
           <div 
-            className="absolute inset-0 pointer-events-none opacity-20 bg-cover bg-center mix-blend-overlay scale-110"
+            className="absolute inset-0 pointer-events-none opacity-25 bg-cover bg-center mix-blend-overlay scale-110"
             style={{ backgroundImage: `url(${serverRacksImg})` }}
           />
 
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:3rem_3rem] opacity-30 pointer-events-none" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:3rem_3rem] opacity-35 pointer-events-none" />
 
           <div className="space-y-3 relative z-10 max-w-xl">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#55DFFF]">Enterprise IT Consulting</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-[#55DFFF] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              Enterprise IT Consulting
+            </span>
             <h2 className="text-3xl sm:text-4xl font-light tracking-tight">
-              Ready to <span className="font-semibold text-white">Build Beyond the Ordinary?</span>
+              Ready to <span className="font-semibold text-white drop-shadow-[0_0_25px_rgba(85,223,255,0.3)]">Build Beyond the Ordinary?</span>
             </h2>
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed font-normal">
               Our engineering team provides tailored server configurations, multi-node private cloud clusters, and direct IT consulting for your business.
@@ -792,7 +806,7 @@ export default function Home() {
           <div className="relative z-10 flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
             <Link
               to="/contact"
-              className="px-8 py-4 rounded-full bg-white text-slate-950 hover:bg-blue-50 hover:text-blue-600 font-bold text-xs uppercase tracking-wider shadow-lg transition-all text-center whitespace-nowrap"
+              className="px-8 py-4 rounded-full bg-white text-slate-950 hover:bg-cyan-50 hover:text-blue-600 font-bold text-xs uppercase tracking-wider shadow-lg shadow-white/10 hover:shadow-cyan-400/30 transition-all text-center whitespace-nowrap"
             >
               Let's talk
             </Link>
