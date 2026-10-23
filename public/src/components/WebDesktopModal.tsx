@@ -46,6 +46,7 @@ export default function WebDesktopModal({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [clipboardText, setClipboardText] = useState('');
   const [showClipboardBar, setShowClipboardBar] = useState(false);
+  const [activeIp, setActiveIp] = useState<string>(vmIp || '');
   const isMountedRef = useRef(true);
 
   // Cleanly disconnect Guacamole client
@@ -93,6 +94,10 @@ export default function WebDesktopModal({
 
       if (!session || (!session.token && !session.ticket)) {
         throw new Error(session?.error || 'Failed to authorize Windows Desktop session ticket.');
+      }
+
+      if (session.ip) {
+        setActiveIp(session.ip);
       }
 
       const guacToken = session.token || session.ticket;
@@ -232,8 +237,9 @@ export default function WebDesktopModal({
 
   // Download .rdp file for native Microsoft Remote Desktop app
   const downloadRdpFile = () => {
+    const effectiveIp = activeIp || vmIp || '172.21.39.51';
     const rdpContent = [
-      `full address:s:${vmIp || '172.21.39.51'}:3389`,
+      `full address:s:${effectiveIp}:3389`,
       `username:s:${adminUser || 'Administrator'}`,
       'prompt for credentials:i:1',
       'screen mode id:i:2',
@@ -287,7 +293,7 @@ export default function WebDesktopModal({
                   {vmName}
                 </span>
                 <span className="text-[11px] font-mono text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">
-                  Windows RDP {vmIp ? `(${vmIp})` : ''}
+                  Windows RDP {activeIp ? `(${activeIp})` : (vmIp ? `(${vmIp})` : '')}
                 </span>
               </div>
             </div>

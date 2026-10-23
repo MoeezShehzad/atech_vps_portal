@@ -1141,7 +1141,7 @@ export async function getConsoleSession(req, res) {
 
     const vm = await prisma.virtualMachine.findFirst({
       where: { vmId, userId },
-      include: { ipPool: true },
+      include: { ipPool: true, image: true },
     });
 
     if (!vm) {
@@ -1162,7 +1162,17 @@ export async function getConsoleSession(req, res) {
       });
     }
 
-    let targetIp = (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress && vm.ipPool[0].ipAddress !== 'DHCP Pending' && vm.ipPool[0].ipAddress !== 'DHCP Leasing...') 
+    const isValidIp = (ip) => Boolean(
+      ip &&
+      typeof ip === 'string' &&
+      !ip.toUpperCase().startsWith('DHCP') &&
+      ip !== 'DHCP Pending' &&
+      ip !== 'DHCP Leasing...' &&
+      ip !== 'Allocated via DHCP' &&
+      ip.includes('.')
+    );
+
+    let targetIp = (vm.ipPool && vm.ipPool.length > 0 && isValidIp(vm.ipPool[0].ipAddress)) 
       ? vm.ipPool[0].ipAddress 
       : null;
 
@@ -1202,7 +1212,14 @@ export async function getConsoleSession(req, res) {
 
     const osFamily = (vm.image?.osFamily || '').toLowerCase();
     const imageName = (vm.image?.name || '').toLowerCase();
-    const isWindows = osFamily.includes('win') || imageName.includes('win');
+    const templatePath = (vm.image?.templatePath || '').toLowerCase();
+    const adminUser = (vm.adminUser || '').toLowerCase();
+    const isWindows = Boolean(
+      osFamily.includes('win') ||
+      imageName.includes('win') ||
+      templatePath.includes('win') ||
+      adminUser === 'administrator'
+    );
 
     if (isWindows) {
       const rdpPayload = buildRdpConnectionPayload({
