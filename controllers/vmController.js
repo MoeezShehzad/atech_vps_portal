@@ -1177,15 +1177,15 @@ export async function getConsoleSession(req, res) {
       ? vm.ipPool[0].ipAddress 
       : null;
 
-    // Only probe Hyper-V agent if IP is not yet resolved in database
-    if (!targetIp) {
+    // Always verify live guest IP from Hyper-V agent so DHCP subnet changes after reboot are picked up immediately
+    {
       try {
         const live = await hypervService.getStatus(vm.vmName);
         if (live && live.IPAddresses && live.IPAddresses.length > 0) {
           const liveIp = live.IPAddresses.find((ip) => ip && ip !== '127.0.0.1' && !ip.includes(':'));
           if (liveIp) {
             targetIp = liveIp;
-            if (vm.ipPool && vm.ipPool.length > 0) {
+            if (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress !== liveIp) {
               await prisma.iPPool.update({
                 where: { ipId: vm.ipPool[0].ipId },
                 data: { ipAddress: liveIp },

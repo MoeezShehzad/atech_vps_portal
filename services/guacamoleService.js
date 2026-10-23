@@ -62,7 +62,7 @@ let guacServerInstance = null;
  * Initialize GuacamoleLite WebSocket server and bridge
  */
 export function setupGuacamoleWebSocket(server) {
-  const guacdHost = process.env.GUACD_HOST || '172.21.39.51';
+  const guacdHost = process.env.GUACD_HOST || (process.platform === 'linux' ? '127.0.0.1' : (process.env.UBUNTU_VM_IP || '127.0.0.1'));
   const guacdPort = parseInt(process.env.GUACD_PORT || '4822', 10);
 
   guacServerInstance = new GuacamoleLite(
