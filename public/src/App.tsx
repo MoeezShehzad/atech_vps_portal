@@ -26,6 +26,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
+const StandaloneDesktop = lazy(() => import('./pages/StandaloneDesktop'));
 
 // Lightweight, seamless route suspense fallback
 function RouteLoadingFallback() {
@@ -53,8 +54,9 @@ function AppContent() {
   const { isAuthenticated, user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // Hide Navbar/Footer on Auth pages and Callback route
+  // Hide Navbar/Footer on Auth pages, Callback route, and Standalone Desktop window
   const isAuthPage = ['/login', '/signup', '/forgot-password', '/auth/callback'].includes(location.pathname);
+  const isDesktopPage = location.pathname.startsWith('/desktop');
 
   // Check if user is actively logged in
   const isLoggedIn = Boolean(isAuthenticated && user);
@@ -74,10 +76,10 @@ function AppContent() {
       <ScrollToTop />
 
       {/* GLOBAL ANNOUNCEMENT TICKER BANNER (Shows above navbar) */}
-      {!isAuthPage && <AnnouncementTicker />}
+      {!isAuthPage && !isDesktopPage && <AnnouncementTicker />}
 
       {/* NAVBAR (Hidden on Auth Pages & Callback) */}
-      {!isAuthPage && (
+      {!isAuthPage && !isDesktopPage && (
         <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
           <nav className="px-4 sm:px-10 py-4 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-3 font-bold text-blue-950 font-poppins">
@@ -220,6 +222,16 @@ function AppContent() {
               }
             />
 
+            {/* STANDALONE WINDOWS DESKTOP POP-OUT SCREEN */}
+            <Route
+              path="/desktop/:vmId"
+              element={
+                <ProtectedRoute>
+                  <StandaloneDesktop />
+                </ProtectedRoute>
+              }
+            />
+
             {/* SECURE ADMIN ROUTE (Protected by Role Guard) */}
             <Route
               path="/admin"
@@ -234,7 +246,7 @@ function AppContent() {
       </main>
 
       {/* FOOTER */}
-      {!isAuthPage && <Footer />}
+      {!isAuthPage && !isDesktopPage && <Footer />}
     </div>
   );
 }

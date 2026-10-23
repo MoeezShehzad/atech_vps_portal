@@ -323,7 +323,7 @@ const server = http.createServer(async (req, res) => {
 
       const effectiveAdminUser = (data.adminUsername && data.adminUsername.toLowerCase() !== 'ubuntu') 
         ? data.adminUsername 
-        : (isWindows ? 'Administrator' : 'ubuntu');
+        : (isWindows ? 'user' : 'ubuntu');
 
       const result = await runPowerShell('Create-VPS.ps1', {
         VMName: vmName,

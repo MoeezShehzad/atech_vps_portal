@@ -350,9 +350,10 @@ export async function deployVM(req, res) {
       )
     );
 
-    const adminUsername = (username && username.trim())
-      ? (isWindows ? username.trim() : username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ''))
-      : (isWindows ? 'Administrator' : 'ubuntu');
+    const adminUsername = (username && username.trim() && username.toLowerCase() !== 'ubuntu')
+      ? (isWindows ? (username.toLowerCase() === 'administrator' ? 'user' : username.trim()) : username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ''))
+      : (isWindows ? 'user' : 'ubuntu');
+    const effectiveAdminPassword = isWindows ? (password && password.trim() ? password.trim() : '') : (password && password.trim() ? password.trim() : 'root');
 
     // Get an active HyperV host
     let host = await prisma.hyperVHost.findFirst({
@@ -447,7 +448,7 @@ export async function deployVM(req, res) {
         status: 'PROVISIONING',
         provisioningStatus: 'IN_PROGRESS',
         adminUser: adminUsername,
-        adminPassword: adminPassword || 'root',
+        adminPassword: effectiveAdminPassword,
         backupEnabled: Boolean(enableBackups),
       },
     });
@@ -494,7 +495,7 @@ export async function deployVM(req, res) {
         storageGb: finalStorage,
         templatePath: image.templatePath,
         adminUsername,
-        adminPassword,
+        adminPassword: effectiveAdminPassword,
         sshPublicKey: resolvedPublicKey,
         osFamily: isWindows ? 'Windows' : 'Linux',
         appId: isWindows ? '' : appId,

@@ -27,30 +27,31 @@ export function generateGuacamoleToken(connectionData) {
 /**
  * Build default optimized RDP settings for private Windows VMs behind NAT
  */
-export function buildRdpConnectionPayload({ ip, username, password, width = 1280, height = 720 }) {
+export function buildRdpConnectionPayload({ ip, username = 'user', password = '', width = 1600, height = 900 }) {
+  const settings = {
+    hostname: ip,
+    port: '3389',
+    username: username || 'user',
+    'ignore-cert': 'true',
+    'security': 'any',
+    'color-depth': '24',
+    'enable-audio': 'true',
+    'enable-clipboard': 'true',
+    'width': String(width || 1600),
+    'height': String(height || 900),
+    'dpi': '96',
+  };
+
+  if (password) {
+    settings.password = password;
+  } else {
+    settings.password = '';
+  }
+
   return {
     connection: {
       type: 'rdp',
-      settings: {
-        hostname: ip,
-        port: '3389',
-        username: username || 'Administrator',
-        password: password || '',
-        'ignore-cert': 'true',
-        'security': 'any',
-        'color-depth': '16',             // High performance 16-bit color (saves 50% RAM/CPU/BW)
-        'disable-wallpaper': 'true',       // Cut bandwidth & CPU
-        'disable-theming': 'true',
-        'disable-font-smoothing': 'true',
-        'disable-full-window-drag': 'true',
-        'disable-menu-animations': 'true',
-        'resize-method': 'display-update', // Seamless dynamic resizing in modern RDP
-        'enable-audio': 'true',
-        'enable-clipboard': 'true',
-        'width': String(width),
-        'height': String(height),
-        'dpi': '96',
-      },
+      settings,
     },
   };
 }
@@ -98,10 +99,15 @@ export function setupGuacamoleWebSocket(server) {
         });
       }
     } catch (e) {
-      console.error('[Guacamole Gateway Upgrade Error]:', e.message);
+      console.error('[Guacamole Upgrade Error]:', e.message);
     }
   });
 
-  console.log(`[Guacamole Gateway] Initialized and attached to /ws/guacamole (guacd at ${guacdHost}:${guacdPort})`);
-  return guacServerInstance;
+  console.log(`[Guacamole Gateway] Initialized RDP WebSocket bridge on /api/ws/guacamole -> guacd at ${guacdHost}:${guacdPort}`);
 }
+
+export default {
+  generateGuacamoleToken,
+  buildRdpConnectionPayload,
+  setupGuacamoleWebSocket,
+};
