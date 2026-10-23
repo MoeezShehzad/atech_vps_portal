@@ -206,8 +206,8 @@ export async function getUserVMs(req, res) {
         hostname: displayHostname,
         hasPublicIp: Boolean(hasDedicatedPublicIp),
         ip: assignedIp,
-        adminUser: vm.adminUser || 'ubuntu',
-        adminPassword: vm.adminPassword || 'root',
+        adminUser: vm.adminUser || ((vm.image?.osFamily?.toLowerCase().includes('win') || vm.image?.name?.toLowerCase().includes('win')) ? 'user' : 'ubuntu'),
+        adminPassword: (vm.image?.osFamily?.toLowerCase().includes('win') || vm.image?.name?.toLowerCase().includes('win') || vm.adminUser === 'user') ? (vm.adminPassword ?? '') : (vm.adminPassword || 'root'),
         os: vm.image?.name || 'Ubuntu 24.04 LTS',
         status: vm.status ? vm.status.toLowerCase() : 'stopped',
         isSuspended: vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED',
@@ -523,7 +523,7 @@ export async function deployVM(req, res) {
         vmName: cleanVmName,
         ipAddress: readyVm?.ipAddress || ipRecord?.ipAddress || 'Allocated via DHCP',
         username: adminUsername,
-        password: adminPassword,
+        password: isWindows ? (effectiveAdminPassword || 'None (Direct Login)') : effectiveAdminPassword,
         os: image?.name || (isWindows ? 'Windows 10 Pro' : 'Linux'),
       }).catch((mailErr) => {
         console.warn('[VM Provision Email Warning]:', mailErr.message);
@@ -1219,13 +1219,14 @@ export async function getConsoleSession(req, res) {
       osFamily.includes('win') ||
       imageName.includes('win') ||
       templatePath.includes('win') ||
-      adminUser === 'administrator'
+      adminUser === 'administrator' ||
+      adminUser === 'user'
     );
 
     if (isWindows) {
       const rdpPayload = buildRdpConnectionPayload({
         ip: targetIp,
-        username: vm.adminUser || 'Administrator',
+        username: vm.adminUser || 'user',
         password: vm.adminPassword || '',
       });
       const guacToken = generateGuacamoleToken(rdpPayload);
@@ -1248,7 +1249,7 @@ export async function getConsoleSession(req, res) {
         vmId,
         vmName: vm.vmName,
         ip: targetIp,
-        adminUser: vm.adminUser || 'Administrator',
+        adminUser: vm.adminUser || 'user',
         adminPassword: vm.adminPassword,
       });
     }
@@ -1553,8 +1554,9 @@ export async function rebuildVMInstance(req, res) {
       if (img) targetImage = img;
     }
 
-    const newPass = adminPassword || vm.adminPassword || 'root';
-    const newUser = adminUsername || vm.adminUser || 'ubuntu';
+    const isRebuildWin = Boolean(targetImage?.osFamily?.toLowerCase().includes('win') || targetImage?.name?.toLowerCase().includes('win') || targetImage?.templatePath?.toLowerCase().includes('win'));
+    const newPass = isRebuildWin ? (adminPassword || '') : (adminPassword || vm.adminPassword || 'root');
+    const newUser = isRebuildWin ? ((adminUsername && adminUsername.toLowerCase() !== 'ubuntu') ? adminUsername : 'user') : (adminUsername || vm.adminUser || 'ubuntu');
 
     // Update status to PROVISIONING
     await prisma.virtualMachine.update({

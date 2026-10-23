@@ -3629,20 +3629,20 @@ export default function Dashboard() {
               <div className="bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800 p-4.5 space-y-4">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
                   <span className="flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Terminal SSH Access
+                    {selectedInstance.os?.toLowerCase().includes('win') ? <Monitor className="w-4 h-4 text-sky-600 dark:text-sky-400" /> : <Terminal className="w-4 h-4 text-blue-600 dark:text-blue-400" />} {selectedInstance.os?.toLowerCase().includes('win') ? 'Remote Desktop (RDP) Access' : 'Terminal SSH Access'}
                   </span>
                   <span className="text-[11px] font-mono text-slate-400 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
-                    Port 22
+                    {selectedInstance.os?.toLowerCase().includes('win') ? 'Port 3389' : 'Port 22'}
                   </span>
                 </div>
 
                 {/* SSH Command Box */}
                 <div className="bg-slate-950 text-slate-200 p-3.5 rounded-xl text-xs font-mono flex items-center justify-between gap-3 border border-slate-800 shadow-inner">
                   <span className="truncate select-all text-emerald-400">
-                    ssh {selectedInstance.adminUser || 'ubuntu'}@{selectedInstance.ip}
+                    {selectedInstance.os?.toLowerCase().includes('win') ? `mstsc /v:${selectedInstance.ip}:3389` : `ssh ${selectedInstance.adminUser || 'ubuntu'}@${selectedInstance.ip}`}
                   </span>
                   <button
-                    onClick={() => handleCopySSH(`ssh ${selectedInstance.adminUser || 'ubuntu'}@${selectedInstance.ip}`)}
+                    onClick={() => handleCopySSH(selectedInstance.os?.toLowerCase().includes('win') ? `mstsc /v:${selectedInstance.ip}:3389` : `ssh ${selectedInstance.adminUser || 'ubuntu'}@${selectedInstance.ip}`)}
                     className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all shrink-0 cursor-pointer"
                     title="Copy SSH Command"
                   >
@@ -3657,14 +3657,14 @@ export default function Dashboard() {
                       <Key className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                       <span>User:</span>
                     </div>
-                    <strong className="text-slate-900 dark:text-white font-mono">{selectedInstance.adminUser || 'ubuntu'}</strong>
+                    <strong className="text-slate-900 dark:text-white font-mono">{selectedInstance.adminUser || (selectedInstance.os?.toLowerCase().includes('win') ? 'user' : 'ubuntu')}</strong>
                   </div>
 
                   <div className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl flex items-center justify-between">
                     <span className="text-slate-500 dark:text-slate-400">Pass:</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <strong className="text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[11px]">
-                        {drawerShowPassword ? (selectedInstance.adminPassword || 'root') : '••••••••'}
+                        {selectedInstance.os?.toLowerCase().includes('win') && !selectedInstance.adminPassword ? 'None (Direct)' : (drawerShowPassword ? (selectedInstance.adminPassword || 'root') : '••••••••')}
                       </strong>
                       <button
                         onClick={() => setDrawerShowPassword(!drawerShowPassword)}
@@ -4408,7 +4408,7 @@ export default function Dashboard() {
                 return;
               }
               setConnectGuideVm(null);
-              setConsoleVm(target);
+              handleOpenConsoleOrDesktop(target);
             }}
           />
         </React.Suspense>

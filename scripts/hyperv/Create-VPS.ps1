@@ -120,7 +120,7 @@ try {
     } catch {}
 
     # 9. Asynchronously run guest configuration (disk filesystem expansion & credential setup for Linux)
-    $IsWindows = $TemplatePath.ToLower().Contains("windows") -or ($AdminUsername -eq "Administrator")
+    $IsWindows = $TemplatePath.ToLower().Contains("windows") -or ($AdminUsername -eq "Administrator") -or ($AdminUsername -eq "user")
     if (-not $IsISO -and -not $IsWindows) {
         $GuestScript = Join-Path $PSScriptRoot "Configure-Guest.ps1"
         if (Test-Path $GuestScript) {

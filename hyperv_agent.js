@@ -478,12 +478,14 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'vmName and newPassword are required' }));
       }
 
-      // Provision new password to guest OS
-      await provisionGuestVM({
-        vmName,
-        adminUsername: adminUsername || 'ubuntu',
-        adminPassword: newPassword,
-      });
+      const isWinReset = (adminUsername && ['user', 'administrator'].includes(adminUsername.toLowerCase()));
+      if (!isWinReset) {
+        await provisionGuestVM({
+          vmName,
+          adminUsername: adminUsername || 'ubuntu',
+          adminPassword: newPassword,
+        });
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ status: 'SUCCESS', message: 'Password updated on guest VM' }));
@@ -552,7 +554,7 @@ server.listen(PORT, HOST, () => {
   console.log(`================================================================`);
 
   // Forward localhost:5000 and localhost:5174 to Ubuntu VM for Google OAuth & local portal access
-  const VM_IP = process.env.UBUNTU_VM_IP || '172.21.39.51';
+  const VM_IP = process.env.UBUNTU_VM_IP || '172.29.90.214';
   [5000, 5174].forEach((fwdPort) => {
     try {
       const bridge = net.createServer((socket) => {
