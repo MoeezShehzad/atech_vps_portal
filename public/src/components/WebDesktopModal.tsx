@@ -143,11 +143,36 @@ export default function WebDesktopModal({
       // 4. Connect with encrypted token
       client.connect(`token=${encodeURIComponent(guacToken)}`);
 
-      // 5. Mouse interactions
+      // Synchronize remote Windows cursor as local hardware cursor
+      display.oncursor = (canvas: HTMLCanvasElement, hotspotX: number, hotspotY: number) => {
+        display.showCursor(false);
+        try {
+          const dataUrl = canvas.toDataURL();
+          displayEl.style.cursor = `url(${dataUrl}) ${hotspotX} ${hotspotY}, auto`;
+        } catch {
+          displayEl.style.cursor = 'default';
+        }
+      };
+
+      // High-precision mouse coordinate tracking using getBoundingClientRect
+      if ((Guacamole as any).Position) {
+        (Guacamole as any).Position.fromClientPosition = function (element: HTMLElement, clientX: number, clientY: number) {
+          const position = new (Guacamole as any).Position();
+          const rect = element.getBoundingClientRect();
+          position.x = clientX - rect.left;
+          position.y = clientY - rect.top;
+          return position;
+        };
+      }
+
+      // 5. Mouse interactions with display scale translation
       const mouse = new Guacamole.Mouse(displayEl);
       mouseRef.current = mouse;
       mouse.onmousedown = mouse.onmouseup = mouse.onmousemove = (mouseState: any) => {
-        client.sendMouseState(mouseState);
+        client.sendMouseState(mouseState, true);
+      };
+      mouse.onmouseout = () => {
+        display.showCursor(false);
       };
 
       // 6. Keyboard interactions
