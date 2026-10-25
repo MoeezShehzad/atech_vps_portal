@@ -144,7 +144,7 @@ class HyperVService {
   /**
    * Provision a new Virtual Machine on Windows Hyper-V.
    */
-  async createVM({ vmId, vmName, cpuCores, ramGb, storageGb, templatePath, switchName = 'External_vSwitch', adminUsername = 'ubuntu', adminPassword = '', sshPublicKey = '', appId = '' }) {
+  async createVM({ vmId, vmName, cpuCores, ramGb, storageGb, templatePath, switchName = 'Default Switch', adminUsername = 'ubuntu', adminPassword = '', sshPublicKey = '', osFamily = 'Linux', appId = '' }) {
     const ramMb = ramGb * 1024;
     console.log(`[HYPER-V] Provisioning VM: ${vmName} (${cpuCores} vCPU, ${ramGb}GB RAM, ${storageGb}GB Disk, user: ${adminUsername}, app: ${appId || 'none'})`);
 
@@ -171,6 +171,7 @@ class HyperVService {
         adminUsername,
         adminPassword,
         sshPublicKey,
+        osFamily,
         appId,
       });
 

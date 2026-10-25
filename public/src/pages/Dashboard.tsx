@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   Server, 
   Cpu, 
@@ -47,6 +47,8 @@ import {
   CreditCard,
   Building2,
   Loader2,
+  Monitor,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
@@ -61,6 +63,7 @@ import { formatDate, formatDateTime } from '../utils/dateFormatter';
 import TableSkeleton from '../components/TableSkeleton';
 
 const WebConsoleModal = React.lazy(() => import('../components/WebConsoleModal'));
+const WebDesktopModal = React.lazy(() => import('../components/WebDesktopModal'));
 const SecurityAndLogs = React.lazy(() => import('../components/SecurityAndLogs'));
 const StorageAndDisks = React.lazy(() => import('../components/StorageAndDisks'));
 const BillingAndInvoices = React.lazy(() => import('../components/BillingAndInvoices'));
@@ -336,6 +339,46 @@ export default function Dashboard() {
   const [userSSHKeys, setUserSSHKeys] = useState<{ keyId: number; name: string; fingerprint: string; keyType: string }[]>([]);
   const [selectedSSHKeyId, setSelectedSSHKeyId] = useState<number | 'custom'>('custom');
   const [customSSHPublicKey, setCustomSSHPublicKey] = useState('');
+
+  const isSelectedWindows = useMemo(() => {
+    const currentImg = catalogImages.find((img) => img.imageId === selectedImageId);
+    return currentImg ? (currentImg.osFamily?.toLowerCase() === 'windows' || currentImg.name?.toLowerCase().includes('windows')) : false;
+  }, [catalogImages, selectedImageId]);
+
+  const handleOpenConsoleOrDesktop = (inst: Instance) => {
+    const isWin = inst.os?.toLowerCase().includes('win');
+    if (isWin) {
+      const width = Math.min(1600, window.screen.availWidth - 60);
+      const height = Math.min(1000, window.screen.availHeight - 60);
+      const left = Math.max(20, Math.round((window.screen.availWidth - width) / 2));
+      const top = Math.max(20, Math.round((window.screen.availHeight - height) / 2));
+
+      window.open(
+        `/desktop/${inst.vmId}`,
+        `ATC_Desktop_${inst.vmId}`,
+        `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+      );
+    } else {
+      setConsoleVm(inst);
+    }
+  };
+
+  const handleImageChange = (newImageId: number) => {
+    setSelectedImageId(newImageId);
+    const targetImg = catalogImages.find((img) => img.imageId === newImageId);
+    const targetIsWindows = targetImg ? (targetImg.osFamily?.toLowerCase() === 'windows' || targetImg.name?.toLowerCase().includes('windows')) : false;
+
+    if (targetIsWindows) {
+      setDeployUsername('user');
+      setDeployPassword('');
+      setAuthMethod('password');
+    } else {
+      if (deployUsername === 'user' || deployUsername === 'Administrator') {
+        setDeployUsername('ubuntu');
+        setDeployPassword('root');
+      }
+    }
+  };
 
   const generateStrongPassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*';
@@ -636,10 +679,10 @@ export default function Dashboard() {
         customCpu,
         customRam,
         customStorage,
-        username: deployUsername.trim() || 'ubuntu',
-        password: deployPassword.trim() || 'root',
-        authMethod,
-        appId: deployTab === 'apps' && selectedAppId ? selectedAppId : undefined,
+        username: isSelectedWindows ? 'user' : (deployUsername.trim() || 'ubuntu'),
+        password: isSelectedWindows ? '' : (deployPassword.trim() || 'root'),
+        authMethod: isSelectedWindows ? 'password' : authMethod,
+        appId: deployTab === 'apps' && selectedAppId && !isSelectedWindows ? selectedAppId : undefined,
         enableBackups: deployBackupsEnabled,
       };
 
@@ -1252,8 +1295,10 @@ export default function Dashboard() {
     }
     const randId = Math.floor(1000 + Math.random() * 9000);
     setNewHostname(`srv-vps-${randId}`);
-    setDeployUsername('ubuntu');
-    setDeployPassword('root');
+    const currentImg = catalogImages.find((img) => img.imageId === selectedImageId);
+    const isWin = currentImg ? (currentImg.osFamily?.toLowerCase() === 'windows' || currentImg.name?.toLowerCase().includes('windows')) : false;
+    setDeployUsername(isWin ? 'user' : 'ubuntu');
+    setDeployPassword(isWin ? '' : 'root');
     setDeployTab('os');
     setSelectedAppId('');
     setAppSearch('');
@@ -1970,17 +2015,21 @@ export default function Dashboard() {
                                   <KeyRound className="w-3.5 h-3.5" />
                                 </button>
 
-                                {/* WEB TERMINAL CONSOLE BUTTON */}
+                                {/* WEB TERMINAL / WINDOWS DESKTOP BUTTON */}
                                 {inst.status === 'running' && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setConsoleVm(inst);
+                                      handleOpenConsoleOrDesktop(inst);
                                     }}
-                                    title="Open In-Browser Web Console Terminal"
-                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-200 dark:hover:border-emerald-800 transition-all cursor-pointer"
+                                    title={inst.os?.toLowerCase().includes('win') ? "Open Windows Desktop (Separate Screen)" : "Open In-Browser Web Console Terminal"}
+                                    className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:border-sky-200 dark:hover:border-sky-800 transition-all cursor-pointer"
                                   >
-                                    <Terminal className="w-3.5 h-3.5" />
+                                    {inst.os?.toLowerCase().includes('win') ? (
+                                      <Monitor className="w-3.5 h-3.5 text-sky-500" />
+                                    ) : (
+                                      <Terminal className="w-3.5 h-3.5" />
+                                    )}
                                   </button>
                                 )}
 
@@ -2933,7 +2982,7 @@ export default function Dashboard() {
                   </label>
                   <select
                     value={selectedImageId}
-                    onChange={(e) => setSelectedImageId(Number(e.target.value))}
+                    onChange={(e) => handleImageChange(Number(e.target.value))}
                     className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl text-sm focus:outline-none focus:border-blue-600 focus:bg-white dark:focus:bg-slate-800 transition-all"
                   >
                     {catalogImages.map((img) => (
@@ -3064,88 +3113,123 @@ export default function Dashboard() {
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                     <Key className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" /> Authentication Method
                   </span>
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">SSH & Root Access</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                    {isSelectedWindows ? 'Pre-configured RDP' : 'SSH & Root Access'}
+                  </span>
                 </div>
 
-                {/* AUTH METHOD SELECTOR TABS */}
-                <div className="grid grid-cols-2 gap-2 bg-slate-200/60 dark:bg-slate-900/60 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setAuthMethod('password')}
-                    className={`py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                      authMethod === 'password'
-                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    <span>Password Auth</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuthMethod('sshKey')}
-                    className={`py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                      authMethod === 'sshKey'
-                        ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                  >
-                    <Terminal className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                    <span>SSH Public Key</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className={authMethod === 'sshKey' ? 'sm:col-span-2' : ''}>
-                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                      Admin Username
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={deployUsername}
-                      onChange={(e) => setDeployUsername(e.target.value)}
-                      placeholder="e.g. admin or custom user"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-0.5">Custom admin account for SSH & sudo access</p>
-                  </div>
-
-                  {authMethod === 'password' ? (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                          Root / Admin Password
-                        </label>
-                        <button
-                          type="button"
-                          onClick={generateStrongPassword}
-                          className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-semibold"
-                        >
-                          Generate Strong
-                        </button>
+                {/* WINDOWS PRE-CONFIGURED ZERO-TOUCH LOGIN CARD */}
+                {isSelectedWindows ? (
+                  <div className="p-3.5 bg-sky-50/80 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Key className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                        <span className="font-semibold text-xs text-sky-900 dark:text-sky-200">
+                          Pre-Configured Windows Account
+                        </span>
                       </div>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          required
-                          value={deployPassword}
-                          onChange={(e) => setDeployPassword(e.target.value)}
-                          placeholder="Secure server password"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 pr-8 transition-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                          title={showPassword ? 'Hide password' : 'Show password'}
-                        >
-                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Encrypted credentials for initial server login</p>
+                      <span className="text-[10px] font-mono bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 px-2 py-0.5 rounded font-medium">
+                        Port 3389
+                      </span>
                     </div>
-                  ) : null}
-                </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs pt-0.5">
+                      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-sky-100 dark:border-sky-900/40">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Default Username</span>
+                        <strong className="text-slate-900 dark:text-white font-mono text-xs">user</strong>
+                      </div>
+                      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-sky-100 dark:border-sky-900/40">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">Initial Password</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-mono text-xs font-semibold">None (Direct Auto-Logon)</span>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                      Your Windows VM boots with instant passwordless desktop access as <strong>user</strong>. You can change credentials inside Windows Settings anytime.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-200/60 dark:bg-slate-900/60 p-1 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setAuthMethod('password')}
+                        className={`py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                          authMethod === 'password'
+                            ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <span>Password Auth</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAuthMethod('sshKey')}
+                        className={`py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                          authMethod === 'sshKey'
+                            ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        <Terminal className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                        <span>SSH Public Key</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className={authMethod === 'sshKey' ? 'sm:col-span-2' : ''}>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                          Admin Username
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={deployUsername}
+                          onChange={(e) => setDeployUsername(e.target.value)}
+                          placeholder="e.g. admin or custom user"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 transition-all"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-0.5">Custom admin account for SSH & sudo access</p>
+                      </div>
+
+                      {authMethod === 'password' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                              Root / Admin Password
+                            </label>
+                            <button
+                              type="button"
+                              onClick={generateStrongPassword}
+                              className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                            >
+                              Generate Strong
+                            </button>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type={showPassword ? 'text' : 'password'}
+                              required
+                              value={deployPassword}
+                              onChange={(e) => setDeployPassword(e.target.value)}
+                              placeholder="Secure server password"
+                              className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg text-xs font-mono focus:outline-none focus:border-blue-600 pr-8 transition-all"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                              title={showPassword ? 'Hide password' : 'Show password'}
+                            >
+                              {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-0.5">Encrypted credentials for initial server login</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 {authMethod === 'sshKey' && (
                   <div className="space-y-2.5 pt-1">
@@ -3545,20 +3629,20 @@ export default function Dashboard() {
               <div className="bg-slate-50/70 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800 p-4.5 space-y-4">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-300">
                   <span className="flex items-center gap-2">
-                    <Terminal className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Terminal SSH Access
+                    {selectedInstance.os?.toLowerCase().includes('win') ? <Monitor className="w-4 h-4 text-sky-600 dark:text-sky-400" /> : <Terminal className="w-4 h-4 text-blue-600 dark:text-blue-400" />} {selectedInstance.os?.toLowerCase().includes('win') ? 'Remote Desktop (RDP) Access' : 'Terminal SSH Access'}
                   </span>
                   <span className="text-[11px] font-mono text-slate-400 bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
-                    Port 22
+                    {selectedInstance.os?.toLowerCase().includes('win') ? 'Port 3389' : 'Port 22'}
                   </span>
                 </div>
 
                 {/* SSH Command Box */}
                 <div className="bg-slate-950 text-slate-200 p-3.5 rounded-xl text-xs font-mono flex items-center justify-between gap-3 border border-slate-800 shadow-inner">
                   <span className="truncate select-all text-emerald-400">
-                    ssh {selectedInstance.adminUser || 'ubuntu'}@{selectedInstance.ip}
+                    {selectedInstance.os?.toLowerCase().includes('win') ? `mstsc /v:${selectedInstance.ip}:3389` : `ssh ${selectedInstance.adminUser || 'ubuntu'}@${selectedInstance.ip}`}
                   </span>
                   <button
-                    onClick={() => handleCopySSH(`ssh ${selectedInstance.adminUser || 'ubuntu'}@${selectedInstance.ip}`)}
+                    onClick={() => handleCopySSH(selectedInstance.os?.toLowerCase().includes('win') ? `mstsc /v:${selectedInstance.ip}:3389` : `ssh ${selectedInstance.adminUser || 'ubuntu'}@${selectedInstance.ip}`)}
                     className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all shrink-0 cursor-pointer"
                     title="Copy SSH Command"
                   >
@@ -3573,14 +3657,14 @@ export default function Dashboard() {
                       <Key className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                       <span>User:</span>
                     </div>
-                    <strong className="text-slate-900 dark:text-white font-mono">{selectedInstance.adminUser || 'ubuntu'}</strong>
+                    <strong className="text-slate-900 dark:text-white font-mono">{selectedInstance.adminUser || (selectedInstance.os?.toLowerCase().includes('win') ? 'user' : 'ubuntu')}</strong>
                   </div>
 
                   <div className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl flex items-center justify-between">
                     <span className="text-slate-500 dark:text-slate-400">Pass:</span>
                     <div className="flex items-center gap-1.5 font-mono">
                       <strong className="text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[11px]">
-                        {drawerShowPassword ? (selectedInstance.adminPassword || 'root') : '••••••••'}
+                        {selectedInstance.os?.toLowerCase().includes('win') && !selectedInstance.adminPassword ? 'None (Direct)' : (drawerShowPassword ? (selectedInstance.adminPassword || 'root') : '••••••••')}
                       </strong>
                       <button
                         onClick={() => setDrawerShowPassword(!drawerShowPassword)}
@@ -3604,19 +3688,30 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Primary Web Console Button */}
+                {/* Primary Web Console / Desktop Button */}
                 {selectedInstance.status === 'running' ? (
-                  <button
-                    onClick={() => {
-                      const target = selectedInstance;
-                      setSelectedInstance(null);
-                      setConsoleVm(target);
-                    }}
-                    className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Terminal className="w-4 h-4 text-emerald-300" />
-                    <span>Launch Web Terminal Console</span>
-                  </button>
+                  selectedInstance.os?.toLowerCase().includes('win') ? (
+                    <button
+                      onClick={() => handleOpenConsoleOrDesktop(selectedInstance)}
+                      className="w-full py-2.5 px-4 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold shadow-md shadow-sky-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Monitor className="w-4 h-4 text-sky-200" />
+                      <span>Launch Windows Desktop (Separate Screen)</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        const target = selectedInstance;
+                        setSelectedInstance(null);
+                        setConsoleVm(target);
+                      }}
+                      className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Terminal className="w-4 h-4 text-emerald-300" />
+                      <span>Launch Web Terminal Console</span>
+                    </button>
+                  )
                 ) : (
                   <div className="w-full py-2.5 px-4 bg-slate-200/60 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border border-slate-300/60 dark:border-slate-700/60">
                     <Terminal className="w-4 h-4 opacity-50" />
@@ -4266,18 +4361,30 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* INTERACTIVE WEB TERMINAL CONSOLE MODAL */}
+      {/* INTERACTIVE WEB TERMINAL / WINDOWS DESKTOP CONSOLE MODAL */}
       {consoleVm && (
         <React.Suspense fallback={null}>
-          <WebConsoleModal
-            vmId={consoleVm.vmId}
-            vmName={consoleVm.name}
-            vmIp={consoleVm.ip}
-            adminUser={consoleVm.adminUser}
-            adminPassword={consoleVm.adminPassword}
-            onClose={() => setConsoleVm(null)}
-            onSessionEnd={fetchVMs}
-          />
+          {consoleVm.os?.toLowerCase().includes('win') ? (
+            <WebDesktopModal
+              vmId={consoleVm.vmId}
+              vmName={consoleVm.name}
+              vmIp={consoleVm.ip}
+              adminUser={consoleVm.adminUser}
+              adminPassword={consoleVm.adminPassword}
+              onClose={() => setConsoleVm(null)}
+              onSessionEnd={fetchVMs}
+            />
+          ) : (
+            <WebConsoleModal
+              vmId={consoleVm.vmId}
+              vmName={consoleVm.name}
+              vmIp={consoleVm.ip}
+              adminUser={consoleVm.adminUser}
+              adminPassword={consoleVm.adminPassword}
+              onClose={() => setConsoleVm(null)}
+              onSessionEnd={fetchVMs}
+            />
+          )}
         </React.Suspense>
       )}
 
@@ -4301,7 +4408,7 @@ export default function Dashboard() {
                 return;
               }
               setConnectGuideVm(null);
-              setConsoleVm(target);
+              handleOpenConsoleOrDesktop(target);
             }}
           />
         </React.Suspense>

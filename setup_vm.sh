@@ -82,7 +82,7 @@ PORT=5000
 HOST=0.0.0.0
 
 # Database Configuration (Points to Windows Host SQL Server on Port 1433)
-DATABASE_URL="sqlserver://${HOST_GATEWAY}:1433;database=atech_vps_db;user=atech_portal_user;password=admin@123;encrypt=true;trustServerCertificate=true"
+DATABASE_URL="sqlserver://${HOST_GATEWAY}:1433;database=atechconsult;user=atech_portal_user;password=admin@123;encrypt=true;trustServerCertificate=true"
 
 # Hyper-V Host Agent URL (Windows Host on Port 5050)
 HYPERV_HOST_URL=http://${HOST_GATEWAY}:5050

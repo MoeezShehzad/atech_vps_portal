@@ -318,26 +318,37 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'vmName is required' }));
       }
 
+      const isWindows = (data.osFamily && data.osFamily.toLowerCase() === 'windows') ||
+        (data.templatePath && (data.templatePath.toLowerCase().includes('windows') || data.templatePath.toLowerCase().endsWith('.iso')));
+
+      const effectiveAdminUser = (data.adminUsername && data.adminUsername.toLowerCase() !== 'ubuntu') 
+        ? data.adminUsername 
+        : (isWindows ? 'user' : 'ubuntu');
+
       const result = await runPowerShell('Create-VPS.ps1', {
         VMName: vmName,
         RAMMB: data.ramMb || 2048,
         CPUCount: data.cpuCount || 2,
         DiskGB: data.diskGb || 40,
-        AdminUsername: data.adminUsername || 'ubuntu',
+        AdminUsername: effectiveAdminUser,
         AdminPassword: data.adminPassword || '',
         SSHPublicKey: data.sshPublicKey || '',
         TemplatePath: data.templatePath || DEFAULT_TEMPLATE,
-        SwitchName: data.switchName || 'External_vSwitch',
+        SwitchName: data.switchName || 'Default Switch',
       });
 
-      // Asynchronously provision guest OS in background
-      provisionGuestVM({
-        vmName,
-        adminUsername: data.adminUsername || 'ubuntu',
-        adminPassword: data.adminPassword || '',
-        sshPublicKey: data.sshPublicKey || '',
-        appId: data.appId || '',
-      }).catch((e) => console.error('[GUEST PROVISION ASYNC ERROR]:', e));
+      // Asynchronously provision guest OS in background ONLY for Linux VMs
+      if (!isWindows) {
+        provisionGuestVM({
+          vmName,
+          adminUsername: effectiveAdminUser,
+          adminPassword: data.adminPassword || '',
+          sshPublicKey: data.sshPublicKey || '',
+          appId: data.appId || '',
+        }).catch((e) => console.error('[GUEST PROVISION ASYNC ERROR]:', e));
+      } else {
+        console.log(`[GUEST PROVISIONER] Windows guest detected for '${vmName}'. Bypassing Linux bash initialization.`);
+      }
 
       invalidateAgentCaches();
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -467,12 +478,14 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'vmName and newPassword are required' }));
       }
 
-      // Provision new password to guest OS
-      await provisionGuestVM({
-        vmName,
-        adminUsername: adminUsername || 'ubuntu',
-        adminPassword: newPassword,
-      });
+      const isWinReset = (adminUsername && ['user', 'administrator'].includes(adminUsername.toLowerCase()));
+      if (!isWinReset) {
+        await provisionGuestVM({
+          vmName,
+          adminUsername: adminUsername || 'ubuntu',
+          adminPassword: newPassword,
+        });
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ status: 'SUCCESS', message: 'Password updated on guest VM' }));
@@ -505,12 +518,19 @@ const server = http.createServer(async (req, res) => {
         SwitchName: data.switchName || 'Default Switch',
       });
 
-      provisionGuestVM({
-        vmName,
-        adminUsername: adminUsername || 'ubuntu',
-        adminPassword: adminPassword || '',
-        sshPublicKey: sshPublicKey || '',
-      }).catch((e) => console.error('[GUEST REBUILD PROVISION ERROR]:', e));
+      const isWindowsRebuild = (data.osFamily && data.osFamily.toLowerCase() === 'windows') ||
+        (templatePath && (templatePath.toLowerCase().includes('windows') || templatePath.toLowerCase().endsWith('.iso')));
+
+      if (!isWindowsRebuild) {
+        provisionGuestVM({
+          vmName,
+          adminUsername: adminUsername || 'ubuntu',
+          adminPassword: adminPassword || '',
+          sshPublicKey: sshPublicKey || '',
+        }).catch((e) => console.error('[GUEST REBUILD PROVISION ERROR]:', e));
+      } else {
+        console.log(`[GUEST PROVISIONER] Windows guest detected for rebuild '${vmName}'. Bypassing Linux bash initialization.`);
+      }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(result));
@@ -534,7 +554,7 @@ server.listen(PORT, HOST, () => {
   console.log(`================================================================`);
 
   // Forward localhost:5000 and localhost:5174 to Ubuntu VM for Google OAuth & local portal access
-  const VM_IP = process.env.UBUNTU_VM_IP || '172.21.39.51';
+  const VM_IP = process.env.UBUNTU_VM_IP || '172.29.90.214';
   [5000, 5174].forEach((fwdPort) => {
     try {
       const bridge = net.createServer((socket) => {

@@ -11,8 +11,8 @@ param (
     [Parameter(Mandatory=$false)][string]$AdminUsername = "ubuntu",
     [Parameter(Mandatory=$false)][string]$AdminPassword = "",
     [Parameter(Mandatory=$false)][string]$SSHPublicKey = "",
-    [Parameter(Mandatory=$false)][string]$TemplatePath = "D:\00-MASTER-TEMPLATES\Ubuntu_Server_24.04_LTS.vhdx",
-    [Parameter(Mandatory=$false)][string]$SwitchName = "External_vSwitch",
+    [Parameter(Mandatory=$false)][string]$TemplatePath = "D:\00_Master_Template\Ubuntu Server 24.04 LTS.vhdx",
+    [Parameter(Mandatory=$false)][string]$SwitchName = "Default Switch",
     [Parameter(Mandatory=$false)][string]$CustomerVMsRoot = "D:\CUSTOMER-VMS",
     [Parameter(Mandatory=$false)][string]$SystemLogsRoot = "D:\SYSTEM-LOGS\provisioning"
 )
@@ -32,6 +32,19 @@ try {
         Write-Error "Template file not found at: '$TemplatePath'"
         exit 1
     }
+
+    # Auto-resolve virtual switch if specified switch does not exist
+    if (-not (Get-VMSwitch -Name $SwitchName -ErrorAction SilentlyContinue)) {
+        if (Get-VMSwitch -Name "Default Switch" -ErrorAction SilentlyContinue) {
+            $SwitchName = "Default Switch"
+        } else {
+            $AnySwitch = Get-VMSwitch -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($AnySwitch) {
+                $SwitchName = $AnySwitch.Name
+            }
+        }
+    }
+    Write-Output "[NETWORK] Attaching to Hyper-V Virtual Switch: '$SwitchName'"
 
     # 2. Directory Layout
     $VMDirectory      = Join-Path -Path $CustomerVMsRoot -ChildPath $VMName
@@ -75,12 +88,12 @@ try {
     # 5. Hardware Configuration
     Set-VMProcessor -VMName $VMName -Count $CPUCount
     $TargetMaxBytes = [int64]$RAMMB * 1MB
-    $StartupBytes = [Math]::Min([int64]1024 * 1MB, $TargetMaxBytes)
+    $StartupBytes = [Math]::Min([int64]2048 * 1MB, $TargetMaxBytes)
     $MinBytes = [Math]::Min([int64]512 * 1MB, $TargetMaxBytes)
     Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $true -StartupBytes $StartupBytes -MinimumBytes $MinBytes -MaximumBytes $TargetMaxBytes -Buffer 20
 
     # 6. Firmware & Secure Boot Configuration
-    # Disable Secure Boot for Linux to prevent "unsigned image hash not allowed" boot failures
+    # Disable Secure Boot for Linux / ISO to prevent "unsigned image hash not allowed" boot failures
     Set-VMFirmware -VMName $VMName -EnableSecureBoot Off
     Write-Output "[FIRMWARE] Secure Boot disabled for guaranteed Linux / ISO boot compatibility."
 
@@ -106,12 +119,17 @@ try {
         Enable-VMResourceMetering -VMName $VMName -ErrorAction SilentlyContinue
     } catch {}
 
-    # 9. Asynchronously run guest configuration (disk filesystem expansion & credential setup)
-    $GuestScript = Join-Path $PSScriptRoot "Configure-Guest.ps1"
-    if (Test-Path $GuestScript) {
-        $ProcArgs = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$GuestScript`" -VMName `"$VMName`" -AdminUsername `"$AdminUsername`" -AdminPassword `"$AdminPassword`" -SSHPublicKey `"$SSHPublicKey`" -TimeoutSeconds 120"
-        Start-Process powershell.exe -ArgumentList $ProcArgs -WindowStyle Hidden -ErrorAction SilentlyContinue | Out-Null
-        Write-Output "[GUEST] Spawned independent process for guest initialization and filesystem expansion."
+    # 9. Asynchronously run guest configuration (disk filesystem expansion & credential setup for Linux)
+    $IsWindows = $TemplatePath.ToLower().Contains("windows") -or ($AdminUsername -eq "Administrator") -or ($AdminUsername -eq "user")
+    if (-not $IsISO -and -not $IsWindows) {
+        $GuestScript = Join-Path $PSScriptRoot "Configure-Guest.ps1"
+        if (Test-Path $GuestScript) {
+            $ProcArgs = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$GuestScript`" -VMName `"$VMName`" -AdminUsername `"$AdminUsername`" -AdminPassword `"$AdminPassword`" -SSHPublicKey `"$SSHPublicKey`" -TimeoutSeconds 120"
+            Start-Process powershell.exe -ArgumentList $ProcArgs -WindowStyle Hidden -ErrorAction SilentlyContinue | Out-Null
+            Write-Output "[GUEST] Spawned independent process for guest initialization and filesystem expansion."
+        }
+    } else {
+        Write-Output "[GUEST] Windows or ISO template detected - skipping Linux guest configuration."
     }
 
     # 10. Audit Logging

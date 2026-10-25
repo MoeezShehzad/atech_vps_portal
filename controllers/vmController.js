@@ -15,6 +15,7 @@ import {
   sendVmFailureAlertToSupport
 } from '../services/emailService.js';
 import firewallService from '../services/firewallService.js';
+import { generateGuacamoleToken, buildRdpConnectionPayload } from '../services/guacamoleService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
 
 /**
@@ -205,8 +206,8 @@ export async function getUserVMs(req, res) {
         hostname: displayHostname,
         hasPublicIp: Boolean(hasDedicatedPublicIp),
         ip: assignedIp,
-        adminUser: vm.adminUser || 'ubuntu',
-        adminPassword: vm.adminPassword || 'root',
+        adminUser: vm.adminUser || ((vm.image?.osFamily?.toLowerCase().includes('win') || vm.image?.name?.toLowerCase().includes('win')) ? 'user' : 'ubuntu'),
+        adminPassword: (vm.image?.osFamily?.toLowerCase().includes('win') || vm.image?.name?.toLowerCase().includes('win') || vm.adminUser === 'user') ? (vm.adminPassword ?? '') : (vm.adminPassword || 'root'),
         os: vm.image?.name || 'Ubuntu 24.04 LTS',
         status: vm.status ? vm.status.toLowerCase() : 'stopped',
         isSuspended: vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED',
@@ -279,7 +280,6 @@ export async function deployVM(req, res) {
     }
 
     const { planId, imageId, vmName, customCpu, customRam, customStorage, username, password, authMethod, sshKeyId, sshPublicKey, appId, enableBackups } = req.body;
-    const adminUsername = (username && username.trim()) ? username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') : 'ubuntu';
     const adminPassword = (password && password.trim()) ? password.trim() : '';
 
     let resolvedPublicKey = '';
@@ -341,6 +341,19 @@ export async function deployVM(req, res) {
     if (!plan || !image) {
       return res.status(404).json({ error: 'Selected VPS plan or operating system not found.' });
     }
+
+    const isWindows = Boolean(
+      image && (
+        image.osFamily?.toLowerCase() === 'windows' ||
+        image.name?.toLowerCase().includes('windows') ||
+        (image.templatePath && image.templatePath.toLowerCase().includes('windows'))
+      )
+    );
+
+    const adminUsername = (username && username.trim() && username.toLowerCase() !== 'ubuntu')
+      ? (isWindows ? (username.toLowerCase() === 'administrator' ? 'user' : username.trim()) : username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, ''))
+      : (isWindows ? 'user' : 'ubuntu');
+    const effectiveAdminPassword = isWindows ? (password && password.trim() ? password.trim() : '') : (password && password.trim() ? password.trim() : 'root');
 
     // Get an active HyperV host
     let host = await prisma.hyperVHost.findFirst({
@@ -435,7 +448,7 @@ export async function deployVM(req, res) {
         status: 'PROVISIONING',
         provisioningStatus: 'IN_PROGRESS',
         adminUser: adminUsername,
-        adminPassword: adminPassword || 'root',
+        adminPassword: effectiveAdminPassword,
         backupEnabled: Boolean(enableBackups),
       },
     });
@@ -482,9 +495,10 @@ export async function deployVM(req, res) {
         storageGb: finalStorage,
         templatePath: image.templatePath,
         adminUsername,
-        adminPassword,
+        adminPassword: effectiveAdminPassword,
         sshPublicKey: resolvedPublicKey,
-        appId,
+        osFamily: isWindows ? 'Windows' : 'Linux',
+        appId: isWindows ? '' : appId,
       });
 
       await prisma.activityLog.create({
@@ -509,14 +523,14 @@ export async function deployVM(req, res) {
         vmName: cleanVmName,
         ipAddress: readyVm?.ipAddress || ipRecord?.ipAddress || 'Allocated via DHCP',
         username: adminUsername,
-        password: adminPassword,
-        os: image?.imageName || 'Linux',
+        password: isWindows ? (effectiveAdminPassword || 'None (Direct Login)') : effectiveAdminPassword,
+        os: image?.name || (isWindows ? 'Windows 10 Pro' : 'Linux'),
       }).catch((mailErr) => {
         console.warn('[VM Provision Email Warning]:', mailErr.message);
       });
 
-      // Trigger automated 1-Click App installation if requested
-      if (appId) {
+      // Trigger automated 1-Click App installation if requested (Linux only)
+      if (appId && !isWindows) {
         import('../services/appStoreService.js').then(({ installAppOnVM }) => {
           installAppOnVM({ vmId: newVm.vmId, userId, appId }).catch((appErr) => {
             console.warn(`[Auto 1-Click App Install Notice on ${cleanVmName}]:`, appErr.message);
@@ -1128,7 +1142,7 @@ export async function getConsoleSession(req, res) {
 
     const vm = await prisma.virtualMachine.findFirst({
       where: { vmId, userId },
-      include: { ipPool: true },
+      include: { ipPool: true, image: true },
     });
 
     if (!vm) {
@@ -1149,19 +1163,29 @@ export async function getConsoleSession(req, res) {
       });
     }
 
-    let targetIp = (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress && vm.ipPool[0].ipAddress !== 'DHCP Pending' && vm.ipPool[0].ipAddress !== 'DHCP Leasing...') 
+    const isValidIp = (ip) => Boolean(
+      ip &&
+      typeof ip === 'string' &&
+      !ip.toUpperCase().startsWith('DHCP') &&
+      ip !== 'DHCP Pending' &&
+      ip !== 'DHCP Leasing...' &&
+      ip !== 'Allocated via DHCP' &&
+      ip.includes('.')
+    );
+
+    let targetIp = (vm.ipPool && vm.ipPool.length > 0 && isValidIp(vm.ipPool[0].ipAddress)) 
       ? vm.ipPool[0].ipAddress 
       : null;
 
-    // Only probe Hyper-V agent if IP is not yet resolved in database
-    if (!targetIp) {
+    // Always verify live guest IP from Hyper-V agent so DHCP subnet changes after reboot are picked up immediately
+    {
       try {
         const live = await hypervService.getStatus(vm.vmName);
         if (live && live.IPAddresses && live.IPAddresses.length > 0) {
           const liveIp = live.IPAddresses.find((ip) => ip && ip !== '127.0.0.1' && !ip.includes(':'));
           if (liveIp) {
             targetIp = liveIp;
-            if (vm.ipPool && vm.ipPool.length > 0) {
+            if (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress !== liveIp) {
               await prisma.iPPool.update({
                 where: { ipId: vm.ipPool[0].ipId },
                 data: { ipAddress: liveIp },
@@ -1185,6 +1209,49 @@ export async function getConsoleSession(req, res) {
 
     if (!targetIp) {
       targetIp = '192.168.2.192'; // Fallback to verified local guest IP if momentarily polling
+    }
+
+    const osFamily = (vm.image?.osFamily || '').toLowerCase();
+    const imageName = (vm.image?.name || '').toLowerCase();
+    const templatePath = (vm.image?.templatePath || '').toLowerCase();
+    const adminUser = (vm.adminUser || '').toLowerCase();
+    const isWindows = Boolean(
+      osFamily.includes('win') ||
+      imageName.includes('win') ||
+      templatePath.includes('win') ||
+      adminUser === 'administrator' ||
+      adminUser === 'user'
+    );
+
+    if (isWindows) {
+      const rdpPayload = buildRdpConnectionPayload({
+        ip: targetIp,
+        username: vm.adminUser || 'user',
+        password: vm.adminPassword || '',
+      });
+      const guacToken = generateGuacamoleToken(rdpPayload);
+
+      await prisma.securityLog.create({
+        data: {
+          userId,
+          action: 'WEB_DESKTOP_ACCESS',
+          ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+          result: 'SUCCESS',
+          details: `Established Guacamole HTML5 RDP Desktop bridge for VM '${vm.vmName}' (${targetIp})`,
+        },
+      }).catch(() => {});
+
+      return res.json({
+        success: true,
+        isWindows: true,
+        token: guacToken,
+        ticket: guacToken,
+        vmId,
+        vmName: vm.vmName,
+        ip: targetIp,
+        adminUser: vm.adminUser || 'user',
+        adminPassword: vm.adminPassword,
+      });
     }
 
     const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
@@ -1215,6 +1282,7 @@ export async function getConsoleSession(req, res) {
 
     return res.json({
       success: true,
+      isWindows: false,
       ticket,
       vmId,
       vmName: vm.vmName,
@@ -1486,8 +1554,9 @@ export async function rebuildVMInstance(req, res) {
       if (img) targetImage = img;
     }
 
-    const newPass = adminPassword || vm.adminPassword || 'root';
-    const newUser = adminUsername || vm.adminUser || 'ubuntu';
+    const isRebuildWin = Boolean(targetImage?.osFamily?.toLowerCase().includes('win') || targetImage?.name?.toLowerCase().includes('win') || targetImage?.templatePath?.toLowerCase().includes('win'));
+    const newPass = isRebuildWin ? (adminPassword || '') : (adminPassword || vm.adminPassword || 'root');
+    const newUser = isRebuildWin ? ((adminUsername && adminUsername.toLowerCase() !== 'ubuntu') ? adminUsername : 'user') : (adminUsername || vm.adminUser || 'ubuntu');
 
     // Update status to PROVISIONING
     await prisma.virtualMachine.update({
