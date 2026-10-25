@@ -1,4 +1,4 @@
-import { decryptVmPassword } from './cryptoService.js';
+import { decryptVmPassword, decodeResourceId } from './cryptoService.js';
 import net from 'net';
 import { WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
@@ -32,7 +32,8 @@ export function setupTerminalWebSocket(server) {
 
   wss.on('connection', async (ws, request, url) => {
     const ticket = url.searchParams.get('ticket') || url.searchParams.get('token');
-    const vmIdParam = Number(url.searchParams.get('vmId'));
+    const rawVmId = url.searchParams.get('vmId');
+    const vmIdParam = rawVmId ? decodeResourceId(rawVmId) : null;
 
     if (!ticket) {
       ws.send('\r\n\x1b[31m[ERROR] Authentication ticket or token is required.\x1b[0m\r\n');
@@ -58,7 +59,8 @@ export function setupTerminalWebSocket(server) {
     // If a console ticket is bound to a specific vmId or siteId, prevent switching target via query param
     const userId = decoded.userId;
     const siteIdParam = Number(url.searchParams.get('siteId'));
-    if (decoded.vmId && vmIdParam && Number(decoded.vmId) !== vmIdParam) {
+    const decodedVmId = decoded.vmId ? decodeResourceId(decoded.vmId) : null;
+    if (decodedVmId && vmIdParam && decodedVmId !== vmIdParam) {
       ws.send('\r\n\x1b[31m[ERROR] Console ticket does not match requested VM.\x1b[0m\r\n');
       return ws.close();
     }
@@ -67,7 +69,7 @@ export function setupTerminalWebSocket(server) {
       return ws.close();
     }
     const siteId = decoded.siteId || siteIdParam;
-    const vmId = decoded.vmId || vmIdParam;
+    const vmId = decodedVmId || vmIdParam;
 
     // =========================================================================
     // BRANCH A: Container Sandbox Terminal (for Managed Web Hosting / Developers)

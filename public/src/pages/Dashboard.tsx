@@ -74,6 +74,8 @@ const OneClickMarketplace = React.lazy(() => import('../components/OneClickMarke
 interface Instance {
   id: string;
   vmId: number;
+  secureSlug?: string;
+  resourceId?: string;
   name: string;
   hostname: string;
   hasPublicIp?: boolean;
@@ -354,7 +356,7 @@ export default function Dashboard() {
       const top = Math.max(20, Math.round((window.screen.availHeight - height) / 2));
 
       window.open(
-        `/desktop/${inst.vmId}`,
+        `/desktop/${inst.secureSlug || inst.vmId}`,
         `ATC_Desktop_${inst.vmId}`,
         `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
       );

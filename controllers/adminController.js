@@ -1,3 +1,4 @@
+import { decodeResourceId, encodeResourceId } from '../services/cryptoService.js';
 // ==============================================================================
 // Controller: adminController.js
 // Purpose: Enterprise Administrator Suite Controller
@@ -367,7 +368,7 @@ export async function getFleetVMs(req, res) {
  */
 export async function adminPowerControl(req, res) {
   try {
-    const vmId = Number(req.params.vmId);
+    const vmId = decodeResourceId(req.params.vmId);
     const { action } = req.body;
 
     if (!['START', 'STOP', 'RESTART', 'FORCE_STOP'].includes(action)) {

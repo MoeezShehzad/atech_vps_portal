@@ -17,7 +17,7 @@ import {
 import firewallService from '../services/firewallService.js';
 import { generateGuacamoleToken, buildRdpConnectionPayload } from '../services/guacamoleService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
-import { encryptVmPassword, decryptVmPassword } from '../services/cryptoService.js';
+import { encryptVmPassword, decryptVmPassword, encodeResourceId, decodeResourceId } from '../services/cryptoService.js';
 
 /**
  * 1. GET /api/vms - Get all VMs for current user
@@ -200,8 +200,11 @@ export async function getUserVMs(req, res) {
       const hasDedicatedPublicIp = vm.ipPool && vm.ipPool.some(ip => ip.ipType === 'PUBLIC_IPV4' && ip.status === 'ASSIGNED' && !ip.ipAddress.startsWith('172.21.') && !ip.ipAddress.startsWith('192.168.') && !ip.ipAddress.startsWith('10.'));
       const displayHostname = hasDedicatedPublicIp ? (vm.hostname || `${vm.vmName}.atc-cloud.net`) : (assignedIp !== 'DHCP Leasing...' ? assignedIp : vm.vmName);
 
+      const secureSlug = encodeResourceId('vps', vm.vmId);
       return {
         id: `vps-${vm.vmId}`,
+        secureSlug,
+        resourceId: secureSlug,
         vmId: vm.vmId,
         name: vm.vmName,
         hostname: displayHostname,
@@ -598,7 +601,7 @@ export async function deployVM(req, res) {
 export async function powerAction(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const { action } = req.body;
 
     if (!['START', 'STOP', 'RESTART', 'FORCE_STOP', 'PAUSE', 'RESUME'].includes(action?.toUpperCase())) {
@@ -703,7 +706,7 @@ export async function powerAction(req, res) {
 export async function previewResize(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const { cpuCores, ramGb, storageGb } = req.body;
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -730,7 +733,7 @@ export async function previewResize(req, res) {
 export async function resizeVM(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const { cpuCores, ramGb, storageGb } = req.body;
 
     const targetCpu = Number(cpuCores);
@@ -902,7 +905,7 @@ export async function resizeVM(req, res) {
 export async function destroyVM(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
 
     const vm = await prisma.virtualMachine.findFirst({
       where: { vmId, userId },
@@ -1004,7 +1007,7 @@ export async function destroyVM(req, res) {
 export async function getVMMetrics(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -1136,7 +1139,7 @@ export async function getVMMetrics(req, res) {
 export async function getConsoleSession(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.vmId);
+    const vmId = decodeResourceId(req.params.vmId);
     if (!userId || !vmId) {
       return res.status(400).json({ error: 'Valid VM ID required.' });
     }
@@ -1303,7 +1306,7 @@ export async function getConsoleSession(req, res) {
 export async function getVMSnapshots(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const vm = await prisma.virtualMachine.findFirst({
       where: { vmId, userId, status: { not: 'TERMINATED' } },
     });
@@ -1354,7 +1357,7 @@ export async function getVMSnapshots(req, res) {
 export async function createVMSnapshot(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const { name, description } = req.body;
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -1400,7 +1403,7 @@ export async function createVMSnapshot(req, res) {
 export async function restoreVMSnapshot(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const snapshotId = Number(req.params.snapshotId);
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -1438,7 +1441,7 @@ export async function restoreVMSnapshot(req, res) {
 export async function deleteVMSnapshot(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const snapshotId = Number(req.params.snapshotId);
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -1485,7 +1488,7 @@ export async function deleteVMSnapshot(req, res) {
 export async function resetVMPassword(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const { newPassword } = req.body;
 
     if (!newPassword || newPassword.length < 6) {
@@ -1533,7 +1536,7 @@ export async function resetVMPassword(req, res) {
 export async function rebuildVMInstance(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const { imageId, adminPassword, adminUsername, sshPublicKey } = req.body;
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -1616,7 +1619,7 @@ export async function rebuildVMInstance(req, res) {
 export async function getVMBackups(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
 
     const vm = await prisma.virtualMachine.findFirst({
       where: { vmId, userId, status: { not: 'TERMINATED' } },
@@ -1664,7 +1667,7 @@ export async function getVMBackups(req, res) {
 export async function createVMBackup(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const { label } = req.body;
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -1753,7 +1756,7 @@ export async function createVMBackup(req, res) {
 export async function restoreVMBackup(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const backupId = req.params.backupId;
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -1799,7 +1802,7 @@ export async function restoreVMBackup(req, res) {
 export async function deleteVMBackup(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const backupId = req.params.backupId;
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -1836,7 +1839,7 @@ export async function deleteVMBackup(req, res) {
 export async function toggleVMBackups(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const { enabled } = req.body;
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -1901,7 +1904,7 @@ export async function toggleVMBackups(req, res) {
 export async function getVMFirewall(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
 
     const vm = await prisma.virtualMachine.findFirst({
       where: { vmId, userId, status: { not: 'TERMINATED' } },
@@ -1922,7 +1925,7 @@ export async function getVMFirewall(req, res) {
 export async function addVMFirewallRule(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const { direction, protocol, port, cidr, action, description } = req.body;
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -1955,7 +1958,7 @@ export async function addVMFirewallRule(req, res) {
 export async function deleteVMFirewallRule(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     const ruleId = req.params.ruleId;
 
     const vm = await prisma.virtualMachine.findFirst({
@@ -1992,7 +1995,7 @@ export async function deleteVMFirewallRule(req, res) {
 export async function reactivateVMInstance(req, res) {
   try {
     const userId = req.user?.userId;
-    const vmId = Number(req.params.id);
+    const vmId = decodeResourceId(req.params.id);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
     const vm = await prisma.virtualMachine.findFirst({
