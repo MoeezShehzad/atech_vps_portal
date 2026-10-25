@@ -76,6 +76,7 @@ import {
   Printer,
 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import AdminPoliciesTab from '../components/AdminPoliciesTab';
 import { apiCall, setAccessToken, getAccessToken } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
@@ -106,6 +107,7 @@ export default function AdminDashboard() {
     | 'threats'
     | 'tickets'
     | 'audit'
+    | 'policies'
   >('overview');
 
   // Sidebar compression & expansion states
@@ -1242,6 +1244,7 @@ export default function AdminDashboard() {
     { id: 'threats', label: 'Security & IP Bans', icon: ShieldAlert, badge: threats.length ? threats.length : null, alert: true },
     { id: 'tickets', label: 'Support Tickets', icon: LifeBuoy, badge: tickets.filter((t) => t.status === 'OPEN').length || null, alert: true },
     { id: 'audit', label: 'Audit Trail', icon: ShieldCheck, badge: null, alert: false },
+    { id: 'policies', label: 'Legal Policies', icon: FileText, badge: null, alert: false },
   ] as const;
 
   return (
@@ -1411,6 +1414,7 @@ export default function AdminDashboard() {
                   {activeTab === 'threats' && 'Security Threat Intel & IP Blacklist'}
                   {activeTab === 'tickets' && 'Customer Support Ticket Helpdesk'}
                   {activeTab === 'audit' && 'Cluster Audit Trail & Event Stream'}
+                  {activeTab === 'policies' && 'Legal Policies & Compliance Suite'}
                 </h1>
               </div>
             </div>
@@ -4115,6 +4119,10 @@ export default function AdminDashboard() {
         )}
 
         {/* TAB 9: AUDIT TRAIL */}
+        {activeTab === 'policies' && (
+          <AdminPoliciesTab />
+        )}
+
         {activeTab === 'audit' && (
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
             <div className="p-5 border-b border-slate-100 dark:border-slate-800">

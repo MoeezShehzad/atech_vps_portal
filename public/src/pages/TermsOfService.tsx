@@ -1,13 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import DynamicPolicyRenderer from '../components/DynamicPolicyRenderer';
 import { Link } from 'react-router-dom';
 import { 
   Scale, Shield, AlertTriangle, FileText, CheckCircle2, Lock, 
   Server, Cpu, Database, ChevronRight, HelpCircle, ArrowUpRight,
-  Layers, KeyRound, Globe, Ban, AlertOctagon
+  Layers, KeyRound, Globe, Ban, AlertOctagon, History
 } from 'lucide-react';
 
 export default function TermsOfService() {
-  const lastUpdated = "October 17, 2026";
+  const fallbackLastUpdated = "October 17, 2026";
+  const [dbPolicy, setDbPolicy] = useState<any>(null);
+  const [versionHistory, setVersionHistory] = useState<any[]>([]);
+  const [selectedVer, setSelectedVer] = useState<string>('');
+  const [loadingVer, setLoadingVer] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/policies/terms-of-service')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && data.policy) setDbPolicy(data.policy);
+      })
+      .catch(() => {});
+
+    fetch('/api/policies/terms-of-service/versions')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && data.versions) setVersionHistory(data.versions);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSelectVersion = async (ver: string) => {
+    setSelectedVer(ver);
+    if (!ver) {
+      fetch('/api/policies/terms-of-service')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.success && data.policy) setDbPolicy(data.policy);
+        });
+      return;
+    }
+
+    try {
+      setLoadingVer(true);
+      const res = await fetch(`/api/policies/terms-of-service/versions/${encodeURIComponent(ver)}`);
+      const data = await res.json();
+      if (data && data.success && data.policy) setDbPolicy(data.policy);
+    } catch (_) {
+    } finally {
+      setLoadingVer(false);
+    }
+  };
+
+  const currentDisplayDate = dbPolicy?.effectiveAt
+    ? new Date(dbPolicy.effectiveAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : fallbackLastUpdated;
+
+  const currentDisplayVersion = dbPolicy?.version || 'v1.0';
   const [activeSection, setActiveSection] = useState('atc-1');
 
   const tableOfContents = [
@@ -46,6 +99,31 @@ export default function TermsOfService() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         
+        {/* ARCHIVE NOTICE BANNER (IF VIEWING HISTORICAL VERSION) */}
+        {dbPolicy && !dbPolicy.isCurrent && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div className="text-xs sm:text-sm text-amber-900 dark:text-amber-200">
+                <strong>Historical Archive Notice:</strong> You are viewing archived version{' '}
+                <span className="font-mono font-bold">{dbPolicy.version}</span>.
+                {dbPolicy.summaryOfChanges && (
+                  <span className="block text-xs mt-0.5 text-amber-800 dark:text-amber-300">
+                    Reason/Summary: {dbPolicy.summaryOfChanges}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSelectVersion('')}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 transition-colors cursor-pointer"
+            >
+              Switch to Live Version
+            </button>
+          </div>
+        )}
+
         {/* ENTERPRISE HERO */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 shadow-sm mb-10">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6 mb-6">
@@ -64,10 +142,10 @@ export default function TermsOfService() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                Version: ATC-MSA 2026.4
+                Version: {currentDisplayVersion}
               </span>
               <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
-                Effective: {lastUpdated}
+                Effective: {currentDisplayDate}
               </span>
             </div>
           </div>
@@ -88,7 +166,11 @@ export default function TermsOfService() {
           </p>
         </div>
 
-        {/* TWO-COLUMN LAYOUT: SIDEBAR TABLE OF CONTENTS + EXPANDED ARTICLES */}
+        {/* POLICY CONTENT RENDERING (DYNAMIC FROM DB OR STATIC FALLBACK) */}
+        {dbPolicy?.content ? (
+          <DynamicPolicyRenderer content={dbPolicy.content} policyTitle={dbPolicy.title} />
+        ) : (
+        /* TWO-COLUMN LAYOUT: SIDEBAR TABLE OF CONTENTS + EXPANDED ARTICLES */
         <div className="grid lg:grid-cols-12 gap-8 items-start">
           
           {/* DESKTOP STICKY SIDEBAR NAVIGATION */}
@@ -579,6 +661,7 @@ export default function TermsOfService() {
 
         </div>
 
+        )}
       </div>
     </div>
   );
