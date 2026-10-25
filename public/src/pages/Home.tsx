@@ -15,10 +15,15 @@ import {
   Sparkles,
   Layers,
   Lock,
-  Database
+  Database,
+  Star,
+  ExternalLink
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchVpsPlans } from '../services/pricingApi';
+import AnimatedCloudTerminal from '../components/AnimatedCloudTerminal';
+
+const GOOGLE_REVIEWS_URL = "https://www.google.com/maps/place/Analytical+Technical+Consulting/@41.6493404,-88.1755207,17z/data=!3m1!4b1!4m6!3m5!1s0x258bf3e100baa53b:0xdad95528ab037483!8m2!3d41.6493364!4d-88.1729458!16s%2Fg%2F11y56zr_t0?entry=ttu&g_ep=EgoyMDI2MTAyMC4wIKXMDSoASAFQAw%3D%3D";
 
 const DEFAULT_HOME_PLANS = [
   {
@@ -245,17 +250,36 @@ export default function Home() {
           <div className="lg:col-span-5">
             <div className="bg-gradient-to-b from-white to-slate-50 border border-slate-200/90 rounded-3xl p-7 shadow-2xl shadow-blue-950/10 relative overflow-hidden backdrop-blur-xs">
               
-              {/* Header: Score & SLA */}
+              {/* Header: Score & SLA with Clickable Google Reviews Link */}
               <div className="flex items-center justify-between border-b border-slate-100 pb-5 mb-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 flex items-center justify-center border border-blue-100 shadow-xs">
-                    <Award className="w-5 h-5" />
+                <a 
+                  href={GOOGLE_REVIEWS_URL} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 group hover:opacity-90 transition-all cursor-pointer"
+                  title="View Analytical Technical Consulting on Google Maps & Reviews"
+                >
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 text-amber-500 flex items-center justify-center border border-amber-200/80 shadow-xs group-hover:scale-105 transition-transform">
+                    <Award className="w-5 h-5 text-amber-600" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-slate-950 tracking-tight">4.9 / 5.0</h3>
-                    <p className="text-xs text-slate-500 font-medium">Enterprise Satisfaction Score</p>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-xl font-bold text-slate-950 tracking-tight group-hover:text-blue-600 transition-colors">4.9 / 5.0</h3>
+                      <div className="flex items-center text-amber-400">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        ))}
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors ml-0.5" />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                        Google Reviews
+                      </span>
+                      <p className="text-xs text-slate-500 font-medium">Enterprise Satisfaction Score</p>
+                    </div>
                   </div>
-                </div>
+                </a>
                 <span className="text-[11px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   Live Cluster
@@ -282,45 +306,8 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Simulated Cloud Terminal Window */}
-              <div className="rounded-2xl bg-slate-950 text-slate-200 p-4 font-mono text-xs shadow-xl border border-slate-800">
-                {/* Terminal Window Header */}
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-3">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-                    <span className="text-[10px] text-slate-400 font-medium ml-2">cloud-node-us01.atc</span>
-                  </div>
-                  <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded-md">
-                    ● PROVISIONED
-                  </span>
-                </div>
-
-                {/* Simulated CLI Command Stream */}
-                <div className="space-y-1.5 text-[11px] leading-relaxed">
-                  <div className="text-slate-400 flex items-center gap-1.5">
-                    <span className="text-blue-400 font-bold">$</span>
-                    <span>atc-cli deploy --plan <strong className="text-white">vps-m</strong> --os <strong className="text-white">ubuntu-24</strong></span>
-                  </div>
-                  <div className="text-emerald-400 flex items-center gap-1.5 pl-3">
-                    <span>✓</span>
-                    <span className="text-slate-300">Allocated 4 vCPU & 6 GB ECC RAM</span>
-                  </div>
-                  <div className="text-emerald-400 flex items-center gap-1.5 pl-3">
-                    <span>✓</span>
-                    <span className="text-slate-300">Mounted 160 GB SSD Storage Array</span>
-                  </div>
-                  <div className="text-emerald-400 flex items-center gap-1.5 pl-3">
-                    <span>✓</span>
-                    <span className="text-slate-300">IP assigned: <span className="text-sky-300">172.27.45.113</span> (1 Gbps)</span>
-                  </div>
-                  <div className="text-blue-300 font-semibold pt-1 border-t border-slate-900 flex justify-between items-center text-[10px]">
-                    <span>STATUS: READY IN 58 SECONDS</span>
-                    <span className="text-slate-400">SSH: PORT 22</span>
-                  </div>
-                </div>
-              </div>
+              {/* Live Interactive Animated Cloud Terminal */}
+              <AnimatedCloudTerminal />
 
             </div>
           </div>
