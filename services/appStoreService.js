@@ -1,3 +1,4 @@
+import { decryptVmPassword } from './cryptoService.js';
 // ==============================================================================
 // File: services/appStoreService.js
 // Purpose: Enterprise Automation Engine for 1-Click Apps on Hyper-V VMs
@@ -331,7 +332,7 @@ export async function installAppOnVM({ vmId, userId, appId, config = {}, asyncMo
     );
 
     const targetUser = vm.adminUser || 'ubuntu';
-    const primaryPass = vm.adminPassword || 'root';
+    const primaryPass = decryptVmPassword(vm.adminPassword) || 'root';
 
     // Multi-credential candidates (same resilient order as Web SSH Terminal)
     const credentialCandidates = [];

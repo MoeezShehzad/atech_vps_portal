@@ -1,3 +1,4 @@
+import { decryptVmPassword } from './cryptoService.js';
 import net from 'net';
 import { WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
@@ -212,7 +213,7 @@ export function setupTerminalWebSocket(server) {
     }
 
     const targetUser = decoded.username || vm.adminUser || 'ubuntu';
-    const targetPassword = decoded.password || vm.adminPassword || 'root';
+    const targetPassword = decoded.password || decryptVmPassword(vm.adminPassword) || 'root';
 
     ws.send(`\r\n\x1b[36m====================================================\x1b[0m\r\n`);
     ws.send(`\x1b[1;32m  ATC CLOUD WEB CONSOLE\x1b[0m — Connected to ${vm.vmName}\r\n`);

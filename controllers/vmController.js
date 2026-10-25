@@ -17,6 +17,7 @@ import {
 import firewallService from '../services/firewallService.js';
 import { generateGuacamoleToken, buildRdpConnectionPayload } from '../services/guacamoleService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
+import { encryptVmPassword, decryptVmPassword } from '../services/cryptoService.js';
 
 /**
  * 1. GET /api/vms - Get all VMs for current user
@@ -207,7 +208,7 @@ export async function getUserVMs(req, res) {
         hasPublicIp: Boolean(hasDedicatedPublicIp),
         ip: assignedIp,
         adminUser: vm.adminUser || ((vm.image?.osFamily?.toLowerCase().includes('win') || vm.image?.name?.toLowerCase().includes('win')) ? 'user' : 'ubuntu'),
-        adminPassword: (vm.image?.osFamily?.toLowerCase().includes('win') || vm.image?.name?.toLowerCase().includes('win') || vm.adminUser === 'user') ? (vm.adminPassword ?? '') : (vm.adminPassword || 'root'),
+        adminPassword: (vm.image?.osFamily?.toLowerCase().includes('win') || vm.image?.name?.toLowerCase().includes('win') || vm.adminUser === 'user') ? (decryptVmPassword(vm.adminPassword) ?? '') : (decryptVmPassword(vm.adminPassword) || 'root'),
         os: vm.image?.name || 'Ubuntu 24.04 LTS',
         status: vm.status ? vm.status.toLowerCase() : 'stopped',
         isSuspended: vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED',
@@ -448,7 +449,7 @@ export async function deployVM(req, res) {
         status: 'PROVISIONING',
         provisioningStatus: 'IN_PROGRESS',
         adminUser: adminUsername,
-        adminPassword: effectiveAdminPassword,
+        adminPassword: encryptVmPassword(effectiveAdminPassword),
         backupEnabled: Boolean(enableBackups),
       },
     });
@@ -1227,7 +1228,7 @@ export async function getConsoleSession(req, res) {
       const rdpPayload = buildRdpConnectionPayload({
         ip: targetIp,
         username: vm.adminUser || 'user',
-        password: vm.adminPassword || '',
+        password: decryptVmPassword(vm.adminPassword) || '',
       });
       const guacToken = generateGuacamoleToken(rdpPayload);
 
@@ -1250,7 +1251,7 @@ export async function getConsoleSession(req, res) {
         vmName: vm.vmName,
         ip: targetIp,
         adminUser: vm.adminUser || 'user',
-        adminPassword: vm.adminPassword,
+        adminPassword: decryptVmPassword(vm.adminPassword),
       });
     }
 
@@ -1262,7 +1263,7 @@ export async function getConsoleSession(req, res) {
         vmName: vm.vmName,
         ip: targetIp,
         username: vm.adminUser || 'ubuntu',
-        password: vm.adminPassword || 'root',
+        password: decryptVmPassword(vm.adminPassword) || 'root',
         purpose: 'web_terminal',
       },
       secret,
@@ -1288,7 +1289,7 @@ export async function getConsoleSession(req, res) {
       vmName: vm.vmName,
       ip: targetIp,
       adminUser: vm.adminUser || 'ubuntu',
-      adminPassword: vm.adminPassword || 'root',
+      adminPassword: decryptVmPassword(vm.adminPassword) || 'root',
     });
   } catch (err) {
     console.error('[getConsoleSession Error]:', err);
@@ -1503,10 +1504,10 @@ export async function resetVMPassword(req, res) {
       newPassword,
     });
 
-    // Update in DB
+    // Update in DB (Encrypted at rest)
     await prisma.virtualMachine.update({
       where: { vmId },
-      data: { adminPassword: newPassword },
+      data: { adminPassword: encryptVmPassword(newPassword) },
     });
 
     await prisma.securityLog.create({
@@ -1566,7 +1567,7 @@ export async function rebuildVMInstance(req, res) {
         provisioningStatus: 'RUNNING',
         imageId: targetImage.imageId,
         adminUser: newUser,
-        adminPassword: newPass,
+        adminPassword: encryptVmPassword(newPass),
       },
     });
 
