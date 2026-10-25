@@ -2,7 +2,6 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 
 function cleanSectionHtml(html, defaultTitle) {
-  // Extract h2 title
   let title = defaultTitle;
   const h2Match = html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
   if (h2Match) {
@@ -19,10 +18,8 @@ function cleanSectionHtml(html, defaultTitle) {
     }
   }
 
-  // Remove the h2 from the body
   let body = html.replace(/<h2[^>]*>[\s\S]*?<\/h2>/i, '');
 
-  // Convert elements
   body = body
     .replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, (m, p1) => {
       const clean = p1.replace(/<[^>]+>/g, '').trim();
@@ -37,7 +34,6 @@ function cleanSectionHtml(html, defaultTitle) {
     .replace(/<ul[^>]*>/gi, '\n')
     .replace(/<\/ul>/gi, '\n')
     .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (m, p1) => {
-      // Normalize whitespace inside paragraph
       const clean = p1
         .replace(/\r?\n\s*/g, ' ')
         .replace(/&quot;/gi, '"')
@@ -61,43 +57,46 @@ function cleanSectionHtml(html, defaultTitle) {
 
 // 1. TERMS OF SERVICE
 const tosSource = fs.readFileSync('public/src/pages/TermsOfService.tsx', 'utf8');
-const tosTOC = [
-  '1. Services Provision, Modifications & Unmanaged Scope',
-  '2. Customer Obligations, Corporate Authority & Authentication',
-  '3. Customer Data & Intellectual Property Sovereignty',
-  '4. ATC Shared Security Responsibility Model',
-  '5. Acceptable Use Policy (AUP) & High-Risk Activities',
-  '6. Absolute Backup Disclaimer & Complete Immunity for Data Loss',
-  '7. Service Level Agreement (SLA) & Sole Remedy',
-  '8. Fees, Invoicing, Automated Billing & Taxes',
-  '9. Service Suspension, Voluntary Deactivation & 90-Day Data Preservation Policy',
-  '10. Term, Termination & NIST SP 800-88 Data Sanitization',
-  '11. Complete Disclaimer of Warranties ("AS IS" & "AS AVAILABLE")',
-  '12. Strict Limitation of Liability & Absolute Damages Cap',
-  '13. Comprehensive Customer Indemnification',
-  '14. Mandatory Binding Individual Arbitration & Class Action Waiver',
-  '15. Governing Law, Exclusive Venue & One-Year Limitation Bar',
-  '16. Safe Harbor, DMCA & Copyright Notice',
-  '17. U.S. Export Controls & Trade Sanctions',
-  '18. Force Majeure & Upstream Continuity',
-  '19. Miscellaneous Legal Provisions & Defined Terms'
-];
 
-const tosSections = [];
+const originalTosSections = [];
 for (let i = 1; i <= 19; i++) {
   const reg = new RegExp(`<section id="atc-${i}"[\\s\\S]*?<\\/section>`, 'i');
   const m = tosSource.match(reg);
   if (m) {
-    tosSections.push(cleanSectionHtml(m[0], tosTOC[i - 1]));
+    originalTosSections.push(m[0]);
   }
 }
-const fullTosMarkdown = tosSections.join('\n\n---\n\n');
-console.log('✓ Cleaned TOS:', tosSections.length, 'sections. Length:', fullTosMarkdown.length);
+
+// Now assemble the 21 sections
+const finalTosSections = [
+  cleanSectionHtml(originalTosSections[0], '1. Services Provision, Modifications & Unmanaged Scope'),
+  "## 2. Cloud Computing Services – Licensing & Compliance Disclaimer\n\nATC provides cloud computing infrastructure and related services only. ATC is not responsible for the licensing, installation, management, or compliance of any operating systems, software applications, third-party tools, or other devices and services used by the customer, unless otherwise agreed in writing.\n\nIf required, ATC can assist customers in procuring the necessary software licenses on their behalf, subject to applicable terms, conditions, and costs.\n\nCustomers are solely responsible for ensuring that all software, operating systems, and applications used on ATC’s cloud infrastructure are properly licensed and comply with the applicable licensing agreements and legal requirements.\n\nIf ATC discovers, or receives a complaint or notification from any software vendor, organization, copyright holder, or authorized representative regarding the use of unlicensed software, ATC reserves the right to suspend or shut down the affected device or service without prior notice until the necessary licenses have been obtained and compliance has been verified.\n\nCustomers are responsible for any costs, liabilities, or consequences arising from their use of unlicensed software.",
+  cleanSectionHtml(originalTosSections[1], '3. Customer Obligations, Corporate Authority & Authentication'),
+  cleanSectionHtml(originalTosSections[2], '4. Customer Data & Intellectual Property Sovereignty'),
+  cleanSectionHtml(originalTosSections[3], '5. ATC Shared Security Responsibility Model'),
+  cleanSectionHtml(originalTosSections[4], '6. Acceptable Use Policy (AUP) & High-Risk Activities'),
+  cleanSectionHtml(originalTosSections[5], '7. Absolute Backup Disclaimer & Complete Immunity for Data Loss'),
+  cleanSectionHtml(originalTosSections[6], '8. Service Level Agreement (SLA) & Sole Remedy'),
+  cleanSectionHtml(originalTosSections[7], '9. Fees, Invoicing, Automated Billing & Taxes'),
+  cleanSectionHtml(originalTosSections[8], '10. Service Suspension, Voluntary Deactivation & 90-Day Data Preservation Policy'),
+  cleanSectionHtml(originalTosSections[9], '11. Term, Termination & NIST SP 800-88 Data Sanitization'),
+  cleanSectionHtml(originalTosSections[10], '12. Complete Disclaimer of Warranties ("AS IS" & "AS AVAILABLE")'),
+  cleanSectionHtml(originalTosSections[11], '13. Strict Limitation of Liability & Absolute Damages Cap'),
+  cleanSectionHtml(originalTosSections[12], '14. Comprehensive Customer Indemnification'),
+  cleanSectionHtml(originalTosSections[13], '15. Mandatory Binding Individual Arbitration & Class Action Waiver'),
+  cleanSectionHtml(originalTosSections[14], '16. Governing Law, Exclusive Venue & One-Year Limitation Bar'),
+  cleanSectionHtml(originalTosSections[15], '17. Safe Harbor, DMCA & Copyright Notice'),
+  "## 18. Suspension of Services, Copyright Disputes & Software Audits\n\nATC shall not be held liable for any claims, disputes, losses, or damages arising from the suspension or shutdown of cloud computing services due to suspected or confirmed software licensing violations or copyright infringement.\n\nIf a copyright holder, software owner, licensing organization, or its authorized representative raises a claim or dispute regarding the use of unlicensed software, ATC reserves the right to suspend or terminate the affected cloud computing services until the customer resolves the matter directly with the relevant copyright holder, software owner, or licensing organization and provides satisfactory evidence of compliance.\n\nATC shall operate in accordance with applicable United States federal laws, rules, and regulations, as well as other applicable legal requirements.\n\nCustomers are responsible for resolving all licensing and copyright-related disputes arising from their use of ATC’s cloud computing services. ATC shall not be responsible for disputes resulting from the customer’s unauthorized use of software or other third-party intellectual property, to the extent permitted by applicable law.",
+  cleanSectionHtml(originalTosSections[16], '19. U.S. Export Controls & Trade Sanctions'),
+  cleanSectionHtml(originalTosSections[17], '20. Force Majeure & Upstream Continuity'),
+  cleanSectionHtml(originalTosSections[18], '21. Miscellaneous Legal Provisions & Defined Terms')
+];
+
+const fullTosMarkdown = finalTosSections.join('\n\n---\n\n');
+console.log('✓ Cleaned TOS with 2 new licensing clauses:', finalTosSections.length, 'sections. Total Length:', fullTosMarkdown.length);
 
 // 2. PRIVACY POLICY
 const privSource = execSync('git show 462e9721:public/src/pages/PrivacyPolicy.tsx', { encoding: 'utf8' });
-console.log('Original Privacy source length at 462e9721:', privSource.length);
-
 const privTOC = [
   '1. Institutional Scope & Regulatory Jurisdiction',
   '2. ATC Enterprise Data Trust Commitments',
@@ -126,7 +125,6 @@ for (let i = 1; i <= 16; i++) {
   }
 }
 const fullPrivMarkdown = privSections.join('\n\n---\n\n');
-console.log('✓ Cleaned Privacy:', privSections.length, 'sections. Length:', fullPrivMarkdown.length);
 
 // 3. REFUND POLICY
 const refundSource = execSync('git show HEAD~1:public/src/pages/RefundPolicy.tsx', { encoding: 'utf8' });
@@ -151,7 +149,6 @@ for (let i = 1; i <= 9; i++) {
   }
 }
 const fullRefMarkdown = refSections.join('\n\n---\n\n');
-console.log('✓ Cleaned Refund:', refSections.length, 'sections. Length:', fullRefMarkdown.length);
 
 // Generate updated scripts/seed_policies.cjs
 const seedCode = `const path = require('path');
@@ -169,7 +166,7 @@ async function seedPolicies() {
       policyType: 'terms-of-service',
       title: 'Cloud Platform Master Services Agreement',
       version: 'v1.0',
-      summaryOfChanges: 'Complete initial baseline enterprise terms of service (all 19 legal articles, unmanaged scope, SLA, arbitration, 90-day preservation).',
+      summaryOfChanges: 'Complete initial baseline enterprise terms of service (all 21 legal articles including Software Licensing & Copyright Compliance Disclaimers).',
       status: 'PUBLISHED',
       isCurrent: true,
       effectiveAt: now,
@@ -242,4 +239,4 @@ seedPolicies()
 `;
 
 fs.writeFileSync('scripts/seed_policies.cjs', seedCode, 'utf8');
-console.log('scripts/seed_policies.cjs generated successfully with clean Markdown!');
+console.log('scripts/seed_policies.cjs generated successfully with 21 TOS articles!');

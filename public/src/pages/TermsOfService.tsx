@@ -236,6 +236,28 @@ export default function TermsOfService() {
             <section id="atc-2" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">2</span>
+                Cloud Computing Services – Licensing &amp; Compliance Disclaimer
+              </h2>
+              <p>
+                ATC provides cloud computing infrastructure and related services only. ATC is not responsible for the licensing, installation, management, or compliance of any operating systems, software applications, third-party tools, or other devices and services used by the customer, unless otherwise agreed in writing.
+              </p>
+              <p>
+                If required, ATC can assist customers in procuring the necessary software licenses on their behalf, subject to applicable terms, conditions, and costs.
+              </p>
+              <p>
+                Customers are solely responsible for ensuring that all software, operating systems, and applications used on ATC’s cloud infrastructure are properly licensed and comply with the applicable licensing agreements and legal requirements.
+              </p>
+              <p>
+                If ATC discovers, or receives a complaint or notification from any software vendor, organization, copyright holder, or authorized representative regarding the use of unlicensed software, ATC reserves the right to suspend or shut down the affected device or service without prior notice until the necessary licenses have been obtained and compliance has been verified.
+              </p>
+              <p>
+                Customers are responsible for any costs, liabilities, or consequences arising from their use of unlicensed software.
+              </p>
+            </section>
+
+            <section id="atc-3" className="space-y-4">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">3</span>
                 Customer Obligations, Corporate Authority &amp; Authentication
               </h2>
               <p>
@@ -256,10 +278,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 3 - CUSTOMER DATA */}
-            <section id="atc-3" className="space-y-4">
+            <section id="atc-4" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">3</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">4</span>
                 Customer Data &amp; Intellectual Property Sovereignty
               </h2>
               <p>
@@ -279,11 +300,10 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 4 - SHARED RESPONSIBILITY MODEL */}
-            <section id="atc-4" className="space-y-4 bg-slate-100 dark:bg-slate-800/60 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <section id="atc-5" className="space-y-4 bg-slate-100 dark:bg-slate-800/60 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
                 <Shield className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                4. ATC Shared Security Responsibility Model
+                5. ATC Shared Security Responsibility Model
               </h2>
               <p className="text-xs sm:text-sm leading-relaxed">
                 Cloud security is a shared responsibility between ATC and Customer. The demarcation of responsibilities is strictly established as follows:
@@ -310,11 +330,10 @@ export default function TermsOfService() {
               </div>
             </section>
 
-            {/* SECTION 5 - AUP & HIGH-RISK ACTIVITIES */}
-            <section id="atc-5" className="space-y-4 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/60 p-6 sm:p-8 rounded-2xl">
+            <section id="atc-6" className="space-y-4 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/60 p-6 sm:p-8 rounded-2xl">
               <h2 className="text-xl font-bold text-rose-900 dark:text-rose-300 font-poppins flex items-center gap-3">
                 <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400 flex-shrink-0" />
-                5. Acceptable Use Policy (AUP) &amp; High-Risk Activities Prohibition
+                6. Acceptable Use Policy (AUP) &amp; High-Risk Activities Prohibition
               </h2>
               <p className="text-xs sm:text-sm text-rose-950 dark:text-rose-200 leading-relaxed">
                 Customer covenants that the Services shall NOT be utilized for any abusive, harmful, or unlawful activities. 
@@ -338,11 +357,10 @@ export default function TermsOfService() {
               </div>
             </section>
 
-            {/* SECTION 6 - ABSOLUTE BACKUP DISCLAIMER */}
-            <section id="atc-6" className="space-y-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 p-6 sm:p-8 rounded-2xl">
+            <section id="atc-7" className="space-y-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 p-6 sm:p-8 rounded-2xl">
               <h2 className="text-xl font-bold text-amber-950 dark:text-amber-300 font-poppins flex items-center gap-3">
                 <AlertOctagon className="w-6 h-6 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                6. Absolute Backup Disclaimer &amp; Complete Immunity for Data Loss
+                7. Absolute Backup Disclaimer &amp; Complete Immunity for Data Loss
               </h2>
               <div className="text-xs sm:text-sm text-amber-950 dark:text-amber-200 font-bold uppercase tracking-wide">
                 CUSTOMER EXPRESSLY ACKNOWLEDGES THAT THE SERVICES DO NOT CONSTITUTE AN ARCHIVAL, ESCROW, OR BACKUP SERVICE.
@@ -360,10 +378,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 7 */}
-            <section id="atc-7" className="space-y-4">
+            <section id="atc-8" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">7</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">8</span>
                 Service Level Agreement (SLA) &amp; Sole Remedy
               </h2>
               <p>
@@ -381,10 +398,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 8 */}
-            <section id="atc-8" className="space-y-4">
+            <section id="atc-9" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">8</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">9</span>
                 Fees, Invoicing, Automated Billing &amp; Taxes
               </h2>
               <p>
@@ -404,10 +420,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 9 */}
-            <section id="atc-9" className="space-y-4">
+            <section id="atc-10" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">9</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">10</span>
                 Service Suspension, Voluntary Deactivation &amp; 90-Day Data Preservation Policy
               </h2>
               <p>
@@ -450,10 +465,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 10 */}
-            <section id="atc-10" className="space-y-4">
+            <section id="atc-11" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">10</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">11</span>
                 Term, Termination &amp; NIST SP 800-88 Data Sanitization
               </h2>
               <p>
@@ -464,10 +478,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 11 - DISCLAIMER OF WARRANTIES */}
-            <section id="atc-11" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
+            <section id="atc-12" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins uppercase tracking-wide">
-                11. Complete Disclaimer of Warranties (&quot;AS IS&quot; &amp; &quot;AS AVAILABLE&quot;)
+                12. Complete Disclaimer of Warranties (&quot;AS IS&quot; &amp; &quot;AS AVAILABLE&quot;)
               </h2>
               <p className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
                 TO THE MAXIMUM EXTENT PERMITTED UNDER APPLICABLE LAW, EXCEPT AS EXPRESSLY PROVIDED IN OUR SERVICE LEVEL AGREEMENT, 
@@ -483,10 +496,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 12 - STRICT LIMITATION OF LIABILITY */}
-            <section id="atc-12" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
+            <section id="atc-13" className="space-y-4 bg-slate-100 dark:bg-slate-800/80 p-6 sm:p-8 rounded-2xl border border-slate-300 dark:border-slate-700">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins uppercase tracking-wide">
-                12. Strict Limitation of Liability &amp; Absolute Damages Cap
+                13. Strict Limitation of Liability &amp; Absolute Damages Cap
               </h2>
               <p className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
                 IN NO EVENT AND UNDER NO LEGAL OR EQUITABLE THEORY—WHETHER IN CONTRACT, TORT (INCLUDING NEGLIGENCE AND GROSS NEGLIGENCE TO THE EXTENT PERMITTED BY LAW), 
@@ -512,10 +524,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 13 - INDEMNIFICATION */}
-            <section id="atc-13" className="space-y-4">
+            <section id="atc-14" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">13</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">14</span>
                 Comprehensive Customer Indemnification
               </h2>
               <p>
@@ -534,11 +545,10 @@ export default function TermsOfService() {
               </ul>
             </section>
 
-            {/* SECTION 14 - BINDING ARBITRATION & CLASS ACTION WAIVER */}
-            <section id="atc-14" className="space-y-4 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 p-6 sm:p-8 rounded-2xl">
+            <section id="atc-15" className="space-y-4 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 p-6 sm:p-8 rounded-2xl">
               <h2 className="text-xl font-bold text-blue-950 dark:text-blue-200 font-poppins flex items-center gap-3">
                 <Scale className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                14. Mandatory Binding Individual Arbitration &amp; Class Action Waiver
+                15. Mandatory Binding Individual Arbitration &amp; Class Action Waiver
               </h2>
               <div className="text-xs sm:text-sm font-bold text-blue-950 dark:text-blue-200 uppercase tracking-wide">
                 PLEASE READ THIS SECTION WITH UTMOST SCRUTINY. IT MANDATES ARBITRATION OF DISPUTES AND ELIMINATES YOUR RIGHT TO PURSUE A COURT TRIAL OR PARTICIPATE IN A CLASS ACTION.
@@ -568,10 +578,9 @@ export default function TermsOfService() {
               </div>
             </section>
 
-            {/* SECTION 15 */}
-            <section id="atc-15" className="space-y-4">
+            <section id="atc-16" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">15</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">16</span>
                 Governing Law, Exclusive Venue &amp; One-Year Limitation Bar
               </h2>
               <p>
@@ -590,10 +599,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 16 */}
-            <section id="atc-16" className="space-y-4">
+            <section id="atc-17" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">16</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">17</span>
                 Safe Harbor, DMCA &amp; Copyright Notice
               </h2>
               <p>
@@ -608,10 +616,29 @@ export default function TermsOfService() {
               </div>
             </section>
 
-            {/* SECTION 17 */}
-            <section id="atc-17" className="space-y-4">
+            {/* SECTION 18 */}
+            <section id="atc-18" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">17</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">18</span>
+                Suspension of Services, Copyright Disputes and Legal Compliance
+              </h2>
+              <p>
+                ATC shall not be held liable for any claims, disputes, losses, or damages arising from the suspension or shutdown of cloud computing services due to suspected or confirmed software licensing violations or copyright infringement.
+              </p>
+              <p>
+                If a copyright holder, software owner, licensing organization, or its authorized representative raises a claim or dispute regarding the use of unlicensed software, ATC reserves the right to suspend or terminate the affected cloud computing services until the customer resolves the matter directly with the relevant copyright holder, software owner, or licensing organization and provides satisfactory evidence of compliance.
+              </p>
+              <p>
+                ATC shall operate in accordance with applicable United States federal laws, rules, and regulations, as well as other applicable legal requirements.
+              </p>
+              <p>
+                Customers are responsible for resolving all licensing and copyright-related disputes arising from their use of ATC’s cloud computing services. ATC shall not be responsible for disputes resulting from the customer’s unauthorized use of software or other third-party intellectual property, to the extent permitted by applicable law.
+              </p>
+            </section>
+
+            <section id="atc-19" className="space-y-4">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">19</span>
                 U.S. Export Controls &amp; Trade Sanctions
               </h2>
               <p>
@@ -621,10 +648,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 18 */}
-            <section id="atc-18" className="space-y-4">
+            <section id="atc-20" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">18</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">20</span>
                 Force Majeure &amp; Upstream Continuity
               </h2>
               <p>
@@ -634,10 +660,9 @@ export default function TermsOfService() {
               </p>
             </section>
 
-            {/* SECTION 19 */}
-            <section id="atc-19" className="space-y-4">
+            <section id="atc-21" className="space-y-4">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white font-poppins flex items-center gap-3">
-                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">19</span>
+                <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold">21</span>
                 Miscellaneous Legal Provisions &amp; Defined Terms
               </h2>
               <p>
