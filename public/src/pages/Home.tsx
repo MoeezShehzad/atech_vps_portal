@@ -250,8 +250,8 @@ export default function Home() {
           <div className="lg:col-span-5">
             <div className="bg-gradient-to-b from-white to-slate-50 border border-slate-200/90 rounded-3xl p-7 shadow-2xl shadow-blue-950/10 relative overflow-hidden backdrop-blur-xs">
               
-              {/* Header: Score & SLA with Clickable Google Reviews Link */}
-              <div className="flex items-center justify-between border-b border-slate-100 pb-5 mb-5">
+              {/* Header: Clickable Google Reviews Link */}
+              <div className="flex items-center justify-between pb-4 mb-1">
                 <a 
                   href={GOOGLE_REVIEWS_URL} 
                   target="_blank" 
@@ -272,38 +272,13 @@ export default function Home() {
                       </div>
                       <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors ml-0.5" />
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
                         Google Reviews
                       </span>
-                      <p className="text-xs text-slate-500 font-medium">Enterprise Satisfaction Score</p>
                     </div>
                   </div>
                 </a>
-                <span className="text-[11px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Cluster
-                </span>
-              </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 gap-3 mb-5">
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-100 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-500 font-medium">Deployments</span>
-                    <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                  </div>
-                  <p className="text-2xl font-black text-slate-950 mt-1">30+</p>
-                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">Automated Active Instances</p>
-                </div>
-                <div className="p-3.5 rounded-2xl bg-white border border-slate-100 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] text-slate-500 font-medium">Uptime Metric</span>
-                    <Activity className="w-3.5 h-3.5 text-emerald-500" />
-                  </div>
-                  <p className="text-2xl font-black text-emerald-600 mt-1">99.9%</p>
-                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">Target Infrastructure Availability</p>
-                </div>
               </div>
 
               {/* Live Interactive Animated Cloud Terminal */}
