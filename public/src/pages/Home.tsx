@@ -54,7 +54,7 @@ const DEFAULT_HOME_PLANS = [
     price: 14.99,
     monthlyPrice: 14.99,
     popular: true,
-    color: 'from-blue-600 to-indigo-600',
+    color: 'from-blue-600 to-blue-700',
   },
   {
     planId: 3,
@@ -69,7 +69,7 @@ const DEFAULT_HOME_PLANS = [
     price: 29.99,
     monthlyPrice: 29.99,
     popular: false,
-    color: 'from-indigo-600 to-purple-600',
+    color: 'from-slate-700 to-slate-800',
   },
 ];
 
@@ -122,7 +122,7 @@ export default function Home() {
             price: Number(p.monthlyPrice) || 9.99,
             monthlyPrice: Number(p.monthlyPrice) || 9.99,
             popular: idx === 1 || p.name.toLowerCase().includes('pro'),
-            color: idx === 0 ? 'from-blue-500 to-cyan-500' : idx === 1 ? 'from-blue-600 to-indigo-600' : 'from-indigo-600 to-purple-600',
+            color: idx === 0 ? 'from-blue-500 to-cyan-500' : idx === 1 ? 'from-blue-600 to-blue-700' : 'from-slate-700 to-slate-800',
           }));
           setPlans(mapped);
         }
@@ -170,7 +170,7 @@ export default function Home() {
       <section className="relative overflow-hidden bg-white border-b border-slate-200/80 pt-16 sm:pt-20 pb-24 sm:pb-32">
         {/* Ambient Gradient Glow Orbs */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none -translate-y-1/2" />
-        <div className="absolute top-1/3 right-10 w-96 h-96 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/3 right-10 w-96 h-96 bg-blue-300/10 rounded-full blur-3xl pointer-events-none" />
         
         {/* Subtle background grid pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-70 pointer-events-none" />
@@ -190,15 +190,15 @@ export default function Home() {
             </div>
 
             {/* Main Headline with Dynamic Typewriter Animation */}
-            <h1 className="text-4xl sm:text-6xl font-extrabold text-slate-950 leading-[1.12] tracking-tight min-h-[135px] sm:min-h-[175px]">
+            <h1 className="text-4xl sm:text-6xl font-normal text-slate-900 leading-[1.15] tracking-tight min-h-[135px] sm:min-h-[175px]">
               Deploy Scalable <br className="hidden sm:inline" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 font-black">
+              <span className="text-blue-600 font-medium">
                 {displayText}
               </span>
               {/* Typewriter Cursor */}
               <span className="inline-block w-1 sm:w-1.5 h-8 sm:h-12 ml-1.5 bg-blue-600 rounded-xs animate-pulse align-middle" />
               <br />
-              Built for Scale.
+              <span className="font-light text-slate-800">Built for Scale.</span>
             </h1>
 
             {/* Description Subtext */}
@@ -210,7 +210,7 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
               <Link
                 to="/configure"
-                className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold text-sm tracking-wide shadow-xl shadow-blue-600/25 hover:from-blue-700 hover:to-indigo-700 hover:shadow-blue-600/35 transition-all flex items-center justify-center gap-2 group cursor-pointer"
+                className="w-full sm:w-auto px-8 py-4 rounded-xl bg-blue-600 text-white font-medium text-sm tracking-wide shadow-md shadow-blue-600/20 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 group cursor-pointer"
               >
                 <span>Deploy Cloud Server</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -319,7 +319,7 @@ export default function Home() {
           <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3.5 py-1 rounded-full uppercase tracking-wider">
             <Zap className="w-3.5 h-3.5" /> High Performance VPS Hosting
           </div>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-950 tracking-tight">
+          <h2 className="text-3xl sm:text-5xl font-light text-slate-900 tracking-tight">
             Predictable Cloud Pricing
           </h2>
           <p className="text-slate-600 text-sm sm:text-base font-normal">
@@ -355,7 +355,7 @@ export default function Home() {
                 }`}
               >
                 {plan.popular && (
-                  <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1 rounded-full shadow-md">
+                  <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[10px] font-semibold uppercase tracking-widest px-3.5 py-1 rounded-full shadow-sm">
                     Most Popular Choice
                   </span>
                 )}
@@ -406,7 +406,7 @@ export default function Home() {
                   onClick={() => handleConfigure(plan)}
                   className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
                     plan.popular
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-600/25'
+                      ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
                       : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
                   }`}
                 >
@@ -426,7 +426,7 @@ export default function Home() {
             <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-200 px-3.5 py-1 rounded-full uppercase tracking-wider">
               <Shield className="w-3.5 h-3.5" /> Engineered For Stability
             </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-light text-slate-900 tracking-tight">
               Enterprise Infrastructure Capabilities
             </h2>
             <p className="text-slate-600 text-sm font-normal">
@@ -470,10 +470,10 @@ export default function Home() {
 
       {/* 5. CALL TO ACTION BANNER */}
       <section className="max-w-7xl mx-auto px-6 py-24">
-        <div className="bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 rounded-3xl p-10 sm:p-16 text-white text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-8 shadow-2xl relative overflow-hidden border border-slate-800">
+        <div className="bg-slate-900 rounded-3xl p-10 sm:p-16 text-white text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-8 shadow-2xl relative overflow-hidden border border-slate-800">
           <div className="space-y-3 relative z-10 max-w-xl">
             <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Custom Enterprise Hosting</span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">Need a custom dedicated setup?</h2>
+            <h2 className="text-3xl sm:text-4xl font-light tracking-tight">Need a custom dedicated setup?</h2>
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
               Our engineering team provides tailored server configurations, multi-node private cloud clusters, and direct IT consulting.
             </p>
@@ -482,7 +482,7 @@ export default function Home() {
           <div className="relative z-10 flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
             <Link
               to="/contact"
-              className="px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-blue-500/30 transition-all text-center whitespace-nowrap"
+              className="px-8 py-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs uppercase tracking-wider shadow-md transition-all text-center whitespace-nowrap"
             >
               Contact Infrastructure Team
             </Link>
