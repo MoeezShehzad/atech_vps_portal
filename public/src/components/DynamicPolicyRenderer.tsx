@@ -53,6 +53,8 @@ export default function DynamicPolicyRenderer({
           title,
           paragraphs: [],
         };
+      } else if (trimmed === '---' || trimmed === '***') {
+        // Divider, skip
       } else if (trimmed.length > 0) {
         currentSection.paragraphs.push(trimmed);
       }
