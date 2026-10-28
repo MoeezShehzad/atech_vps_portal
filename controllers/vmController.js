@@ -40,9 +40,30 @@ async function resolveWorkspaceContext(req, userId) {
     }
   }
 
+  // If no org header is explicitly passed and user has no personal VMs, check if they are in an active organization
   if (!orgHeader || orgHeader === 'personal') {
+    if (!isCompanyUser) {
+      const personalVmCount = await prisma.virtualMachine.count({
+        where: { userId, status: { not: 'TERMINATED' } },
+      });
+      if (personalVmCount === 0) {
+        const activeMembership = await prisma.organizationMember.findFirst({
+          where: { userId, status: 'active' },
+          include: { organization: true },
+        });
+        if (activeMembership && activeMembership.organization) {
+          return {
+            effectiveUserId: activeMembership.organization.ownerId,
+            isOrgContext: true,
+            memberRole: activeMembership.role,
+            org: activeMembership.organization,
+          };
+        }
+      }
+    }
     return { effectiveUserId: userId, isOrgContext: false, memberRole: 'owner' };
   }
+
   const orgId = parseInt(orgHeader, 10);
   if (isNaN(orgId)) {
     return { effectiveUserId: userId, isOrgContext: false, memberRole: 'owner' };
@@ -62,6 +83,63 @@ async function resolveWorkspaceContext(req, userId) {
     return { effectiveUserId: org.ownerId, isOrgContext: true, memberRole: member.role, org };
   }
   return { effectiveUserId: userId, isOrgContext: false, memberRole: 'owner' };
+}
+
+/**
+ * Enterprise RBAC helper: Authenticate access to a specific Virtual Machine
+ * Verifies direct ownership or authorized active organization team membership.
+ */
+export async function getAuthorizedVm(vmId, userId, options = {}) {
+  const { include, allowedRoles } = options;
+
+  if (!vmId || !userId) {
+    return { error: 'Valid VM ID and User ID required.', status: 400 };
+  }
+
+  const vm = await prisma.virtualMachine.findUnique({
+    where: { vmId },
+    include: include || { ipPool: true, image: true, plan: true, subscription: true },
+  });
+
+  if (!vm || vm.status === 'TERMINATED') {
+    return { error: 'Virtual machine not found.', status: 404 };
+  }
+
+  // 1. Direct owner check
+  if (vm.userId === userId) {
+    return { vm, role: 'owner', isOrgContext: false, effectiveUserId: userId };
+  }
+
+  // 2. Organization membership check
+  // Check if caller is an active member in an organization owned by the VM owner
+  const membership = await prisma.organizationMember.findFirst({
+    where: {
+      userId,
+      status: 'active',
+      organization: {
+        ownerId: vm.userId,
+      },
+    },
+    include: { organization: true },
+  });
+
+  if (membership) {
+    if (allowedRoles && Array.isArray(allowedRoles) && !allowedRoles.includes(membership.role)) {
+      return {
+        error: `Access Denied: Your role '${membership.role}' does not have permission to perform this action.`,
+        status: 403,
+      };
+    }
+    return {
+      vm,
+      role: membership.role,
+      isOrgContext: true,
+      org: membership.organization,
+      effectiveUserId: vm.userId,
+    };
+  }
+
+  return { error: 'Virtual machine not found or unauthorized.', status: 404 };
 }
 
 export async function getUserVMs(req, res) {
@@ -658,21 +736,16 @@ export async function powerAction(req, res) {
       return res.status(400).json({ error: 'Invalid power action. Allowed: START, STOP, RESTART, FORCE_STOP, PAUSE, RESUME' });
     }
 
-    const { effectiveUserId, isOrgContext, memberRole } = await resolveWorkspaceContext(req, userId);
-    if (isOrgContext && memberRole === 'viewer') {
-      return res.status(403).json({ error: 'Access Denied: Viewers have read-only access and cannot execute power actions.' });
-    }
-    if (isOrgContext && memberRole === 'billing') {
-      return res.status(403).json({ error: 'Access Denied: Billing specialists cannot execute VM operations.' });
-    }
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId: effectiveUserId },
+    const authResult = await getAuthorizedVm(vmId, userId, {
       include: { subscription: true },
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
 
-    if (!vm) {
-      return res.status(404).json({ error: 'Virtual machine not found.' });
+    if (authResult.error) {
+      return res.status(authResult.status || 403).json({ error: authResult.error });
     }
+
+    const { vm } = authResult;
 
     if (vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED') {
       const subEndDate = vm.subscription?.endDate;
@@ -766,14 +839,16 @@ export async function previewResize(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const { cpuCores, ramGb, storageGb } = req.body;
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId },
+    const authResult = await getAuthorizedVm(vmId, userId, {
       include: { subscription: true, plan: true },
+      allowedRoles: ['owner', 'admin'],
     });
 
-    if (!vm) {
-      return res.status(404).json({ error: 'Virtual machine not found.' });
+    if (authResult.error) {
+      return res.status(authResult.status || 403).json({ error: authResult.error });
     }
+
+    const { vm } = authResult;
 
     const targetStorage = storageGb ? Number(storageGb) : vm.storageGb;
     const calculation = calculateResizePrice(vm, Number(cpuCores), Number(ramGb), targetStorage);
@@ -800,14 +875,16 @@ export async function resizeVM(req, res) {
       return res.status(400).json({ error: 'Invalid CPU cores (1-32) or RAM amount (1-128 GB) specified.' });
     }
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId },
+    const authResult = await getAuthorizedVm(vmId, userId, {
       include: { subscription: true, plan: true },
+      allowedRoles: ['owner', 'admin'],
     });
 
-    if (!vm) {
-      return res.status(404).json({ error: 'Virtual machine not found.' });
+    if (authResult.error) {
+      return res.status(authResult.status || 403).json({ error: authResult.error });
     }
+
+    const { vm } = authResult;
 
     if (vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED') {
       return res.status(403).json({
@@ -964,19 +1041,23 @@ export async function destroyVM(req, res) {
     const userId = req.user?.userId;
     const vmId = decodeResourceId(req.params.id);
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId },
+    const authResult = await getAuthorizedVm(vmId, userId, {
       include: { subscription: true },
+      allowedRoles: ['owner', 'admin'],
     });
 
-    if (!vm) {
-      // Idempotent: VM is already removed from DB, return 200 OK so UI clears smoothly
-      return res.json({
-        success: true,
-        message: 'Virtual machine is already removed.',
-        alreadyRemoved: true,
-      });
+    if (authResult.error) {
+      if (authResult.status === 404) {
+        return res.json({
+          success: true,
+          message: 'Virtual machine is already removed.',
+          alreadyRemoved: true,
+        });
+      }
+      return res.status(authResult.status || 403).json({ error: authResult.error });
     }
+
+    const { vm } = authResult;
 
     const force = req.query.force === 'true' || req.body?.force === true;
 
@@ -1070,13 +1151,15 @@ export async function getVMMetrics(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops', 'viewer'],
     });
 
-    if (!vm) {
-      return res.status(404).json({ error: 'Virtual machine not found' });
+    if (authResult.error) {
+      return res.status(authResult.status || 404).json({ error: authResult.error });
     }
+
+    const { vm } = authResult;
 
     // If VM is not running, return static zeroed state
     if (vm.status !== 'RUNNING') {
@@ -1201,14 +1284,16 @@ export async function getConsoleSession(req, res) {
       return res.status(400).json({ error: 'Valid VM ID required.' });
     }
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId },
+    const authResult = await getAuthorizedVm(vmId, userId, {
       include: { ipPool: true, image: true },
+      allowedRoles: ['owner', 'admin', 'devops', 'viewer'],
     });
 
-    if (!vm) {
-      return res.status(404).json({ error: 'Virtual machine not found or unauthorized.' });
+    if (authResult.error) {
+      return res.status(authResult.status || 403).json({ error: authResult.error });
     }
+
+    const { vm } = authResult;
 
     if (vm.status === 'SUSPENDED') {
       return res.status(403).json({
@@ -1246,11 +1331,13 @@ export async function getConsoleSession(req, res) {
           const liveIp = live.IPAddresses.find((ip) => ip && ip !== '127.0.0.1' && !ip.includes(':'));
           if (liveIp) {
             targetIp = liveIp;
-            if (vm.ipPool && vm.ipPool.length > 0 && vm.ipPool[0].ipAddress !== liveIp) {
-              await prisma.iPPool.update({
-                where: { ipId: vm.ipPool[0].ipId },
-                data: { ipAddress: liveIp },
-              }).catch(() => {});
+            if (vm.ipPool && vm.ipPool.length > 0) {
+              if (vm.ipPool[0].ipAddress !== liveIp) {
+                await prisma.iPPool.update({
+                  where: { ipId: vm.ipPool[0].ipId },
+                  data: { ipAddress: liveIp },
+                }).catch(() => {});
+              }
             } else {
               await prisma.iPPool.create({
                 data: {
@@ -1319,6 +1406,8 @@ export async function getConsoleSession(req, res) {
     const ticket = jwt.sign(
       {
         userId,
+        effectiveUserId: vm.userId,
+        role: authResult.role,
         vmId,
         vmName: vm.vmName,
         ip: targetIp,
@@ -1364,10 +1453,11 @@ export async function getVMSnapshots(req, res) {
   try {
     const userId = req.user?.userId;
     const vmId = decodeResourceId(req.params.id);
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops', 'viewer'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 404).json({ error: authResult.error });
+    const { vm } = authResult;
 
     let snapshots = await prisma.vMSnapshot.findMany({
       where: { vmId, deletedAt: null },
@@ -1417,10 +1507,11 @@ export async function createVMSnapshot(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const { name, description } = req.body;
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     const snapName = (name || `Snapshot_${Date.now()}`).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
 
@@ -1463,10 +1554,11 @@ export async function restoreVMSnapshot(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const snapshotId = Number(req.params.snapshotId);
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     const snapshot = await prisma.vMSnapshot.findFirst({
       where: { snapshotId, vmId, deletedAt: null },
@@ -1501,10 +1593,11 @@ export async function deleteVMSnapshot(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const snapshotId = Number(req.params.snapshotId);
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     const snapshot = await prisma.vMSnapshot.findFirst({
       where: { snapshotId, vmId },
@@ -1552,10 +1645,11 @@ export async function resetVMPassword(req, res) {
       return res.status(400).json({ error: 'New password must be at least 6 characters' });
     }
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     // Update in Hyper-V Guest
     await hypervService.resetPassword({
@@ -1596,11 +1690,12 @@ export async function rebuildVMInstance(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const { imageId, adminPassword, adminUsername, sshPublicKey } = req.body;
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
       include: { image: true },
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     if (vm.status === 'SUSPENDED') {
       return res.status(403).json({
@@ -1678,8 +1773,7 @@ export async function getVMBackups(req, res) {
     const userId = req.user?.userId;
     const vmId = decodeResourceId(req.params.id);
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
       include: {
         plan: true,
         subscription: true,
@@ -1687,9 +1781,11 @@ export async function getVMBackups(req, res) {
           orderBy: { createdAt: 'desc' },
         },
       },
+      allowedRoles: ['owner', 'admin', 'devops', 'viewer'],
     });
 
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 404).json({ error: authResult.error });
+    const { vm } = authResult;
 
     const backupEnabled = Boolean(vm.backupEnabled);
     const backupsList = vm.backups || [];
@@ -1727,11 +1823,12 @@ export async function createVMBackup(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const { label } = req.body;
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
       include: { subscription: true },
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     let backupNewlySubscribed = false;
     let newMonthlyPrice = Number(vm.subscription?.monthlyPrice || 9.99);
@@ -1816,10 +1913,11 @@ export async function restoreVMBackup(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const backupId = req.params.backupId;
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     const backup = await prisma.backup.findFirst({
       where: { backupId: BigInt(backupId), vmId },
@@ -1862,10 +1960,11 @@ export async function deleteVMBackup(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const backupId = req.params.backupId;
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     const backup = await prisma.backup.findFirst({
       where: { backupId: BigInt(backupId), vmId },
@@ -1899,11 +1998,12 @@ export async function toggleVMBackups(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const { enabled } = req.body;
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
       include: { subscription: true },
+      allowedRoles: ['owner', 'admin'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     let currentPrice = Number(vm.subscription?.monthlyPrice || 9.99);
     let newPrice = currentPrice;
@@ -1963,10 +2063,11 @@ export async function getVMFirewall(req, res) {
     const userId = req.user?.userId;
     const vmId = decodeResourceId(req.params.id);
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops', 'viewer'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 404).json({ error: authResult.error });
+    const { vm } = authResult;
 
     const rules = firewallService.getRules(vmId);
     return res.json({ success: true, rules });
@@ -1985,10 +2086,11 @@ export async function addVMFirewallRule(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const { direction, protocol, port, cidr, action, description } = req.body;
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     const rule = firewallService.addRule(vmId, { direction, protocol, port, cidr, action, description });
 
@@ -2018,10 +2120,11 @@ export async function deleteVMFirewallRule(req, res) {
     const vmId = decodeResourceId(req.params.id);
     const ruleId = req.params.ruleId;
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId, status: { not: 'TERMINATED' } },
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops'],
     });
-    if (!vm) return res.status(404).json({ error: 'Virtual Machine not found' });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
 
     const deleted = firewallService.deleteRule(vmId, ruleId);
     if (!deleted) return res.status(404).json({ error: 'Firewall rule not found' });
@@ -2055,12 +2158,13 @@ export async function reactivateVMInstance(req, res) {
     const vmId = decodeResourceId(req.params.id);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId },
+    const authResult = await getAuthorizedVm(vmId, userId, {
       include: { subscription: true },
+      allowedRoles: ['owner', 'admin', 'billing'],
     });
 
-    if (!vm) return res.status(404).json({ error: 'Virtual machine not found.' });
+    if (authResult.error) return res.status(authResult.status || 404).json({ error: authResult.error });
+    const { vm } = authResult;
     if (!vm.subscriptionId) return res.status(400).json({ error: 'No subscription linked to this VM.' });
 
     const result = await reactivateSubscription(vm.subscriptionId, userId);

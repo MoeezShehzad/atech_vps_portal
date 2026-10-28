@@ -182,13 +182,33 @@ export function setupTerminalWebSocket(server) {
       return ws.close();
     }
 
-    const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId },
+    const vm = await prisma.virtualMachine.findUnique({
+      where: { vmId },
       include: { ipPool: true },
     });
 
-    if (!vm) {
+    if (!vm || vm.status === 'TERMINATED') {
       ws.send('\r\n\x1b[31m[ERROR] Virtual machine not found or access denied.\x1b[0m\r\n');
+      return ws.close();
+    }
+
+    // Verify authorized access: either direct owner, or active member of owner's organization
+    let hasAccess = vm.userId === userId;
+    if (!hasAccess) {
+      const membership = await prisma.organizationMember.findFirst({
+        where: {
+          userId,
+          status: 'active',
+          organization: { ownerId: vm.userId },
+        },
+      });
+      if (membership && membership.role !== 'billing') {
+        hasAccess = true;
+      }
+    }
+
+    if (!hasAccess) {
+      ws.send('\r\n\x1b[31m[ERROR] Unauthorized: You do not have permission to access this virtual machine terminal.\x1b[0m\r\n');
       return ws.close();
     }
 

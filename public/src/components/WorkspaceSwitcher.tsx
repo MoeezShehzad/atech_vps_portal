@@ -36,10 +36,16 @@ export default function WorkspaceSwitcher({
         const res = await apiCall('/company/my-organizations');
         if (res?.success && res?.organizations && isMounted) {
           setOrganizations(res.organizations);
-          // If user registered as company, automatically lock to their company workspace
-          if (isCompanyUser && res.organizations.length > 0) {
-            const firstOrg = res.organizations[0];
-            if (currentWorkspace === 'personal' || !currentWorkspace) {
+          // Auto-select first organization if:
+          // 1. User registered as company (strictly company workspace)
+          // 2. Or user has never selected a workspace yet and belongs to an organization
+          const savedWorkspace = localStorage.getItem('atech_active_workspace_org_id');
+          if (res.organizations.length > 0) {
+            if (isCompanyUser && (currentWorkspace === 'personal' || !currentWorkspace)) {
+              const firstOrg = res.organizations[0];
+              onSelectWorkspace(String(firstOrg.orgId), firstOrg.name, firstOrg.role);
+            } else if (!savedWorkspace && (currentWorkspace === 'personal' || !currentWorkspace)) {
+              const firstOrg = res.organizations[0];
               onSelectWorkspace(String(firstOrg.orgId), firstOrg.name, firstOrg.role);
             }
           }
