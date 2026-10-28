@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Building2, User, ChevronDown, Check, Sparkles } from 'lucide-react';
+import { Building2, User, ChevronDown, Check, Lock } from 'lucide-react';
 import { apiCall } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export interface WorkspaceOrg {
   orgId: number;
@@ -12,7 +13,7 @@ export interface WorkspaceOrg {
 }
 
 interface WorkspaceSwitcherProps {
-  currentWorkspace: string; // 'personal' or orgId string
+  currentWorkspace: string;
   onSelectWorkspace: (workspaceId: string, orgName?: string, role?: string) => void;
 }
 
@@ -20,9 +21,13 @@ export default function WorkspaceSwitcher({
   currentWorkspace,
   onSelectWorkspace,
 }: WorkspaceSwitcherProps) {
+  const { user } = useAuth();
   const [organizations, setOrganizations] = useState<WorkspaceOrg[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Check if current user is registered as a company
+  const isCompanyUser = user?.accountType === 'company' || Boolean(user?.companyName);
 
   useEffect(() => {
     let isMounted = true;
@@ -31,16 +36,23 @@ export default function WorkspaceSwitcher({
         const res = await apiCall('/company/my-organizations');
         if (res?.success && res?.organizations && isMounted) {
           setOrganizations(res.organizations);
+          // If user registered as company, automatically lock to their company workspace
+          if (isCompanyUser && res.organizations.length > 0) {
+            const firstOrg = res.organizations[0];
+            if (currentWorkspace === 'personal' || !currentWorkspace) {
+              onSelectWorkspace(String(firstOrg.orgId), firstOrg.name, firstOrg.role);
+            }
+          }
         }
       } catch (err) {
-        // Silent catch for individual accounts without organizations
+        // Silent catch for individual accounts
       }
     }
     loadOrgs();
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isCompanyUser]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -52,13 +64,13 @@ export default function WorkspaceSwitcher({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // If user has no organizations, don't show the switcher to keep individual views clean
+  // If user has no organizations, don't show the switcher
   if (!organizations || organizations.length === 0) {
     return null;
   }
 
-  const selectedOrg = organizations.find((o) => String(o.orgId) === String(currentWorkspace));
-  const isPersonal = !selectedOrg || currentWorkspace === 'personal';
+  const selectedOrg = organizations.find((o) => String(o.orgId) === String(currentWorkspace)) || organizations[0];
+  const isPersonal = !isCompanyUser && (!selectedOrg || currentWorkspace === 'personal');
 
   const roleBadges: Record<string, string> = {
     owner: 'Owner',
@@ -68,9 +80,28 @@ export default function WorkspaceSwitcher({
     billing: 'Billing',
   };
 
+  // If user is a company account, lock switcher to Company only (read-only pill with company name)
+  if (isCompanyUser) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-blue-50/90 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 shadow-2xs select-none">
+        <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center">
+          <Building2 className="w-3.5 h-3.5" />
+        </div>
+        <div className="flex items-center gap-1.5 max-w-[170px] sm:max-w-[220px] truncate">
+          <span className="truncate font-bold">
+            {selectedOrg?.name || user?.companyName || 'Company Organization'}
+          </span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] uppercase font-mono font-bold bg-blue-200/70 dark:bg-blue-900/80 text-blue-800 dark:text-blue-200">
+            {selectedOrg?.isOwner ? 'Owner' : 'Company'}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // For invited team members (who are not company owners themselves), allow switching between personal and invited orgs
   return (
     <div className="relative inline-block text-left" ref={containerRef}>
-      {/* Switcher Pill Button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -104,7 +135,6 @@ export default function WorkspaceSwitcher({
         <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
         <div className="absolute right-0 sm:left-0 mt-2 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden animate-fadeIn py-1.5">
           <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">

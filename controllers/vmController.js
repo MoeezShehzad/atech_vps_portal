@@ -24,7 +24,22 @@ import { encryptVmPassword, decryptVmPassword, encodeResourceId, decodeResourceI
  */
 // Helper to resolve effective target owner and role for multi-tenant workspace context
 async function resolveWorkspaceContext(req, userId) {
-  const orgHeader = req.headers['x-organization-id'] || req.query.orgId;
+  // Check if the user is registered as a company
+  const currentUser = await prisma.user.findUnique({
+    where: { userId },
+    select: { userId: true, accountType: true, companyName: true },
+  });
+  const isCompanyUser = currentUser?.accountType === 'company' || Boolean(currentUser?.companyName);
+
+  let orgHeader = req.headers['x-organization-id'] || req.query.orgId;
+  // If user registered as company, force them into their company organization context
+  if (isCompanyUser && (!orgHeader || orgHeader === 'personal')) {
+    const ownedOrg = await prisma.organization.findFirst({ where: { ownerId: userId } });
+    if (ownedOrg) {
+      orgHeader = String(ownedOrg.orgId);
+    }
+  }
+
   if (!orgHeader || orgHeader === 'personal') {
     return { effectiveUserId: userId, isOrgContext: false, memberRole: 'owner' };
   }
