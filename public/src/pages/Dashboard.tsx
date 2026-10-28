@@ -56,6 +56,7 @@ import Sidebar from '../components/Sidebar';
 import AccountSettings from '../components/AccountSettings';
 import NotificationBell from '../components/NotificationBell';
 import ThemeToggle from '../components/ThemeToggle';
+import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import { apiCall, setAccessToken } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import WindowsResourceGraph from '../components/WindowsResourceGraph';
@@ -209,6 +210,14 @@ export default function Dashboard() {
   }, [activeTab]);
 
   // Real-time server state from API
+  const [currentWorkspace, setCurrentWorkspace] = useState<string>(() => {
+    try {
+      return localStorage.getItem('atech_active_workspace_org_id') || 'personal';
+    } catch {
+      return 'personal';
+    }
+  });
+  const [currentMemberRole, setCurrentMemberRole] = useState<string>('owner');
   const [instances, setInstances] = useState<Instance[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -411,6 +420,17 @@ export default function Dashboard() {
   } | null>(null);
   const [useSavedMethodForTrial, setUseSavedMethodForTrial] = useState(true);
 
+  const handleWorkspaceSwitch = (workspaceId: string) => {
+    try {
+      localStorage.setItem('atech_active_workspace_org_id', workspaceId);
+    } catch {}
+    setCurrentWorkspace(workspaceId);
+    setIsLoading(true);
+    setTimeout(() => {
+      fetchVMs().finally(() => setIsLoading(false));
+    }, 50);
+  };
+
   // 1. Fetch user VMs, subscriptions and saved payment method from API
   const fetchVMs = useCallback(async () => {
     try {
@@ -418,6 +438,9 @@ export default function Dashboard() {
       if (data) {
         if (data.vms) setInstances(data.vms);
         if (data.activeSubscriptions) setActiveSubscriptions(data.activeSubscriptions);
+        if (data.currentWorkspace) {
+          setCurrentMemberRole(data.currentWorkspace.memberRole || 'owner');
+        }
       }
     } catch (err) {
       console.error('Failed to load user VMs:', err);
@@ -1503,6 +1526,12 @@ export default function Dashboard() {
                 )}
               </div>
               <div className="flex items-center gap-2.5">
+                {/* ENTERPRISE WORKSPACE / ORGANIZATION SWITCHER */}
+                <WorkspaceSwitcher
+                  currentWorkspace={currentWorkspace}
+                  onSelectWorkspace={handleWorkspaceSwitch}
+                />
+
                 {/* IN-APP REAL-TIME NOTIFICATION BELL */}
                 <NotificationBell />
 

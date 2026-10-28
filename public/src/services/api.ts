@@ -69,12 +69,19 @@ export const apiCall = async (
     endpoint === '/auth/logout';
 
   const makeRequest = async (token: string | null) => {
+    const activeOrgId = localStorage.getItem('atech_active_workspace_org_id');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
 
       ...(token && !isAuthEndpoint
         ? {
             Authorization: `Bearer ${token}`,
+          }
+        : {}),
+
+      ...(activeOrgId && activeOrgId !== 'personal'
+        ? {
+            'X-Organization-Id': activeOrgId,
           }
         : {}),
 

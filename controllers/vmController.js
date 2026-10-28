@@ -22,6 +22,33 @@ import { encryptVmPassword, decryptVmPassword, encodeResourceId, decodeResourceI
 /**
  * 1. GET /api/vms - Get all VMs for current user
  */
+// Helper to resolve effective target owner and role for multi-tenant workspace context
+async function resolveWorkspaceContext(req, userId) {
+  const orgHeader = req.headers['x-organization-id'] || req.query.orgId;
+  if (!orgHeader || orgHeader === 'personal') {
+    return { effectiveUserId: userId, isOrgContext: false, memberRole: 'owner' };
+  }
+  const orgId = parseInt(orgHeader, 10);
+  if (isNaN(orgId)) {
+    return { effectiveUserId: userId, isOrgContext: false, memberRole: 'owner' };
+  }
+  const org = await prisma.organization.findUnique({
+    where: { orgId },
+    include: { members: { where: { userId, status: 'active' } } },
+  });
+  if (!org) {
+    return { effectiveUserId: userId, isOrgContext: false, memberRole: 'owner' };
+  }
+  if (org.ownerId === userId) {
+    return { effectiveUserId: org.ownerId, isOrgContext: true, memberRole: 'owner', org };
+  }
+  const member = org.members[0];
+  if (member) {
+    return { effectiveUserId: org.ownerId, isOrgContext: true, memberRole: member.role, org };
+  }
+  return { effectiveUserId: userId, isOrgContext: false, memberRole: 'owner' };
+}
+
 export async function getUserVMs(req, res) {
   try {
     const userId = req.user?.userId;
@@ -29,9 +56,11 @@ export async function getUserVMs(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    const { effectiveUserId, isOrgContext, memberRole, org } = await resolveWorkspaceContext(req, userId);
+
     const vms = await prisma.virtualMachine.findMany({
       where: {
-        userId,
+        userId: effectiveUserId,
         status: { not: 'TERMINATED' },
       },
       include: {
@@ -154,7 +183,7 @@ export async function getUserVMs(req, res) {
     const now = new Date();
     const activeSubscriptions = await prisma.subscription.findMany({
       where: {
-        userId,
+        userId: effectiveUserId,
         status: { in: ['ACTIVE', 'TRIAL'] },
         endDate: { gt: now },
       },
@@ -242,6 +271,12 @@ export async function getUserVMs(req, res) {
       count: formatted.length,
       vms: formatted,
       activeSubscriptions: activeSubsFormatted,
+      currentWorkspace: {
+        isOrgContext,
+        orgId: org?.orgId || null,
+        orgName: org?.name || null,
+        memberRole,
+      },
     });
   } catch (error) {
     console.error('[VM Controller] Error fetching user VMs:', error);
@@ -608,8 +643,15 @@ export async function powerAction(req, res) {
       return res.status(400).json({ error: 'Invalid power action. Allowed: START, STOP, RESTART, FORCE_STOP, PAUSE, RESUME' });
     }
 
+    const { effectiveUserId, isOrgContext, memberRole } = await resolveWorkspaceContext(req, userId);
+    if (isOrgContext && memberRole === 'viewer') {
+      return res.status(403).json({ error: 'Access Denied: Viewers have read-only access and cannot execute power actions.' });
+    }
+    if (isOrgContext && memberRole === 'billing') {
+      return res.status(403).json({ error: 'Access Denied: Billing specialists cannot execute VM operations.' });
+    }
     const vm = await prisma.virtualMachine.findFirst({
-      where: { vmId, userId },
+      where: { vmId, userId: effectiveUserId },
       include: { subscription: true },
     });
 

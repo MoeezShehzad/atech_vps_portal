@@ -1216,12 +1216,69 @@ export async function sendReactivationSuccessEmail({ email, fullName, vmName, pl
   }
 }
 
+
+/**
+ * Team Member Organization Invitation Email
+ */
+export async function sendTeamInvitationEmail({
+  email,
+  inviterName,
+  companyName,
+  role,
+  inviteToken,
+  isExistingUser,
+}) {
+  const loginUrl = `${APP_URL}/login?returnTo=/dashboard`;
+  const signupUrl = `${APP_URL}/signup?email=${encodeURIComponent(email)}&invite=${inviteToken}`;
+  const targetUrl = isExistingUser ? loginUrl : signupUrl;
+
+  const roleLabels = {
+    admin: 'Administrator (Full Access)',
+    devops: 'DevOps / Engineer (Operations & SSH)',
+    viewer: 'Viewer / Auditor (Read Only)',
+    billing: 'Billing Specialist (Finance & Invoices)',
+  };
+  const roleDisplay = roleLabels[role] || role;
+
+  const html = wrapEmailTemplate({
+    title: `You have been invited to join ${escapeHtml(companyName)}`,
+    subtitle: `Hi there,`,
+    categoryBadge: 'Team Invitation',
+    contentHtml: `
+      <p style="margin-top:0;"><strong>${escapeHtml(inviterName)}</strong> has invited you to join the <strong>${escapeHtml(companyName)}</strong> organization on the ATC Cloud Platform.</p>
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:20px 0;">
+        <p style="margin:0 0 8px 0;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Assigned Role</p>
+        <p style="margin:0;font-size:15px;color:#0f172a;font-weight:bold;">${escapeHtml(roleDisplay)}</p>
+      </div>
+      <p>${isExistingUser ? "You can sign in with your existing ATC Cloud credentials to access company servers and collaborative resources." : "Click below to complete your registration and join your team on ATC Cloud."}</p>
+      <p style="font-size:13px;color:#64748b;margin-bottom:0;">If you were not expecting this invitation, you can safely ignore this email.</p>
+    `,
+    ctaText: isExistingUser ? 'Sign In to Console' : 'Accept Invitation & Sign Up',
+    ctaUrl: targetUrl,
+  });
+
+  try {
+    const info = await transporterNoReply.sendMail({
+      from: `"ATC Cloud Teams" <${NOREPLY_EMAIL}>`,
+      to: email,
+      subject: `Invitation: Join ${companyName} on ATC Cloud`,
+      html,
+    });
+    console.log(`[No-Reply] Team invitation email dispatched to ${email} (ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[No-Reply Error] Team invitation email failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
 export default {
   transporterSupport,
   transporterNoReply,
   transporterBilling,
   transporterAlerts,
   sendVerificationEmail,
+  sendTeamInvitationEmail,
   sendPasswordResetEmail,
   sendVmProvisionedEmail,
   sendContactFormNotification,

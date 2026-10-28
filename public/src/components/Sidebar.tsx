@@ -55,12 +55,12 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    ...(isCompany ? [{ id: 'team', label: 'Team Management', icon: Users }] : []),
     { id: 'marketplace', label: '1-Click Marketplace', icon: Boxes },
     { id: 'storage', label: 'Storage & Disk', icon: HardDrive },
     { id: 'billing', label: 'Billing & Invoices', icon: CreditCard },
     { id: 'security', label: 'Security & Logs', icon: Shield },
     { id: 'support', label: 'Support & Helpdesk', icon: LifeBuoy },
+    ...(isCompany ? [{ id: 'team', label: 'Team Management', icon: Users }] : []),
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

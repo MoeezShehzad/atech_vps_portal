@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import prisma from '../lib/prisma.js';
-import { sendVerificationEmail } from '../services/emailService.js';
+import { sendVerificationEmail, sendTeamInvitationEmail } from '../services/emailService.js';
 
 /**
  * Helper to retrieve or automatically initialize the user's organization.
@@ -327,11 +327,24 @@ export const inviteCompanyMember = async (req, res) => {
       },
     });
 
+    // Dispatch team invitation email via Corporate SMTP
+    const inviterName = org.owner.fullName || "Your Team Administrator";
+    sendTeamInvitationEmail({
+      email: normalizedEmail,
+      inviterName,
+      companyName: org.name,
+      role: newMember.role,
+      inviteToken,
+      isExistingUser: !!existingUser,
+    }).catch((emailErr) => {
+      console.error("[Team Invite Email Dispatch Warning]:", emailErr);
+    });
+
     return res.status(201).json({
       success: true,
       message: existingUser
-        ? `Added ${existingUser.fullName} directly to your organization team!`
-        : `Invitation created for ${normalizedEmail}.`,
+        ? `Added ${existingUser.fullName} directly to your organization team! An email notification has been sent.`
+        : `Invitation email sent to ${normalizedEmail}.`,
       member: {
         memberId: newMember.memberId,
         userId: newMember.userId,
@@ -444,5 +457,75 @@ export const removeCompanyMember = async (req, res) => {
   } catch (err) {
     console.error('[removeCompanyMember Error]:', err);
     return res.status(500).json({ error: 'Failed to remove team member.' });
+  }
+};
+
+/**
+ * GET /api/company/my-organizations
+ * Returns all organizations the current user belongs to (as owner or active member).
+ */
+export const getMyOrganizations = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    // 1. Find orgs owned by user
+    const owned = await prisma.organization.findMany({
+      where: { ownerId: userId },
+      include: {
+        owner: { select: { userId: true, fullName: true, email: true } },
+        _count: { select: { members: true } },
+      },
+    });
+
+    // 2. Find orgs where user is active member
+    const memberships = await prisma.organizationMember.findMany({
+      where: { userId, status: 'active' },
+      include: {
+        organization: {
+          include: {
+            owner: { select: { userId: true, fullName: true, email: true } },
+            _count: { select: { members: true } },
+          },
+        },
+      },
+    });
+
+    const orgMap = new Map();
+    
+    // Add owned
+    owned.forEach((o) => {
+      orgMap.set(o.orgId, {
+        orgId: o.orgId,
+        name: o.name,
+        role: 'owner',
+        isOwner: true,
+        ownerId: o.ownerId,
+        ownerName: o.owner.fullName,
+        memberCount: o._count.members,
+      });
+    });
+
+    // Add member orgs
+    memberships.forEach((m) => {
+      if (!orgMap.has(m.orgId)) {
+        orgMap.set(m.orgId, {
+          orgId: m.orgId,
+          name: m.organization.name,
+          role: m.role,
+          isOwner: m.organization.ownerId === userId,
+          ownerId: m.organization.ownerId,
+          ownerName: m.organization.owner.fullName,
+          memberCount: m.organization._count.members,
+        });
+      }
+    });
+
+    return res.json({
+      success: true,
+      organizations: Array.from(orgMap.values()),
+    });
+  } catch (err) {
+    console.error('[getMyOrganizations Error]:', err);
+    return res.status(500).json({ error: 'Failed to retrieve organizations.' });
   }
 };
