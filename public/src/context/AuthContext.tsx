@@ -20,6 +20,9 @@ export interface User {
   zip?: string;
   postal_code?: string;
   country?: string;
+  accountType?: 'individual' | 'company' | 'developer' | 'student';
+  companyName?: string;
+  companySize?: string;
   role?: string;
   roles?: string[];
   avatarUrl?: string;

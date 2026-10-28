@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Mail, Lock, User, ArrowRight, ArrowLeft, Eye, EyeOff,
   AlertCircle, ShieldCheck, CheckCircle2, RefreshCw, Loader2, Sparkles,
-  Server, HardDrive, Zap, Shield, ChevronRight
+  Server, HardDrive, Zap, Shield, ChevronRight, Building2, Code2, GraduationCap
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiCall, setAccessToken, API_BASE_URL } from '../services/api';
@@ -12,6 +12,8 @@ import OtpInput from '../components/OtpInput';
 import {
   ModernFloatingInput,
   ModernCountrySelect,
+  ModernAccountTypeSelect,
+  ModernCompanySizeSelect,
   type CountryOption
 } from '../components/ModernFormControls';
 
@@ -98,6 +100,9 @@ export default function Auth({ initialMode }: AuthProps) {
   // Sign Up States
   // -------------------------------------------------------------
   const [fullName, setFullName] = useState('');
+  const [accountType, setAccountType] = useState<'individual' | 'company' | 'developer' | 'student'>('individual');
+  const [companyName, setCompanyName] = useState('');
+  const [companySize, setCompanySize] = useState('10-49');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [showSignupPassword, setShowSignupPassword] = useState(false);
@@ -223,6 +228,18 @@ export default function Auth({ initialMode }: AuthProps) {
     setSignupLoading(true);
     try {
       const normalized = signupEmail.trim().toLowerCase();
+      if (accountType === 'company') {
+        if (!companyName.trim()) {
+          setSignupError('Please enter your Company / Organization name.');
+          setSignupLoading(false);
+          return;
+        }
+        if (!companySize) {
+          setSignupError('Please select your organization size.');
+          setSignupLoading(false);
+          return;
+        }
+      }
       const res = await apiCall('/auth/register', {
         method: 'POST',
         body: JSON.stringify({
@@ -231,6 +248,9 @@ export default function Auth({ initialMode }: AuthProps) {
           password: signupPassword,
           country: currentCountry.name,
           countryCode: currentCountry.code,
+          accountType,
+          companyName: accountType === 'company' ? companyName.trim() : undefined,
+          companySize: accountType === 'company' ? companySize : undefined,
         }),
       });
 
@@ -461,28 +481,18 @@ export default function Auth({ initialMode }: AuthProps) {
               }`}
             >
               <div className="max-w-md w-full mx-auto space-y-5">
-                {/* Interactive Pill Switcher inside Desktop Form */}
-                <div className="hidden lg:flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 text-[11px] font-bold uppercase tracking-wider border border-blue-200/60 dark:border-blue-800/60">
-                    <ShieldCheck className="w-3.5 h-3.5" /> Console Authentication
-                  </span>
+                <div className="flex items-center justify-between">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-poppins tracking-tight">
+                    Sign In
+                  </h1>
                   <button
                     type="button"
                     onClick={() => switchMode('signup')}
                     className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 cursor-pointer group"
                   >
-                    New user? Create Account
+                    New user? Sign Up
                     <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                   </button>
-                </div>
-
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-poppins tracking-tight">
-                    Welcome back
-                  </h1>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    Sign in to manage your virtual private servers and cloud network.
-                  </p>
                 </div>
 
                 {/* SSO Federated Login Button */}
@@ -777,27 +787,18 @@ export default function Auth({ initialMode }: AuthProps) {
                 ) : (
                   /* SIGN UP FORM */
                   <div className="space-y-4">
-                    <div className="hidden lg:flex items-center justify-between">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 text-[11px] font-bold uppercase tracking-wider border border-cyan-200/60 dark:border-cyan-800/60">
-                        <Sparkles className="w-3.5 h-3.5" /> Enterprise Cloud Account
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-poppins tracking-tight">
+                        Sign Up
+                      </h2>
                       <button
                         type="button"
                         onClick={() => switchMode('login')}
                         className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 cursor-pointer group"
                       >
-                        <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
                         Already registered? Sign In
+                        <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                       </button>
-                    </div>
-
-                    <div>
-                      <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-poppins tracking-tight">
-                        Create your cloud account
-                      </h2>
-                      <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                        Deploy enterprise SSD servers in seconds with zero setup fees.
-                      </p>
                     </div>
 
                     {/* Federated SSO */}
@@ -822,7 +823,7 @@ export default function Auth({ initialMode }: AuthProps) {
                       </div>
                       <div className="relative flex justify-center text-[11px] uppercase tracking-wider">
                         <span className="bg-white dark:bg-slate-900 px-3 text-slate-400 font-semibold">
-                          Or register with work email
+                          Or register with email
                         </span>
                       </div>
                     </div>
@@ -835,6 +836,7 @@ export default function Auth({ initialMode }: AuthProps) {
                     )}
 
                     <form className="space-y-3.5" onSubmit={handleSignupSubmit}>
+                      {/* 1. Full Legal Name & Country (Top Row) */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <ModernFloatingInput
                           id="signup-fullname"
@@ -858,10 +860,43 @@ export default function Auth({ initialMode }: AuthProps) {
                         />
                       </div>
 
+                      {/* 2. Account Type Dropdown (Directly below Full Name & Country) */}
+                      <ModernAccountTypeSelect
+                        label="Account Type"
+                        value={accountType}
+                        onChange={(val) => setAccountType(val)}
+                        required
+                      />
+
+                      {/* 3. Conditional Company Fields (Company Name + People / Size Dropdown) */}
+                      {accountType === 'company' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 transition-all animate-fadeIn">
+                          <ModernFloatingInput
+                            id="signup-company"
+                            name="company"
+                            label="Company Name"
+                            type="text"
+                            required
+                            value={companyName}
+                            onChange={(e) => setCompanyName(e.target.value)}
+                            icon={<Building2 className="h-4 w-4" />}
+                            placeholder="Acme Corporation Ltd."
+                            autoComplete="organization"
+                          />
+
+                          <ModernCompanySizeSelect
+                            label="Company Size"
+                            value={companySize}
+                            onChange={(val) => setCompanySize(val)}
+                            required
+                          />
+                        </div>
+                      )}
+
                       <ModernFloatingInput
                         id="signup-email"
                         name="username"
-                        label="Work Email Address"
+                        label="Email Address"
                         type="email"
                         required
                         value={signupEmail}
@@ -952,16 +987,16 @@ export default function Auth({ initialMode }: AuthProps) {
 
                       <button
                         type="submit"
-                        disabled={signupLoading}
-                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-sm transition-all shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        disabled={signupLoading || !agreeTerms}
+                        className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
                       >
                         {signupLoading ? (
                           <>
-                            <Loader2 className="w-4 h-4 animate-spin" /> Creating Cloud Account...
+                            <Loader2 className="w-4 h-4 animate-spin" /> Creating Account...
                           </>
                         ) : (
                           <>
-                            Create Cloud Account <ArrowRight className="w-4 h-4" />
+                            Create Account <ArrowRight className="w-4 h-4" />
                           </>
                         )}
                       </button>

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, ChevronDown, ChevronUp, Check, Loader2 } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Check, Loader2, User, Building2, Code2, GraduationCap } from 'lucide-react';
 
 export interface CountryOption {
   id?: number;
@@ -830,6 +830,214 @@ export function ModernCitySelect({
             )}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ==============================================================================
+// Modern Account Type / Role Dropdown Selector (Clean Microsoft Style)
+// ==============================================================================
+export interface ModernAccountTypeSelectProps {
+  label?: string;
+  value: 'individual' | 'company' | 'developer' | 'student';
+  onChange: (value: 'individual' | 'company' | 'developer' | 'student') => void;
+  required?: boolean;
+  error?: string;
+}
+
+export function ModernAccountTypeSelect({
+  label = "Account Type",
+  value,
+  onChange,
+  required = true,
+  error,
+}: ModernAccountTypeSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const options: { value: 'individual' | 'company' | 'developer' | 'student'; label: string }[] = [
+    { value: 'individual', label: 'Individual / Personal' },
+    { value: 'company', label: 'Company / Business' },
+    { value: 'developer', label: 'Developer / Freelancer' },
+    { value: 'student', label: 'Student / Academic' },
+  ];
+
+  const selected = options.find((o) => o.value === value) || options[0];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className={`relative flex items-center justify-between w-full bg-white dark:bg-slate-900 border rounded-xl px-3.5 py-3 cursor-pointer select-none transition-all duration-200 ${
+          error
+            ? 'border-rose-400 ring-2 ring-rose-500/10 dark:border-rose-500'
+            : isOpen
+            ? 'border-blue-600 dark:border-blue-500 ring-3 ring-blue-600/15 dark:ring-blue-500/20 shadow-xs'
+            : 'border-slate-300 dark:border-slate-700/80 hover:border-slate-400 dark:hover:border-slate-600'
+        }`}
+      >
+        <span className="absolute -top-2.5 left-3 px-1.5 bg-white dark:bg-slate-900 text-[11px] font-semibold text-slate-700 dark:text-slate-300 leading-none rounded z-10">
+          {label} {required && <span className="text-rose-500">*</span>}
+        </span>
+
+        <span className="text-sm font-medium text-slate-900 dark:text-white truncate">
+          {selected.label}
+        </span>
+
+        <div className="shrink-0 text-slate-500 dark:text-slate-400 ml-2">
+          {isOpen ? (
+            <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 transition-transform" />
+          ) : (
+            <ChevronDown className="w-4 h-4 transition-transform" />
+          )}
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 overflow-hidden animate-fadeIn py-1">
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <div
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
+                  isSelected
+                    ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
+                }`}
+              >
+                <span>{opt.label}</span>
+                {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {error && (
+        <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-400 font-medium pl-1 animate-fadeIn">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ==============================================================================
+// Modern Company Size Dropdown Selector (Microsoft Registration Style)
+// ==============================================================================
+export interface ModernCompanySizeSelectProps {
+  label?: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  error?: string;
+}
+
+export function ModernCompanySizeSelect({
+  label = "Organization Size",
+  value,
+  onChange,
+  required = true,
+  error,
+}: ModernCompanySizeSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const options = [
+    { value: '1', label: '1 person (Solo / Founder)' },
+    { value: '2-9', label: '2 - 9 people' },
+    { value: '10-49', label: '10 - 49 people' },
+    { value: '50-249', label: '50 - 249 people' },
+    { value: '250-999', label: '250 - 999 people' },
+    { value: '1000+', label: '1,000+ people (Enterprise)' },
+  ];
+
+  const selected = options.find((o) => o.value === value);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative w-full" ref={containerRef}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className={`relative flex items-center justify-between w-full bg-white dark:bg-slate-900 border rounded-xl px-3.5 py-3 cursor-pointer select-none transition-all duration-200 ${
+          error
+            ? 'border-rose-400 ring-2 ring-rose-500/10 dark:border-rose-500'
+            : isOpen
+            ? 'border-blue-600 dark:border-blue-500 ring-3 ring-blue-600/15 dark:ring-blue-500/20 shadow-xs'
+            : 'border-slate-300 dark:border-slate-700/80 hover:border-slate-400 dark:hover:border-slate-600'
+        }`}
+      >
+        <span className="absolute -top-2.5 left-3 px-1.5 bg-white dark:bg-slate-900 text-[11px] font-semibold text-slate-700 dark:text-slate-300 leading-none rounded z-10">
+          {label} {required && <span className="text-rose-500">*</span>}
+        </span>
+
+        <span className={`text-sm truncate ${selected ? 'font-medium text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>
+          {selected ? selected.label : 'Select company size...'}
+        </span>
+
+        <div className="shrink-0 text-slate-500 dark:text-slate-400 ml-2">
+          {isOpen ? (
+            <ChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400 transition-transform" />
+          ) : (
+            <ChevronDown className="w-4 h-4 transition-transform" />
+          )}
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-50 overflow-hidden animate-fadeIn py-1 max-h-56 overflow-y-auto">
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <div
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`flex items-center justify-between px-3.5 py-2.5 text-sm cursor-pointer transition-colors ${
+                  isSelected
+                    ? 'bg-blue-50/80 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-semibold'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
+                }`}
+              >
+                <span>{opt.label}</span>
+                {isSelected && <Check className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {error && (
+        <p className="mt-1 text-[11px] text-rose-600 dark:text-rose-400 font-medium pl-1 animate-fadeIn">
+          {error}
+        </p>
       )}
     </div>
   );
