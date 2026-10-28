@@ -42,6 +42,8 @@ model User {
   sshKeys         SSHKey[]
   managedWebsites ManagedWebsite[]
   policyVersions  LegalPolicyVersion[]
+  ownedOrganizations Organization[]  @relation("OrgOwner")
+  orgMemberships     OrganizationMember[]
 
   @@map("Users")
 }
@@ -523,4 +525,41 @@ model LegalPolicyVersion {
   @@index([policyType, isCurrent], map: "ix_policy_type_current")
   @@index([policyType, version], map: "ix_policy_type_version")
   @@map("Legal_Policy_Versions")
+}
+
+model Organization {
+  orgId        Int      @id @default(autoincrement()) @map("org_id")
+  name         String   @db.NVarChar(150)
+  ownerId      Int      @map("owner_id")
+  companySize  String?  @map("company_size") @db.NVarChar(50)
+  billingEmail String?  @map("billing_email") @db.NVarChar(255)
+  taxId        String?  @map("tax_id") @db.NVarChar(50)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  owner   User                 @relation("OrgOwner", fields: [ownerId], references: [userId], onDelete: Cascade, onUpdate: NoAction)
+  members OrganizationMember[]
+
+  @@index([ownerId], map: "IX_Organizations_Owner")
+  @@map("Organizations")
+}
+
+model OrganizationMember {
+  memberId     Int       @id @default(autoincrement()) @map("member_id")
+  orgId        Int       @map("org_id")
+  userId       Int?      @map("user_id")
+  invitedEmail String    @map("invited_email") @db.NVarChar(255)
+  role         String    @default("devops") @map("role") @db.NVarChar(50)
+  status       String    @default("invited") @map("status") @db.NVarChar(30)
+  inviteToken  String?   @map("invite_token") @db.NVarChar(255)
+  invitedAt    DateTime  @default(now()) @map("invited_at")
+  joinedAt     DateTime? @map("joined_at")
+
+  organization Organization @relation(fields: [orgId], references: [orgId], onDelete: Cascade, onUpdate: NoAction)
+  user         User?        @relation(fields: [userId], references: [userId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([orgId], map: "IX_OrgMembers_Org")
+  @@index([userId], map: "IX_OrgMembers_User")
+  @@index([invitedEmail], map: "IX_OrgMembers_Email")
+  @@map("OrganizationMembers")
 }

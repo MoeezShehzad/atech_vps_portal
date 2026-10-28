@@ -70,6 +70,7 @@ const BillingAndInvoices = React.lazy(() => import('../components/BillingAndInvo
 const ConnectionGuideModal = React.lazy(() => import('../components/ConnectionGuideModal'));
 const SupportAndTickets = React.lazy(() => import('../components/SupportAndTickets'));
 const OneClickMarketplace = React.lazy(() => import('../components/OneClickMarketplace'));
+const TeamManagement = React.lazy(() => import('../components/TeamManagement'));
 
 interface Instance {
   id: string;
@@ -1356,6 +1357,17 @@ export default function Dashboard() {
               Exit Impersonation
             </button>
           </div>
+        )}
+
+        {/* RENDER TEAM MANAGEMENT (COMPANY ACCOUNTS) */}
+        {activeTab === 'team' && (
+          <React.Suspense fallback={
+            <div className="py-20 flex justify-center">
+              <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+            </div>
+          }>
+            <TeamManagement />
+          </React.Suspense>
         )}
 
         {/* RENDER ACCOUNT SETTINGS WHEN TAB IS SETTINGS */}
