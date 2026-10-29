@@ -202,13 +202,13 @@ export function setupTerminalWebSocket(server) {
           organization: { ownerId: vm.userId },
         },
       });
-      if (membership && membership.role !== 'billing') {
+      if (membership && ['owner', 'admin', 'devops'].includes(membership.role)) {
         hasAccess = true;
       }
     }
 
     if (!hasAccess) {
-      ws.send('\r\n\x1b[31m[ERROR] Unauthorized: You do not have permission to access this virtual machine terminal.\x1b[0m\r\n');
+      ws.send('\r\n\x1b[31m[ERROR] Access Denied: Interactive console sessions are restricted to DevOps and Admin roles under CIA Security Policy.\x1b[0m\r\n');
       return ws.close();
     }
 

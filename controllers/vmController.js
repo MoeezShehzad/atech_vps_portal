@@ -31,7 +31,7 @@ async function resolveWorkspaceContext(req, userId) {
   });
   const isCompanyUser = currentUser?.accountType === 'company' || Boolean(currentUser?.companyName);
 
-  let orgHeader = req.headers['x-organization-id'] || req.query.orgId;
+  let orgHeader = req?.headers?.['x-organization-id'] || req?.query?.orgId;
   // If user registered as company, force them into their company organization context
   if (isCompanyUser && (!orgHeader || orgHeader === 'personal')) {
     const ownedOrg = await prisma.organization.findFirst({ where: { ownerId: userId } });
@@ -333,7 +333,11 @@ export async function getUserVMs(req, res) {
         hasPublicIp: Boolean(hasDedicatedPublicIp),
         ip: assignedIp,
         adminUser: vm.adminUser || ((vm.image?.osFamily?.toLowerCase().includes('win') || vm.image?.name?.toLowerCase().includes('win')) ? 'user' : 'ubuntu'),
-        adminPassword: (vm.image?.osFamily?.toLowerCase().includes('win') || vm.image?.name?.toLowerCase().includes('win') || vm.adminUser === 'user') ? (decryptVmPassword(vm.adminPassword) ?? '') : (decryptVmPassword(vm.adminPassword) || 'root'),
+        adminPassword: (isOrgContext && memberRole === 'viewer')
+          ? '••••••••••••'
+          : ((vm.image?.osFamily?.toLowerCase().includes('win') || vm.image?.name?.toLowerCase().includes('win') || vm.adminUser === 'user')
+            ? (decryptVmPassword(vm.adminPassword) ?? '')
+            : (decryptVmPassword(vm.adminPassword) || 'root')),
         os: vm.image?.name || 'Ubuntu 24.04 LTS',
         status: vm.status ? vm.status.toLowerCase() : 'stopped',
         isSuspended: vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED',
@@ -1286,7 +1290,7 @@ export async function getConsoleSession(req, res) {
 
     const authResult = await getAuthorizedVm(vmId, userId, {
       include: { ipPool: true, image: true },
-      allowedRoles: ['owner', 'admin', 'devops', 'viewer'],
+      allowedRoles: ['owner', 'admin', 'devops'], // Viewers strictly restricted under CIA Confidentiality & Integrity
     });
 
     if (authResult.error) {
@@ -2160,7 +2164,7 @@ export async function reactivateVMInstance(req, res) {
 
     const authResult = await getAuthorizedVm(vmId, userId, {
       include: { subscription: true },
-      allowedRoles: ['owner', 'admin', 'billing'],
+      allowedRoles: ['owner', 'admin'],
     });
 
     if (authResult.error) return res.status(authResult.status || 404).json({ error: authResult.error });

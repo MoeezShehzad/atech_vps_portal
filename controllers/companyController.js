@@ -310,7 +310,7 @@ export const inviteCompanyMember = async (req, res) => {
         orgId: org.orgId,
         userId: existingUser ? existingUser.userId : null,
         invitedEmail: normalizedEmail,
-        role: ['admin', 'devops', 'viewer', 'billing'].includes(role) ? role : 'devops',
+        role: ['admin', 'devops', 'viewer'].includes(role) ? role : 'devops',
         status: existingUser ? 'active' : 'invited',
         inviteToken,
         joinedAt: existingUser ? new Date() : null,
@@ -374,7 +374,7 @@ export const updateMemberRole = async (req, res) => {
     const { memberId } = req.params;
     const { role } = req.body;
 
-    const validRoles = ['admin', 'devops', 'viewer', 'billing'];
+    const validRoles = ['admin', 'devops', 'viewer'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: 'Invalid role selected.' });
     }

@@ -26,7 +26,7 @@ export interface CompanyMember {
   fullName: string;
   email: string;
   avatarUrl: string | null;
-  role: 'owner' | 'admin' | 'devops' | 'viewer' | 'billing';
+  role: 'owner' | 'admin' | 'devops' | 'viewer';
   status: 'active' | 'invited' | 'revoked';
   invitedAt: string;
   joinedAt: string | null;
@@ -60,7 +60,7 @@ const ROLE_DEFINITIONS = [
     badge: 'Full Access',
     icon: Shield,
     color: 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800',
-    description: 'Can manage all servers, invite and remove members, update company billing.',
+    description: 'Can manage all servers, deploy instances, invite and remove members, and update company settings.',
   },
   {
     id: 'devops',
@@ -68,23 +68,15 @@ const ROLE_DEFINITIONS = [
     badge: 'Operations',
     icon: Terminal,
     color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800',
-    description: 'Can reboot, power, access SSH web console, and view performance telemetry.',
+    description: 'Can reboot, power on/off, launch SSH web console & RDP desktop, take checkpoints, and configure firewalls.',
   },
   {
     id: 'viewer',
     label: 'Viewer / Auditor',
-    badge: 'Read Only',
+    badge: 'Read Only (CIA)',
     icon: Eye,
     color: 'text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700',
-    description: 'Read-only view of cloud servers and monitoring metrics. Cannot run commands.',
-  },
-  {
-    id: 'billing',
-    label: 'Billing Specialist',
-    badge: 'Finance',
-    icon: CreditCard,
-    color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800',
-    description: 'Access invoices, payment receipts, and monthly expense statements only.',
+    description: 'Read-only monitoring of cloud servers, performance telemetry, and security audit logs. Cannot open terminal or modify servers.',
   },
 ];
 
@@ -98,7 +90,7 @@ export default function TeamManagement() {
   // Invite Modal State
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'admin' | 'devops' | 'viewer' | 'billing'>('devops');
+  const [inviteRole, setInviteRole] = useState<'admin' | 'devops' | 'viewer'>('devops');
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState('');
 
@@ -388,7 +380,6 @@ export default function TeamManagement() {
                           <option value="admin">Admin</option>
                           <option value="devops">DevOps / Engineer</option>
                           <option value="viewer">Viewer / Auditor</option>
-                          <option value="billing">Billing Specialist</option>
                         </select>
                       ) : (
                         <span className="font-semibold text-slate-700 dark:text-slate-300 capitalize">

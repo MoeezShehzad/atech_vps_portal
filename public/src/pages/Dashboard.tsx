@@ -1998,6 +1998,10 @@ export default function Dashboard() {
                                       {reactivatingVmId === inst.vmId && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                                       Reactivate
                                     </button>
+                                  ) : currentMemberRole === 'viewer' ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 select-none" title="Viewer role: Read-only monitoring (CIA Security Policy)">
+                                      <Eye className="w-3.5 h-3.5" /> Read-Only
+                                    </span>
                                   ) : (
                                   <>
                                 {/* POWER BUTTON */}
@@ -2089,7 +2093,8 @@ export default function Dashboard() {
                                   <Boxes className="w-3.5 h-3.5" />
                                 </button>
 
-                                {/* RESIZE SPECS BUTTON */}
+                                {/* RESIZE SPECS BUTTON (Owner & Admin only) */}
+                                {(currentMemberRole === 'owner' || currentMemberRole === 'admin') && (
                                 <button
                                   onClick={(e) => openResizeModal(inst, e)}
                                   title="Scale CPU & RAM Specs"
@@ -2097,10 +2102,12 @@ export default function Dashboard() {
                                 >
                                   <Sliders className="w-3.5 h-3.5" />
                                 </button>
+                                )}
                                   </>
                                 )}
                                 
-                                {/* DELETE ACTION BUTTON */}
+                                {/* DELETE ACTION BUTTON (Owner & Admin only) */}
+                                {(currentMemberRole === 'owner' || currentMemberRole === 'admin') && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -2111,6 +2118,7 @@ export default function Dashboard() {
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -3706,33 +3714,44 @@ export default function Dashboard() {
                   <div className="p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl flex items-center justify-between">
                     <span className="text-slate-500 dark:text-slate-400">Pass:</span>
                     <div className="flex items-center gap-1.5 font-mono">
-                      <strong className="text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[11px]">
-                        {selectedInstance.os?.toLowerCase().includes('win') && !selectedInstance.adminPassword ? 'None (Direct)' : (drawerShowPassword ? (selectedInstance.adminPassword || 'root') : '••••••••')}
-                      </strong>
-                      <button
-                        onClick={() => setDrawerShowPassword(!drawerShowPassword)}
-                        className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                        title={drawerShowPassword ? 'Hide Password' : 'Show Password'}
-                      >
-                        {drawerShowPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(selectedInstance.adminPassword || 'root');
-                          setCopiedDrawerPassword(true);
-                          setTimeout(() => setCopiedDrawerPassword(false), 2000);
-                        }}
-                        className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                        title="Copy Password"
-                      >
-                        {copiedDrawerPassword ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
+                      {currentMemberRole === 'viewer' ? (
+                        <span className="text-slate-400 font-mono text-xs italic">Protected (Viewer role)</span>
+                      ) : (
+                        <>
+                          <strong className="text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-[11px]">
+                            {selectedInstance.os?.toLowerCase().includes('win') && !selectedInstance.adminPassword ? 'None (Direct)' : (drawerShowPassword ? (selectedInstance.adminPassword || 'root') : '••••••••')}
+                          </strong>
+                          <button
+                            onClick={() => setDrawerShowPassword(!drawerShowPassword)}
+                            className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                            title={drawerShowPassword ? 'Hide Password' : 'Show Password'}
+                          >
+                            {drawerShowPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(selectedInstance.adminPassword || 'root');
+                              setCopiedDrawerPassword(true);
+                              setTimeout(() => setCopiedDrawerPassword(false), 2000);
+                            }}
+                            className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                            title="Copy Password"
+                          >
+                            {copiedDrawerPassword ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* Primary Web Console / Desktop Button */}
-                {selectedInstance.status === 'running' ? (
+                {currentMemberRole === 'viewer' ? (
+                  <div className="w-full py-2.5 px-4 bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 select-none">
+                    <Eye className="w-4 h-4 text-slate-400" />
+                    <span>Console Access Restricted for Viewer (CIA Security)</span>
+                  </div>
+                ) : selectedInstance.status === 'running' ? (
                   selectedInstance.os?.toLowerCase().includes('win') ? (
                     <button
                       onClick={() => handleOpenConsoleOrDesktop(selectedInstance)}
@@ -3781,13 +3800,19 @@ export default function Dashboard() {
 
                   <button
                     type="button"
+                    disabled={currentMemberRole === 'viewer'}
                     onClick={() => {
+                      if (currentMemberRole === 'viewer') return;
                       setResetPasswordTargetVm(selectedInstance);
                       setNewResetPassword('');
                       setIsResetPasswordOpen(true);
                     }}
-                    className="py-2.5 px-3 bg-white dark:bg-slate-800/80 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-200 hover:text-amber-600 dark:hover:text-amber-400 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-all border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer group"
-                    title="Reset guest root/admin password"
+                    className={`py-2.5 px-3 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-all border shadow-xs group ${
+                      currentMemberRole === 'viewer'
+                        ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
+                        : 'bg-white dark:bg-slate-800/80 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-200 hover:text-amber-600 dark:hover:text-amber-400 border-slate-200 dark:border-slate-700 cursor-pointer'
+                    }`}
+                    title={currentMemberRole === 'viewer' ? "Action restricted for Viewers (CIA Integrity)" : "Reset guest root/admin password"}
                   >
                     <Key className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
                     <span>Reset Pass</span>
@@ -3795,14 +3820,20 @@ export default function Dashboard() {
 
                   <button
                     type="button"
+                    disabled={currentMemberRole === 'viewer'}
                     onClick={() => {
+                      if (currentMemberRole === 'viewer') return;
                       setRebuildTargetVm(selectedInstance);
                       setRebuildPassword('');
                       setRebuildConfirmHostname('');
                       setIsRebuildOpen(true);
                     }}
-                    className="py-2.5 px-3 bg-white dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-200 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-all border border-slate-200 dark:border-slate-700 shadow-xs cursor-pointer group"
-                    title="Rebuild VM with clean OS"
+                    className={`py-2.5 px-3 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-1.5 transition-all border shadow-xs group ${
+                      currentMemberRole === 'viewer'
+                        ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
+                        : 'bg-white dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-200 hover:text-rose-600 dark:hover:text-rose-400 border-slate-200 dark:border-slate-700 cursor-pointer'
+                    }`}
+                    title={currentMemberRole === 'viewer' ? "Action restricted for Viewers (CIA Integrity)" : "Rebuild VM with clean OS"}
                   >
                     <RotateCcw className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
                     <span>Rebuild OS</span>

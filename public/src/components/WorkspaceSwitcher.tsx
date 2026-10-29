@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 export interface WorkspaceOrg {
   orgId: number;
   name: string;
-  role: 'owner' | 'admin' | 'devops' | 'viewer' | 'billing';
+  role: 'owner' | 'admin' | 'devops' | 'viewer';
   isOwner: boolean;
   ownerName: string;
   memberCount: number;
@@ -83,7 +83,6 @@ export default function WorkspaceSwitcher({
     admin: 'Admin',
     devops: 'DevOps',
     viewer: 'Viewer',
-    billing: 'Billing',
   };
 
   // If user is a company account, lock switcher to Company only (read-only pill with company name)
