@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Lock, CheckCircle, AlertCircle, Loader2, Camera, MapPin, ShieldCheck, Key, Plus, Trash2, Copy, Check, Download, Terminal, Mail, Eye, EyeOff, CreditCard, Power, Clock, AlertTriangle, Zap, Shield } from 'lucide-react';
+import { User, Phone, Lock, Building2, CheckCircle, AlertCircle, Loader2, Camera, MapPin, ShieldCheck, Key, Plus, Trash2, Copy, Check, Download, Terminal, Mail, Eye, EyeOff, CreditCard, Power, Clock, AlertTriangle, Zap, Shield } from 'lucide-react';
 import { apiCall } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { formatDate } from '../utils/dateFormatter';
@@ -51,6 +51,7 @@ interface FeedbackMessage {
 export default function AccountSettings() {
   const { isAuthenticated, user: authUser, updateUser } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [organizations, setOrganizations] = useState<any[]>([]);
 
   // Profile details state
   const [fullName, setFullName] = useState<string>('');
@@ -150,6 +151,18 @@ export default function AccountSettings() {
     }
   };
 
+  useEffect(() => {
+    async function loadOrgs() {
+      try {
+        const res = await apiCall('/company/my-organizations');
+        if (res?.success && res?.organizations) {
+          setOrganizations(res.organizations);
+        }
+      } catch (err) {}
+    }
+    loadOrgs();
+  }, []);
+
   const populateUserData = (data: UserProfile) => {
     setProfile(data);
     setFullName(data.fullName || data.name || '');
@@ -559,6 +572,50 @@ export default function AccountSettings() {
         </div>
       )}
 
+      {/* Organization & Workspace Membership Card */}
+      {organizations.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-400" /> Organization Workspace Membership
+            </h3>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {organizations.length} {organizations.length === 1 ? 'Workspace' : 'Workspaces'}
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {organizations.map((org: any) => (
+              <div
+                key={org.orgId}
+                className="p-4 rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/60 dark:bg-slate-800/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">{org.name}</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                      {org.isOwner ? 'Owner' : (org.role?.toUpperCase() || 'MEMBER')}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                    <span>Account Owner: <strong>{org.ownerName}</strong></span>
+                    <span>•</span>
+                    <span>{org.memberCount} team members</span>
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200/80 dark:border-slate-700 shrink-0">
+                  <Lock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>
+                    Billing Authority: {org.isOwner ? 'Full Control' : 'Restricted to Owner'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Main Profile & Personal Details */}
       <form onSubmit={handleSaveProfile} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">

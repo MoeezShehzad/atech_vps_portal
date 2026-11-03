@@ -1353,7 +1353,12 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-[#0b0f19] font-sans">
       {/* PERSISTENT SIDEBAR */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isCompanyWorkspace={currentWorkspace !== 'personal'}
+        isOwner={currentWorkspace === 'personal' || currentMemberRole === 'owner'}
+      />
 
       {/* DYNAMIC CONTENT CONTAINER */}
       <main ref={mainContentRef} className="flex-1 p-6 md:p-10 overflow-y-auto">
@@ -1419,6 +1424,24 @@ export default function Dashboard() {
 
         {/* RENDER BILLING & INVOICES */}
         {activeTab === 'billing' && (
+          currentWorkspace !== 'personal' && currentMemberRole !== 'owner' ? (
+            <div className="max-w-md mx-auto my-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center space-y-4 shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-900 flex items-center justify-center text-amber-600 mx-auto">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">Organization Billing Restricted</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Billing details, payment methods, and subscription controls for this organization are strictly restricted to the Organization Owner.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('dashboard')}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition cursor-pointer"
+              >
+                Return to Dashboard
+              </button>
+            </div>
+          ) : (
           <React.Suspense fallback={
             <div className="py-20 flex justify-center">
               <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
@@ -1426,6 +1449,7 @@ export default function Dashboard() {
           }>
             <BillingAndInvoices />
           </React.Suspense>
+          )
         )}
 
         {/* RENDER SUPPORT & HELPDESK */}

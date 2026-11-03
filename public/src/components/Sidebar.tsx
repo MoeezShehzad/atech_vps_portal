@@ -22,9 +22,16 @@ import atcLogo from '../assets/ATC_Logo.png';
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  isCompanyWorkspace?: boolean;
+  isOwner?: boolean;
 }
 
-export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+export default function Sidebar({
+  activeTab,
+  setActiveTab,
+  isCompanyWorkspace = false,
+  isOwner = true,
+}: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -57,7 +64,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'marketplace', label: '1-Click Marketplace', icon: Boxes },
     { id: 'storage', label: 'Storage & Disk', icon: HardDrive },
-    { id: 'billing', label: 'Billing & Invoices', icon: CreditCard },
+    ...((!isCompanyWorkspace || isOwner) ? [{ id: 'billing', label: 'Billing & Invoices', icon: CreditCard }] : []),
     { id: 'security', label: 'Security & Logs', icon: Shield },
     { id: 'support', label: 'Support & Helpdesk', icon: LifeBuoy },
     ...(isCompany ? [{ id: 'team', label: 'Team Management', icon: Users }] : []),
