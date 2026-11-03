@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Lock, Eye, EyeOff, CreditCard } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Lock, Eye, EyeOff, CreditCard, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../services/api';
 import { ModernFloatingInput } from '../components/ModernFormControls';
@@ -450,12 +450,31 @@ export default function Checkout() {
                         <h2 className="text-xl font-extrabold text-slate-950 tracking-tight">1. Billing Details</h2>
                         <p className="text-xs text-slate-500 mt-1">Logged in as <span className="font-bold text-slate-900">{user?.email}</span></p>
                       </div>
-                      <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1 rounded-full">
-                        Authenticated User
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {(user?.accountType === 'company' || Boolean(user?.companyName)) && (
+                          <span className="text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full flex items-center gap-1">
+                            <Building2 className="w-3 h-3" />
+                            {user?.companyName || 'Enterprise'}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1 rounded-full">
+                          Authenticated User
+                        </span>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-1">
+                      {(user?.accountType === 'company' || Boolean(user?.companyName)) && (
+                        <div className="sm:col-span-2">
+                          <ModernFloatingInput
+                            label="Company / Organization Name"
+                            disabled
+                            value={user?.companyName || ''}
+                            icon={<Building2 className="w-4 h-4" />}
+                            placeholder="Acme Corporation Ltd."
+                          />
+                        </div>
+                      )}
                       <ModernFloatingInput
                         label="Full Legal Name"
                         disabled
@@ -755,7 +774,16 @@ export default function Checkout() {
                     </button>
                   </div>
                   <p className="text-slate-900 font-bold">
-                    {isAuthenticated ? user?.fullName : `${customerInfo.firstName} ${customerInfo.lastName}`} ({isAuthenticated ? user?.email : customerInfo.email})
+                    {isAuthenticated ? (
+                      <>
+                        {user?.fullName}
+                        {(user?.accountType === 'company' || Boolean(user?.companyName)) && user?.companyName && (
+                          <span className="text-blue-600 font-semibold ml-1.5">({user.companyName})</span>
+                        )}
+                      </>
+                    ) : (
+                      `${customerInfo.firstName} ${customerInfo.lastName}`
+                    )} ({isAuthenticated ? user?.email : customerInfo.email})
                   </p>
                   <p className="text-slate-600 font-medium">
                     Phone: {customerInfo.phone || 'N/A'}
@@ -1215,7 +1243,7 @@ export default function Checkout() {
               <div className="space-y-3 text-xs">
                 <div className="flex justify-between text-slate-600 font-medium">
                   <span>{orderData.plan.name} ({orderData.term?.label || '1 Month'})</span>
-                  <span className="font-bold text-slate-900">${orderData.plan.monthlyPrice?.toFixed(2)}/mo</span>
+                  <span className="font-bold text-slate-900">${(Number(orderData.plan.monthlyPrice ?? orderData.plan.price ?? 0)).toFixed(2)}/mo</span>
                 </div>
 
                 <div className="flex justify-between text-slate-600">
@@ -1246,7 +1274,7 @@ export default function Checkout() {
                     {orderData.addons.map((addon: any, idx: number) => (
                       <div key={idx} className="flex justify-between text-slate-600">
                         <span>{addon.name}</span>
-                        <span className="font-bold text-slate-900">+${addon.price?.toFixed(2)}/mo</span>
+                        <span className="font-bold text-slate-900">+${Number(addon.price || 0).toFixed(2)}/mo</span>
                       </div>
                     ))}
                   </div>
