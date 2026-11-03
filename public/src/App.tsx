@@ -27,6 +27,7 @@ const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
 const StandaloneDesktop = lazy(() => import('./pages/StandaloneDesktop'));
+const AcceptInvite = lazy(() => import('./pages/AcceptInvite'));
 
 // Lightweight, seamless route suspense fallback
 function RouteLoadingFallback() {
@@ -206,6 +207,8 @@ function AppContent() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ForgotPassword />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/invite" element={<AcceptInvite />} />
+            <Route path="/accept-invite" element={<AcceptInvite />} />
             <Route path="/configure" element={<AddtoCart />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/terms" element={<TermsOfService />} />

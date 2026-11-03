@@ -1228,9 +1228,8 @@ export async function sendTeamInvitationEmail({
   inviteToken,
   isExistingUser,
 }) {
-  const loginUrl = `${APP_URL}/login?returnTo=/dashboard`;
-  const signupUrl = `${APP_URL}/signup?email=${encodeURIComponent(email)}&invite=${inviteToken}`;
-  const targetUrl = isExistingUser ? loginUrl : signupUrl;
+  const inviteUrl = `${APP_URL}/invite?token=${inviteToken}&email=${encodeURIComponent(email)}`;
+  const targetUrl = inviteUrl;
 
   const roleLabels = {
     admin: 'Administrator (Full Access)',
@@ -1253,7 +1252,7 @@ export async function sendTeamInvitationEmail({
       <p>${isExistingUser ? "You can sign in with your existing ATC Cloud credentials to access company servers and collaborative resources." : "Click below to complete your registration and join your team on ATC Cloud."}</p>
       <p style="font-size:13px;color:#64748b;margin-bottom:0;">If you were not expecting this invitation, you can safely ignore this email.</p>
     `,
-    ctaText: isExistingUser ? 'Sign In to Console' : 'Accept Invitation & Sign Up',
+    ctaText: 'Accept Invitation & Join Workspace',
     ctaUrl: targetUrl,
   });
 

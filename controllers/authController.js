@@ -7,6 +7,7 @@ import prisma from '../lib/prisma.js';
 import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 import { setupUserTrial } from '../services/trialService.js';
 import { generateAndSendOTP, verifyOTP } from '../services/otpService.js';
+import { autoLinkPendingInvites } from './companyController.js';
 
 // --- CENTRALIZED AUTH CONFIGURATION ---
 const JWT_SECRET = process.env.JWT_SECRET || 'atc_cloud_default_jwt_secret_must_change';
@@ -251,6 +252,9 @@ export const googleAuthCallback = async (req, res) => {
       });
     }
 
+    // Auto-link pending team invitations
+    await autoLinkPendingInvites(user.userId, user.email);
+
     // 4. Issue Refresh Token in HttpOnly cookie
     const refreshToken = await createAndStoreRefreshToken(user.userId);
     setRefreshTokenCookie(res, refreshToken);
@@ -350,6 +354,9 @@ export const register = async (req, res) => {
 
       return user;
     });
+
+    // Auto-link pending team invitations
+    await autoLinkPendingInvites(newUser.userId, newUser.email);
 
     let trialResult = null;
     if (cardData && cardData.cardNumber) {
@@ -637,6 +644,9 @@ export const login = async (req, res) => {
       data: { lastLoginAt: new Date() },
     });
 
+    // Auto-link pending team invitations on login
+    await autoLinkPendingInvites(user.userId, user.email);
+
     // Record successful login in security audit trail
     await prisma.securityLog.create({
       data: {
@@ -723,6 +733,7 @@ export const refreshTokenHandler = async (req, res) => {
 
     const roles = storedToken.user.userRoles.map((ur) => ur.role.roleName);
 
+    await autoLinkPendingInvites(storedToken.user.userId, storedToken.user.email);
     const newAccessToken = generateAccessToken(storedToken.user.userId, storedToken.user.email, roles);
     const newRefreshToken = await createAndStoreRefreshToken(storedToken.user.userId);
 
@@ -964,6 +975,8 @@ export const sendOtpHandler = async (req, res) => {
     let fallbackToken = null;
     if (user) {
       if (purpose === 'VERIFY_EMAIL') {
+      // Auto-link pending team invitations on OTP verification
+      await autoLinkPendingInvites(user?.userId, normalizedEmail);
         fallbackToken = jwt.sign(
           { userId: user.userId, email: user.email },
           JWT_VERIFY_SECRET,

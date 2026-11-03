@@ -51,7 +51,7 @@ const SHOWCASE_SLIDES = [
 export default function Auth({ initialMode }: AuthProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
 
   const routeMode = location.pathname.includes('signup') ? 'signup' : 'login';
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode || routeMode);
@@ -75,7 +75,21 @@ export default function Auth({ initialMode }: AuthProps) {
   }, []);
 
   const searchParams = new URLSearchParams(location.search);
-  const redirectParam = searchParams.get('redirect');
+  const emailParam = searchParams.get('email') || '';
+  const inviteParam = searchParams.get('invite') || '';
+  const redirectParam = searchParams.get('redirect') || searchParams.get('returnTo');
+
+  // If already authenticated, redirect smoothly
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (inviteParam) {
+        navigate(`/invite?token=${inviteParam}`);
+      } else {
+        const dest = redirectParam || '/dashboard';
+        navigate(dest, { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, inviteParam, redirectParam, navigate]);
   const locState = location.state as {
     from?: { pathname: string };
     returnTo?: string;
@@ -90,7 +104,7 @@ export default function Auth({ initialMode }: AuthProps) {
   // -------------------------------------------------------------
   // Sign In States
   // -------------------------------------------------------------
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginEmail, setLoginEmail] = useState(emailParam);
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -103,7 +117,7 @@ export default function Auth({ initialMode }: AuthProps) {
   const [accountType, setAccountType] = useState<'individual' | 'company' | 'developer' | 'student'>('individual');
   const [companyName, setCompanyName] = useState('');
   const [companySize, setCompanySize] = useState('10-49');
-  const [signupEmail, setSignupEmail] = useState('');
+  const [signupEmail, setSignupEmail] = useState(emailParam);
   const [signupPassword, setSignupPassword] = useState('');
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);

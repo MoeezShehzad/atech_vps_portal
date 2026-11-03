@@ -8,12 +8,20 @@ import {
   updateMemberRole,
   removeCompanyMember,
   getMyOrganizations,
+  getInviteDetails,
+  acceptCompanyInvite,
 } from '../controllers/companyController.js';
 
 const router = express.Router();
 
-// All company routes require authenticated user session
+// Public invitation token inspection route
+router.get('/invite/:token', getInviteDetails);
+
+// All following company routes require authenticated user session
 router.use(authenticateToken);
+
+// Accept invitation
+router.post('/invite/accept', acceptCompanyInvite);
 
 router.get('/my-organizations', getMyOrganizations);
 router.get('/profile', getCompanyProfile);

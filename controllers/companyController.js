@@ -529,3 +529,204 @@ export const getMyOrganizations = async (req, res) => {
     return res.status(500).json({ error: 'Failed to retrieve organizations.' });
   }
 };
+
+/**
+ * Automatically link pending organization invitations to a user account
+ * based on matching email address.
+ */
+export const autoLinkPendingInvites = async (userId, userEmail) => {
+  if (!userId || !userEmail) return [];
+  try {
+    const normalizedEmail = userEmail.toLowerCase().trim();
+    const pendingInvites = await prisma.organizationMember.findMany({
+      where: {
+        invitedEmail: normalizedEmail,
+        status: 'invited',
+      },
+      include: {
+        organization: true,
+      },
+    });
+
+    if (pendingInvites.length === 0) return [];
+
+    const activated = [];
+    for (const invite of pendingInvites) {
+      const updated = await prisma.organizationMember.update({
+        where: { memberId: invite.memberId },
+        data: {
+          userId,
+          status: 'active',
+          joinedAt: new Date(),
+        },
+      });
+      activated.push(updated);
+      console.log(`[AutoLink] Connected User ${userId} (${normalizedEmail}) to Organization ${invite.orgId} (${invite.organization?.name}) as ${invite.role}`);
+    }
+    return activated;
+  } catch (err) {
+    console.error('[autoLinkPendingInvites Error]:', err.message);
+    return [];
+  }
+};
+
+/**
+ * GET /api/company/invite/:token
+ * Public endpoint: Retrieve details of an organization invite by its secure token.
+ */
+export const getInviteDetails = async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      return res.status(400).json({ error: 'Invite token is required.' });
+    }
+
+    const membership = await prisma.organizationMember.findFirst({
+      where: { inviteToken: token },
+      include: {
+        organization: {
+          include: {
+            owner: { select: { fullName: true, email: true } },
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      return res.status(404).json({
+        valid: false,
+        error: 'This invitation link is invalid or has expired.',
+      });
+    }
+
+    // Check if a registered user already exists for this invited email
+    const existingUser = await prisma.user.findUnique({
+      where: { email: membership.invitedEmail.toLowerCase().trim() },
+      select: { userId: true, fullName: true, email: true },
+    });
+
+    return res.json({
+      valid: true,
+      invite: {
+        memberId: membership.memberId,
+        invitedEmail: membership.invitedEmail,
+        role: membership.role,
+        status: membership.status,
+        organization: {
+          orgId: membership.organization.orgId,
+          name: membership.organization.name,
+          companySize: membership.organization.companySize,
+          ownerName: membership.organization.owner.fullName,
+        },
+        userExists: !!existingUser,
+      },
+    });
+  } catch (err) {
+    console.error('[getInviteDetails Error]:', err);
+    return res.status(500).json({ error: 'Failed to verify invitation token.' });
+  }
+};
+
+/**
+ * POST /api/company/invite/accept
+ * Authenticated endpoint: Accept an invitation and link the current user to the organization.
+ */
+export const acceptCompanyInvite = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userEmail = req.user.email.toLowerCase().trim();
+    const { token } = req.body;
+
+    let membership = null;
+    if (token) {
+      membership = await prisma.organizationMember.findFirst({
+        where: { inviteToken: token },
+        include: {
+          organization: {
+            include: {
+              owner: { select: { fullName: true, email: true } },
+            },
+          },
+        },
+      });
+    }
+
+    // Fallback: search for any pending invite matching the user's email
+    if (!membership) {
+      membership = await prisma.organizationMember.findFirst({
+        where: {
+          invitedEmail: userEmail,
+          status: 'invited',
+        },
+        include: {
+          organization: {
+            include: {
+              owner: { select: { fullName: true, email: true } },
+            },
+          },
+        },
+      });
+    }
+
+    if (!membership) {
+      // Check if user is already an active member of this or another org
+      const activeMember = await prisma.organizationMember.findFirst({
+        where: { userId, status: 'active' },
+        include: { organization: true },
+      });
+
+      if (activeMember) {
+        return res.json({
+          success: true,
+          message: 'You are already an active member of this organization workspace.',
+          organization: {
+            orgId: activeMember.orgId,
+            name: activeMember.organization.name,
+            role: activeMember.role,
+          },
+        });
+      }
+
+      return res.status(404).json({ error: 'No pending invitation found for your account.' });
+    }
+
+    // If already active with this user
+    if (membership.status === 'active' && membership.userId === userId) {
+      return res.json({
+        success: true,
+        message: 'You are already an active member of this workspace.',
+        organization: {
+          orgId: membership.orgId,
+          name: membership.organization.name,
+          role: membership.role,
+        },
+      });
+    }
+
+    // Activate the membership and link userId
+    const updated = await prisma.organizationMember.update({
+      where: { memberId: membership.memberId },
+      data: {
+        userId,
+        status: 'active',
+        joinedAt: new Date(),
+      },
+      include: {
+        organization: true,
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: `You have successfully joined ${updated.organization.name}!`,
+      organization: {
+        orgId: updated.orgId,
+        name: updated.organization.name,
+        role: updated.role,
+      },
+    });
+  } catch (err) {
+    console.error('[acceptCompanyInvite Error]:', err);
+    return res.status(500).json({ error: 'Failed to accept invitation.' });
+  }
+};
