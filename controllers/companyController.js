@@ -1,3 +1,5 @@
+import bcrypt from 'bcryptjs';
+import { generateAccessToken, createAndStoreRefreshToken, setRefreshTokenCookie } from './authController.js';
 import crypto from 'crypto';
 import prisma from '../lib/prisma.js';
 import { sendVerificationEmail, sendTeamInvitationEmail } from '../services/emailService.js';
@@ -197,7 +199,56 @@ export const updateCompanyProfile = async (req, res) => {
       return res.status(403).json({ error: 'Only company owners and admins can update company details.' });
     }
 
-    const { name, companySize, billingEmail, taxId } = req.body;
+    const { name, companySize, billingEmail, taxId, ownerPassword } = req.body;
+
+    // Strict Security: Non-owner admins must provide Account Owner's password to authorize org-wide profile updates
+    if (!isOwner) {
+      if (!ownerPassword) {
+        return res.status(403).json({
+          requiresOwnerPassword: true,
+          error: `Owner authorization required. Please enter the Account Owner's password (${org.owner.fullName || org.owner.email}) to modify company settings.`,
+        });
+      }
+
+      const ownerUser = await prisma.user.findUnique({
+        where: { userId: org.ownerId },
+      });
+
+      if (!ownerUser || !ownerUser.passwordHash) {
+        return res.status(403).json({
+          error: 'Unable to verify owner authorization credentials. Please contact the owner directly.',
+        });
+      }
+
+      const isPasswordValid = await bcrypt.compare(ownerPassword, ownerUser.passwordHash);
+      const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
+
+      if (!isPasswordValid) {
+        await prisma.securityLog.create({
+          data: {
+            userId,
+            action: 'OWNER_AUTHORIZATION_FAILED',
+            ipAddress: clientIp,
+            result: 'FAILURE',
+            details: `Unauthorized attempt to update organization settings for ${org.name} (OrgId: ${org.orgId}) with invalid owner password`,
+          },
+        }).catch(() => {});
+
+        return res.status(401).json({
+          error: "Invalid Account Owner password. Authorization denied.",
+        });
+      }
+
+      await prisma.securityLog.create({
+        data: {
+          userId,
+          action: 'COMPANY_SETTINGS_MODIFIED_WITH_OWNER_ELEVATION',
+          ipAddress: clientIp,
+          result: 'SUCCESS',
+          details: `Organization ${org.name} settings updated by member ${userId} authorized via owner password elevation`,
+        },
+      }).catch(() => {});
+    }
 
     const updated = await prisma.organization.update({
       where: { orgId: org.orgId },
@@ -388,6 +439,28 @@ export const updateMemberRole = async (req, res) => {
       return res.status(403).json({ error: 'Only owners and admins can modify member roles.' });
     }
 
+    // Strict Security: Non-owner admins must provide Account Owner password to modify member roles
+    if (!isOwner) {
+      const ownerPassword = req.body?.ownerPassword || req.headers['x-owner-password'];
+      if (!ownerPassword) {
+        return res.status(403).json({
+          requiresOwnerPassword: true,
+          error: `Owner authorization required. Please enter the Account Owner's password (${org.owner.fullName || org.owner.email}) to modify member access roles.`,
+        });
+      }
+
+      const ownerUser = await prisma.user.findUnique({
+        where: { userId: org.ownerId },
+      });
+
+      const isPasswordValid = ownerUser?.passwordHash && (await bcrypt.compare(ownerPassword, ownerUser.passwordHash));
+      if (!isPasswordValid) {
+        return res.status(401).json({
+          error: "Invalid Account Owner password. Authorization denied.",
+        });
+      }
+    }
+
     const target = await prisma.organizationMember.findUnique({
       where: { memberId: parseInt(memberId, 10) },
     });
@@ -432,6 +505,28 @@ export const removeCompanyMember = async (req, res) => {
     const callerMember = org.members.find((m) => m.userId === userId);
     if (!isOwner && callerMember?.role !== 'admin') {
       return res.status(403).json({ error: 'Only owners and admins can remove team members.' });
+    }
+
+    // Strict Security: Non-owner admins must provide Account Owner password to remove team members or revoke invites
+    if (!isOwner) {
+      const ownerPassword = req.body?.ownerPassword || req.headers['x-owner-password'] || req.query?.ownerPassword;
+      if (!ownerPassword) {
+        return res.status(403).json({
+          requiresOwnerPassword: true,
+          error: `Owner authorization required. Please enter the Account Owner's password (${org.owner.fullName || org.owner.email}) to revoke team access.`,
+        });
+      }
+
+      const ownerUser = await prisma.user.findUnique({
+        where: { userId: org.ownerId },
+      });
+
+      const isPasswordValid = ownerUser?.passwordHash && (await bcrypt.compare(ownerPassword, ownerUser.passwordHash));
+      if (!isPasswordValid) {
+        return res.status(401).json({
+          error: "Invalid Account Owner password. Authorization denied.",
+        });
+      }
     }
 
     const target = await prisma.organizationMember.findUnique({
@@ -728,5 +823,151 @@ export const acceptCompanyInvite = async (req, res) => {
   } catch (err) {
     console.error('[acceptCompanyInvite Error]:', err);
     return res.status(500).json({ error: 'Failed to accept invitation.' });
+  }
+};
+
+
+/**
+ * POST /api/company/invite/activate
+ * Public endpoint: Allows an invited user without an existing account
+ * to choose a password, activate their account, and immediately join the organization.
+ */
+export const activateInvitedUser = async (req, res) => {
+  try {
+    const { token, fullName, password } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Invitation token is required.' });
+    }
+
+    if (!fullName || typeof fullName !== 'string' || fullName.trim().length < 2) {
+      return res.status(400).json({ error: 'Please enter a valid full name (at least 2 characters).' });
+    }
+
+    if (!password || typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+    }
+
+    // Lookup pending invite
+    const membership = await prisma.organizationMember.findFirst({
+      where: {
+        inviteToken: token,
+        status: 'invited',
+      },
+      include: {
+        organization: {
+          include: {
+            owner: { select: { fullName: true, email: true } },
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      return res.status(400).json({
+        error: 'This invitation token is invalid, has expired, or has already been accepted.',
+      });
+    }
+
+    const normalizedEmail = membership.invitedEmail.toLowerCase().trim();
+
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        error: 'An account with this email address already exists. Please sign in to accept the invitation.',
+        userExists: true,
+      });
+    }
+
+    // Securely hash the chosen password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Find default Customer role
+    const customerRole = await prisma.role.findUnique({
+      where: { roleName: 'Customer' },
+    });
+
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress;
+
+    // Execute atomic creation & activation
+    const newUser = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          fullName: fullName.trim(),
+          email: normalizedEmail,
+          passwordHash,
+          emailVerified: true,
+          accountType: 'individual',
+          isActive: true,
+          provider: 'LOCAL',
+          lastLoginAt: new Date(),
+        },
+      });
+
+      if (customerRole) {
+        await tx.userRole.create({
+          data: {
+            userId: createdUser.userId,
+            roleId: customerRole.roleId,
+          },
+        });
+      }
+
+      await tx.organizationMember.update({
+        where: { memberId: membership.memberId },
+        data: {
+          userId: createdUser.userId,
+          status: 'active',
+          joinedAt: new Date(),
+          inviteToken: null,
+        },
+      });
+
+      return createdUser;
+    });
+
+    // Auto-link any other pending invites
+    await autoLinkPendingInvites(newUser.userId, newUser.email);
+
+    // Audit log
+    await prisma.securityLog.create({
+      data: {
+        userId: newUser.userId,
+        action: 'INVITED_USER_ACCOUNT_ACTIVATION',
+        ipAddress: clientIp,
+        result: 'SUCCESS',
+        details: `Activated account and joined organization ${membership.organization.name} as ${membership.role}`,
+      },
+    }).catch(() => {});
+
+    const roles = ['Customer'];
+    const accessToken = generateAccessToken(newUser.userId, newUser.email, roles);
+    const refreshToken = await createAndStoreRefreshToken(newUser.userId);
+    setRefreshTokenCookie(res, refreshToken);
+
+    return res.status(201).json({
+      success: true,
+      message: `Welcome to ${membership.organization.name}! Your account has been activated.`,
+      accessToken,
+      user: {
+        userId: newUser.userId,
+        fullName: newUser.fullName,
+        email: newUser.email,
+        accountType: newUser.accountType,
+        roles,
+      },
+      organization: {
+        orgId: membership.organization.orgId,
+        name: membership.organization.name,
+        role: membership.role,
+      },
+    });
+  } catch (err) {
+    console.error('[activateInvitedUser Error]:', err);
+    return res.status(500).json({ error: 'Failed to activate account. ' + err.message });
   }
 };

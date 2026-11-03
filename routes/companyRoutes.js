@@ -10,6 +10,7 @@ import {
   getMyOrganizations,
   getInviteDetails,
   acceptCompanyInvite,
+  activateInvitedUser,
 } from '../controllers/companyController.js';
 
 const router = express.Router();
@@ -17,10 +18,13 @@ const router = express.Router();
 // Public invitation token inspection route
 router.get('/invite/:token', getInviteDetails);
 
+// Public invitation account activation route (new user registers and activates via invite)
+router.post('/invite/activate', activateInvitedUser);
+
 // All following company routes require authenticated user session
 router.use(authenticateToken);
 
-// Accept invitation
+// Accept invitation (for existing/logged-in users)
 router.post('/invite/accept', acceptCompanyInvite);
 
 router.get('/my-organizations', getMyOrganizations);

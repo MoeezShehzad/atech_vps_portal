@@ -22,7 +22,7 @@ const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost
 // --- HELPER FUNCTIONS ---
 
 // 1. Generate short-lived Access Token (15 minutes)
-const generateAccessToken = (userId, email, roles) => {
+export const generateAccessToken = (userId, email, roles) => {
   return jwt.sign(
     { userId, email, roles },
     JWT_ACCESS_SECRET,
@@ -31,7 +31,7 @@ const generateAccessToken = (userId, email, roles) => {
 };
 
 // 2. Generate long-lived Refresh Token (7 days) and save to DB
-const createAndStoreRefreshToken = async (userId) => {
+export const createAndStoreRefreshToken = async (userId) => {
   const refreshToken = jwt.sign(
     { userId },
     JWT_REFRESH_SECRET,
@@ -52,7 +52,7 @@ const createAndStoreRefreshToken = async (userId) => {
 };
 
 // 3. Helper to set HttpOnly Cookie
-const setRefreshTokenCookie = (res, token) => {
+export const setRefreshTokenCookie = (res, token) => {
   res.cookie('refreshToken', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
