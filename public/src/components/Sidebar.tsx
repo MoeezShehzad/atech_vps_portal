@@ -17,7 +17,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
-import atcLogo from '../assets/ATC_Logo.png';
 
 interface SidebarProps {
   activeTab: string;
@@ -102,32 +101,8 @@ export default function Sidebar({
       </button>
 
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-        {/* Brand Header */}
-        <div className={`shrink-0 border-b border-slate-100 dark:border-slate-800 flex items-center transition-all ${collapsed ? 'p-3.5 justify-center' : 'px-5 py-4 space-x-3'}`}>
-          <div className="flex items-center justify-center shrink-0">
-            <img 
-              src={atcLogo} 
-              alt="ATC Logo" 
-              className={`object-contain transition-all ${collapsed ? 'h-7 w-auto' : 'h-8 w-auto drop-shadow-xs'}`} 
-            />
-          </div>
-          {!collapsed && (
-            <div className="overflow-hidden min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h1 className="font-bold text-base text-slate-900 dark:text-white leading-tight font-poppins truncate tracking-tight">
-                  ATC CLOUD
-                </h1>
-                <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-600 dark:text-amber-400 border border-amber-400/30">
-                  VPS
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">Infrastructure Portal</p>
-            </div>
-          )}
-        </div>
-
         {/* Dynamic Workspace / Identity Badge (Company Logo or Person Avatar) */}
-        <div className={`p-3 border-b border-slate-100 dark:border-slate-800 transition-all ${collapsed ? 'flex justify-center' : ''}`}>
+        <div className={`p-3.5 border-b border-slate-200/80 dark:border-slate-800 transition-all ${collapsed ? 'flex justify-center' : ''}`}>
           <button
             type="button"
             onClick={() => setActiveTab('settings')}
@@ -138,26 +113,26 @@ export default function Sidebar({
                   : `${displayUserName} • Personal Profile`
                 : 'Account & Profile Settings'
             }
-            className={`w-full group flex items-center rounded-xl p-2 transition-all hover:bg-slate-100/70 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200/80 dark:hover:border-slate-700/60 cursor-pointer ${
+            className={`w-full group flex items-center rounded-xl p-2.5 transition-all hover:bg-slate-100/80 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200/80 dark:hover:border-slate-700/60 cursor-pointer ${
               activeTab === 'settings'
-                ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/60'
-                : 'bg-slate-50/50 dark:bg-slate-950/30'
+                ? 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/60'
+                : 'bg-slate-50/70 dark:bg-slate-950/30'
             } ${collapsed ? 'justify-center !p-1.5' : 'space-x-3'}`}
           >
             {/* Identity Avatar / Logo Thumbnail */}
             <div className="relative shrink-0">
-              <div className={`rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 flex items-center justify-center font-bold shadow-xs transition-transform group-hover:scale-105 ${
-                collapsed ? 'w-10 h-10' : 'w-11 h-11'
+              <div className={`rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 flex items-center justify-center p-1 shadow-xs transition-transform group-hover:scale-105 ${
+                collapsed ? 'w-10 h-10' : 'w-12 h-12'
               }`}>
                 {isCompanyWorkspace ? (
                   effectiveCompanyLogo ? (
                     <img
                       src={effectiveCompanyLogo}
-                      alt="Company Logo"
-                      className="w-full h-full object-cover"
+                      alt={displayCompanyName}
+                      className="max-w-full max-h-full object-contain"
                     />
                   ) : (
-                    <div className="w-full h-full bg-linear-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white text-sm font-black tracking-tight">
+                    <div className="w-full h-full bg-linear-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center text-white text-base font-black tracking-tight">
                       {displayCompanyName.charAt(0).toUpperCase()}
                     </div>
                   )
@@ -166,10 +141,10 @@ export default function Sidebar({
                     <img
                       src={personAvatar}
                       alt={displayUserName}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover rounded-lg"
                     />
                   ) : (
-                    <div className="w-full h-full bg-linear-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-sm font-bold">
+                    <div className="w-full h-full bg-linear-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">
                       {(user?.fullName || 'U').charAt(0).toUpperCase()}
                     </div>
                   )
@@ -196,22 +171,25 @@ export default function Sidebar({
             {!collapsed && (
               <div className="flex-1 min-w-0 text-left">
                 <div className="flex items-center justify-between gap-1">
-                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                  <p 
+                    className="text-xs font-bold text-slate-900 dark:text-white leading-snug line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                    title={isCompanyWorkspace ? displayCompanyName : displayUserName}
+                  >
                     {isCompanyWorkspace ? displayCompanyName : displayUserName}
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="flex items-center gap-1.5 mt-1">
                   {isCompanyWorkspace ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 truncate">
-                      <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                    <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
                         {displayRole}
                       </span>
-                      <span className="truncate text-slate-400 dark:text-slate-500">
+                      <span className="truncate text-slate-400 dark:text-slate-500 font-medium">
                         &bull; {user?.fullName?.split(' ')[0] || user?.email?.split('@')[0]}
                       </span>
                     </span>
                   ) : (
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate block">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate block font-medium">
                       {user?.email || 'Personal Account'}
                     </span>
                   )}

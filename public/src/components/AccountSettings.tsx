@@ -738,13 +738,16 @@ export default function AccountSettings() {
           {isCompanyAccount && (
             <div className="flex items-start gap-4 border-t md:border-t-0 md:border-l border-slate-200/80 dark:border-slate-700/80 pt-4 md:pt-0 md:pl-5">
               <div className="relative shrink-0">
-                <div className="w-18 h-18 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden text-slate-400 dark:text-slate-500 font-bold text-xl shadow-xs">
+                <div className="w-40 sm:w-48 h-20 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 flex items-center justify-center overflow-hidden text-slate-400 dark:text-slate-500 font-bold shadow-xs">
                   {uploadingLogo ? (
                     <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                   ) : companyLogoPreview ? (
-                    <img src={companyLogoPreview} alt="Company Logo" className="w-full h-full object-cover" />
+                    <img src={companyLogoPreview} alt="Company Logo" className="max-w-full max-h-full object-contain" />
                   ) : (
-                    <Building2 className="w-8 h-8 text-blue-600/70" />
+                    <div className="flex flex-col items-center justify-center text-slate-400 gap-1">
+                      <Building2 className="w-6 h-6 text-blue-600/70" />
+                      <span className="text-[10px] font-medium">No Logo</span>
+                    </div>
                   )}
                 </div>
                 <label 

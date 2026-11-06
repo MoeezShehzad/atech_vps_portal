@@ -56,7 +56,6 @@ import Sidebar from '../components/Sidebar';
 import AccountSettings from '../components/AccountSettings';
 import NotificationBell from '../components/NotificationBell';
 import ThemeToggle from '../components/ThemeToggle';
-import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import { apiCall, setAccessToken } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import WindowsResourceGraph from '../components/WindowsResourceGraph';
@@ -1560,12 +1559,7 @@ export default function Dashboard() {
                 )}
               </div>
               <div className="flex items-center gap-2.5">
-                {/* ENTERPRISE WORKSPACE / ORGANIZATION SWITCHER */}
-                <WorkspaceSwitcher
-                  currentWorkspace={currentWorkspace}
-                  onSelectWorkspace={handleWorkspaceSwitch}
-                />
-
+                
                 {/* IN-APP REAL-TIME NOTIFICATION BELL */}
                 <NotificationBell />
 

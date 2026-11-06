@@ -93,7 +93,7 @@ export default function WorkspaceSwitcher({
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-blue-50/90 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 shadow-2xs select-none">
         <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center overflow-hidden border border-blue-300/40 shrink-0">
           {org?.logoUrl ? (
-            <img src={org.logoUrl} alt={org.name} className="w-full h-full object-cover" />
+            <img src={org.logoUrl} alt={org.name} className="max-w-full max-h-full object-contain" />
           ) : (
             <Building2 className="w-3.5 h-3.5" />
           )}
@@ -125,7 +125,7 @@ export default function WorkspaceSwitcher({
         {isPersonal ? (
           <div className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 overflow-hidden shrink-0">
             {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+              <img src={user.avatarUrl} alt="Avatar" className="max-w-full max-h-full object-contain" />
             ) : (
               <User className="w-3.5 h-3.5" />
             )}
@@ -133,7 +133,7 @@ export default function WorkspaceSwitcher({
         ) : (
           <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center overflow-hidden border border-blue-300/40 shrink-0">
             {selectedOrg?.logoUrl ? (
-              <img src={selectedOrg.logoUrl} alt={selectedOrg.name} className="w-full h-full object-cover" />
+              <img src={selectedOrg.logoUrl} alt={selectedOrg.name} className="max-w-full max-h-full object-contain" />
             ) : (
               <Building2 className="w-3.5 h-3.5" />
             )}
@@ -182,7 +182,7 @@ export default function WorkspaceSwitcher({
                   <div className="flex items-center gap-2.5">
                     <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 overflow-hidden">
                       {user?.avatarUrl ? (
-                        <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                        <img src={user.avatarUrl} alt="Avatar" className="max-w-full max-h-full object-contain" />
                       ) : (
                         <User className="w-4 h-4" />
                       )}
@@ -223,7 +223,7 @@ export default function WorkspaceSwitcher({
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0 overflow-hidden border border-blue-200/50 dark:border-blue-800/50">
                       {org.logoUrl ? (
-                        <img src={org.logoUrl} alt={org.name} className="w-full h-full object-cover" />
+                        <img src={org.logoUrl} alt={org.name} className="max-w-full max-h-full object-contain" />
                       ) : (
                         <Building2 className="w-4 h-4" />
                       )}

@@ -752,11 +752,11 @@ export default function TeamManagement() {
                         <form onSubmit={handleSaveCompanySettings} className="space-y-4">
               {/* Company Logo Upload Control */}
               <div className="flex items-center gap-4 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <div className="w-14 h-14 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                <div className="w-32 h-14 rounded-xl bg-white dark:bg-slate-700 p-1.5 border border-slate-200 dark:border-slate-600 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
                   {uploadingLogo ? (
                     <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                   ) : editLogoUrl ? (
-                    <img src={editLogoUrl} alt="Logo" className="w-full h-full object-cover" />
+                    <img src={editLogoUrl} alt="Logo" className="max-w-full max-h-full object-contain" />
                   ) : (
                     <Building2 className="w-6 h-6 text-slate-400" />
                   )}
