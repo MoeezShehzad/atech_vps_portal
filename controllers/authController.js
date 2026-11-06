@@ -750,6 +750,9 @@ export const refreshTokenHandler = async (req, res) => {
         city: storedToken.user.city,
         postalCode: storedToken.user.postalCode,
         country: storedToken.user.country,
+        accountType: storedToken.user.accountType || 'individual',
+        companyName: storedToken.user.companyName || null,
+        companySize: storedToken.user.companySize || null,
         roles,
       },
     });

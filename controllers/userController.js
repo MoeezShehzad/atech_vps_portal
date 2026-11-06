@@ -25,6 +25,7 @@ export const getMe = async (req, res) => {
 
     res.json({
       id: user.userId,
+      userId: user.userId,
       fullName: user.fullName || '',
       email: user.email,
       phone: user.phone || '',

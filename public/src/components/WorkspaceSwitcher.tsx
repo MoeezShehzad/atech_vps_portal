@@ -27,7 +27,7 @@ export default function WorkspaceSwitcher({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Check if current user is registered as a company
-  const isCompanyUser = user?.accountType === 'company' || Boolean(user?.companyName);
+  const isCompanyUser = user?.accountType === 'company' || Boolean(user?.companyName) || organizations.some((o) => o.isOwner);
 
   useEffect(() => {
     let isMounted = true;
@@ -85,8 +85,9 @@ export default function WorkspaceSwitcher({
     viewer: 'Viewer',
   };
 
-  // If user is a company account, lock switcher to Company only (read-only pill with company name)
-  if (isCompanyUser) {
+  // If user is a company account, lock switcher to Company Owner pill
+  if (isCompanyUser && organizations.length <= 1) {
+    const org = organizations[0];
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-blue-50/90 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 shadow-2xs select-none">
         <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center">
@@ -94,10 +95,10 @@ export default function WorkspaceSwitcher({
         </div>
         <div className="flex items-center gap-1.5 max-w-[170px] sm:max-w-[220px] truncate">
           <span className="truncate font-bold">
-            {selectedOrg?.name || user?.companyName || 'Company Organization'}
+            {org?.name || user?.companyName || 'Company Organization'}
           </span>
           <span className="px-1.5 py-0.2 rounded text-[10px] uppercase font-mono font-bold bg-blue-200/70 dark:bg-blue-900/80 text-blue-800 dark:text-blue-200">
-            {selectedOrg?.isOwner ? 'Owner' : 'Company'}
+            Owner
           </span>
         </div>
       </div>
@@ -152,31 +153,33 @@ export default function WorkspaceSwitcher({
           </div>
 
           <div className="py-1">
-            {/* 1. Personal Workspace Option */}
-            <div
-              onClick={() => {
-                onSelectWorkspace('personal');
-                setIsOpen(false);
-              }}
-              className={`flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-xs transition-colors ${
-                isPersonal
-                  ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold'
-                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
-                  <User className="w-4 h-4" />
+            {!isCompanyUser && (
+              <>
+                <div
+                  onClick={() => {
+                    onSelectWorkspace('personal');
+                    setIsOpen(false);
+                  }}
+                  className={`flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-xs transition-colors ${
+                    isPersonal
+                      ? 'bg-blue-50/70 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-medium'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="font-semibold">Personal Account</p>
+                      <p className="text-[10px] text-slate-400 font-normal">Personal servers & billing</p>
+                    </div>
+                  </div>
+                  {isPersonal && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
                 </div>
-                <div>
-                  <p className="font-semibold">Personal Account</p>
-                  <p className="text-[10px] text-slate-400 font-normal">Personal servers & billing</p>
-                </div>
-              </div>
-              {isPersonal && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
-            </div>
-
-            <div className="my-1 border-t border-slate-100 dark:border-slate-800/80" />
+                <div className="my-1 border-t border-slate-100 dark:border-slate-800/80" />
+              </>
+            )}
 
             <div className="px-3 py-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">

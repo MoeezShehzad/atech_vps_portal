@@ -58,7 +58,7 @@ export default function Sidebar({
     navigate('/login');
   };
 
-  const isCompany = user?.accountType === 'company' || Boolean(user?.companyName);
+  const isCompany = user?.accountType === 'company' || Boolean(user?.companyName) || isCompanyWorkspace || isOwner;
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },

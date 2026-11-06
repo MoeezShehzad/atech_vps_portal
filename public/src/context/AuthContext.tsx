@@ -80,7 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const freshUser = await apiCall('/users/me', { method: 'GET' });
       const resolvedUser = freshUser?.user || freshUser;
-      if (resolvedUser && resolvedUser.userId) {
+      if (resolvedUser && (resolvedUser.userId || resolvedUser.id)) {
+        resolvedUser.userId = resolvedUser.userId || resolvedUser.id;
         setUser(resolvedUser);
       }
     } catch (err) {
