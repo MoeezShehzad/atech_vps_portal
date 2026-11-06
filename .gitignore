@@ -33,6 +33,12 @@ windows_proxy.js
 *.sql
 *.bundle
 
+# Uploaded user images & company logos (preserve folder structure via .gitkeep)
+uploads/avatars/*
+!uploads/avatars/.gitkeep
+uploads/logos/*
+!uploads/logos/.gitkeep
+
 # OS metadata
 .DS_Store
 Thumbs.db

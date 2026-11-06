@@ -26,6 +26,14 @@ export interface User {
   role?: string;
   roles?: string[];
   avatarUrl?: string;
+  companyLogoUrl?: string;
+  organization?: {
+    orgId: number;
+    name: string;
+    logoUrl?: string | null;
+    isOwner?: boolean;
+    role?: string;
+  };
   emailVerified?: boolean;
   hasPassword?: boolean;
   isImpersonated?: boolean;

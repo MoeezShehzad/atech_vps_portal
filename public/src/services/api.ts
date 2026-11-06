@@ -70,8 +70,9 @@ export const apiCall = async (
 
   const makeRequest = async (token: string | null) => {
     const activeOrgId = localStorage.getItem('atech_active_workspace_org_id');
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
 
       ...(token && !isAuthEndpoint
         ? {

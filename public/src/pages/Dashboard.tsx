@@ -218,6 +218,8 @@ export default function Dashboard() {
     }
   });
   const [currentMemberRole, setCurrentMemberRole] = useState<string>('owner');
+  const [currentOrgName, setCurrentOrgName] = useState<string | null>(null);
+  const [currentOrgLogo, setCurrentOrgLogo] = useState<string | null>(null);
   const [instances, setInstances] = useState<Instance[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -420,11 +422,14 @@ export default function Dashboard() {
   } | null>(null);
   const [useSavedMethodForTrial, setUseSavedMethodForTrial] = useState(true);
 
-  const handleWorkspaceSwitch = (workspaceId: string) => {
+  const handleWorkspaceSwitch = (workspaceId: string, orgName?: string, role?: string, logoUrl?: string | null) => {
     try {
       localStorage.setItem('atech_active_workspace_org_id', workspaceId);
     } catch {}
     setCurrentWorkspace(workspaceId);
+    if (orgName) setCurrentOrgName(orgName);
+    if (role) setCurrentMemberRole(role);
+    if (logoUrl !== undefined) setCurrentOrgLogo(logoUrl);
     setIsLoading(true);
     setTimeout(() => {
       fetchVMs().finally(() => setIsLoading(false));
@@ -440,7 +445,9 @@ export default function Dashboard() {
         if (data.activeSubscriptions) setActiveSubscriptions(data.activeSubscriptions);
         if (data.currentWorkspace) {
           setCurrentMemberRole(data.currentWorkspace.memberRole || 'owner');
-        }
+          if (data.currentWorkspace.orgName) setCurrentOrgName(data.currentWorkspace.orgName);
+          if (data.currentWorkspace.orgLogo !== undefined) setCurrentOrgLogo(data.currentWorkspace.orgLogo);
+          }
       }
     } catch (err) {
       console.error('Failed to load user VMs:', err);
@@ -1358,6 +1365,9 @@ export default function Dashboard() {
         setActiveTab={setActiveTab}
         isCompanyWorkspace={currentWorkspace !== 'personal'}
         isOwner={currentWorkspace === 'personal' || currentMemberRole === 'owner'}
+        workspaceName={currentOrgName || undefined}
+        workspaceLogo={currentOrgLogo || undefined}
+        workspaceRole={currentMemberRole || undefined}
       />
 
       {/* DYNAMIC CONTENT CONTAINER */}

@@ -372,6 +372,7 @@ export async function getUserVMs(req, res) {
         isOrgContext,
         orgId: org?.orgId || null,
         orgName: org?.name || null,
+        orgLogo: org?.logo_url || null,
         memberRole,
       },
     });

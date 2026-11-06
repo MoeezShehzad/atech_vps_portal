@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../lib/prisma.js';
+import { safelyRemoveUploadedFile } from '../middleware/uploadMiddleware.js';
 
 // 1. Fetch current logged-in user profile
 export const getMe = async (req, res) => {
@@ -23,6 +24,22 @@ export const getMe = async (req, res) => {
 
     const primaryRole = user.userRoles?.[0]?.role?.roleName || 'Customer';
 
+    // Retrieve active or primary organization if associated
+    const org = await prisma.organization.findFirst({
+      where: {
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId, status: 'active' } } },
+        ],
+      },
+      select: {
+        orgId: true,
+        name: true,
+        logo_url: true,
+        ownerId: true,
+      },
+    });
+
     res.json({
       id: user.userId,
       userId: user.userId,
@@ -36,9 +53,18 @@ export const getMe = async (req, res) => {
       country: user.country || '',
       role: primaryRole,
       accountType: user.accountType || 'individual',
-      companyName: user.companyName || null,
+      companyName: user.companyName || org?.name || null,
       companySize: user.companySize || null,
       avatarUrl: user.avatar_url || null,
+      companyLogoUrl: org?.logo_url || null,
+      organization: org
+        ? {
+            orgId: org.orgId,
+            name: org.name,
+            logoUrl: org.logo_url || null,
+            isOwner: org.ownerId === userId,
+          }
+        : null,
       hasPassword: Boolean(user.passwordHash),
       authProvider: user.provider || 'LOCAL',
     });
@@ -55,9 +81,15 @@ export const updateMe = async (req, res) => {
     const { fullName, phone, address, city, state, postalCode, postal_code, country, avatarUrl } = req.body;
     const valueForPostalCode = postalCode ?? postal_code ?? null;
 
-    // Validate avatar string length if present to prevent MySQL @db.Text overflow (64KB max)
-    if (avatarUrl && avatarUrl.length > 65000) {
-      return res.status(400).json({ error: 'Avatar image is too large. Please upload an image under 50KB or use an image URL.' });
+    // If changing avatarUrl to null or a new uploaded file, clean old uploaded file if different
+    if (avatarUrl !== undefined) {
+      const existing = await prisma.user.findUnique({
+        where: { userId },
+        select: { avatar_url: true },
+      });
+      if (existing?.avatar_url && existing.avatar_url !== avatarUrl) {
+        safelyRemoveUploadedFile(existing.avatar_url);
+      }
     }
 
     const updatedUser = await prisma.user.update({
@@ -87,6 +119,7 @@ export const updateMe = async (req, res) => {
       message: 'Profile updated successfully',
       user: {
         id: updatedUser.userId,
+        userId: updatedUser.userId,
         fullName: updatedUser.fullName,
         email: updatedUser.email,
         phone: updatedUser.phone,
@@ -107,7 +140,96 @@ export const updateMe = async (req, res) => {
   }
 };
 
-// 3. Update or set password
+// 3. Upload User Profile Avatar (Dedicated Multipart File Handler)
+export const uploadAvatar = async (req, res) => {
+  try {
+    const userId = Number(req.user.id || req.user.userId);
+    if (!req.file) {
+      return res.status(400).json({ error: 'No avatar image file was uploaded.' });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { userId },
+      select: { userId: true, avatar_url: true },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found in system.' });
+    }
+
+    // Clean up previous uploaded avatar file from disk if present
+    if (existingUser.avatar_url) {
+      safelyRemoveUploadedFile(existingUser.avatar_url);
+    }
+
+    // Relative web URL served via Express static
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+    const updatedUser = await prisma.user.update({
+      where: { userId },
+      data: { avatar_url: avatarUrl },
+      include: {
+        userRoles: {
+          include: { role: true },
+        },
+      },
+    });
+
+    const primaryRole = updatedUser.userRoles?.[0]?.role?.roleName || 'Customer';
+
+    return res.json({
+      success: true,
+      message: 'Profile picture uploaded and saved successfully.',
+      avatarUrl,
+      user: {
+        id: updatedUser.userId,
+        userId: updatedUser.userId,
+        fullName: updatedUser.fullName,
+        email: updatedUser.email,
+        avatarUrl: updatedUser.avatar_url,
+        role: primaryRole,
+      },
+    });
+  } catch (error) {
+    console.error('[UPLOAD AVATAR ERROR]:', error);
+    return res.status(500).json({ error: 'Failed to save avatar image.' });
+  }
+};
+
+// 4. Delete/Remove Profile Avatar
+export const deleteAvatar = async (req, res) => {
+  try {
+    const userId = Number(req.user.id || req.user.userId);
+    const existingUser = await prisma.user.findUnique({
+      where: { userId },
+      select: { userId: true, avatar_url: true },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    if (existingUser.avatar_url) {
+      safelyRemoveUploadedFile(existingUser.avatar_url);
+    }
+
+    await prisma.user.update({
+      where: { userId },
+      data: { avatar_url: null },
+    });
+
+    return res.json({
+      success: true,
+      message: 'Profile picture removed successfully.',
+      avatarUrl: null,
+    });
+  } catch (error) {
+    console.error('[DELETE AVATAR ERROR]:', error);
+    return res.status(500).json({ error: 'Failed to remove profile picture.' });
+  }
+};
+
+// 5. Update or set password
 export const updatePassword = async (req, res) => {
   try {
     const userId = Number(req.user.id || req.user.userId);

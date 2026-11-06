@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { generateAccessToken, createAndStoreRefreshToken, setRefreshTokenCookie } from './authController.js';
 import crypto from 'crypto';
 import prisma from '../lib/prisma.js';
+import { safelyRemoveUploadedFile } from '../middleware/uploadMiddleware.js';
 import { sendVerificationEmail, sendTeamInvitationEmail } from '../services/emailService.js';
 
 /**
@@ -165,6 +166,7 @@ export const getCompanyProfile = async (req, res) => {
         companySize: org.companySize,
         billingEmail: org.billingEmail,
         taxId: org.taxId,
+        logoUrl: org.logo_url || null,
         createdAt: org.createdAt,
         owner: org.owner,
         totalMembers: org.members.filter((m) => m.status === 'active').length,
@@ -199,7 +201,7 @@ export const updateCompanyProfile = async (req, res) => {
       return res.status(403).json({ error: 'Only company owners and admins can update company details.' });
     }
 
-    const { name, companySize, billingEmail, taxId, ownerPassword } = req.body;
+    const { name, companySize, billingEmail, taxId, logoUrl, ownerPassword } = req.body;
 
     // Strict Security: Non-owner admins must provide Account Owner's password to authorize org-wide profile updates
     if (!isOwner) {
@@ -257,6 +259,7 @@ export const updateCompanyProfile = async (req, res) => {
         companySize: companySize || undefined,
         billingEmail: billingEmail ? billingEmail.trim().toLowerCase() : undefined,
         taxId: taxId !== undefined ? taxId.trim() : undefined,
+        logo_url: logoUrl !== undefined ? logoUrl : undefined,
       },
     });
 
@@ -597,6 +600,7 @@ export const getMyOrganizations = async (req, res) => {
         ownerId: o.ownerId,
         ownerName: o.owner.fullName,
         memberCount: o._count.members,
+        logoUrl: o.logo_url || null,
       });
     });
 
@@ -611,6 +615,7 @@ export const getMyOrganizations = async (req, res) => {
           ownerId: m.organization.ownerId,
           ownerName: m.organization.owner.fullName,
           memberCount: m.organization._count.members,
+          logoUrl: m.organization.logo_url || null,
         });
       }
     });
@@ -969,5 +974,95 @@ export const activateInvitedUser = async (req, res) => {
   } catch (err) {
     console.error('[activateInvitedUser Error]:', err);
     return res.status(500).json({ error: 'Failed to activate account. ' + err.message });
+  }
+};
+
+/**
+ * POST /api/company/logo
+ * Dedicated multipart logo image upload handler
+ */
+export const uploadCompanyLogo = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const org = await getOrCreateUserOrg(userId);
+
+    if (!org) {
+      return res.status(404).json({ error: 'Organization not found.' });
+    }
+
+    const isOwner = org.ownerId === userId;
+    const member = org.members.find((m) => m.userId === userId);
+    if (!isOwner && member?.role !== 'admin') {
+      return res.status(403).json({ error: 'Only organization owners and admins can upload company logo.' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No logo image file was uploaded.' });
+    }
+
+    // Clean up old logo file if present
+    if (org.logo_url) {
+      safelyRemoveUploadedFile(org.logo_url);
+    }
+
+    const logoUrl = `/uploads/logos/${req.file.filename}`;
+
+    const updated = await prisma.organization.update({
+      where: { orgId: org.orgId },
+      data: { logo_url: logoUrl },
+    });
+
+    return res.json({
+      success: true,
+      message: 'Company logo uploaded and saved successfully.',
+      logoUrl: updated.logo_url,
+      organization: {
+        orgId: updated.orgId,
+        name: updated.name,
+        logoUrl: updated.logo_url,
+      },
+    });
+  } catch (err) {
+    console.error('[uploadCompanyLogo Error]:', err);
+    return res.status(500).json({ error: 'Failed to upload company logo.' });
+  }
+};
+
+/**
+ * DELETE /api/company/logo
+ * Removes company logo and resets to default
+ */
+export const deleteCompanyLogo = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const org = await getOrCreateUserOrg(userId);
+
+    if (!org) {
+      return res.status(404).json({ error: 'Organization not found.' });
+    }
+
+    const isOwner = org.ownerId === userId;
+    const member = org.members.find((m) => m.userId === userId);
+    if (!isOwner && member?.role !== 'admin') {
+      return res.status(403).json({ error: 'Only organization owners and admins can remove company logo.' });
+    }
+
+    if (org.logo_url) {
+      safelyRemoveUploadedFile(org.logo_url);
+    }
+
+    await prisma.organization.update({
+      where: { orgId: org.orgId },
+      data: { logo_url: null },
+    });
+
+    return res.json({
+      success: true,
+      message: 'Company logo removed successfully.',
+      logoUrl: null,
+    });
+  } catch (err) {
+    console.error('[deleteCompanyLogo Error]:', err);
+    return res.status(500).json({ error: 'Failed to remove company logo.' });
   }
 };

@@ -1,8 +1,11 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
+import { handleLogoUpload } from '../middleware/uploadMiddleware.js';
 import {
   getCompanyProfile,
   updateCompanyProfile,
+  uploadCompanyLogo,
+  deleteCompanyLogo,
   getCompanyMembers,
   inviteCompanyMember,
   updateMemberRole,
@@ -30,6 +33,8 @@ router.post('/invite/accept', acceptCompanyInvite);
 router.get('/my-organizations', getMyOrganizations);
 router.get('/profile', getCompanyProfile);
 router.patch('/profile', updateCompanyProfile);
+router.post('/logo', handleLogoUpload, uploadCompanyLogo);
+router.delete('/logo', deleteCompanyLogo);
 router.get('/members', getCompanyMembers);
 router.post('/members/invite', inviteCompanyMember);
 router.patch('/members/:memberId/role', updateMemberRole);

@@ -7,6 +7,9 @@ BigInt.prototype.toJSON = function () {
 };
 
 import http from 'http';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -110,6 +113,16 @@ app.use(
   })
 );
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Static uploads directory serving (Avatars, Organization Logos)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir, { maxAge: '7d' }));
+app.use('/api/uploads', express.static(uploadsDir, { maxAge: '7d' }));
+
 
 // 4. Rate Limiting Configurations
 const authLimiter = rateLimit({

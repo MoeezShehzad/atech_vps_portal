@@ -41,6 +41,7 @@ export interface CompanyProfile {
   companySize: string;
   billingEmail: string;
   taxId: string | null;
+  logoUrl?: string | null;
   createdAt: string;
   owner: {
     userId: number;
@@ -112,6 +113,8 @@ export default function TeamManagement() {
   const [editCompanySize, setEditCompanySize] = useState('10-49');
   const [editBillingEmail, setEditBillingEmail] = useState('');
   const [editTaxId, setEditTaxId] = useState('');
+  const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [ownerPassword, setOwnerPassword] = useState('');
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -195,12 +198,68 @@ export default function TeamManagement() {
     setEditCompanySize(profile.companySize || '10-49');
     setEditBillingEmail(profile.billingEmail || '');
     setEditTaxId(profile.taxId || '');
+    setEditLogoUrl(profile.logoUrl || null);
     setOwnerPassword('');
     setSettingsError(null);
     setShowSettingsModal(true);
   };
 
   // Handle Company Profile Save
+  
+  const handleLogoUploadModal = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setSettingsError('Logo file size cannot exceed 10MB.');
+      return;
+    }
+
+    try {
+      setUploadingLogo(true);
+      setSettingsError(null);
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      const res = await apiCall('/company/logo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res?.success && res.logoUrl) {
+        setEditLogoUrl(res.logoUrl);
+        if (profile) {
+          setProfile({ ...profile, logoUrl: res.logoUrl });
+        }
+      } else {
+        setSettingsError(res?.error || 'Failed to upload logo.');
+      }
+    } catch (err: any) {
+      setSettingsError(err?.message || 'Failed to upload logo.');
+    } finally {
+      setUploadingLogo(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveLogoModal = async () => {
+    try {
+      setUploadingLogo(true);
+      setSettingsError(null);
+      const res = await apiCall('/company/logo', { method: 'DELETE' });
+      if (res?.success) {
+        setEditLogoUrl(null);
+        if (profile) {
+          setProfile({ ...profile, logoUrl: null });
+        }
+      }
+    } catch (err: any) {
+      setSettingsError(err?.message || 'Failed to remove logo.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const handleSaveCompanySettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setSettingsError(null);
@@ -690,7 +749,44 @@ export default function TeamManagement() {
               </div>
             )}
 
-            <form onSubmit={handleSaveCompanySettings} className="space-y-4">
+                        <form onSubmit={handleSaveCompanySettings} className="space-y-4">
+              {/* Company Logo Upload Control */}
+              <div className="flex items-center gap-4 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                <div className="w-14 h-14 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                  {uploadingLogo ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                  ) : editLogoUrl ? (
+                    <img src={editLogoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <Building2 className="w-6 h-6 text-slate-400" />
+                  )}
+                </div>
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold px-2.5 py-1 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition-all inline-block shadow-2xs">
+                      {editLogoUrl ? 'Change Logo' : 'Upload Logo'}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                        className="hidden"
+                        disabled={uploadingLogo}
+                        onChange={handleLogoUploadModal}
+                      />
+                    </label>
+                    {editLogoUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogoModal}
+                        disabled={uploadingLogo}
+                        className="text-xs text-rose-600 hover:text-rose-700 dark:text-rose-400 font-medium cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400">Stored on webserver. PNG, JPG, WEBP, or SVG up to 10MB.</p>
+                </div>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
                   Company / Organization Name <span className="text-rose-500">*</span>

@@ -10,11 +10,12 @@ export interface WorkspaceOrg {
   isOwner: boolean;
   ownerName: string;
   memberCount: number;
+  logoUrl?: string | null;
 }
 
 interface WorkspaceSwitcherProps {
   currentWorkspace: string;
-  onSelectWorkspace: (workspaceId: string, orgName?: string, role?: string) => void;
+  onSelectWorkspace: (workspaceId: string, orgName?: string, role?: string, logoUrl?: string | null) => void;
 }
 
 export default function WorkspaceSwitcher({
@@ -43,10 +44,10 @@ export default function WorkspaceSwitcher({
           if (res.organizations.length > 0) {
             if (isCompanyUser && (currentWorkspace === 'personal' || !currentWorkspace)) {
               const firstOrg = res.organizations[0];
-              onSelectWorkspace(String(firstOrg.orgId), firstOrg.name, firstOrg.role);
+              onSelectWorkspace(String(firstOrg.orgId), firstOrg.name, firstOrg.role, firstOrg.logoUrl);
             } else if (!savedWorkspace && (currentWorkspace === 'personal' || !currentWorkspace)) {
               const firstOrg = res.organizations[0];
-              onSelectWorkspace(String(firstOrg.orgId), firstOrg.name, firstOrg.role);
+              onSelectWorkspace(String(firstOrg.orgId), firstOrg.name, firstOrg.role, firstOrg.logoUrl);
             }
           }
         }
@@ -90,8 +91,12 @@ export default function WorkspaceSwitcher({
     const org = organizations[0];
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-blue-50/90 dark:bg-blue-950/60 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 shadow-2xs select-none">
-        <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center">
-          <Building2 className="w-3.5 h-3.5" />
+        <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center overflow-hidden border border-blue-300/40 shrink-0">
+          {org?.logoUrl ? (
+            <img src={org.logoUrl} alt={org.name} className="w-full h-full object-cover" />
+          ) : (
+            <Building2 className="w-3.5 h-3.5" />
+          )}
         </div>
         <div className="flex items-center gap-1.5 max-w-[170px] sm:max-w-[220px] truncate">
           <span className="truncate font-bold">
@@ -118,12 +123,20 @@ export default function WorkspaceSwitcher({
         }`}
       >
         {isPersonal ? (
-          <div className="w-5 h-5 rounded-md bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300">
-            <User className="w-3.5 h-3.5" />
+          <div className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 overflow-hidden shrink-0">
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-3.5 h-3.5" />
+            )}
           </div>
         ) : (
-          <div className="w-5 h-5 rounded-md bg-blue-600 text-white flex items-center justify-center">
-            <Building2 className="w-3.5 h-3.5" />
+          <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center overflow-hidden border border-blue-300/40 shrink-0">
+            {selectedOrg?.logoUrl ? (
+              <img src={selectedOrg.logoUrl} alt={selectedOrg.name} className="w-full h-full object-cover" />
+            ) : (
+              <Building2 className="w-3.5 h-3.5" />
+            )}
           </div>
         )}
 
@@ -157,7 +170,7 @@ export default function WorkspaceSwitcher({
               <>
                 <div
                   onClick={() => {
-                    onSelectWorkspace('personal');
+                    onSelectWorkspace('personal', 'Personal Workspace', 'owner', null);
                     setIsOpen(false);
                   }}
                   className={`flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-xs transition-colors ${
@@ -167,8 +180,12 @@ export default function WorkspaceSwitcher({
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
-                      <User className="w-4 h-4" />
+                    <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 overflow-hidden">
+                      {user?.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="w-4 h-4" />
+                      )}
                     </div>
                     <div>
                       <p className="font-semibold">Personal Account</p>
@@ -194,7 +211,7 @@ export default function WorkspaceSwitcher({
                 <div
                   key={org.orgId}
                   onClick={() => {
-                    onSelectWorkspace(String(org.orgId), org.name, org.role);
+                    onSelectWorkspace(String(org.orgId), org.name, org.role, org.logoUrl);
                     setIsOpen(false);
                   }}
                   className={`flex items-center justify-between px-3.5 py-2.5 cursor-pointer text-xs transition-colors ${
@@ -204,8 +221,12 @@ export default function WorkspaceSwitcher({
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0">
-                      <Building2 className="w-4 h-4" />
+                    <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0 overflow-hidden border border-blue-200/50 dark:border-blue-800/50">
+                      {org.logoUrl ? (
+                        <img src={org.logoUrl} alt={org.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Building2 className="w-4 h-4" />
+                      )}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 truncate">

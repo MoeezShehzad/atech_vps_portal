@@ -42,6 +42,7 @@ interface UserProfile {
   companyName?: string;
   companySize?: string;
   avatarUrl?: string;
+  companyLogoUrl?: string;
   hasPassword?: boolean;
   authProvider?: string;
 }
@@ -66,6 +67,9 @@ export default function AccountSettings() {
   const [postalCode, setPostalCode] = useState<string>('');
   const [country, setCountry] = useState<string>('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState<boolean>(false);
+  const [uploadingLogo, setUploadingLogo] = useState<boolean>(false);
 
   // Geo SQL Tables State
   const [countriesList, setCountriesList] = useState<CountryOption[]>([]);
@@ -179,6 +183,7 @@ export default function AccountSettings() {
     const userCountry = data.country || 'Pakistan';
     setCountry(userCountry);
     setAvatarPreview(data.avatarUrl || null);
+    setCompanyLogoPreview(data.companyLogoUrl || (data as any).organization?.logoUrl || null);
   };
 
   const fetchProfile = async () => {
@@ -342,21 +347,112 @@ export default function AccountSettings() {
     }
   }, [stateName, provincesList.length]);
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 1. Direct Webserver Multipart Upload for Profile Avatar
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 50 * 1024) {
-        setMessage({ type: 'error', text: 'Avatar image is too large. Please select an image under 50 KB.' });
-        return;
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'Avatar image is too large. Please select an image under 10 MB.' });
+      return;
+    }
+
+    try {
+      setUploadingAvatar(true);
+      setMessage(null);
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const res = await apiCall('/users/me/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res?.success && res.avatarUrl) {
+        setAvatarPreview(res.avatarUrl);
+        updateUser({ avatarUrl: res.avatarUrl });
+        setMessage({ type: 'success', text: 'Profile picture uploaded and saved to webserver.' });
+      } else {
+        setMessage({ type: 'error', text: res?.error || 'Failed to upload profile picture.' });
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err?.message || 'Failed to upload avatar.' });
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = '';
     }
   };
 
+  const handleRemoveAvatar = async () => {
+    try {
+      setUploadingAvatar(true);
+      setMessage(null);
+      const res = await apiCall('/users/me/avatar', { method: 'DELETE' });
+      if (res?.success) {
+        setAvatarPreview(null);
+        updateUser({ avatarUrl: undefined });
+        setMessage({ type: 'success', text: 'Profile picture removed.' });
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err?.message || 'Failed to remove profile picture.' });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  // 2. Direct Webserver Multipart Upload for Company / Organization Logo
+  const handleCompanyLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'Company logo is too large. Please select an image under 10 MB.' });
+      return;
+    }
+
+    try {
+      setUploadingLogo(true);
+      setMessage(null);
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      const res = await apiCall('/company/logo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res?.success && res.logoUrl) {
+        setCompanyLogoPreview(res.logoUrl);
+        updateUser({ companyLogoUrl: res.logoUrl });
+        setMessage({ type: 'success', text: 'Company logo uploaded and saved to webserver.' });
+      } else {
+        setMessage({ type: 'error', text: res?.error || 'Failed to upload company logo.' });
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err?.message || 'Failed to upload company logo.' });
+    } finally {
+      setUploadingLogo(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveCompanyLogo = async () => {
+    try {
+      setUploadingLogo(true);
+      setMessage(null);
+      const res = await apiCall('/company/logo', { method: 'DELETE' });
+      if (res?.success) {
+        setCompanyLogoPreview(null);
+        updateUser({ companyLogoUrl: undefined });
+        setMessage({ type: 'success', text: 'Company logo removed.' });
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err?.message || 'Failed to remove company logo.' });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+      
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -607,13 +703,6 @@ export default function AccountSettings() {
                     <span>{org.memberCount} team members</span>
                   </p>
                 </div>
-
-                <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200/80 dark:border-slate-700 shrink-0">
-                  <Lock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>
-                    Billing Authority: {org.isOwner ? 'Full Control' : 'Restricted to Owner'}
-                  </span>
-                </div>
               </div>
             ))}
           </div>
@@ -632,25 +721,103 @@ export default function AccountSettings() {
           </span>
         </div>
 
-        {/* Profile Avatar Upload */}
-        <div className="flex items-center gap-5">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden text-slate-400 dark:text-slate-500 font-bold text-xl">
-              {avatarPreview ? (
-                <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                (fullName || 'U').charAt(0).toUpperCase()
+        {/* Images & Branding Upload Section (Stored directly on webserver) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+          {/* User Profile Avatar Card */}
+          <div className="flex items-start gap-4">
+            <div className="relative shrink-0">
+              <div className="w-18 h-18 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden text-slate-400 dark:text-slate-500 font-bold text-xl shadow-xs">
+                {uploadingAvatar ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                ) : avatarPreview ? (
+                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  (fullName || 'U').charAt(0).toUpperCase()
+                )}
+              </div>
+              <label 
+                title="Upload profile picture"
+                className="absolute -bottom-1 -right-1 p-1.5 bg-blue-600 text-white rounded-xl cursor-pointer hover:bg-blue-700 transition-all shadow-sm flex items-center justify-center"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <input 
+                  type="file" 
+                  accept="image/jpeg,image/png,image/webp,image/gif" 
+                  className="hidden" 
+                  disabled={uploadingAvatar}
+                  onChange={handleAvatarChange} 
+                />
+              </label>
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-blue-600" />
+                Personal Profile Picture
+              </h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Stored on webserver. PNG, JPG, or WEBP up to 10MB.
+              </p>
+              {avatarPreview && (
+                <button
+                  type="button"
+                  onClick={handleRemoveAvatar}
+                  disabled={uploadingAvatar}
+                  className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:underline pt-0.5 inline-block cursor-pointer"
+                >
+                  Remove picture
+                </button>
               )}
             </div>
-            <label className="absolute -bottom-1 -right-1 p-1.5 bg-blue-600 text-white rounded-xl cursor-pointer hover:bg-blue-700 transition-all shadow-sm">
-              <Camera className="w-3.5 h-3.5" />
-              <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-            </label>
           </div>
-          <div>
-            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">Profile Picture</h4>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">PNG, JPG, or GIF up to 2MB.</p>
-          </div>
+
+          {/* Company / Organization Logo Card (Shown for Company Accounts / Workspaces) */}
+          {isCompanyAccount && (
+            <div className="flex items-start gap-4 border-t md:border-t-0 md:border-l border-slate-200/80 dark:border-slate-700/80 pt-4 md:pt-0 md:pl-5">
+              <div className="relative shrink-0">
+                <div className="w-18 h-18 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden text-slate-400 dark:text-slate-500 font-bold text-xl shadow-xs">
+                  {uploadingLogo ? (
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  ) : companyLogoPreview ? (
+                    <img src={companyLogoPreview} alt="Company Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <Building2 className="w-8 h-8 text-blue-600/70" />
+                  )}
+                </div>
+                <label 
+                  title="Upload company logo"
+                  className="absolute -bottom-1 -right-1 p-1.5 bg-blue-600 text-white rounded-xl cursor-pointer hover:bg-blue-700 transition-all shadow-sm flex items-center justify-center"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <input 
+                    type="file" 
+                    accept="image/jpeg,image/png,image/webp,image/svg+xml" 
+                    className="hidden" 
+                    disabled={uploadingLogo}
+                    onChange={handleCompanyLogoChange} 
+                  />
+                </label>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                  Company / Brand Logo
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Displayed in sidebar and team workspace. Up to 10MB.
+                </p>
+                {companyLogoPreview && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveCompanyLogo}
+                    disabled={uploadingLogo}
+                    className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 hover:underline pt-0.5 inline-block cursor-pointer"
+                  >
+                    Remove logo
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

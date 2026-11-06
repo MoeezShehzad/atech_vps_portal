@@ -534,6 +534,7 @@ model Organization {
   companySize  String?  @map("company_size") @db.NVarChar(50)
   billingEmail String?  @map("billing_email") @db.NVarChar(255)
   taxId        String?  @map("tax_id") @db.NVarChar(50)
+  logo_url     String?  @map("logo_url") @db.NVarChar(Max)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
 

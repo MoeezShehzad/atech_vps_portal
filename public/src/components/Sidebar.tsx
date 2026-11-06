@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Server, 
   HardDrive, 
-  Cpu, 
   Shield, 
   Settings, 
   LogOut, 
@@ -13,6 +11,8 @@ import {
   ChevronRight,
   Boxes,
   Users,
+  Building2,
+  User as UserIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +24,9 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isCompanyWorkspace?: boolean;
   isOwner?: boolean;
+  workspaceName?: string;
+  workspaceLogo?: string | null;
+  workspaceRole?: string;
 }
 
 export default function Sidebar({
@@ -31,6 +34,9 @@ export default function Sidebar({
   setActiveTab,
   isCompanyWorkspace = false,
   isOwner = true,
+  workspaceName,
+  workspaceLogo,
+  workspaceRole,
 }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -60,6 +66,14 @@ export default function Sidebar({
 
   const isCompany = user?.accountType === 'company' || Boolean(user?.companyName) || isCompanyWorkspace || isOwner;
 
+  // Active Workspace / Identity details
+  const effectiveCompanyLogo = workspaceLogo || user?.companyLogoUrl || user?.organization?.logoUrl || null;
+  const personAvatar = user?.avatarUrl || null;
+
+  const displayCompanyName = workspaceName || user?.companyName || user?.organization?.name || 'Company Organization';
+  const displayUserName = user?.fullName || user?.email?.split('@')[0] || 'User Profile';
+  const displayRole = workspaceRole || (isOwner ? 'Owner' : user?.role || 'Member');
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'marketplace', label: '1-Click Marketplace', icon: Boxes },
@@ -77,7 +91,7 @@ export default function Sidebar({
         collapsed ? 'w-20' : 'w-64'
       }`}
     >
-      {/* Single Middle Collapse/Expand Toggle on Sidebar Rail (NOT in options) */}
+      {/* Middle Collapse/Expand Toggle on Sidebar Rail */}
       <button
         type="button"
         onClick={toggleSidebar}
@@ -110,6 +124,101 @@ export default function Sidebar({
               <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">Infrastructure Portal</p>
             </div>
           )}
+        </div>
+
+        {/* Dynamic Workspace / Identity Badge (Company Logo or Person Avatar) */}
+        <div className={`p-3 border-b border-slate-100 dark:border-slate-800 transition-all ${collapsed ? 'flex justify-center' : ''}`}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('settings')}
+            title={
+              collapsed
+                ? isCompanyWorkspace
+                  ? `${displayCompanyName} • Company Workspace (${displayRole})`
+                  : `${displayUserName} • Personal Profile`
+                : 'Account & Profile Settings'
+            }
+            className={`w-full group flex items-center rounded-xl p-2 transition-all hover:bg-slate-100/70 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200/80 dark:hover:border-slate-700/60 cursor-pointer ${
+              activeTab === 'settings'
+                ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/60'
+                : 'bg-slate-50/50 dark:bg-slate-950/30'
+            } ${collapsed ? 'justify-center !p-1.5' : 'space-x-3'}`}
+          >
+            {/* Identity Avatar / Logo Thumbnail */}
+            <div className="relative shrink-0">
+              <div className={`rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 flex items-center justify-center font-bold shadow-xs transition-transform group-hover:scale-105 ${
+                collapsed ? 'w-10 h-10' : 'w-11 h-11'
+              }`}>
+                {isCompanyWorkspace ? (
+                  effectiveCompanyLogo ? (
+                    <img
+                      src={effectiveCompanyLogo}
+                      alt="Company Logo"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-linear-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white text-sm font-black tracking-tight">
+                      {displayCompanyName.charAt(0).toUpperCase()}
+                    </div>
+                  )
+                ) : (
+                  personAvatar ? (
+                    <img
+                      src={personAvatar}
+                      alt={displayUserName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-linear-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white text-sm font-bold">
+                      {(user?.fullName || 'U').charAt(0).toUpperCase()}
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* Persona Status / Type Indicator Pill */}
+              {isCompanyWorkspace ? (
+                <span
+                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-blue-600 border-2 border-white dark:border-slate-900 flex items-center justify-center text-white shadow-2xs"
+                  title="Company Organization"
+                >
+                  <Building2 className="w-2.5 h-2.5" />
+                </span>
+              ) : (
+                <span
+                  className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 shadow-2xs"
+                  title="Personal Account Active"
+                />
+              )}
+            </div>
+
+            {/* Label & Details (Shown when expanded) */}
+            {!collapsed && (
+              <div className="flex-1 min-w-0 text-left">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    {isCompanyWorkspace ? displayCompanyName : displayUserName}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  {isCompanyWorkspace ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                        {displayRole}
+                      </span>
+                      <span className="truncate text-slate-400 dark:text-slate-500">
+                        &bull; {user?.fullName?.split(' ')[0] || user?.email?.split('@')[0]}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate block">
+                      {user?.email || 'Personal Account'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </button>
         </div>
 
         {/* Navigation */}
