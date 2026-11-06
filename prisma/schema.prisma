@@ -21,7 +21,7 @@ model User {
   accountType   String?   @default("individual") @map("account_type") @db.NVarChar(50)
   companyName   String?   @map("company_name") @db.NVarChar(150)
   companySize   String?   @map("company_size") @db.NVarChar(50)
-  googleId      String?   @unique(map: "uq_users_google_id") @map("google_id") @db.VarChar(255)
+  googleId      String?   @map("google_id") @db.VarChar(255)
   provider      String    @default("LOCAL") @map("provider") @db.VarChar(20)
   avatar_url    String?   @db.NVarChar(Max)
   isActive      Boolean   @default(true) @map("is_active")
@@ -505,7 +505,7 @@ model EmailOTP {
 model LegalPolicyVersion {
   id               Int       @id @default(autoincrement()) @map("id")
   policyType       String    @map("policy_type") @db.VarChar(50)
-  title            String    @db.VarChar(255)
+  title            String    @db.NVarChar(255)
   version          String    @db.VarChar(30)
   content          String    @db.NVarChar(Max)
   summaryOfChanges String?   @map("summary_of_changes") @db.NVarChar(Max)
