@@ -11,8 +11,8 @@ param (
     [Parameter(Mandatory=$false)][string]$AdminUsername = "ubuntu",
     [Parameter(Mandatory=$false)][string]$AdminPassword = "",
     [Parameter(Mandatory=$false)][string]$SSHPublicKey = "",
-    [Parameter(Mandatory=$false)][string]$TemplatePath = "D:\00_Master_Template\Ubuntu Server 24.04 LTS.vhdx",
-    [Parameter(Mandatory=$false)][string]$SwitchName = "Default Switch",
+    [Parameter(Mandatory=$false)][string]$TemplatePath = "D:\00-MASTER-TEMPLATES\Ubuntu_Server_24.04_LTS.vhdx",
+    [Parameter(Mandatory=$false)][string]$SwitchName = "External_vSwitch",
     [Parameter(Mandatory=$false)][string]$CustomerVMsRoot = "D:\CUSTOMER-VMS",
     [Parameter(Mandatory=$false)][string]$SystemLogsRoot = "D:\SYSTEM-LOGS\provisioning"
 )
@@ -35,12 +35,19 @@ try {
 
     # Auto-resolve virtual switch if specified switch does not exist
     if (-not (Get-VMSwitch -Name $SwitchName -ErrorAction SilentlyContinue)) {
-        if (Get-VMSwitch -Name "Default Switch" -ErrorAction SilentlyContinue) {
+        if (Get-VMSwitch -Name "External_vSwitch" -ErrorAction SilentlyContinue) {
+            $SwitchName = "External_vSwitch"
+        } elseif (Get-VMSwitch -Name "Default Switch" -ErrorAction SilentlyContinue) {
             $SwitchName = "Default Switch"
         } else {
-            $AnySwitch = Get-VMSwitch -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($AnySwitch) {
-                $SwitchName = $AnySwitch.Name
+            $ExtSwitch = Get-VMSwitch -ErrorAction SilentlyContinue | Where-Object { $_.SwitchType -eq 'External' } | Select-Object -First 1
+            if ($ExtSwitch) {
+                $SwitchName = $ExtSwitch.Name
+            } else {
+                $AnySwitch = Get-VMSwitch -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($AnySwitch) {
+                    $SwitchName = $AnySwitch.Name
+                }
             }
         }
     }
@@ -150,6 +157,9 @@ try {
     exit 0
 }
 catch {
+    if ($VMDirectory -and (Test-Path $VMDirectory) -and (-not (Get-VM -Name $VMName -ErrorAction SilentlyContinue))) {
+        Remove-Item -Path $VMDirectory -Recurse -Force -ErrorAction SilentlyContinue | Out-Null
+    }
     Write-Error "Failed to provision VM '$VMName': $_"
     exit 1
 }

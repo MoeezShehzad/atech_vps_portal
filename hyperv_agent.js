@@ -334,7 +334,7 @@ const server = http.createServer(async (req, res) => {
         AdminPassword: data.adminPassword || '',
         SSHPublicKey: data.sshPublicKey || '',
         TemplatePath: data.templatePath || DEFAULT_TEMPLATE,
-        SwitchName: data.switchName || 'Default Switch',
+        SwitchName: data.switchName || process.env.HYPERV_SWITCH_NAME || 'External_vSwitch',
       });
 
       // Asynchronously provision guest OS in background ONLY for Linux VMs
@@ -515,7 +515,7 @@ const server = http.createServer(async (req, res) => {
         AdminPassword: adminPassword || '',
         SSHPublicKey: sshPublicKey || '',
         TemplatePath: templatePath || DEFAULT_TEMPLATE,
-        SwitchName: data.switchName || 'Default Switch',
+        SwitchName: data.switchName || process.env.HYPERV_SWITCH_NAME || 'External_vSwitch',
       });
 
       const isWindowsRebuild = (data.osFamily && data.osFamily.toLowerCase() === 'windows') ||
