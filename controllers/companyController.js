@@ -1005,7 +1005,7 @@ export const uploadCompanyLogo = async (req, res) => {
       safelyRemoveUploadedFile(org.logo_url);
     }
 
-    const logoUrl = `/uploads/logos/${req.file.filename}`;
+    const logoUrl = req.file.relativeUrl || `/uploads/logos/${req.file.filename}`;
 
     const updated = await prisma.organization.update({
       where: { orgId: org.orgId },

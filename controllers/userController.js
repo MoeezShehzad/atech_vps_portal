@@ -163,7 +163,7 @@ export const uploadAvatar = async (req, res) => {
     }
 
     // Relative web URL served via Express static
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    const avatarUrl = req.file.relativeUrl || `/uploads/avatars/${req.file.filename}`;
 
     const updatedUser = await prisma.user.update({
       where: { userId },

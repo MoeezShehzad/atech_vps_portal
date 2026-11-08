@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import prisma from '../lib/prisma.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,7 +14,18 @@ const UPLOADS_DIR = path.join(ROOT_DIR, 'uploads');
 const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars');
 const LOGOS_DIR = path.join(UPLOADS_DIR, 'logos');
 
-// Ensure directories exist
+// Helper to sanitize folder / slug names for safe filesystem storage
+export function sanitizeSlug(str) {
+  if (!str || typeof str !== 'string') return 'general';
+  return str
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .substring(0, 40) || 'general';
+}
+
+// Ensure base directories exist
 for (const dir of [UPLOADS_DIR, AVATARS_DIR, LOGOS_DIR]) {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -49,11 +61,36 @@ function fileFilter(req, file, cb) {
 }
 
 /**
- * Disk storage for User Avatars
+ * Disk storage for User Avatars (Tenant & User Isolated)
+ * Path: /uploads/users/<UserSlug>_<UserId>/avatars/<filename>
  */
 const avatarStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, AVATARS_DIR);
+  destination: async (req, _file, cb) => {
+    try {
+      const userId = Number(req.user?.userId || req.user?.id);
+      let userSlug = 'user';
+
+      if (userId) {
+        const user = await prisma.user.findUnique({
+          where: { userId },
+          select: { fullName: true, email: true },
+        });
+        const namePart = user?.fullName || user?.email?.split('@')[0] || req.user?.fullName || req.user?.email?.split('@')[0];
+        userSlug = sanitizeSlug(namePart);
+      }
+
+      const folderName = `${userSlug}_${userId || 'anon'}`;
+      const targetDir = path.join(UPLOADS_DIR, 'users', folderName, 'avatars');
+
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      cb(null, targetDir);
+    } catch (err) {
+      console.warn('[Avatar Upload Destination Fallback]:', err.message);
+      cb(null, AVATARS_DIR);
+    }
   },
   filename: (req, file, cb) => {
     const userId = req.user?.id || req.user?.userId || 'user';
@@ -65,11 +102,58 @@ const avatarStorage = multer.diskStorage({
 });
 
 /**
- * Disk storage for Organization / Company Logos
+ * Disk storage for Organization / Company Logos (Tenant & Company Isolated)
+ * Path: /uploads/companies/<CompanySlug>_<OrgId>/logos/<filename>
  */
 const logoStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, LOGOS_DIR);
+  destination: async (req, _file, cb) => {
+    try {
+      const userId = Number(req.user?.userId || req.user?.id);
+      let orgSlug = 'company';
+      let orgId = req.org?.orgId || req.params?.orgId || req.body?.orgId;
+
+      if (userId) {
+        let org = null;
+        if (orgId) {
+          org = await prisma.organization.findUnique({ where: { orgId: Number(orgId) } });
+        }
+        if (!org) {
+          org = await prisma.organization.findFirst({
+            where: {
+              OR: [
+                { ownerId: userId },
+                { members: { some: { userId, status: 'active' } } },
+              ],
+            },
+          });
+        }
+
+        if (org) {
+          orgSlug = sanitizeSlug(org.name);
+          orgId = org.orgId;
+        } else {
+          const user = await prisma.user.findUnique({
+            where: { userId },
+            select: { companyName: true },
+          });
+          if (user?.companyName) {
+            orgSlug = sanitizeSlug(user.companyName);
+          }
+        }
+      }
+
+      const folderName = `${orgSlug}_${orgId || 'org'}`;
+      const targetDir = path.join(UPLOADS_DIR, 'companies', folderName, 'logos');
+
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      cb(null, targetDir);
+    } catch (err) {
+      console.warn('[Logo Upload Destination Fallback]:', err.message);
+      cb(null, LOGOS_DIR);
+    }
   },
   filename: (req, file, cb) => {
     const orgId = req.org?.orgId || req.params?.orgId || req.body?.orgId || 'org';
@@ -113,6 +197,11 @@ export function handleAvatarUpload(req, res, next) {
       return res.status(400).json({ error: 'No image file uploaded. Please select an image.' });
     }
 
+    if (req.file.path) {
+      const relativeFromUploads = path.relative(UPLOADS_DIR, req.file.path).replace(/\\/g, '/');
+      req.file.relativeUrl = `/uploads/${relativeFromUploads}`;
+    }
+
     next();
   });
 }
@@ -133,6 +222,11 @@ export function handleLogoUpload(req, res, next) {
 
     if (!req.file) {
       return res.status(400).json({ error: 'No logo image file uploaded. Please select an image.' });
+    }
+
+    if (req.file.path) {
+      const relativeFromUploads = path.relative(UPLOADS_DIR, req.file.path).replace(/\\/g, '/');
+      req.file.relativeUrl = `/uploads/${relativeFromUploads}`;
     }
 
     next();
