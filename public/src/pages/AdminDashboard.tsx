@@ -74,7 +74,12 @@ import {
   HelpCircle,
   ExternalLink,
   Printer,
+  Terminal,
+  Monitor,
 } from 'lucide-react';
+
+const WebConsoleModal = React.lazy(() => import('../components/WebConsoleModal'));
+const WebDesktopModal = React.lazy(() => import('../components/WebDesktopModal'));
 import { jsPDF } from 'jspdf';
 import AdminPoliciesTab from '../components/AdminPoliciesTab';
 import { apiCall, setAccessToken, getAccessToken } from '../services/api';
@@ -857,7 +862,106 @@ export default function AdminDashboard() {
     }
   };
 
-  const executeFleetPower = async (vmId: number, action: 'START' | 'STOP') => {
+  // Web Terminal Console / Windows Desktop state
+  const [consoleVm, setConsoleVm] = useState<any | null>(null);
+
+  // Resize modal state for Fleet VMs
+  const [resizingVm, setResizingVm] = useState<any | null>(null);
+  const [resizeCpu, setResizeCpu] = useState<number>(2);
+  const [resizeRam, setResizeRam] = useState<number>(4);
+  const [resizeStorage, setResizeStorage] = useState<number>(50);
+  const [resizePricing, setResizePricing] = useState<any | null>(null);
+  const [resizeLoading, setResizeLoading] = useState(false);
+
+  const handleOpenConsoleOrDesktop = (vm: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (vm.status !== 'running') {
+      toast.info(`Server '${vm.name}' is currently powered off. Please start the server to connect.`);
+      return;
+    }
+    const isWin = Boolean(vm.isWindows || vm.os?.toLowerCase().includes('win') || vm.osFamily?.toLowerCase().includes('win'));
+    if (isWin) {
+      const width = Math.min(1600, window.screen.availWidth - 60);
+      const height = Math.min(1000, window.screen.availHeight - 60);
+      const left = Math.max(20, Math.round((window.screen.availWidth - width) / 2));
+      const top = Math.max(20, Math.round((window.screen.availHeight - height) / 2));
+
+      window.open(
+        `/desktop/${vm.vmId}`,
+        `ATC_Desktop_${vm.vmId}`,
+        `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+      );
+    } else {
+      setConsoleVm(vm);
+    }
+  };
+
+  const openResizeModal = (vm: any, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setResizingVm(vm);
+    setResizeCpu(vm.cpuCores || vm.vCPU || 2);
+    setResizeRam(vm.ramGb || vm.ramGB || 4);
+    setResizeStorage(vm.storageGb || vm.diskGB || 50);
+    setResizePricing({ newPrice: vm.monthlyPrice || 20, priceDelta: 0 });
+  };
+
+  useEffect(() => {
+    if (!resizingVm) return;
+    const updatePreview = async () => {
+      try {
+        const data = await apiCall(`/vms/${resizingVm.vmId}/preview-resize`, {
+          method: 'POST',
+          body: JSON.stringify({ cpuCores: resizeCpu, ramGb: resizeRam, storageGb: resizeStorage }),
+        });
+        if (data) {
+          setResizePricing(data);
+        }
+      } catch (err) {
+        console.error('Preview resize error:', err);
+      }
+    };
+    updatePreview();
+  }, [resizeCpu, resizeRam, resizeStorage, resizingVm]);
+
+  const handleResizeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resizingVm) return;
+
+    setResizeLoading(true);
+    try {
+      const res = await apiCall(`/vms/${resizingVm.vmId}/resize`, {
+        method: 'PATCH',
+        body: JSON.stringify({ cpuCores: resizeCpu, ramGb: resizeRam, storageGb: resizeStorage }),
+      });
+      if (res && (res.success || res.updatedVm)) {
+        toast.success(`Specs successfully scaled for '${resizingVm.name}'`);
+        setFleetVMs((prev) =>
+          prev.map((v) =>
+            v.vmId === resizingVm.vmId
+              ? {
+                  ...v,
+                  cpuCores: resizeCpu,
+                  ramGb: resizeRam,
+                  storageGb: resizeStorage,
+                  vCPU: resizeCpu,
+                  ramGB: resizeRam,
+                  diskGB: resizeStorage,
+                }
+              : v
+          )
+        );
+        setResizingVm(null);
+      } else {
+        toast.error(res?.error || 'Failed to scale specs.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error executing hardware resize.');
+    } finally {
+      setResizeLoading(false);
+    }
+  };
+
+  const executeFleetPower = async (vmId: number, action: 'START' | 'STOP' | 'RESTART') => {
     try {
       setPowerActionLoadingId(vmId);
       const res = await apiCall(`/admin/fleet/vms/${vmId}/power`, {
@@ -867,7 +971,11 @@ export default function AdminDashboard() {
       if (res && res.success) {
         toast.success(res.message);
         setFleetVMs((prev) =>
-          prev.map((v) => (v.vmId === vmId ? { ...v, status: action === 'START' ? 'running' : 'stopped' } : v))
+          prev.map((v) =>
+            v.vmId === vmId
+              ? { ...v, status: action === 'START' || action === 'RESTART' ? 'running' : 'stopped' }
+              : v
+          )
         );
       }
     } catch (err: any) {
@@ -2994,32 +3102,92 @@ export default function AdminDashboard() {
                     <th className="px-6 py-3.5">Status</th>
                     <th className="px-6 py-3.5">IP</th>
                     <th className="px-6 py-3.5">Specs</th>
-                    <th className="px-6 py-3.5 text-right">Power Override</th>
+                    <th className="px-6 py-3.5 text-right">Fleet Actions / Controls</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {fleetVMs.map((v) => (
-                    <tr key={v.vmId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                      <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white text-xs">{v.name}</td>
-                      <td className="px-6 py-4 text-xs font-mono">{v.owner?.email || 'N/A'}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${v.status === 'running' ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                          {v.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-xs font-mono">{v.ip}</td>
-                      <td className="px-6 py-4 text-xs font-mono">{v.cpuCores} vCPU • {v.ramGb} GB</td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => handleFleetPower(v.vmId, v.status)}
-                          disabled={powerActionLoadingId === v.vmId}
-                          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-rose-600"
-                        >
-                          <Power className={`w-4 h-4 ${powerActionLoadingId === v.vmId ? 'animate-spin' : ''}`} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {fleetVMs.map((v) => {
+                    const isWin = Boolean(v.isWindows || v.os?.toLowerCase().includes('win') || v.osFamily?.toLowerCase().includes('win'));
+                    return (
+                      <tr key={v.vmId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white text-xs">{v.name}</td>
+                        <td className="px-6 py-4 text-xs font-mono">{v.owner?.email || 'N/A'}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${v.status === 'running' ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                            {v.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-xs font-mono">{v.ip}</td>
+                        <td className="px-6 py-4 text-xs font-mono">{v.cpuCores} vCPU • {v.ramGb} GB</td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* POWER TOGGLE BUTTON (START / STOP) */}
+                            <button
+                              onClick={() => handleFleetPower(v.vmId, v.status)}
+                              disabled={powerActionLoadingId === v.vmId}
+                              title={v.status === 'running' ? "Power Off Instance" : "Power On Instance"}
+                              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                                v.status === 'running'
+                                  ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-600 hover:border-rose-200 dark:hover:border-rose-800'
+                                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-600 hover:border-emerald-200 dark:hover:border-emerald-800'
+                              }`}
+                            >
+                              <Power className={`w-3.5 h-3.5 ${powerActionLoadingId === v.vmId ? 'animate-spin' : ''}`} />
+                            </button>
+
+                            {/* RESTART / REBOOT BUTTON */}
+                            <button
+                              onClick={() => executeFleetPower(v.vmId, 'RESTART')}
+                              disabled={powerActionLoadingId === v.vmId || v.status !== 'running'}
+                              title={v.status === 'running' ? "Reboot / Restart Server" : "Cannot reboot while powered off"}
+                              className={`p-1.5 rounded-lg border transition-all ${
+                                v.status === 'running'
+                                  ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:border-amber-200 dark:hover:border-amber-800 cursor-pointer'
+                                  : 'opacity-40 cursor-not-allowed border-slate-200 dark:border-slate-700 text-slate-400'
+                              }`}
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${powerActionLoadingId === v.vmId ? 'animate-spin' : ''}`} />
+                            </button>
+
+                            {/* RESIZE HARDWARE SPECS BUTTON */}
+                            <button
+                              onClick={(e) => openResizeModal(v, e)}
+                              title="Scale CPU, RAM & Disk Specs"
+                              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-200 dark:hover:border-blue-800 transition-all cursor-pointer"
+                            >
+                              <Sliders className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* TERMINAL (LINUX) / RDP (WINDOWS) BUTTON */}
+                            <button
+                              onClick={(e) => handleOpenConsoleOrDesktop(v, e)}
+                              disabled={v.status !== 'running'}
+                              title={
+                                v.status !== 'running'
+                                  ? 'VM must be running to connect'
+                                  : isWin
+                                  ? 'Open Windows Desktop (Separate Screen / RDP)'
+                                  : 'Open In-Browser Web Console Terminal (SSH)'
+                              }
+                              className={`p-1.5 rounded-lg border transition-all ${
+                                v.status !== 'running'
+                                  ? 'opacity-40 cursor-not-allowed border-slate-200 dark:border-slate-700 text-slate-400'
+                                  : isWin
+                                  ? 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:border-sky-200 dark:hover:border-sky-800 cursor-pointer'
+                                  : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-200 dark:hover:border-emerald-800 cursor-pointer'
+                              }`}
+                            >
+                              {isWin ? (
+                                <Monitor className="w-3.5 h-3.5 text-sky-500" />
+                              ) : (
+                                <Terminal className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -4845,6 +5013,210 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+      )}
+      {/* HARDWARE SPECS RESIZE MODAL */}
+      {resizingVm && (
+        <div className="fixed inset-0 z-[120] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 relative animate-in fade-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setResizingVm(null)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 text-blue-600 mb-2">
+              <div className="p-2.5 bg-blue-50 dark:bg-blue-950/60 rounded-xl">
+                <Sliders className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white font-poppins">
+                  Scale Hardware Specs
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Target Fleet VM: <strong className="text-slate-800 dark:text-slate-200">{resizingVm.name}</strong> ({resizingVm.owner?.email || 'N/A'})
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleResizeSubmit} className="space-y-6 mt-6">
+              {/* CPU CORES SLIDER */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Cpu className="w-4 h-4 text-blue-600 dark:text-blue-400" /> vCPU Cores
+                  </span>
+                  <span className="text-blue-600 dark:text-blue-400 font-bold text-sm">{resizeCpu} Cores</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="16"
+                  step="1"
+                  value={resizeCpu}
+                  onChange={(e) => setResizeCpu(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>1 Core</span>
+                  <span>4 Cores</span>
+                  <span>8 Cores</span>
+                  <span>16 Cores</span>
+                </div>
+              </div>
+
+              {/* RAM SLIDER */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <MemoryStick className="w-4 h-4 text-purple-600 dark:text-purple-400" /> RAM Memory
+                  </span>
+                  <span className="text-purple-600 dark:text-purple-400 font-bold text-sm">{resizeRam} GB RAM</span>
+                </div>
+                <input
+                  type="range"
+                  min="2"
+                  max="64"
+                  step="2"
+                  value={resizeRam}
+                  onChange={(e) => setResizeRam(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>2 GB</span>
+                  <span>16 GB</span>
+                  <span>32 GB</span>
+                  <span>64 GB</span>
+                </div>
+              </div>
+
+              {/* SSD STORAGE SLIDER */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-semibold">
+                  <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <HardDrive className="w-4 h-4 text-amber-600 dark:text-amber-400" /> SSD Storage Disk
+                  </span>
+                  <span className="text-amber-600 dark:text-amber-400 font-bold text-sm">{resizeStorage} GB SSD</span>
+                </div>
+                <input
+                  type="range"
+                  min={resizingVm.storageGb || resizingVm.diskGB || 20}
+                  max="500"
+                  step="10"
+                  value={resizeStorage}
+                  onChange={(e) => setResizeStorage(Number(e.target.value))}
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>{resizingVm.storageGb || resizingVm.diskGB || 20} GB (Current)</span>
+                  <span>100 GB</span>
+                  <span>250 GB</span>
+                  <span>500 GB</span>
+                </div>
+                <p className="text-[10px] text-slate-400 italic">
+                  * Dynamic expansion: Virtual disks can be scaled up dynamically without data loss. Disk shrinking is not supported to protect file system data.
+                </p>
+              </div>
+
+              {/* PRORATED PRICE PREVIEW */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 font-medium">
+                  <span>Billing Cycle Status:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {resizePricing?.daysRemaining ?? 15} days remaining in cycle
+                  </span>
+                </div>
+
+                {resizePricing?.unusedOldCredit !== undefined && resizePricing.priceDelta > 0 && (
+                  <div className="space-y-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px]">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Unused Current Plan Credit ({resizePricing.daysRemaining}d):</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
+                        -${resizePricing.unusedOldCredit?.toFixed(2)} USD
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>Prorated Upgraded Specs ({resizePricing.daysRemaining}d):</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-semibold font-mono">
+                        +${resizePricing.proratedNewCost?.toFixed(2)} USD
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-slate-900 dark:text-white text-xs">Amount Due Today (Prorated):</p>
+                    <p className="text-[10px] text-slate-400">
+                      ~\${resizePricing?.hourlyRate || '0.00'}/hr equivalent
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-blue-600 dark:text-blue-400 font-mono">
+                      ${resizePricing?.dueToday !== undefined ? resizePricing.dueToday.toFixed(2) : (resizePricing?.newPrice || resizingVm.monthlyPrice || 20)}
+                      <span className="text-xs font-normal text-slate-500"> USD</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-200/60 dark:border-slate-700/60 flex justify-between">
+                  <span>Next Recurring Monthly Bill:</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">
+                    ${resizePricing?.newPrice || resizingVm.monthlyPrice || 20}/mo
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setResizingVm(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resizeLoading}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  {resizeLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Adjusting Specs...
+                    </>
+                  ) : (
+                    `Apply Specification Changes ${resizePricing?.dueToday ? `(\${resizePricing.dueToday.toFixed(2)})` : ''}`
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* INTERACTIVE WEB TERMINAL / WINDOWS DESKTOP CONSOLE MODAL */}
+      {consoleVm && (
+        <React.Suspense fallback={null}>
+          {Boolean(consoleVm.isWindows || consoleVm.os?.toLowerCase().includes('win') || consoleVm.osFamily?.toLowerCase().includes('win')) ? (
+            <WebDesktopModal
+              vmId={consoleVm.vmId}
+              vmName={consoleVm.name}
+              vmIp={consoleVm.ip}
+              adminUser={consoleVm.adminUser}
+              onClose={() => setConsoleVm(null)}
+              onSessionEnd={fetchFleet}
+            />
+          ) : (
+            <WebConsoleModal
+              vmId={consoleVm.vmId}
+              vmName={consoleVm.name}
+              vmIp={consoleVm.ip}
+              adminUser={consoleVm.adminUser}
+              onClose={() => setConsoleVm(null)}
+              onSessionEnd={fetchFleet}
+            />
+          )}
+        </React.Suspense>
       )}
     </div>
   );

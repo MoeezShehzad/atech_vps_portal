@@ -110,6 +110,25 @@ export async function getAuthorizedVm(vmId, userId, options = {}) {
     return { vm, role: 'owner', isOrgContext: false, effectiveUserId: userId };
   }
 
+  // 1.5 System Administrator / Superuser check (enables cluster fleet management)
+  const callerUser = await prisma.user.findUnique({
+    where: { userId },
+    include: {
+      userRoles: {
+        include: { role: true },
+      },
+    },
+  });
+
+  const isSystemAdmin = callerUser?.userRoles?.some((ur) => {
+    const rName = ur.role?.roleName?.toLowerCase();
+    return rName === 'admin' || rName === 'superuser' || rName === 'super admin';
+  });
+
+  if (isSystemAdmin) {
+    return { vm, role: 'admin', isOrgContext: false, effectiveUserId: vm.userId, isAdminOverride: true };
+  }
+
   // 2. Organization membership check
   // Check if caller is an active member in an organization owned by the VM owner
   const membership = await prisma.organizationMember.findFirst({
@@ -891,14 +910,14 @@ export async function resizeVM(req, res) {
 
     const { vm } = authResult;
 
-    if (vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED') {
+    if (!authResult.isAdminOverride && (vm.status === 'SUSPENDED' || vm.subscription?.status === 'SUSPENDED')) {
       return res.status(403).json({
         error: 'Hardware specification upgrades are locked while this instance is in billing suspension. Please reactivate to restore access.',
         isSuspended: true,
       });
     }
 
-    if (vm.subscription?.status === 'TRIAL') {
+    if (!authResult.isAdminOverride && vm.subscription?.status === 'TRIAL') {
       return res.status(403).json({
         error: 'Hardware upgrades are not available on free trial instances. Please convert to a paid subscription first.',
       });
@@ -953,7 +972,7 @@ export async function resizeVM(req, res) {
         const invNum = `INV-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
         generatedInvoice = await prisma.invoice.create({
           data: {
-            userId,
+            userId: authResult.effectiveUserId || vm.userId || userId,
             subscriptionId: vm.subscriptionId,
             invoiceNumber: invNum,
             subtotal: priceInfo.dueToday,

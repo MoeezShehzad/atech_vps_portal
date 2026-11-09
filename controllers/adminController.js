@@ -332,16 +332,35 @@ export async function getFleetVMs(req, res) {
       const hv = hvMap.get(vmDisplayName.toLowerCase());
       const assignedIp = (v.ipPool && v.ipPool.length > 0) ? v.ipPool[0].ipAddress : (v.ipAddress || '172.19.124.x');
 
+      const osFamily = (v.image?.osFamily || '').toLowerCase();
+      const imageName = (v.image?.name || '').toLowerCase();
+      const templatePath = (v.image?.templatePath || '').toLowerCase();
+      const adminUser = (v.adminUser || '').toLowerCase();
+      const isWindows = Boolean(
+        osFamily.includes('win') ||
+        imageName.includes('win') ||
+        templatePath.includes('win') ||
+        adminUser === 'administrator' ||
+        adminUser === 'user'
+      );
+
       return {
         vmId: v.vmId,
         name: vmDisplayName,
         hostname: v.hostname || `${vmDisplayName}.atc-cloud.net`,
         os: v.image?.name || 'Ubuntu 24.04 LTS',
+        osFamily: v.image?.osFamily || '',
+        adminUser: v.adminUser || 'ubuntu',
+        isWindows,
         status: hv?.State ? (hv.State === 'Running' ? 'running' : 'stopped') : (v.status ? v.status.toLowerCase() : 'stopped'),
         ip: assignedIp,
         cpuCores: v.cpuCores,
         ramGb: v.ramGb,
         storageGb: v.storageGb,
+        vCPU: v.cpuCores,
+        ramGB: v.ramGb,
+        diskGB: v.storageGb,
+        monthlyPrice: v.plan?.priceMonthly ? Number(v.plan.priceMonthly) : 20,
         owner: {
           userId: v.user?.userId,
           fullName: v.user?.fullName,
