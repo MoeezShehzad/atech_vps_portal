@@ -36,26 +36,26 @@ export const PLAN_SPEC_RATES = {
     cpuPerCoreMonth: 1.00,
     ramPerGbMonth: 0.594,
     storagePerGbMonth: 0.05,
-    maxSnapshots: 7,
+    maxSnapshots: 5,
   },
   'VPS Enterprise': {
     cpuPerCoreMonth: 1.00,
     ramPerGbMonth: 0.594,
     storagePerGbMonth: 0.05,
-    maxSnapshots: 7,
+    maxSnapshots: 5,
   },
   // Plan 4: VPS Ultra Compute ($59.99/mo: 16 Cores @ $0.95, 32GB RAM @ $0.587, 500GB SSD @ $0.052)
   4: {
     cpuPerCoreMonth: 0.95,
     ramPerGbMonth: 0.587,
     storagePerGbMonth: 0.052,
-    maxSnapshots: 5,
+    maxSnapshots: 7,
   },
   'VPS Ultra Compute': {
     cpuPerCoreMonth: 0.95,
     ramPerGbMonth: 0.587,
     storagePerGbMonth: 0.052,
-    maxSnapshots: 5,
+    maxSnapshots: 7,
   },
 };
 

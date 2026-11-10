@@ -11,10 +11,10 @@ export const PLAN_SPEC_RATES: Record<number | string, {
   'VPS Basic': { cpuPerCoreMonth: 2.00, ramPerGbMonth: 0.7225, storagePerGbMonth: 0.02, maxSnapshots: 1 },
   2: { cpuPerCoreMonth: 1.05, ramPerGbMonth: 0.598, storagePerGbMonth: 0.05, maxSnapshots: 2 },
   'VPS Pro': { cpuPerCoreMonth: 1.05, ramPerGbMonth: 0.598, storagePerGbMonth: 0.05, maxSnapshots: 2 },
-  3: { cpuPerCoreMonth: 1.00, ramPerGbMonth: 0.594, storagePerGbMonth: 0.05, maxSnapshots: 7 },
-  'VPS Enterprise': { cpuPerCoreMonth: 1.00, ramPerGbMonth: 0.594, storagePerGbMonth: 0.05, maxSnapshots: 7 },
-  4: { cpuPerCoreMonth: 0.95, ramPerGbMonth: 0.587, storagePerGbMonth: 0.052, maxSnapshots: 5 },
-  'VPS Ultra Compute': { cpuPerCoreMonth: 0.95, ramPerGbMonth: 0.587, storagePerGbMonth: 0.052, maxSnapshots: 5 },
+  3: { cpuPerCoreMonth: 1.00, ramPerGbMonth: 0.594, storagePerGbMonth: 0.05, maxSnapshots: 5 },
+  'VPS Enterprise': { cpuPerCoreMonth: 1.00, ramPerGbMonth: 0.594, storagePerGbMonth: 0.05, maxSnapshots: 5 },
+  4: { cpuPerCoreMonth: 0.95, ramPerGbMonth: 0.587, storagePerGbMonth: 0.052, maxSnapshots: 7 },
+  'VPS Ultra Compute': { cpuPerCoreMonth: 0.95, ramPerGbMonth: 0.587, storagePerGbMonth: 0.052, maxSnapshots: 7 },
 };
 
 export const DEFAULT_SPEC_RATES = {

@@ -12,7 +12,7 @@ const filesToSync = [
 ];
 
 const conn = new Client();
-console.log('Connecting to Ubuntu VM 172.31.40.75...');
+console.log('Connecting to Ubuntu VM 172.23.201.102...');
 
 conn.on('ready', () => {
   console.log('SSH connection ready. Opening SFTP...');
@@ -76,7 +76,7 @@ conn.on('ready', () => {
 }).on('error', err => {
   console.error('SSH connect error:', err);
 }).connect({
-  host: '172.31.40.75',
+  host: '172.23.201.102',
   port: 22,
   username: 'ubuntu',
   password: 'root',

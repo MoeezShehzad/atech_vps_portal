@@ -8,8 +8,8 @@ conn.on('ready', () => {
     async function run() {
       await prisma.vPSPlan.updateMany({ where: { name: 'VPS Basic' }, data: { maxSnapshots: 1 } });
       await prisma.vPSPlan.updateMany({ where: { name: 'VPS Pro' }, data: { maxSnapshots: 2 } });
-      await prisma.vPSPlan.updateMany({ where: { name: 'VPS Enterprise' }, data: { maxSnapshots: 7 } });
-      await prisma.vPSPlan.updateMany({ where: { name: 'VPS Ultra Compute' }, data: { maxSnapshots: 5 } });
+      await prisma.vPSPlan.updateMany({ where: { name: 'VPS Enterprise' }, data: { maxSnapshots: 5 } });
+      await prisma.vPSPlan.updateMany({ where: { name: 'VPS Ultra Compute' }, data: { maxSnapshots: 7 } });
       const plans = await prisma.vPSPlan.findMany({ select: { name: true, maxSnapshots: true } });
       console.log('SUCCESS_DB_SNAPSHOTS:', plans);
       await prisma.\\$disconnect();
@@ -32,7 +32,7 @@ conn.on('ready', () => {
 }).on('error', err => {
   console.error('SSH Error:', err);
 }).connect({
-  host: '172.31.40.75',
+  host: '172.23.201.102',
   port: 22,
   username: 'ubuntu',
   password: 'root',

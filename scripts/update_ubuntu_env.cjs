@@ -3,7 +3,9 @@ const { Client } = require('ssh2');
 const conn = new Client();
 conn.on('ready', () => {
   const cmd = `
-    sed -i 's/172.28.64.1/172.31.32.1/g' /home/ubuntu/atech_vps_portal/.env
+    sed -i 's/172.31.32.1/172.23.192.1/g' /home/ubuntu/atech_vps_portal/.env
+    sed -i 's/172.31.40.75/172.23.201.102/g' /home/ubuntu/atech_vps_portal/.env
+    sed -i 's/172.28.70.228/172.23.201.102/g' /home/ubuntu/atech_vps_portal/.env
     echo "=== UPDATED .ENV ==="
     grep DATABASE_URL /home/ubuntu/atech_vps_portal/.env
     echo "=== RESTARTING BACKEND ==="
@@ -28,7 +30,7 @@ conn.on('ready', () => {
 }).on('error', err => {
   console.error('SSH Error:', err);
 }).connect({
-  host: '172.31.40.75',
+  host: '172.23.201.102',
   port: 22,
   username: 'ubuntu',
   password: 'root',

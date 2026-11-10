@@ -250,7 +250,7 @@ export default function ServerConfigure() {
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-slate-400 block font-medium">Snapshots</span>
                   <span className="font-bold text-blue-600">
-                    {selectedPlan.maxSnapshots || (selectedPlan.name?.includes('Pro') ? 2 : selectedPlan.name?.includes('Enterprise') ? 7 : selectedPlan.name?.includes('Ultra') ? 5 : 1)} Included
+                    {selectedPlan.maxSnapshots || (selectedPlan.name?.includes('Pro') ? 2 : selectedPlan.name?.includes('Enterprise') ? 5 : selectedPlan.name?.includes('Ultra') ? 7 : 1)} Included
                   </span>
                 </div>
               </div>
