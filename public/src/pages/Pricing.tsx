@@ -189,19 +189,19 @@ export default function Pricing() {
     <div className="min-h-screen bg-white text-slate-900 py-16 px-6 font-sans">
       <div className="max-w-6xl mx-auto space-y-16">
         {/* HEADER & TOGGLE */}
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl font-extrabold text-slate-950 sm:text-5xl tracking-tight">
+        <div className="text-center space-y-3">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 tracking-tight">
             Affordable & Secure VPS Hosting
           </h1>
-          <p className="text-slate-500 max-w-2xl mx-auto text-base">
-            Full virtualization, unmetered bandwidth, and high-speed SSD storage.
+          <p className="text-slate-500 max-w-xl mx-auto text-sm font-normal">
+            Full virtualization, dedicated resources, and high-speed SSD storage.
           </p>
 
           {/* SMOOTH PILL SWITCH TOGGLE */}
-          <div className="pt-4 flex items-center justify-center gap-3">
+          <div className="pt-2 flex items-center justify-center gap-3">
             <span
-              className={`text-xs font-bold transition-colors cursor-pointer select-none ${
-                billingCycle === 'monthly' ? 'text-slate-950' : 'text-slate-400'
+              className={`text-xs font-medium transition-colors cursor-pointer select-none ${
+                billingCycle === 'monthly' ? 'text-slate-900' : 'text-slate-400'
               }`}
               onClick={() => setBillingCycle('monthly')}
             >
@@ -211,24 +211,24 @@ export default function Pricing() {
             <button
               type="button"
               onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-              className="w-12 h-6 bg-slate-200 rounded-full p-1 relative transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+              className="w-11 h-6 bg-slate-200 rounded-full p-1 relative transition-colors focus:outline-none"
               aria-label="Toggle Billing Cycle"
             >
               <div
                 className={`w-4 h-4 bg-blue-600 rounded-full transition-transform duration-200 ease-in-out ${
-                  billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-0'
+                  billingCycle === 'yearly' ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>
 
             <span
-              className={`text-xs font-bold transition-colors cursor-pointer select-none flex items-center gap-1.5 ${
-                billingCycle === 'yearly' ? 'text-slate-950' : 'text-slate-400'
+              className={`text-xs font-medium transition-colors cursor-pointer select-none flex items-center gap-1.5 ${
+                billingCycle === 'yearly' ? 'text-slate-900' : 'text-slate-400'
               }`}
               onClick={() => setBillingCycle('yearly')}
             >
               <span>1-Year Term</span>
-              <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2 py-0.5 rounded-full font-medium">
                 Save 15%
               </span>
             </span>
@@ -247,16 +247,16 @@ export default function Pricing() {
             return (
               <div
                 key={plan.planId}
-                className={`relative rounded-3xl p-6 flex flex-col justify-between transition-all bg-white ${
+                className={`relative rounded-2xl p-6 flex flex-col justify-between transition-all bg-white ${
                   isBestseller
-                    ? 'border-2 border-blue-600 shadow-xl scale-105 z-10'
-                    : 'border border-slate-200 shadow-sm hover:border-slate-300'
+                    ? 'border-2 border-blue-600 shadow-lg scale-102 z-10'
+                    : 'border border-slate-200 shadow-xs hover:border-slate-300'
                 }`}
               >
                 {/* PROMO / TAG BADGES */}
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-3 min-h-[22px]">
                   {plan.promoSaveText && billingCycle === 'yearly' ? (
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full border border-emerald-200">
+                    <span className="bg-emerald-50 text-emerald-700 text-[10px] font-medium uppercase px-2 py-0.5 rounded-md border border-emerald-200">
                       {plan.promoSaveText}
                     </span>
                   ) : (
@@ -264,69 +264,69 @@ export default function Pricing() {
                   )}
 
                   {plan.tag && (
-                    <span className="bg-blue-600 text-white text-[9px] font-extrabold uppercase px-2.5 py-1 rounded-full">
+                    <span className="bg-blue-600 text-white text-[9px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md">
                       {plan.tag}
                     </span>
                   )}
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-5">
                   <div>
-                    <h3 className="text-xl font-bold text-slate-950">{plan.name}</h3>
+                    <h3 className="text-base font-semibold text-slate-900">{plan.name}</h3>
                     
                     {/* PRICE DISPLAY */}
-                    <div className="mt-3">
+                    <div className="mt-2">
                       <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-black text-slate-950">
+                        <span className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                           ${displayPrice}
                         </span>
-                        <span className="text-sm font-medium text-slate-500">/mo</span>
+                        <span className="text-xs font-normal text-slate-500">/mo</span>
                       </div>
 
                       {billingCycle === 'yearly' ? (
-                        <p className="text-[11px] text-emerald-600 font-semibold mt-1">
+                        <p className="text-[11px] text-emerald-600 font-normal mt-0.5">
                           Billed annually (${plan.yearlyTotalPrice}/yr), save 15%
                         </p>
                       ) : (
-                        <p className="text-[11px] text-slate-400 mt-1">Billed monthly, cancel anytime</p>
+                        <p className="text-[11px] text-slate-400 font-normal mt-0.5">Billed monthly, cancel anytime</p>
                       )}
                     </div>
                   </div>
 
                   {/* SPECS LIST */}
-                  <ul className="space-y-3 text-xs text-slate-600 border-t border-slate-100 pt-4">
+                  <ul className="space-y-2.5 text-xs text-slate-600 border-t border-slate-100 pt-3.5">
                     <li className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{plan.cpuCores} vCPU Cores</span>
+                      <span className="font-medium text-slate-800">{plan.cpuCores} vCPU Cores</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{plan.ramGb} GB</span> RAM
+                      <span className="font-medium text-slate-800">{plan.ramGb} GB RAM</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{plan.storageGb} GB</span> {plan.storageType || 'SSD'}
+                      <span className="font-medium text-slate-800">{plan.storageGb} GB {plan.storageType || 'SSD'}</span>
                     </li>
-                    <li className="flex items-center gap-2 text-blue-600 font-semibold">
+                    <li className="flex items-center gap-1.5 text-blue-600 font-normal">
                       <Camera className="w-3.5 h-3.5" />
                       <span>{plan.maxSnapshots || 1} Snapshot{Number(plan.maxSnapshots) > 1 ? 's' : ''} Included</span>
                     </li>
                   </ul>
                 </div>
 
-                <div className="mt-6 space-y-2">
+                <div className="mt-5 space-y-2">
                   <button
                     onClick={() => handleSelectPreset(plan)}
-                    className={`w-full py-2.5 px-4 rounded-full font-bold text-xs transition-all ${
+                    className={`w-full py-2 px-3 rounded-lg font-medium text-xs transition-all ${
                       isBestseller
-                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md'
-                        : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+                        ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                     }`}
                   >
                     Add to cart
                   </button>
                   <button
                     onClick={() => handleChooseBasePlan(plan)}
-                    className={`w-full py-1.5 px-3 rounded-full font-semibold text-[11px] transition-all border ${
+                    className={`w-full py-1.5 px-3 rounded-lg font-normal text-[11px] transition-all border ${
                       selectedBasePlanId === plan.planId
-                        ? 'border-blue-600 text-blue-600 bg-blue-50/50'
+                        ? 'border-blue-500 text-blue-600 bg-blue-50/40 font-medium'
                         : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
                     }`}
                   >
