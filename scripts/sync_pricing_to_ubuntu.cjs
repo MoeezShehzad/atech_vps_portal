@@ -3,16 +3,23 @@ const path = require('path');
 
 const filesToSync = [
   'controllers/authController.js',
+  'controllers/vmController.js',
   'services/pricingService.js',
+  'services/trialService.js',
+  'services/emailService.js',
+  'routes/pricing.js',
   'prisma/seed.js',
+  'seed_data.js',
   'public/src/services/pricingApi.ts',
   'public/src/pages/Pricing.tsx',
   'public/src/pages/Home.tsx',
-  'public/src/pages/AddtoCart.tsx'
+  'public/src/pages/AddtoCart.tsx',
+  'public/src/pages/Dashboard.tsx',
+  'public/src/pages/AdminDashboard.tsx'
 ];
 
 const conn = new Client();
-console.log('Connecting to Ubuntu VM 172.23.201.102...');
+console.log('Connecting to Ubuntu VM 172.24.210.109...');
 
 conn.on('ready', () => {
   console.log('SSH connection ready. Opening SFTP...');
@@ -76,7 +83,7 @@ conn.on('ready', () => {
 }).on('error', err => {
   console.error('SSH connect error:', err);
 }).connect({
-  host: '172.23.201.102',
+  host: '172.24.210.109',
   port: 22,
   username: 'ubuntu',
   password: 'root',

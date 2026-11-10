@@ -553,7 +553,7 @@ export async function deployVM(req, res) {
     const isTrialSub = subscription.status === 'TRIAL';
     const maxAllowedCpu = isTrialSub ? (subscription.plan?.cpuCores || 2) : 32;
     const maxAllowedRam = isTrialSub ? (subscription.plan?.ramGb || 2) : 128;
-    const maxAllowedStorage = isTrialSub ? (subscription.plan?.storageGb || 50) : 2000;
+    const maxAllowedStorage = isTrialSub ? (subscription.plan?.storageGb || 120) : 2000;
 
     const finalCpu = Math.max(1, Math.min(maxAllowedCpu, customCpu ? Number(customCpu) : (subscription.plan?.cpuCores || plan.cpuCores)));
     const finalRam = Math.max(1, Math.min(maxAllowedRam, customRam ? Number(customRam) : (subscription.plan?.ramGb || plan.ramGb)));

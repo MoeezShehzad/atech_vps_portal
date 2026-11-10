@@ -1681,7 +1681,7 @@ export default function Dashboard() {
                     <p className="text-slate-300 text-sm md:text-base leading-relaxed">
                       {activeSlot
                         ? `Your ${activeSlot.planName} package is active and your dedicated cloud resources are reserved on our cluster. Whenever you're ready, click below to pick your OS, set admin credentials, or choose 1-Click Apps.`
-                        : `Deploy high-performance virtual cloud infrastructure at zero cost today. You get 2 vCPU Cores, 2 GB RAM, and 50 GB SSD Storage completely free for 30 days.`}
+                        : `Deploy high-performance virtual cloud infrastructure at zero cost today. You get 2 vCPU Cores, 2 GB RAM, and 120 GB SSD Storage completely free for 30 days.`}
                     </p>
                     <div className="pt-2 flex flex-wrap gap-4">
                       {activeSlot ? (
@@ -2437,7 +2437,7 @@ export default function Dashboard() {
                 <input
                   type="range"
                   min={resizingInstance.diskGB}
-                  max="500"
+                  max="1000"
                   step="10"
                   value={resizeStorage}
                   onChange={(e) => setResizeStorage(Number(e.target.value))}
@@ -2445,9 +2445,9 @@ export default function Dashboard() {
                 />
                 <div className="flex justify-between text-[10px] text-slate-400">
                   <span>{resizingInstance.diskGB} GB (Current)</span>
-                  <span>100 GB</span>
                   <span>250 GB</span>
                   <span>500 GB</span>
+                  <span>1 TB</span>
                 </div>
                 <p className="text-[10px] text-slate-400 italic">
                   * Dynamic expansion: Virtual disks can be scaled up dynamically without data loss. Disk shrinking is not supported to protect file system data.
@@ -2577,7 +2577,7 @@ export default function Dashboard() {
                 </div>
                 <div className="p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center">
                   <span className="block text-[10px] text-slate-400 uppercase font-bold">Storage</span>
-                  <span className="font-bold text-slate-900 dark:text-white">50 GB SSD</span>
+                  <span className="font-bold text-slate-900 dark:text-white">120 GB SSD</span>
                 </div>
                 <div className="p-2 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-center">
                   <span className="block text-[10px] text-slate-400 uppercase font-bold">OS Image</span>

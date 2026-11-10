@@ -245,7 +245,7 @@ export default function ServerConfigure() {
                 </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-slate-400 block font-medium">Storage</span>
-                  <span className="font-bold text-slate-900">{selectedPlan.storageGb ? `${selectedPlan.storageGb} GB ${selectedPlan.storageType || 'SSD'}` : selectedPlan.storage}</span>
+                  <span className="font-bold text-slate-900">{selectedPlan.storageGb ? `${selectedPlan.storageGb >= 1000 ? `${selectedPlan.storageGb >= 1024 && selectedPlan.storageGb % 1024 === 0 ? selectedPlan.storageGb / 1024 : Math.round(selectedPlan.storageGb / 1000)} TB` : `${selectedPlan.storageGb} GB`} ${selectedPlan.storageType || 'SSD'}` : selectedPlan.storage}</span>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                   <span className="text-slate-400 block font-medium">Snapshots</span>

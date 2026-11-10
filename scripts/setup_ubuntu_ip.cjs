@@ -1,7 +1,7 @@
 const { Client } = require('ssh2');
 
-const UBUNTU_IP = '172.23.201.102';
-const WINDOWS_HOST_IP = '172.23.192.1';
+const UBUNTU_IP = '172.24.210.109';
+const WINDOWS_HOST_IP = '172.24.208.1';
 
 const conn = new Client();
 conn.on('ready', () => {

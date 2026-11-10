@@ -871,7 +871,7 @@ export async function sendTrialStartedEmail({ email, fullName, planName, trialEn
           </tr>
           <tr>
             <td style="color:#64748b;padding-bottom:6px;">Specs:</td>
-            <td align="right" style="color:#0f172a;font-weight:600;padding-bottom:6px;">2 vCPU Cores • 2 GB RAM • 50 GB SSD</td>
+            <td align="right" style="color:#0f172a;font-weight:600;padding-bottom:6px;">2 vCPU Cores • 2 GB RAM • 120 GB SSD</td>
           </tr>
           <tr>
             <td style="color:#64748b;padding-bottom:6px;">Amount Charged Today:</td>

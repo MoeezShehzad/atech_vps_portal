@@ -24,8 +24,8 @@ net localgroup "Hyper-V Administrators" "%USERNAME%" /add >nul 2>&1
 powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 5050 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" >nul 2>&1
 
 :: Configure localhost port forwarders to Ubuntu VM for Google OAuth & Portal access
-netsh interface portproxy add v4tov4 listenport=5000 listenaddress=127.0.0.1 connectport=5000 connectaddress=172.19.124.110 >nul 2>&1
-netsh interface portproxy add v4tov4 listenport=5174 listenaddress=127.0.0.1 connectport=5174 connectaddress=172.19.124.110 >nul 2>&1
+netsh interface portproxy add v4tov4 listenport=5000 listenaddress=127.0.0.1 connectport=5000 connectaddress=172.24.210.109 >nul 2>&1
+netsh interface portproxy add v4tov4 listenport=5174 listenaddress=127.0.0.1 connectport=5174 connectaddress=172.24.210.109 >nul 2>&1
 
 cls
 color 0A
@@ -35,7 +35,7 @@ echo ======================================================================
 echo  [+] Windows Host: %COMPUTERNAME% (User: %USERNAME%)
 echo  [+] Status: ELEVATED (Hyper-V Access Granted)
 echo  [+] Listening on: http://0.0.0.0:5050
-echo  [+] IPs: 172.25.80.1 (WSL/Hyper-V) ^| 192.168.100.92 (Wi-Fi)
+echo  [+] IPs: 172.24.208.1 (WSL/Hyper-V) ^| 10.228.35.211 (Wi-Fi)
 echo.
 echo  Testing Hyper-V communication...
 powershell -NoProfile -Command "Get-VM -ErrorAction SilentlyContinue | Format-Table Name, State, CPUUsage, MemoryAssigned -AutoSize"

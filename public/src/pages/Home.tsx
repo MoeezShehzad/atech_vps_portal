@@ -34,12 +34,18 @@ const DEFAULT_HOME_PLANS = [
     cpuCores: 2,
     ram: '4 GB RAM',
     ramGb: 4,
-    storage: '50 GB SSD',
-    storageGb: 50,
+    storage: '120 GB SSD',
+    storageGb: 120,
+    storageType: 'SSD',
     snapshots: '1 Included Snapshot',
+    maxSnapshots: 1,
     price: 6.99,
     monthlyPrice: 6.99,
+    regularPriceMonthly: 6.99,
+    promoPriceMonthly: 5.94,
+    yearlyTotalPrice: 71,
     popular: false,
+    tag: undefined,
     color: 'from-blue-500 to-cyan-500',
   },
   {
@@ -49,12 +55,18 @@ const DEFAULT_HOME_PLANS = [
     cpuCores: 4,
     ram: '8 GB RAM',
     ramGb: 8,
-    storage: '120 GB SSD',
-    storageGb: 120,
+    storage: '250 GB SSD',
+    storageGb: 250,
+    storageType: 'SSD',
     snapshots: '2 Included Snapshots',
+    maxSnapshots: 2,
     price: 14.99,
     monthlyPrice: 14.99,
+    regularPriceMonthly: 14.99,
+    promoPriceMonthly: 12.74,
+    yearlyTotalPrice: 153,
     popular: true,
+    tag: 'BESTSELLER',
     color: 'from-blue-600 to-blue-700',
   },
   {
@@ -64,13 +76,40 @@ const DEFAULT_HOME_PLANS = [
     cpuCores: 8,
     ram: '16 GB RAM',
     ramGb: 16,
-    storage: '250 GB SSD',
-    storageGb: 250,
+    storage: '500 GB SSD',
+    storageGb: 500,
+    storageType: 'SSD',
     snapshots: '5 Included Snapshots',
+    maxSnapshots: 5,
     price: 29.99,
     monthlyPrice: 29.99,
+    regularPriceMonthly: 29.99,
+    promoPriceMonthly: 25.49,
+    yearlyTotalPrice: 306,
     popular: false,
+    tag: 'BEST VALUE',
     color: 'from-slate-700 to-slate-800',
+  },
+  {
+    planId: 4,
+    name: 'VPS Ultra Compute',
+    cpu: '16 Cores',
+    cpuCores: 16,
+    ram: '32 GB RAM',
+    ramGb: 32,
+    storage: '1 TB SSD',
+    storageGb: 1000,
+    storageType: 'SSD',
+    snapshots: '7 Included Snapshots',
+    maxSnapshots: 7,
+    price: 59.99,
+    monthlyPrice: 59.99,
+    regularPriceMonthly: 59.99,
+    promoPriceMonthly: 50.99,
+    yearlyTotalPrice: 612,
+    popular: false,
+    tag: 'HIGH COMPUTE',
+    color: 'from-indigo-600 to-purple-600',
   },
 ];
 
@@ -97,7 +136,7 @@ const TYPEWRITER_PHRASES = [
 
 export default function Home() {
   const navigate = useNavigate();
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('monthly');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annually'>('annually');
   const [plans, setPlans] = useState<any[]>(DEFAULT_HOME_PLANS);
 
   // Typewriter Animation State
@@ -110,21 +149,38 @@ export default function Home() {
     fetchVpsPlans()
       .then((dbPlans) => {
         if (Array.isArray(dbPlans) && dbPlans.length > 0) {
-          const mapped = dbPlans.slice(0, 3).map((p, idx) => ({
-            planId: p.planId,
-            name: p.name,
-            cpu: `${p.cpuCores} Cores`,
-            cpuCores: p.cpuCores,
-            ram: `${p.ramGb} GB RAM`,
-            ramGb: p.ramGb,
-            storage: `${p.storageGb} GB SSD`,
-            storageGb: p.storageGb,
-            snapshots: `${p.maxSnapshots || (idx === 0 ? 1 : idx === 1 ? 2 : 5)} Included Snapshot${(p.maxSnapshots || 1) > 1 ? 's' : ''}`,
-            price: Number(p.monthlyPrice) || 9.99,
-            monthlyPrice: Number(p.monthlyPrice) || 9.99,
-            popular: idx === 1 || p.name.toLowerCase().includes('pro'),
-            color: idx === 0 ? 'from-blue-500 to-cyan-500' : idx === 1 ? 'from-blue-600 to-blue-700' : 'from-slate-700 to-slate-800',
-          }));
+          const mapped = dbPlans.map((p, idx) => {
+            const reg = Number(p.monthlyPrice) || 6.99;
+            const promo = Number((reg * 0.85).toFixed(2));
+            const yearlyTotal = Number((promo * 12).toFixed(0));
+
+            let tag: string | undefined = undefined;
+            if (p.name.includes('Pro')) tag = 'BESTSELLER';
+            else if (p.name.includes('Enterprise')) tag = 'BEST VALUE';
+            else if (p.name.includes('Ultra')) tag = 'HIGH COMPUTE';
+
+            return {
+              planId: p.planId,
+              name: p.name,
+              cpu: `${p.cpuCores} Cores`,
+              cpuCores: p.cpuCores,
+              ram: `${p.ramGb} GB RAM`,
+              ramGb: p.ramGb,
+              storage: p.storageGb >= 1000 ? `${p.storageGb >= 1024 && p.storageGb % 1024 === 0 ? p.storageGb / 1024 : Math.round(p.storageGb / 1000)} TB SSD` : `${p.storageGb} GB SSD`,
+              storageGb: p.storageGb,
+              storageType: p.storageType || 'SSD',
+              snapshots: `${p.maxSnapshots || (idx === 0 ? 1 : idx === 1 ? 2 : idx === 2 ? 5 : 7)} Included Snapshot${(p.maxSnapshots || 1) > 1 ? 's' : ''}`,
+              maxSnapshots: p.maxSnapshots,
+              price: reg,
+              monthlyPrice: reg,
+              regularPriceMonthly: reg,
+              promoPriceMonthly: promo,
+              yearlyTotalPrice: yearlyTotal,
+              popular: idx === 1 || p.name.toLowerCase().includes('pro'),
+              tag,
+              color: idx === 0 ? 'from-blue-500 to-cyan-500' : idx === 1 ? 'from-blue-600 to-blue-700' : idx === 2 ? 'from-slate-700 to-slate-800' : 'from-indigo-600 to-purple-600',
+            };
+          });
           setPlans(mapped);
         }
       })
@@ -342,77 +398,94 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 items-stretch">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
           {plans.map((plan) => {
-            const finalPrice = billingCycle === 'annually' ? +(plan.price * 0.85).toFixed(2) : plan.price;
+            const isBestseller = plan.popular || plan.tag === 'BESTSELLER';
+            const displayPrice = billingCycle === 'annually' ? plan.promoPriceMonthly : plan.regularPriceMonthly;
 
             return (
               <div
                 key={plan.name}
-                className={`bg-white rounded-3xl p-8 border transition-all duration-300 flex flex-col justify-between relative hover:-translate-y-1.5 ${
-                  plan.popular
-                    ? 'border-blue-600 shadow-2xl shadow-blue-900/10 ring-2 ring-blue-600/30 md:scale-105 z-10'
-                    : 'border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-xl'
+                className={`bg-white rounded-3xl p-6 border transition-all duration-300 flex flex-col justify-between relative hover:-translate-y-1.5 ${
+                  isBestseller
+                    ? 'border-blue-600 shadow-xl shadow-blue-900/10 ring-2 ring-blue-600/30 z-10'
+                    : 'border-slate-200 shadow-xs hover:border-slate-300 hover:shadow-lg'
                 }`}
               >
-                {plan.popular && (
-                  <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[10px] font-semibold uppercase tracking-widest px-3.5 py-1 rounded-full shadow-sm">
-                    Most Popular Choice
-                  </span>
-                )}
+                {/* PROMO / TAG BADGES */}
+                <div className="flex justify-between items-center mb-3 min-h-[22px]">
+                  {billingCycle === 'annually' ? (
+                    <span className="bg-emerald-50 text-emerald-700 text-[10px] font-medium uppercase px-2 py-0.5 rounded-md border border-emerald-200">
+                      Save 15%
+                    </span>
+                  ) : (
+                    <div />
+                  )}
+
+                  {plan.tag && (
+                    <span className="bg-blue-600 text-white text-[9px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md">
+                      {plan.tag}
+                    </span>
+                  )}
+                </div>
 
                 <div>
-                  <div className="flex justify-between items-baseline mb-3">
-                    <h3 className="text-2xl font-black text-slate-950">{plan.name}</h3>
-                    <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 text-slate-600">
-                      General Purpose
-                    </span>
+                  <div className="mb-2">
+                    <h3 className="text-lg font-bold text-slate-950">{plan.name}</h3>
                   </div>
 
-                  <div className="mb-6 pb-6 border-b border-slate-100">
+                  <div className="mb-5 pb-5 border-b border-slate-100">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl sm:text-5xl font-black text-slate-950 tracking-tight">${finalPrice.toFixed(2)}</span>
-                      <span className="text-slate-500 text-xs font-bold"> / month</span>
+                      <span className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
+                        ${Number(displayPrice).toFixed(2)}
+                      </span>
+                      <span className="text-slate-500 text-xs font-normal"> / mo</span>
                     </div>
-                    {billingCycle === 'annually' && (
-                      <p className="text-[11px] text-emerald-600 font-semibold mt-1">Billed annually (${(finalPrice * 12).toFixed(2)}/yr)</p>
+                    {billingCycle === 'annually' ? (
+                      <p className="text-[11px] text-emerald-600 font-semibold mt-1">
+                        Billed annually (${plan.yearlyTotalPrice}/yr), save 15%
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 font-normal mt-1">
+                        Billed monthly, cancel anytime
+                      </p>
                     )}
                   </div>
 
-                  <ul className="space-y-3.5 text-xs text-slate-600 font-medium mb-8">
-                    <li className="flex items-center gap-3">
+                  <ul className="space-y-3 text-xs text-slate-600 font-medium mb-6">
+                    <li className="flex items-center gap-2.5">
                       <Cpu className="w-4 h-4 text-blue-600 shrink-0" /> 
                       <span><strong className="text-slate-950 font-bold">{plan.cpu}</strong> vCPU Cores</span>
                     </li>
-                    <li className="flex items-center gap-3">
+                    <li className="flex items-center gap-2.5">
                       <Zap className="w-4 h-4 text-blue-600 shrink-0" /> 
                       <span><strong className="text-slate-950 font-bold">{plan.ram}</strong> High-Speed Memory</span>
                     </li>
-                    <li className="flex items-center gap-3">
+                    <li className="flex items-center gap-2.5">
                       <Server className="w-4 h-4 text-blue-600 shrink-0" /> 
-                      <span><strong className="text-slate-950 font-bold">{plan.storage}</strong> Enterprise SSD</span>
+                      <span><strong className="text-slate-950 font-bold">{plan.storage}</strong></span>
                     </li>
-                    <li className="flex items-center gap-3">
-                      <Camera className="w-4 h-4 text-blue-600 shrink-0" /> 
-                      <span><strong className="text-slate-950 font-bold">{plan.snapshots}</strong> Instant Restore</span>
+                    <li className="flex items-center gap-2.5 text-blue-600 font-normal">
+                      <Camera className="w-4 h-4 shrink-0" /> 
+                      <span><strong className="font-bold">{plan.snapshots}</strong></span>
                     </li>
-                    <li className="flex items-center gap-3">
+                    <li className="flex items-center gap-2.5">
                       <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" /> 
-                      <span>Dedicated IPv4 & Full Root Access</span>
+                      <span>Full Root Access</span>
                     </li>
                   </ul>
                 </div>
 
                 <button
                   onClick={() => handleConfigure(plan)}
-                  className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                    plan.popular
+                  className={`w-full py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    isBestseller
                       ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
                       : 'bg-slate-100 text-slate-800 hover:bg-slate-200'
                   }`}
                 >
                   <span>Configure Server</span>
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             );

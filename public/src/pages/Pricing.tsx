@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchVpsPlans, type VPSPlan, getRatesForPlan, calculatePlanCustomPrice } from '../services/pricingApi';
-import { Camera, Check } from 'lucide-react';
+import { Camera, Check, ShieldCheck } from 'lucide-react';
 
 interface ExtendedPlan extends VPSPlan {
   tag?: string;
@@ -40,7 +40,7 @@ const DEFAULT_FALLBACK_PLANS: ExtendedPlan[] = [
     name: 'VPS Basic',
     cpuCores: 2,
     ramGb: 4,
-    storageGb: 50,
+    storageGb: 120,
     storageType: 'SSD',
     bandwidthMbps: 1000,
     ipv4Addresses: 1,
@@ -56,7 +56,7 @@ const DEFAULT_FALLBACK_PLANS: ExtendedPlan[] = [
     name: 'VPS Pro',
     cpuCores: 4,
     ramGb: 8,
-    storageGb: 120,
+    storageGb: 250,
     storageType: 'SSD',
     bandwidthMbps: 2000,
     ipv4Addresses: 1,
@@ -72,7 +72,7 @@ const DEFAULT_FALLBACK_PLANS: ExtendedPlan[] = [
     name: 'VPS Enterprise',
     cpuCores: 8,
     ramGb: 16,
-    storageGb: 250,
+    storageGb: 500,
     storageType: 'SSD',
     bandwidthMbps: 5000,
     ipv4Addresses: 2,
@@ -88,7 +88,7 @@ const DEFAULT_FALLBACK_PLANS: ExtendedPlan[] = [
     name: 'VPS Ultra Compute',
     cpuCores: 16,
     ramGb: 32,
-    storageGb: 500,
+    storageGb: 1000,
     storageType: 'SSD',
     bandwidthMbps: 10000,
     ipv4Addresses: 2,
@@ -113,16 +113,16 @@ export default function Pricing() {
   // Custom Builder States
   const [cpu, setCpu] = useState<number>(4);
   const [ram, setRam] = useState<number>(8);
-  const [storage, setStorage] = useState<number>(120);
+  const [storage, setStorage] = useState<number>(250);
 
   const activeBasePlan = plans.find((p) => p.planId === selectedBasePlanId) || plans[0] || DEFAULT_FALLBACK_PLANS[1];
 
   // Sync builder sliders when user selects a different base plan
   const handleChooseBasePlan = (plan: ExtendedPlan) => {
     setSelectedBasePlanId(plan.planId);
-    setCpu(Math.max(plan.cpuCores, cpu));
-    setRam(Math.max(plan.ramGb, ram));
-    setStorage(Math.max(plan.storageGb, storage));
+    setCpu(plan.cpuCores);
+    setRam(plan.ramGb);
+    setStorage(plan.storageGb);
   };
 
   useEffect(() => {
@@ -132,6 +132,12 @@ export default function Pricing() {
         if (Array.isArray(data) && data.length > 0) {
           const enriched = data.map(enrichDbPlan);
           setPlans(enriched);
+          const defaultPlan = enriched.find((p) => p.planId === selectedBasePlanId) || enriched[0];
+          if (defaultPlan) {
+            setCpu(defaultPlan.cpuCores);
+            setRam(defaultPlan.ramGb);
+            setStorage(defaultPlan.storageGb);
+          }
         } else {
           setPlans(DEFAULT_FALLBACK_PLANS);
         }
@@ -238,7 +244,7 @@ export default function Pricing() {
         {/* PRICING CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
           {plans.map((plan) => {
-            const isBestseller = plan.tag === 'BESTSELLER';
+            const isSelected = selectedBasePlanId === plan.planId;
             const displayPrice =
               billingCycle === 'yearly'
                 ? plan.promoPriceMonthly
@@ -247,10 +253,11 @@ export default function Pricing() {
             return (
               <div
                 key={plan.planId}
-                className={`relative rounded-2xl p-6 flex flex-col justify-between transition-all bg-white ${
-                  isBestseller
-                    ? 'border-2 border-blue-600 shadow-lg scale-102 z-10'
-                    : 'border border-slate-200 shadow-xs hover:border-slate-300'
+                onClick={() => handleChooseBasePlan(plan)}
+                className={`group relative rounded-2xl p-6 flex flex-col justify-between transition-all bg-white cursor-pointer select-none ${
+                  isSelected
+                    ? 'border-2 border-blue-600 shadow-xl ring-4 ring-blue-500/10 scale-102 z-10'
+                    : 'border border-slate-200 shadow-xs hover:border-slate-400 hover:shadow-md'
                 }`}
               >
                 {/* PROMO / TAG BADGES */}
@@ -263,11 +270,18 @@ export default function Pricing() {
                     <div />
                   )}
 
-                  {plan.tag && (
-                    <span className="bg-blue-600 text-white text-[9px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md">
-                      {plan.tag}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {plan.tag && (
+                      <span className="bg-blue-600 text-white text-[9px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-md">
+                        {plan.tag}
+                      </span>
+                    )}
+                    {isSelected && (
+                      <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[9px] font-bold uppercase px-2 py-0.5 rounded-md">
+                        Active
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-5">
@@ -302,35 +316,37 @@ export default function Pricing() {
                       <span className="font-medium text-slate-800">{plan.ramGb} GB RAM</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className="font-medium text-slate-800">{plan.storageGb} GB {plan.storageType || 'SSD'}</span>
+                      <span className="font-medium text-slate-800">
+                        {plan.storageGb >= 1000
+                          ? `${plan.storageGb >= 1024 && plan.storageGb % 1024 === 0 ? plan.storageGb / 1024 : Math.round(plan.storageGb / 1000)} TB`
+                          : `${plan.storageGb} GB`}{' '}
+                        {plan.storageType || 'SSD'}
+                      </span>
                     </li>
                     <li className="flex items-center gap-1.5 text-blue-600 font-normal">
                       <Camera className="w-3.5 h-3.5" />
                       <span>{plan.maxSnapshots || 1} Snapshot{Number(plan.maxSnapshots) > 1 ? 's' : ''} Included</span>
                     </li>
+                    <li className="flex items-center gap-1.5 text-emerald-600 font-normal">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Full Root Access</span>
+                    </li>
                   </ul>
                 </div>
 
-                <div className="mt-5 space-y-2">
+                <div className="mt-5">
                   <button
-                    onClick={() => handleSelectPreset(plan)}
-                    className={`w-full py-2 px-3 rounded-lg font-medium text-xs transition-all ${
-                      isBestseller
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectPreset(plan);
+                    }}
+                    className={`w-full py-2 px-3 rounded-lg font-medium text-xs transition-all cursor-pointer ${
+                      isSelected
                         ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-xs'
                         : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                     }`}
                   >
                     Add to cart
-                  </button>
-                  <button
-                    onClick={() => handleChooseBasePlan(plan)}
-                    className={`w-full py-1.5 px-3 rounded-lg font-normal text-[11px] transition-all border ${
-                      selectedBasePlanId === plan.planId
-                        ? 'border-blue-500 text-blue-600 bg-blue-50/40 font-medium'
-                        : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                    }`}
-                  >
-                    {selectedBasePlanId === plan.planId ? '✓ Customizer Active' : 'Customize Specs'}
                   </button>
                 </div>
               </div>
@@ -344,7 +360,7 @@ export default function Pricing() {
             <div>
               <h2 className="text-xl font-bold text-slate-900">Custom VPS Calculator</h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Scaling on top of <span className="font-bold text-blue-600">{activeBasePlan.name}</span> (${Number(activeBasePlan.monthlyPrice).toFixed(2)}/mo base)
+                Scaling on top of <span className="font-bold text-blue-600">{activeBasePlan.name}</span> (${billingCycle === 'yearly' ? activeBasePlan.promoPriceMonthly : Number(activeBasePlan.monthlyPrice).toFixed(2)}/mo base)
               </p>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-white px-3 py-1.5 rounded-full border border-slate-200">
@@ -387,7 +403,11 @@ export default function Pricing() {
             <div>
               <div className="flex justify-between font-semibold mb-1">
                 <span>SSD Storage</span>
-                <span className="text-blue-600">{storage} GB</span>
+                <span className="text-blue-600">
+                  {storage >= 1000
+                    ? `${(storage / 1000).toFixed(storage % 1000 === 0 ? 0 : 1)} TB`
+                    : `${storage} GB`}
+                </span>
               </div>
               <input
                 type="range" min={activeBasePlan.storageGb} max="2000" step="10" value={storage}
@@ -405,12 +425,17 @@ export default function Pricing() {
               <span className="text-xs uppercase text-slate-400 font-extrabold block">Total Estimate</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-black text-slate-950">
-                  ${calculateCustomMonthly().toFixed(2)}
+                  ${(billingCycle === 'yearly' ? calculateCustomMonthly() * 0.85 : calculateCustomMonthly()).toFixed(2)}
                 </span>
                 <span className="text-sm font-semibold text-slate-500">/mo</span>
+                {billingCycle === 'yearly' && (
+                  <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Save 15%
+                  </span>
+                )}
                 {customCalc.diffMonthly > 0 && (
                   <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                    +${customCalc.diffMonthly.toFixed(2)} customized specs
+                    +${(billingCycle === 'yearly' ? customCalc.diffMonthly * 0.85 : customCalc.diffMonthly).toFixed(2)} customized specs
                   </span>
                 )}
               </div>

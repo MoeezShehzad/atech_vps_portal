@@ -140,7 +140,7 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
     });
   }
 
-  // 2. Find VPS Basic Plan (2 vCPU Cores, 2 GB RAM, 50 GB SSD)
+  // 2. Find VPS Basic Plan (2 vCPU Cores, 2 GB RAM, 120 GB SSD)
   let basicPlan = await prisma.vPSPlan.findFirst({
     where: { planId: 1 },
   });
@@ -212,7 +212,7 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
       hostname: `${vmName}.atc-cloud.net`,
       cpuCores: basicPlan?.cpuCores || 2,
       ramGb: basicPlan?.ramGb || 2,
-      storageGb: basicPlan?.storageGb || 50,
+      storageGb: basicPlan?.storageGb || 120,
       status: 'PROVISIONING',
       provisioningStatus: 'IN_PROGRESS',
       adminUser: 'ubuntu',
@@ -235,7 +235,7 @@ export async function setupUserTrial({ userId, cardData, ipAddress = '' }) {
       vmName,
       cpuCores: basicPlan?.cpuCores || 2,
       ramGb: basicPlan?.ramGb || 2,
-      storageGb: basicPlan?.storageGb || 50,
+      storageGb: basicPlan?.storageGb || 120,
       templatePath: image.templatePath || 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx',
       adminUsername: 'ubuntu',
       adminPassword: 'AtcSecure2026!',

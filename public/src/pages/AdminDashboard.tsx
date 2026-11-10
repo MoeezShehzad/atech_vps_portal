@@ -5101,7 +5101,7 @@ export default function AdminDashboard() {
                 <input
                   type="range"
                   min={resizingVm.storageGb || resizingVm.diskGB || 20}
-                  max="500"
+                  max="1000"
                   step="10"
                   value={resizeStorage}
                   onChange={(e) => setResizeStorage(Number(e.target.value))}
@@ -5109,9 +5109,9 @@ export default function AdminDashboard() {
                 />
                 <div className="flex justify-between text-[10px] text-slate-400">
                   <span>{resizingVm.storageGb || resizingVm.diskGB || 20} GB (Current)</span>
-                  <span>100 GB</span>
                   <span>250 GB</span>
                   <span>500 GB</span>
+                  <span>1 TB</span>
                 </div>
                 <p className="text-[10px] text-slate-400 italic">
                   * Dynamic expansion: Virtual disks can be scaled up dynamically without data loss. Disk shrinking is not supported to protect file system data.

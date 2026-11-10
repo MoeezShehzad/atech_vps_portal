@@ -5,7 +5,7 @@
 
 // Per-plan customized unit rates based on plan volume tier
 export const PLAN_SPEC_RATES = {
-  // Plan 1: VPS Basic ($6.99/mo: 2 Cores @ $2.00, 4GB RAM @ $0.7225, 50GB SSD @ $0.002)
+  // Plan 1: VPS Basic ($6.99/mo: 2 Cores @ $2.00, 4GB RAM @ $0.7225, 120GB SSD @ $0.002)
   1: {
     cpuPerCoreMonth: 2.00,
     ramPerGbMonth: 0.7225,
@@ -18,7 +18,7 @@ export const PLAN_SPEC_RATES = {
     storagePerGbMonth: 0.02,
     maxSnapshots: 1,
   },
-  // Plan 2: VPS Pro ($14.99/mo: 4 Cores @ $1.05, 8GB RAM @ $0.598, 120GB SSD @ $0.05)
+  // Plan 2: VPS Pro ($14.99/mo: 4 Cores @ $1.05, 8GB RAM @ $0.598, 250GB SSD @ $0.05)
   2: {
     cpuPerCoreMonth: 1.05,
     ramPerGbMonth: 0.598,
@@ -31,7 +31,7 @@ export const PLAN_SPEC_RATES = {
     storagePerGbMonth: 0.05,
     maxSnapshots: 2,
   },
-  // Plan 3: VPS Enterprise ($29.99/mo: 8 Cores @ $1.00, 16GB RAM @ $0.594, 250GB SSD @ $0.05)
+  // Plan 3: VPS Enterprise ($29.99/mo: 8 Cores @ $1.00, 16GB RAM @ $0.594, 500GB SSD @ $0.05)
   3: {
     cpuPerCoreMonth: 1.00,
     ramPerGbMonth: 0.594,
@@ -44,7 +44,7 @@ export const PLAN_SPEC_RATES = {
     storagePerGbMonth: 0.05,
     maxSnapshots: 5,
   },
-  // Plan 4: VPS Ultra Compute ($59.99/mo: 16 Cores @ $0.95, 32GB RAM @ $0.587, 500GB SSD @ $0.052)
+  // Plan 4: VPS Ultra Compute ($59.99/mo: 16 Cores @ $0.95, 32GB RAM @ $0.587, 1000GB (1TB) SSD @ $0.052)
   4: {
     cpuPerCoreMonth: 0.95,
     ramPerGbMonth: 0.587,
