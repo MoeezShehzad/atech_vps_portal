@@ -3,11 +3,77 @@
 // Purpose: Dynamic VPS spec pricing calculator (RAM, vCPU, SSD storage deltas)
 // ==============================================================================
 
-export const SPEC_UNIT_RATES = {
-  ramPerGbMonth: 1.50,       // $1.50 / GB / month
-  cpuPerCoreMonth: 2.50,     // $2.50 / vCPU core / month
-  storagePerGbMonth: 0.10,   // $0.10 / GB SSD / month
+// Per-plan customized unit rates based on plan volume tier
+export const PLAN_SPEC_RATES = {
+  // Plan 1: VPS Basic ($6.99/mo: 2 Cores @ $2.00, 4GB RAM @ $0.7225, 50GB SSD @ $0.002)
+  1: {
+    cpuPerCoreMonth: 2.00,
+    ramPerGbMonth: 0.7225,
+    storagePerGbMonth: 0.02, // $0.02/GB (Boss rate)
+    maxSnapshots: 1,
+  },
+  'VPS Basic': {
+    cpuPerCoreMonth: 2.00,
+    ramPerGbMonth: 0.7225,
+    storagePerGbMonth: 0.02,
+    maxSnapshots: 1,
+  },
+  // Plan 2: VPS Pro ($14.99/mo: 4 Cores @ $1.05, 8GB RAM @ $0.598, 120GB SSD @ $0.05)
+  2: {
+    cpuPerCoreMonth: 1.05,
+    ramPerGbMonth: 0.598,
+    storagePerGbMonth: 0.05,
+    maxSnapshots: 2,
+  },
+  'VPS Pro': {
+    cpuPerCoreMonth: 1.05,
+    ramPerGbMonth: 0.598,
+    storagePerGbMonth: 0.05,
+    maxSnapshots: 2,
+  },
+  // Plan 3: VPS Enterprise ($29.99/mo: 8 Cores @ $1.00, 16GB RAM @ $0.594, 250GB SSD @ $0.05)
+  3: {
+    cpuPerCoreMonth: 1.00,
+    ramPerGbMonth: 0.594,
+    storagePerGbMonth: 0.05,
+    maxSnapshots: 7,
+  },
+  'VPS Enterprise': {
+    cpuPerCoreMonth: 1.00,
+    ramPerGbMonth: 0.594,
+    storagePerGbMonth: 0.05,
+    maxSnapshots: 7,
+  },
+  // Plan 4: VPS Ultra Compute ($59.99/mo: 16 Cores @ $0.95, 32GB RAM @ $0.587, 500GB SSD @ $0.052)
+  4: {
+    cpuPerCoreMonth: 0.95,
+    ramPerGbMonth: 0.587,
+    storagePerGbMonth: 0.052,
+    maxSnapshots: 5,
+  },
+  'VPS Ultra Compute': {
+    cpuPerCoreMonth: 0.95,
+    ramPerGbMonth: 0.587,
+    storagePerGbMonth: 0.052,
+    maxSnapshots: 5,
+  },
 };
+
+export const SPEC_UNIT_RATES = {
+  ramPerGbMonth: 0.7225,
+  cpuPerCoreMonth: 2.00,
+  storagePerGbMonth: 0.02,
+};
+
+export function getRatesForPlan(planOrId) {
+  if (!planOrId) return SPEC_UNIT_RATES;
+  if (typeof planOrId === 'number' || typeof planOrId === 'string') {
+    return PLAN_SPEC_RATES[planOrId] || SPEC_UNIT_RATES;
+  }
+  const byId = planOrId.planId ? PLAN_SPEC_RATES[planOrId.planId] : null;
+  const byName = planOrId.name ? PLAN_SPEC_RATES[planOrId.name] : null;
+  return byId || byName || SPEC_UNIT_RATES;
+}
 
 /**
  * Calculates new monthly price based on a base plan and customized hardware specs.
@@ -17,14 +83,15 @@ export const SPEC_UNIT_RATES = {
  */
 export function calculateCustomPrice(plan, targetSpecs) {
   const basePrice = Number(plan.monthlyPrice);
+  const rates = getRatesForPlan(plan);
   
   const ramDiff = Math.max(0, targetSpecs.ramGb - plan.ramGb);
   const cpuDiff = Math.max(0, targetSpecs.cpuCores - plan.cpuCores);
   const storageDiff = Math.max(0, (targetSpecs.storageGb || plan.storageGb) - plan.storageGb);
 
-  const ramDeltaPrice = Number((ramDiff * SPEC_UNIT_RATES.ramPerGbMonth).toFixed(2));
-  const cpuDeltaPrice = Number((cpuDiff * SPEC_UNIT_RATES.cpuPerCoreMonth).toFixed(2));
-  const storageDeltaPrice = Number((storageDiff * SPEC_UNIT_RATES.storagePerGbMonth).toFixed(2));
+  const ramDeltaPrice = Number((ramDiff * rates.ramPerGbMonth).toFixed(2));
+  const cpuDeltaPrice = Number((cpuDiff * rates.cpuPerCoreMonth).toFixed(2));
+  const storageDeltaPrice = Number((storageDiff * rates.storagePerGbMonth).toFixed(2));
 
   const totalMonthlyPrice = Number((basePrice + ramDeltaPrice + cpuDeltaPrice + storageDeltaPrice).toFixed(2));
   const diffMonthly = Number((totalMonthlyPrice - basePrice).toFixed(2));
@@ -54,9 +121,10 @@ export function calculateResizePrice(currentVm, newCpuCores, newRamGb, newStorag
   const cpuDelta = newCpuCores - currentCpu;
   const storageDelta = (newStorageGb ? Number(newStorageGb) : currentStorage) - currentStorage;
 
-  const ramCostDelta = ramDelta * SPEC_UNIT_RATES.ramPerGbMonth;
-  const cpuCostDelta = cpuDelta * SPEC_UNIT_RATES.cpuPerCoreMonth;
-  const storageCostDelta = Math.max(0, storageDelta) * SPEC_UNIT_RATES.storagePerGbMonth;
+  const rates = getRatesForPlan(currentVm.plan || currentVm.subscription?.plan || currentVm.planId);
+  const ramCostDelta = ramDelta * rates.ramPerGbMonth;
+  const cpuCostDelta = cpuDelta * rates.cpuPerCoreMonth;
+  const storageCostDelta = Math.max(0, storageDelta) * rates.storagePerGbMonth;
   const totalDelta = Number((ramCostDelta + cpuCostDelta + storageCostDelta).toFixed(2));
 
   const newPrice = Math.max(4.99, Number((currentPrice + totalDelta).toFixed(2)));

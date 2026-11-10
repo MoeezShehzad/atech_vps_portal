@@ -248,9 +248,9 @@ export default function ServerConfigure() {
                   <span className="font-bold text-slate-900">{selectedPlan.storageGb ? `${selectedPlan.storageGb} GB ${selectedPlan.storageType || 'SSD'}` : selectedPlan.storage}</span>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <span className="text-slate-400 block font-medium">Network</span>
-                  <span className="font-bold text-slate-900">
-                    {selectedPlan.bandwidth || (selectedPlan.bandwidthMbps ? `${selectedPlan.bandwidthMbps >= 1000 ? `${selectedPlan.bandwidthMbps / 1000} Gbps` : `${selectedPlan.bandwidthMbps} Mbps`} Uplink` : '1 Gbps Uplink')}
+                  <span className="text-slate-400 block font-medium">Snapshots</span>
+                  <span className="font-bold text-blue-600">
+                    {selectedPlan.maxSnapshots || (selectedPlan.name?.includes('Pro') ? 2 : selectedPlan.name?.includes('Enterprise') ? 7 : selectedPlan.name?.includes('Ultra') ? 5 : 1)} Included
                   </span>
                 </div>
               </div>

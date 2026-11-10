@@ -17,7 +17,8 @@ import {
   Lock,
   Database,
   Star,
-  ExternalLink
+  ExternalLink,
+  Camera
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchVpsPlans } from '../services/pricingApi';
@@ -31,13 +32,13 @@ const DEFAULT_HOME_PLANS = [
     name: 'VPS Basic',
     cpu: '2 Cores',
     cpuCores: 2,
-    ram: '2 GB RAM',
-    ramGb: 2,
+    ram: '4 GB RAM',
+    ramGb: 4,
     storage: '50 GB SSD',
     storageGb: 50,
-    bandwidth: '4 TB Bandwidth',
-    price: 4.97,
-    monthlyPrice: 4.97,
+    snapshots: '1 Included Snapshot',
+    price: 6.99,
+    monthlyPrice: 6.99,
     popular: false,
     color: 'from-blue-500 to-cyan-500',
   },
@@ -50,7 +51,7 @@ const DEFAULT_HOME_PLANS = [
     ramGb: 8,
     storage: '120 GB SSD',
     storageGb: 120,
-    bandwidth: '8 TB Bandwidth',
+    snapshots: '2 Included Snapshots',
     price: 14.99,
     monthlyPrice: 14.99,
     popular: true,
@@ -65,7 +66,7 @@ const DEFAULT_HOME_PLANS = [
     ramGb: 16,
     storage: '250 GB SSD',
     storageGb: 250,
-    bandwidth: '12 TB Bandwidth',
+    snapshots: '7 Included Snapshots',
     price: 29.99,
     monthlyPrice: 29.99,
     popular: false,
@@ -118,7 +119,7 @@ export default function Home() {
             ramGb: p.ramGb,
             storage: `${p.storageGb} GB SSD`,
             storageGb: p.storageGb,
-            bandwidth: `${Math.round(((p.bandwidthMbps || 1000) / 1000) * 4) || 4} TB Bandwidth`,
+            snapshots: `${p.maxSnapshots || (idx === 0 ? 1 : idx === 1 ? 2 : 7)} Included Snapshot${(p.maxSnapshots || 1) > 1 ? 's' : ''}`,
             price: Number(p.monthlyPrice) || 9.99,
             monthlyPrice: Number(p.monthlyPrice) || 9.99,
             popular: idx === 1 || p.name.toLowerCase().includes('pro'),
@@ -392,8 +393,8 @@ export default function Home() {
                       <span><strong className="text-slate-950 font-bold">{plan.storage}</strong> Enterprise SSD</span>
                     </li>
                     <li className="flex items-center gap-3">
-                      <Globe className="w-4 h-4 text-blue-600 shrink-0" /> 
-                      <span><strong className="text-slate-950 font-bold">{plan.bandwidth}</strong> Premium Traffic</span>
+                      <Camera className="w-4 h-4 text-blue-600 shrink-0" /> 
+                      <span><strong className="text-slate-950 font-bold">{plan.snapshots}</strong> Instant Restore</span>
                     </li>
                     <li className="flex items-center gap-3">
                       <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" /> 

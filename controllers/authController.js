@@ -14,8 +14,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'atc_cloud_default_jwt_secret_must_
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
 const JWT_VERIFY_SECRET = process.env.JWT_VERIFY_SECRET || JWT_SECRET;
-const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://172.23.28.242';
-const BACKEND_URL = process.env.BACKEND_URL || process.env.SERVER_URL || 'http://172.23.28.242';
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'http://172.31.40.75:5174';
+const BACKEND_URL = process.env.BACKEND_URL || process.env.SERVER_URL || 'http://172.31.40.75:5000';
 // Google OAuth strictly forbids private IP addresses (RFC 1918). It requires localhost or a public FQDN domain.
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback';
 
