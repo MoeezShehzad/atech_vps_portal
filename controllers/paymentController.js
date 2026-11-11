@@ -152,9 +152,9 @@ export async function processCardPayment(req, res) {
     const isMultiYearOrder = term === '24m';
     let expectedSubtotal = baseMonthly;
     if (isYearlyOrder) {
-      expectedSubtotal = Number((baseMonthly * 12 * 0.85).toFixed(2));
+      expectedSubtotal = Number((baseMonthly * 12 * 0.95).toFixed(2));
     } else if (isMultiYearOrder) {
-      expectedSubtotal = Number((baseMonthly * 24 * 0.75).toFixed(2));
+      expectedSubtotal = Number((baseMonthly * 24 * 0.85).toFixed(2));
     }
 
     let couponDiscount = 0;
@@ -179,7 +179,12 @@ export async function processCardPayment(req, res) {
       }
     }
 
-    const minAuthorizedPrice = Math.max(0.50, Number((expectedSubtotal - couponDiscount).toFixed(2)));
+    const netSubtotal = Math.max(0.50, Number((expectedSubtotal - couponDiscount).toFixed(2)));
+    // Adjustment #4: When customer pays from credit card, charge 1.5% fee on whole amount, TAX is 0%.
+    const expectedFee = Number((netSubtotal * 0.015).toFixed(2));
+    const expectedTotal = Number((netSubtotal + expectedFee).toFixed(2));
+
+    const minAuthorizedPrice = Math.max(0.50, expectedTotal);
     if (Number(amount) < (minAuthorizedPrice - 0.50)) {
       console.warn(`[SECURITY ALERT] Price tampering attempt detected for User #${userId}: submitted $${amount}, required min $${minAuthorizedPrice}`);
       return res.status(400).json({
@@ -245,9 +250,9 @@ export async function processCardPayment(req, res) {
         userId,
         subscriptionId: subscription.subscriptionId,
         invoiceNumber,
-        subtotal: Number(amount),
+        subtotal: Number(req.body.subtotal || netSubtotal),
         tax: 0,
-        discount: 0,
+        discount: couponDiscount,
         total: Number(amount),
         currency: 'USD',
         status: 'PAID',
@@ -297,6 +302,9 @@ export async function processCardPayment(req, res) {
       fullName: req.user.fullName || effectiveCardName,
       invoiceNumber,
       amount: Number(amount),
+      subtotal: Number(req.body.subtotal || netSubtotal),
+      processingFee: expectedFee,
+      tax: 0,
       planName: plan.name,
       currency: 'USD',
     }).catch((mailErr) => console.warn('[Invoice Receipt Email Warning]:', mailErr.message));
@@ -309,6 +317,9 @@ export async function processCardPayment(req, res) {
       subscriptionId: subscription.subscriptionId,
       cardBrand: effectiveBrand,
       last4: effectiveLast4,
+      subtotal: Number(req.body.subtotal || netSubtotal),
+      processingFee: expectedFee,
+      tax: 0,
       amount: Number(amount).toFixed(2),
       currency: 'USD',
     });
@@ -373,9 +384,9 @@ export async function processBankPayment(req, res) {
     const isMultiYear = term === '24m';
     let expectedSubtotal = baseMonthly;
     if (isYearly) {
-      expectedSubtotal = Number((baseMonthly * 12 * 0.85).toFixed(2));
+      expectedSubtotal = Number((baseMonthly * 12 * 0.95).toFixed(2));
     } else if (isMultiYear) {
-      expectedSubtotal = Number((baseMonthly * 24 * 0.75).toFixed(2));
+      expectedSubtotal = Number((baseMonthly * 24 * 0.85).toFixed(2));
     }
 
     let couponDiscount = 0;
@@ -483,6 +494,9 @@ export async function processBankPayment(req, res) {
       fullName: req.user.fullName,
       invoiceNumber,
       amount: Number(amount),
+      subtotal: Number(req.body.subtotal || amount),
+      processingFee: 0,
+      tax: 0,
       planName: `${plan.name} (Direct Bank Transfer - Due: ${bankResult.dueDate.toISOString().split('T')[0]})`,
       currency: 'USD',
     }).catch((mailErr) => console.warn('[Invoice Email Warning]:', mailErr.message));
@@ -498,6 +512,9 @@ export async function processBankPayment(req, res) {
       maskedAccount: bankResult.maskedAccount,
       dueDate: bankResult.dueDate.toISOString().split('T')[0],
       remittanceDetails: bankResult.remittanceDetails,
+      subtotal: Number(req.body.subtotal || amount),
+      processingFee: 0,
+      tax: 0,
       amount: Number(amount).toFixed(2),
       currency: 'USD',
     });

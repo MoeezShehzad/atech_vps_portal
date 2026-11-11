@@ -45,7 +45,8 @@ export default function Checkout() {
 
   const isYearly = orderData.isYearly || orderData.term?.id === '12m';
   const isMultiYear = orderData.term?.id === '24m';
-  const effectiveAmount = Number(orderData.totalDueToday ?? orderData.monthlyTotal ?? 11);
+  const orderSubtotal = Number(orderData.totalDueToday ?? orderData.monthlyTotal ?? 11);
+  const effectiveAmount = orderSubtotal; // Backwards compatibility alias
 
   // State Management
   const [currentStep, setCurrentStep] = useState<StepId>('details');
@@ -124,10 +125,20 @@ export default function Checkout() {
   const [deployPreference, setDeployPreference] = useState<'immediate' | 'later'>(
     orderData?.deployPreference || 'immediate'
   );
+
+  // Adjustment #4: When customer pays with Credit Card, charge 1.5% fee on whole amount, TAX is 0%.
+  const isCardPayment = paymentMethod === 'card';
+  const cardFee = isCardPayment ? Number((orderSubtotal * 0.015).toFixed(2)) : 0;
+  const taxAmount = 0.00;
+  const finalPayableAmount = Number((orderSubtotal + cardFee + taxAmount).toFixed(2));
+
   const [paymentSuccessData, setPaymentSuccessData] = useState<{
     transactionId: string;
     invoiceNumber: string;
-    amount: string;
+    amount: string | number;
+    subtotal?: string | number;
+    processingFee?: string | number;
+    tax?: string | number;
     method: string;
     dueDate?: string;
     isDeployLater?: boolean;
@@ -271,7 +282,9 @@ export default function Checkout() {
       if (paymentMethod === 'card') {
         const payload: any = {
           planId: orderData.plan?.planId || 1,
-          amount: effectiveAmount,
+          amount: finalPayableAmount,
+          subtotal: orderSubtotal,
+          processingFee: cardFee,
           term: orderData.term?.id || '1m',
           couponCode: orderData.appliedCoupon?.code,
           customerInfo,
@@ -320,7 +333,10 @@ export default function Checkout() {
           setPaymentSuccessData({
             transactionId: res.transactionId,
             invoiceNumber: res.invoiceNumber,
-            amount: res.amount,
+            amount: res.amount || finalPayableAmount,
+            subtotal: res.subtotal || orderSubtotal,
+            processingFee: res.processingFee !== undefined ? res.processingFee : cardFee,
+            tax: 0,
             method: `${res.cardBrand} •••• ${res.last4}`,
             isDeployLater: deployPreference === 'later',
           });
@@ -330,7 +346,9 @@ export default function Checkout() {
           method: 'POST',
           body: JSON.stringify({
             planId: orderData.plan?.planId || 1,
-            amount: effectiveAmount,
+            amount: orderSubtotal,
+            subtotal: orderSubtotal,
+            processingFee: 0,
             term: orderData.term?.id || '1m',
             couponCode: orderData.appliedCoupon?.code,
             bankName: bankDetails.bankName,
@@ -346,7 +364,10 @@ export default function Checkout() {
           setPaymentSuccessData({
             transactionId: res.transactionId,
             invoiceNumber: res.invoiceNumber,
-            amount: res.amount,
+            amount: res.amount || orderSubtotal,
+            subtotal: res.subtotal || orderSubtotal,
+            processingFee: 0,
+            tax: 0,
             method: `Bank Wire (Sort: ${res.sortCode} / A/C: ${res.maskedAccount})`,
             dueDate: res.dueDate,
             isDeployLater: true,
@@ -841,7 +862,7 @@ export default function Checkout() {
                   >
                     <span className="text-lg">💳</span>
                     <span className="font-extrabold">Credit / Debit Card</span>
-                    <span className="text-[10px] text-slate-400 font-medium">Visa / Mastercard / Amex</span>
+                    <span className="text-[10px] text-slate-400 font-medium">Visa / Mastercard / Amex (1.5% Fee)</span>
                   </button>
 
                   <button
@@ -855,7 +876,7 @@ export default function Checkout() {
                   >
                     <span className="text-lg">🏦</span>
                     <span className="font-extrabold">Direct Bank Wire</span>
-                    <span className="text-[10px] text-slate-400 font-medium">Sorting A/C & Net Terms</span>
+                    <span className="text-[10px] text-slate-400 font-medium">Sorting A/C & Net Terms (0% Fee)</span>
                   </button>
                 </div>
 
@@ -1141,8 +1162,8 @@ export default function Checkout() {
                     ) : (
                       <span>
                         {deployPreference === 'later'
-                          ? `Purchase & Reserve Slot ($${effectiveAmount.toFixed(2)}${isYearly ? ' Full Year Upfront' : isMultiYear ? ' 2-Year Term Upfront' : '/mo'})`
-                          : `Complete & Deploy ($${effectiveAmount.toFixed(2)}${isYearly ? ' Full Year Upfront' : isMultiYear ? ' 2-Year Term Upfront' : '/mo'})`}
+                          ? `Purchase & Reserve Slot ($${finalPayableAmount.toFixed(2)}${isYearly ? ' Full Year Upfront' : isMultiYear ? ' 2-Year Term Upfront' : '/mo'})`
+                          : `Complete & Deploy ($${finalPayableAmount.toFixed(2)}${isYearly ? ' Full Year Upfront' : isMultiYear ? ' 2-Year Term Upfront' : '/mo'})`}
                       </span>
                     )}
                   </button>
@@ -1181,7 +1202,21 @@ export default function Checkout() {
                       <span className="font-bold font-mono text-slate-900 text-[11px]">{paymentSuccessData.transactionId}</span>
                     </div>
                     <div className="flex justify-between border-b border-slate-200/60 pb-2">
-                      <span className="text-slate-500">Amount</span>
+                      <span className="text-slate-500">Order Subtotal</span>
+                      <span className="font-bold text-slate-900">${Number(paymentSuccessData.subtotal || orderSubtotal).toFixed(2)} USD</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                      <span className="text-slate-500">Taxes</span>
+                      <span className="font-bold text-slate-900">$0.00 USD</span>
+                    </div>
+                    {Number(paymentSuccessData.processingFee || 0) > 0 && (
+                      <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                        <span className="text-slate-500">Credit Card Fee (1.5%)</span>
+                        <span className="font-bold text-slate-900">+${Number(paymentSuccessData.processingFee).toFixed(2)} USD</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                      <span className="text-slate-500">Total Charged</span>
                       <span className="font-bold text-emerald-600">${Number(paymentSuccessData.amount).toFixed(2)} USD</span>
                     </div>
                     <div className="flex justify-between border-b border-slate-200/60 pb-2">
@@ -1293,8 +1328,28 @@ export default function Checkout() {
                 )}
               </div>
 
+              {/* Subtotal & Taxes & Fees Breakdown */}
+              <div className="pt-3 border-t border-slate-100 space-y-1.5 text-xs">
+                <div className="flex justify-between text-slate-600">
+                  <span>Order Subtotal:</span>
+                  <span className="font-semibold text-slate-900">${orderSubtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-slate-600">
+                  <span>Taxes (0%):</span>
+                  <span className="font-semibold text-slate-900">$0.00</span>
+                </div>
+                {isCardPayment && (
+                  <div className="flex justify-between text-slate-600">
+                    <span className="flex items-center gap-1 text-slate-700 font-medium">
+                      Credit Card Fee (1.5%):
+                    </span>
+                    <span className="font-semibold text-slate-900">+${cardFee.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
               {/* Total Calculation */}
-              <div className="pt-4 border-t border-slate-200 space-y-1">
+              <div className="pt-3 border-t border-slate-200 space-y-1">
                 <div className="flex justify-between items-baseline">
                   <div>
                     <span className="text-xs font-bold text-slate-700 block">
@@ -1307,11 +1362,11 @@ export default function Checkout() {
                   <div className="text-right">
                     {orderData.discountAmount > 0 && (
                       <span className="text-xs line-through text-slate-400 font-semibold mr-2 block">
-                        ${(Number(orderData.fullTermSubtotal || effectiveAmount) + Number(orderData.discountAmount)).toFixed(2)}
+                        ${(Number(orderData.fullTermSubtotal || orderSubtotal) + Number(orderData.discountAmount)).toFixed(2)}
                       </span>
                     )}
                     <span className="text-3xl font-black text-slate-950 tracking-tight">
-                      ${effectiveAmount.toFixed(2)}
+                      ${finalPayableAmount.toFixed(2)}
                     </span>
                   </div>
                 </div>

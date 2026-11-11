@@ -42,8 +42,8 @@ const DEFAULT_HOME_PLANS = [
     price: 6.99,
     monthlyPrice: 6.99,
     regularPriceMonthly: 6.99,
-    promoPriceMonthly: 5.94,
-    yearlyTotalPrice: 71,
+    promoPriceMonthly: 6.64,
+    yearlyTotalPrice: 79.68,
     popular: false,
     tag: undefined,
     color: 'from-blue-500 to-cyan-500',
@@ -63,8 +63,8 @@ const DEFAULT_HOME_PLANS = [
     price: 14.99,
     monthlyPrice: 14.99,
     regularPriceMonthly: 14.99,
-    promoPriceMonthly: 12.74,
-    yearlyTotalPrice: 153,
+    promoPriceMonthly: 14.24,
+    yearlyTotalPrice: 170.88,
     popular: true,
     tag: 'BESTSELLER',
     color: 'from-blue-600 to-blue-700',
@@ -84,8 +84,8 @@ const DEFAULT_HOME_PLANS = [
     price: 29.99,
     monthlyPrice: 29.99,
     regularPriceMonthly: 29.99,
-    promoPriceMonthly: 25.49,
-    yearlyTotalPrice: 306,
+    promoPriceMonthly: 28.49,
+    yearlyTotalPrice: 341.88,
     popular: false,
     tag: 'BEST VALUE',
     color: 'from-slate-700 to-slate-800',
@@ -105,8 +105,8 @@ const DEFAULT_HOME_PLANS = [
     price: 59.99,
     monthlyPrice: 59.99,
     regularPriceMonthly: 59.99,
-    promoPriceMonthly: 50.99,
-    yearlyTotalPrice: 612,
+    promoPriceMonthly: 56.99,
+    yearlyTotalPrice: 683.88,
     popular: false,
     tag: 'HIGH COMPUTE',
     color: 'from-indigo-600 to-purple-600',
@@ -151,8 +151,8 @@ export default function Home() {
         if (Array.isArray(dbPlans) && dbPlans.length > 0) {
           const mapped = dbPlans.map((p, idx) => {
             const reg = Number(p.monthlyPrice) || 6.99;
-            const promo = Number((reg * 0.85).toFixed(2));
-            const yearlyTotal = Number((promo * 12).toFixed(0));
+            const promo = Number((reg * 0.95).toFixed(2));
+            const yearlyTotal = Number((promo * 12).toFixed(2));
 
             let tag: string | undefined = undefined;
             if (p.name.includes('Pro')) tag = 'BESTSELLER';
@@ -393,7 +393,7 @@ export default function Home() {
               <div className={`w-4 h-4 bg-blue-600 rounded-full transition-transform ${billingCycle === 'annually' ? 'translate-x-6' : ''}`} />
             </button>
             <span className={`text-xs font-bold ${billingCycle === 'annually' ? 'text-slate-900' : 'text-slate-400'}`}>
-              Annually <span className="text-emerald-700 text-[10px] bg-emerald-50 border border-emerald-200 font-bold px-2 py-0.5 rounded-full ml-1">Save 15%</span>
+              Annually <span className="text-emerald-700 text-[10px] bg-emerald-50 border border-emerald-200 font-bold px-2 py-0.5 rounded-full ml-1">Save 5%</span>
             </span>
           </div>
         </div>
@@ -416,7 +416,7 @@ export default function Home() {
                 <div className="flex justify-between items-center mb-3 min-h-[22px]">
                   {billingCycle === 'annually' ? (
                     <span className="bg-emerald-50 text-emerald-700 text-[10px] font-medium uppercase px-2 py-0.5 rounded-md border border-emerald-200">
-                      Save 15%
+                      Save 5%
                     </span>
                   ) : (
                     <div />
@@ -443,7 +443,7 @@ export default function Home() {
                     </div>
                     {billingCycle === 'annually' ? (
                       <p className="text-[11px] text-emerald-600 font-semibold mt-1">
-                        Billed annually (${plan.yearlyTotalPrice}/yr), save 15%
+                        Billed annually (${Number(plan.yearlyTotalPrice).toFixed(2)}/yr), save 5%
                       </p>
                     ) : (
                       <p className="text-[11px] text-slate-400 font-normal mt-1">

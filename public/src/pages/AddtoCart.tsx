@@ -19,8 +19,8 @@ const DATACENTER_LOCATIONS = [
 
 const BILLING_TERMS = [
   { id: '1m', label: '1 Month', desc: 'Flexible monthly billing, cancel anytime', monthlyPriceRatio: 1.0, discountText: '', nonRefundable: true },
-  { id: '12m', label: '12 Months (1 Year)', desc: 'Billed full year upfront with 15% savings.', monthlyPriceRatio: 0.85, discountText: 'Save 15%', nonRefundable: true },
-  { id: '24m', label: '24 Months (2 Years)', desc: 'Best multi-year value with 25% savings.', monthlyPriceRatio: 0.75, discountText: 'Save 25%', nonRefundable: true },
+  { id: '12m', label: '12 Months (1 Year)', desc: 'Billed full year upfront with 5% savings.', monthlyPriceRatio: 0.95, discountText: 'Save 5%', nonRefundable: true },
+  { id: '24m', label: '24 Months (2 Years)', desc: 'Best multi-year value with 15% savings.', monthlyPriceRatio: 0.85, discountText: 'Save 15%', nonRefundable: true },
 ];
 
 const ADDONS: { id: string; name: string; desc: string; price: number }[] = [];
@@ -39,7 +39,7 @@ export default function ServerConfigure() {
     storageGb: 120,
     storageType: 'SSD',
     monthlyPrice: 6.99,
-    promoPriceMonthly: 5.94,
+    promoPriceMonthly: 6.64,
   };
 
   const isUpgrade = Boolean(location.state?.isUpgrade);
@@ -84,8 +84,8 @@ export default function ServerConfigure() {
       selectedTerm === '1m'
         ? (selectedPlan.monthlyPrice ?? selectedPlan.price ?? 6)
         : selectedTerm === '24m'
-          ? Number(((selectedPlan.monthlyPrice ?? selectedPlan.price ?? 6) * 0.75).toFixed(2))
-          : (selectedPlan.promoPriceMonthly ?? Number(((selectedPlan.monthlyPrice ?? selectedPlan.price ?? 6) * 0.85).toFixed(2)))
+          ? Number(((selectedPlan.monthlyPrice ?? selectedPlan.price ?? 6) * 0.85).toFixed(2))
+          : (selectedPlan.promoPriceMonthly ?? Number(((selectedPlan.monthlyPrice ?? selectedPlan.price ?? 6) * 0.95).toFixed(2)))
     ) || 0;
 
   const osPrice = activeOsObj?.fee || 0;

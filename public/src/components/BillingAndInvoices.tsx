@@ -312,19 +312,31 @@ export default function BillingAndInvoices() {
       }
 
       // Totals
+      const invSub = Number(inv.subtotal || inv.total || 0);
+      const invTotal = Number(inv.total || invSub);
+      const invFee = invTotal > invSub ? Number((invTotal - invSub).toFixed(2)) : 0;
+
       y += 4;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
       doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
       doc.text('Subtotal:', 140, y);
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-      doc.text(`$${Number(inv.subtotal).toFixed(2)}`, 185, y, { align: 'right' });
+      doc.text(`$${invSub.toFixed(2)}`, 185, y, { align: 'right' });
 
       y += 6;
       doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
       doc.text('Tax (0%):', 140, y);
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
       doc.text(`$${Number(inv.tax || 0).toFixed(2)}`, 185, y, { align: 'right' });
+
+      if (invFee > 0) {
+        y += 6;
+        doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+        doc.text('Card Fee (1.5%):', 140, y);
+        doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+        doc.text(`+$${invFee.toFixed(2)}`, 185, y, { align: 'right' });
+      }
 
       y += 8;
       doc.setDrawColor(15, 23, 42);
@@ -335,7 +347,7 @@ export default function BillingAndInvoices() {
       doc.setFontSize(11);
       doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
       doc.text('Total Paid:', 140, y + 3.5);
-      doc.text(`$${Number(inv.total).toFixed(2)} USD`, 185, y + 3.5, { align: 'right' });
+      doc.text(`$${invTotal.toFixed(2)} USD`, 185, y + 3.5, { align: 'right' });
 
       // Footer
       doc.setFont('helvetica', 'normal');
@@ -796,6 +808,12 @@ export default function BillingAndInvoices() {
                   <span>Sales Tax / VAT (0%):</span>
                   <span className="font-mono text-slate-900 dark:text-white">$0.00 USD</span>
                 </div>
+                {selectedInvoice.total > selectedInvoice.subtotal && (
+                  <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                    <span>Credit Card Processing Fee (1.5%):</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">+${(selectedInvoice.total - selectedInvoice.subtotal).toFixed(2)} USD</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm font-bold text-slate-900 dark:text-white border-t border-slate-200 dark:border-slate-700 pt-2">
                   <span>Total Paid:</span>
                   <span className="font-mono text-emerald-600 dark:text-emerald-400">${selectedInvoice.total.toFixed(2)} USD</span>

@@ -284,6 +284,9 @@ export async function getInvoiceDetails(req, res) {
         ],
         subtotal: Number(invoice.subtotal),
         tax: Number(invoice.tax),
+        processingFee: Number(invoice.total) > Number(invoice.subtotal) 
+          ? Number((Number(invoice.total) - Number(invoice.subtotal)).toFixed(2)) 
+          : 0,
         total: Number(invoice.total),
         currency: invoice.currency || 'USD',
         status: invoice.status,

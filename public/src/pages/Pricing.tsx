@@ -14,8 +14,8 @@ interface ExtendedPlan extends VPSPlan {
 // Helper to format and enrich database plans for frontend presentation
 const enrichDbPlan = (plan: VPSPlan): ExtendedPlan => {
   const regular = Number(plan.monthlyPrice) || 0;
-  const promo = Number((regular * 0.85).toFixed(2)); // 15% discount for 1-year billing
-  const yearlyTotal = Math.round(promo * 12);
+  const promo = Number((regular * 0.95).toFixed(2)); // 5% discount for 1-year billing
+  const yearlyTotal = Number((promo * 12).toFixed(2));
 
   let tag: string | undefined;
   if (plan.planId === 2) tag = 'BESTSELLER';
@@ -28,7 +28,7 @@ const enrichDbPlan = (plan: VPSPlan): ExtendedPlan => {
     regularPriceMonthly: regular,
     promoPriceMonthly: promo,
     yearlyTotalPrice: yearlyTotal,
-    promoSaveText: 'Save 15%',
+    promoSaveText: 'Save 5%',
     tag,
   };
 };
@@ -175,7 +175,7 @@ export default function Pricing() {
       storageType: 'SSD',
       monthlyPrice: customMonthly,
       regularPriceMonthly: customMonthly,
-      promoPriceMonthly: Number((customMonthly * 0.85).toFixed(2)),
+      promoPriceMonthly: Number((customMonthly * 0.95).toFixed(2)),
       currency: 'USD',
       isActive: true,
       tag: isCustomized ? 'CUSTOM' : activeBasePlan.tag,
@@ -235,7 +235,7 @@ export default function Pricing() {
             >
               <span>1-Year Term</span>
               <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2 py-0.5 rounded-full font-medium">
-                Save 15%
+                Save 5%
               </span>
             </span>
           </div>
@@ -299,7 +299,7 @@ export default function Pricing() {
 
                       {billingCycle === 'yearly' ? (
                         <p className="text-[11px] text-emerald-600 font-normal mt-0.5">
-                          Billed annually (${plan.yearlyTotalPrice}/yr), save 15%
+                          Billed annually (${Number(plan.yearlyTotalPrice).toFixed(2)}/yr), save 5%
                         </p>
                       ) : (
                         <p className="text-[11px] text-slate-400 font-normal mt-0.5">Billed monthly, cancel anytime</p>
@@ -425,17 +425,17 @@ export default function Pricing() {
               <span className="text-xs uppercase text-slate-400 font-extrabold block">Total Estimate</span>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-black text-slate-950">
-                  ${(billingCycle === 'yearly' ? calculateCustomMonthly() * 0.85 : calculateCustomMonthly()).toFixed(2)}
+                  ${(billingCycle === 'yearly' ? calculateCustomMonthly() * 0.95 : calculateCustomMonthly()).toFixed(2)}
                 </span>
                 <span className="text-sm font-semibold text-slate-500">/mo</span>
                 {billingCycle === 'yearly' && (
                   <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    Save 15%
+                    Save 5%
                   </span>
                 )}
                 {customCalc.diffMonthly > 0 && (
                   <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                    +${(billingCycle === 'yearly' ? customCalc.diffMonthly * 0.85 : customCalc.diffMonthly).toFixed(2)} customized specs
+                    +${(billingCycle === 'yearly' ? customCalc.diffMonthly * 0.95 : customCalc.diffMonthly).toFixed(2)} customized specs
                   </span>
                 )}
               </div>

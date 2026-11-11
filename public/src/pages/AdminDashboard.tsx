@@ -724,6 +724,15 @@ export default function AdminDashboard() {
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
       doc.text(`$${tax.toFixed(2)}`, 185, y, { align: 'right' });
 
+      if (total > subtotal) {
+        const cardFee = Number((total - subtotal).toFixed(2));
+        y += 6;
+        doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+        doc.text('Card Fee (1.5%):', 140, y);
+        doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
+        doc.text(`+$${cardFee.toFixed(2)}`, 185, y, { align: 'right' });
+      }
+
       y += 8;
       doc.setDrawColor(15, 23, 42);
       doc.setLineWidth(0.5);
@@ -4976,6 +4985,12 @@ export default function AdminDashboard() {
                   <span>Tax (0%):</span>
                   <span>${Number(selectedInvoiceReceipt.tax || 0).toFixed(2)}</span>
                 </div>
+                {Number(selectedInvoiceReceipt.total || selectedInvoiceReceipt.amount || 0) > Number(selectedInvoiceReceipt.subtotal || 0) && Number(selectedInvoiceReceipt.subtotal || 0) > 0 && (
+                  <div className="flex justify-between text-slate-500 font-mono">
+                    <span>Credit Card Processing Fee (1.5%):</span>
+                    <span>+${(Number(selectedInvoiceReceipt.total || selectedInvoiceReceipt.amount || 0) - Number(selectedInvoiceReceipt.subtotal || 0)).toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-700 text-sm">
                   <span className="font-bold text-slate-900 dark:text-white font-poppins">Total Amount:</span>
                   <span className="font-mono font-bold text-lg text-blue-600 dark:text-blue-400">

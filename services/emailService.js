@@ -579,8 +579,11 @@ export async function sendTicketReplyNotification({
 /**
  * Invoice Generated & Payment Receipt
  */
-export async function sendInvoiceReceiptEmail({ email, fullName, invoiceNumber, amount, planName, currency = 'USD' }) {
+export async function sendInvoiceReceiptEmail({ email, fullName, invoiceNumber, amount, subtotal, processingFee = 0, tax = 0, planName, currency = 'USD' }) {
   const invoiceUrl = `${APP_URL}/dashboard?tab=billing`;
+  const orderSubtotal = subtotal ? Number(subtotal) : Number(amount) - Number(processingFee || 0);
+  const feeAmount = Number(processingFee || 0);
+
   const html = wrapEmailTemplate({
     title: `Payment Receipt: ${escapeHtml(invoiceNumber)}`,
     subtitle: `Hi ${escapeHtml(fullName || 'Customer')}, here is your payment receipt.`,
@@ -599,7 +602,22 @@ export async function sendInvoiceReceiptEmail({ email, fullName, invoiceNumber, 
               <strong>${escapeHtml(planName || 'Cloud VPS Compute Plan')}</strong><br/>
               <span style="font-size:12px;color:#64748b;">Invoice ${escapeHtml(invoiceNumber)} • Paid</span>
             </td>
-            <td align="right" style="font-size:16px;font-weight:700;color:#0f172a;">
+            <td align="right" style="font-size:15px;font-weight:600;color:#0f172a;">
+              $${orderSubtotal.toFixed(2)} ${escapeHtml(currency)}
+            </td>
+          </tr>
+          <tr style="border-top:1px solid #f1f5f9;">
+            <td style="color:#64748b;font-size:13px;">Taxes (0%)</td>
+            <td align="right" style="color:#0f172a;font-size:13px;font-weight:500;">$0.00 ${escapeHtml(currency)}</td>
+          </tr>
+          ${feeAmount > 0 ? `
+          <tr style="border-top:1px solid #f1f5f9;">
+            <td style="color:#64748b;font-size:13px;">Credit Card Processing Fee (1.5%)</td>
+            <td align="right" style="color:#0f172a;font-size:13px;font-weight:500;">+$${feeAmount.toFixed(2)} ${escapeHtml(currency)}</td>
+          </tr>` : ''}
+          <tr style="border-top:2px solid #e2e8f0;background-color:#f8fafc;">
+            <td style="font-weight:700;color:#0f172a;">Total Paid</td>
+            <td align="right" style="font-size:16px;font-weight:700;color:#10b981;">
               $${Number(amount).toFixed(2)} ${escapeHtml(currency)}
             </td>
           </tr>
