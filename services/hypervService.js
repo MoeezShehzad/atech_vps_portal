@@ -57,8 +57,8 @@ class HyperVService {
    * Fast pre-flight check to verify which host agent is reachable.
    * Prevents long hangs if the host agent is offline.
    */
-  async findReachableHost() {
-    if (this.activeHost && Date.now() - this.lastHostCheck < 15000) {
+  async findReachableHost(forceCheck = false) {
+    if (!forceCheck && this.activeHost && Date.now() - this.lastHostCheck < 15000) {
       return this.activeHost;
     }
 
@@ -75,7 +75,7 @@ class HyperVService {
       try {
         const ping = await fetch(`${host}/health`, {
           method: 'GET',
-          signal: AbortSignal.timeout(2000),
+          signal: AbortSignal.timeout(1800),
         });
         if (ping.ok) {
           this.activeHost = host;
@@ -88,8 +88,8 @@ class HyperVService {
     return null;
   }
 
-  async isHostReachable() {
-    const host = await this.findReachableHost();
+  async isHostReachable(forceCheck = false) {
+    const host = await this.findReachableHost(forceCheck);
     return Boolean(host);
   }
 
@@ -144,20 +144,22 @@ class HyperVService {
   /**
    * Provision a new Virtual Machine on Windows Hyper-V.
    */
-  async createVM({ vmId, vmName, cpuCores, ramGb, storageGb, templatePath, switchName = process.env.HYPERV_SWITCH_NAME || 'External_vSwitch', adminUsername = 'ubuntu', adminPassword = '', sshPublicKey = '', osFamily = 'Linux', appId = '' }) {
+  async createVM({ vmId = null, vmName, cpuCores, ramGb, storageGb, templatePath, switchName = process.env.HYPERV_SWITCH_NAME || 'External_vSwitch', adminUsername = 'ubuntu', adminPassword = '', sshPublicKey = '', osFamily = 'Linux', appId = '' }) {
     const ramMb = ramGb * 1024;
     console.log(`[HYPER-V] Provisioning VM: ${vmName} (${cpuCores} vCPU, ${ramGb}GB RAM, ${storageGb}GB Disk, user: ${adminUsername}, app: ${appId || 'none'})`);
 
-    // Record Provisioning Job in Database
-    const job = await prisma.provisioningJob.create({
-      data: {
-        vmId: Number(vmId),
-        jobType: 'CREATE',
-        status: 'RUNNING',
-        currentStep: 'Sending command to Windows Hyper-V Host',
-        startedAt: new Date(),
-      },
-    });
+    let job = null;
+    if (vmId) {
+      job = await prisma.provisioningJob.create({
+        data: {
+          vmId: Number(vmId),
+          jobType: 'CREATE',
+          status: 'RUNNING',
+          currentStep: 'Sending command to Windows Hyper-V Host',
+          startedAt: new Date(),
+        },
+      }).catch(() => null);
+    }
 
     try {
       // Dispatch to Windows Host Agent
@@ -175,16 +177,6 @@ class HyperVService {
         appId,
       });
 
-      // Update Provisioning Job as completed
-      await prisma.provisioningJob.update({
-        where: { jobId: job.jobId },
-        data: {
-          status: 'COMPLETED',
-          currentStep: 'Provisioned in Hyper-V and started',
-          completedAt: new Date(),
-        },
-      });
-
       let extractedVmId = result?.VMId || result?.vmId || (result?.output && typeof result.output === 'object' && result.output.VMId);
       if (!extractedVmId && typeof result?.output === 'string') {
         const idMatch = result.output.match(/"VMId"\s*:\s*"([a-f0-9-]+)"/i);
@@ -192,38 +184,59 @@ class HyperVService {
       }
       if (!extractedVmId) extractedVmId = `hyp-${Date.now()}`;
 
-      // Update VM status in DB
-      await prisma.virtualMachine.update({
-        where: { vmId: Number(vmId) },
-        data: {
-          status: 'RUNNING',
-          provisioningStatus: 'COMPLETED',
-          hypervVmId: extractedVmId,
-          startedAt: new Date(),
-        },
-      });
+      if (job) {
+        await prisma.provisioningJob.update({
+          where: { jobId: job.jobId },
+          data: {
+            status: 'COMPLETED',
+            currentStep: 'Provisioned in Hyper-V and started',
+            completedAt: new Date(),
+          },
+        }).catch(() => null);
+      }
 
-      return result;
+      if (vmId) {
+        await prisma.virtualMachine.update({
+          where: { vmId: Number(vmId) },
+          data: {
+            status: 'RUNNING',
+            provisioningStatus: 'COMPLETED',
+            hypervVmId: extractedVmId,
+            startedAt: new Date(),
+          },
+        }).catch(() => null);
+      }
+
+      return {
+        ...result,
+        VMId: extractedVmId,
+        hypervVmId: extractedVmId,
+      };
     } catch (err) {
       console.error(`[HYPER-V PROVISIONING FAILED] VM ${vmName}:`, err.message);
 
-      await prisma.provisioningJob.update({
-        where: { jobId: job.jobId },
-        data: {
-          status: 'FAILED',
-          errorMessage: err.message,
-          completedAt: new Date(),
-        },
-      });
+      if (job) {
+        await prisma.provisioningJob.update({
+          where: { jobId: job.jobId },
+          data: {
+            status: 'FAILED',
+            errorMessage: err.message,
+            completedAt: new Date(),
+          },
+        }).catch(() => null);
+      }
 
-      await prisma.virtualMachine.update({
-        where: { vmId: Number(vmId) },
-        data: {
-          status: 'FAILED',
-          provisioningStatus: 'FAILED',
-          provisioningError: err.message,
-        },
-      });
+      if (vmId) {
+        await prisma.virtualMachine.update({
+          where: { vmId: Number(vmId) },
+          data: {
+            status: 'TERMINATED',
+            provisioningStatus: 'FAILED',
+            provisioningError: err.message,
+            terminatedAt: new Date(),
+          },
+        }).catch(() => null);
+      }
 
       throw err;
     }

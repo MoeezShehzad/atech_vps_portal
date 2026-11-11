@@ -17,6 +17,9 @@ import {
 import firewallService from '../services/firewallService.js';
 import { generateGuacamoleToken, buildRdpConnectionPayload } from '../services/guacamoleService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
+
+// Concurrency lock: prevents double-click race conditions on active subscription slots
+const activeProvisioningSlots = new Set();
 import { encryptVmPassword, decryptVmPassword, encodeResourceId, decodeResourceId } from '../services/cryptoService.js';
 
 /**
@@ -570,116 +573,181 @@ export async function deployVM(req, res) {
     }
 
     const isSlotReused = Boolean(subscription);
-    console.log(`[Deploy VM] Reusing active subscription slot #${subscription.subscriptionId} (${subscription.plan.name}) for user #${userId}`);
+    console.log(`[Deploy VM] Attempting to deploy into active slot #${subscription.subscriptionId} (${subscription.plan.name}) for user #${userId}`);
 
-    // 2. Assign IP: pick available IP from pool or generate unique pending DHCP lease
-    ipRecord = await prisma.iPPool.findFirst({
-      where: { status: 'AVAILABLE' },
-    });
-    if (!ipRecord) {
-      ipRecord = await prisma.iPPool.create({
-        data: {
-          ipAddress: `DHCP-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
-          subnetMask: '255.255.255.0',
-          gateway: '172.16.16.1',
-          ipType: 'LOCAL_IPV4',
-          status: 'AVAILABLE',
-        },
+    // Concurrency Lock: prevent parallel double-click submissions on the exact same subscription slot
+    if (activeProvisioningSlots.has(subscription.subscriptionId)) {
+      return res.status(409).json({
+        error: 'Provisioning is already in progress for this subscription slot. Please wait a few moments.',
+        code: 'PROVISION_IN_PROGRESS',
       });
     }
+    activeProvisioningSlots.add(subscription.subscriptionId);
 
-    // 3. Create VM in MS SQL Server with unique pending hyperv identifier
-    const pendingHypervId = `pending-${cleanVmName}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-    newVm = await prisma.virtualMachine.create({
-      data: {
-        userId,
-        subscriptionId: subscription.subscriptionId,
-        planId: subscription.planId || plan.planId,
-        imageId: image.imageId,
-        hostId: host.hostId,
-        vmName: cleanVmName,
-        hostname: `${cleanVmName}.atc-cloud.net`,
-        hypervVmId: pendingHypervId,
-        cpuCores: finalCpu,
-        ramGb: finalRam,
-        storageGb: finalStorage,
-        status: 'PROVISIONING',
-        provisioningStatus: 'IN_PROGRESS',
-        adminUser: adminUsername,
-        adminPassword: encryptVmPassword(effectiveAdminPassword),
-        backupEnabled: Boolean(enableBackups),
-      },
-    });
-
-    if (ipRecord) {
-      await prisma.iPPool.update({
-        where: { ipId: ipRecord.ipId },
-        data: { status: 'ASSIGNED', assignedVmId: newVm.vmId },
-      });
-    }
-
-    if (enableBackups) {
-      await prisma.backup.create({
-        data: {
-          vmId: newVm.vmId,
-          backupType: 'AUTOMATED',
-          backupLocation: `Hyper-V Cluster / Daily Snapshot 0`,
-          backupSizeGb: Number((finalStorage * 0.12).toFixed(1)),
-          status: 'COMPLETED',
-          startedAt: new Date(Date.now() - 3600000),
-          completedAt: new Date(),
-        },
-      }).catch((e) => console.warn('[Deploy Initial Backup Warning]:', e.message));
-    }
-
-    // 4. Log Activity
-    await prisma.activityLog.create({
-      data: {
-        userId,
-        vmId: newVm.vmId,
-        action: 'DEPLOY_VM',
-        status: 'PENDING',
-        details: `Provisioning ${cleanVmName} (${finalCpu} vCPU / ${finalRam} GB RAM / ${isSlotReused ? 'Covered by Active Subscription ($0.00)' : `${pricing.totalMonthlyPrice} USD/mo`})`,
-      },
-    });
-
-    // 5. Trigger Hyper-V Provisioning Engine (Awaited with error handling)
     try {
-      await hypervService.createVM({
-        vmId: newVm.vmId,
-        vmName: cleanVmName,
-        cpuCores: finalCpu,
-        ramGb: finalRam,
-        storageGb: finalStorage,
-        templatePath: image.templatePath,
-        adminUsername,
-        adminPassword: effectiveAdminPassword,
-        sshPublicKey: resolvedPublicKey,
-        osFamily: isWindows ? 'Windows' : 'Linux',
-        appId: isWindows ? '' : appId,
-      });
+      // =========================================================================
+      // STEP 1: FAST PRE-FLIGHT HYPERVISOR REACHABILITY CHECK (ZERO DB WRITES)
+      // =========================================================================
+      const isHypervOnline = await hypervService.isHostReachable(true);
+      if (!isHypervOnline) {
+        activeProvisioningSlots.delete(subscription.subscriptionId);
+        return res.status(503).json({
+          error: 'Unable to reach the infrastructure hypervisor. Our automated monitors have logged this event. Please verify hyperv_agent.js is running.',
+          code: 'HYPERVISOR_UNREACHABLE',
+        });
+      }
 
-      await prisma.activityLog.create({
-        data: {
-          userId,
-          vmId: newVm.vmId,
-          action: 'DEPLOY_VM',
-          status: 'SUCCESS',
-          details: `Successfully provisioned ${cleanVmName}`,
-        },
-      });
+      // Pre-flight check for duplicate VM name on Hyper-V
+      try {
+        const hvCheck = await hypervService.getStatus(cleanVmName);
+        if (hvCheck && (hvCheck.Found || hvCheck.VMId)) {
+          activeProvisioningSlots.delete(subscription.subscriptionId);
+          return res.status(400).json({
+            error: `A virtual machine named '${cleanVmName}' already exists on the hypervisor. Please choose a unique hostname.`,
+            code: 'VM_NAME_EXISTS',
+          });
+        }
+      } catch (_) {}
 
-      const readyVm = await prisma.virtualMachine.findUnique({
-        where: { vmId: newVm.vmId },
-        include: { plan: true, image: true, ipPool: true, subscription: true },
-      });
+      // =========================================================================
+      // STEP 2: HYPER-V PHYSICAL CREATION FIRST (ZERO DB WRITES UNTIL CONFIRMED)
+      // =========================================================================
+      let hypervResult = null;
+      try {
+        hypervResult = await hypervService.createVM({
+          vmName: cleanVmName,
+          cpuCores: finalCpu,
+          ramGb: finalRam,
+          storageGb: finalStorage,
+          templatePath: image.templatePath,
+          adminUsername,
+          adminPassword: effectiveAdminPassword,
+          sshPublicKey: resolvedPublicKey,
+          osFamily: isWindows ? 'Windows' : 'Linux',
+          appId: isWindows ? '' : appId,
+        });
+      } catch (provisionErr) {
+        activeProvisioningSlots.delete(subscription.subscriptionId);
+        console.error(`[VM PROVISION ERROR] Hyper-V failed to create physical VM '${cleanVmName}':`, provisionErr.message);
+        // ZERO DATABASE RECORDS WERE WRITTEN. Subscription slot is 100% untouched!
+        return res.status(500).json({
+          error: sanitizeInfrastructureError(provisionErr),
+          code: 'HYPERVISOR_CREATION_FAILED',
+        });
+      }
 
-      // Send credentials and quick-connect email to the customer
+      const confirmedHypervId = hypervResult?.VMId || hypervResult?.hypervVmId || `hyp-${Date.now()}`;
+
+      // =========================================================================
+      // STEP 3: ATOMIC PRISMA TRANSACTION & COMPENSATING ROLLBACK SAFEGUARD
+      // =========================================================================
+      let newVm = null;
+      let ipRecord = null;
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          // 1. Assign IP: pick available IP from pool or generate unique pending DHCP lease
+          ipRecord = await tx.iPPool.findFirst({
+            where: { status: 'AVAILABLE' },
+          });
+          if (!ipRecord) {
+            ipRecord = await tx.iPPool.create({
+              data: {
+                ipAddress: `DHCP-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+                subnetMask: '255.255.255.0',
+                gateway: '172.16.16.1',
+                ipType: 'LOCAL_IPV4',
+                status: 'AVAILABLE',
+              },
+            });
+          }
+
+          // 2. Insert VirtualMachine with CONFIRMED real hypervVmId
+          newVm = await tx.virtualMachine.create({
+            data: {
+              userId,
+              subscriptionId: subscription.subscriptionId,
+              planId: subscription.planId || plan.planId,
+              imageId: image.imageId,
+              hostId: host.hostId,
+              vmName: cleanVmName,
+              hostname: `${cleanVmName}.atc-cloud.net`,
+              hypervVmId: String(confirmedHypervId),
+              cpuCores: finalCpu,
+              ramGb: finalRam,
+              storageGb: finalStorage,
+              status: 'RUNNING',
+              provisioningStatus: 'COMPLETED',
+              adminUser: adminUsername,
+              adminPassword: encryptVmPassword(effectiveAdminPassword),
+              backupEnabled: Boolean(enableBackups),
+              startedAt: new Date(),
+            },
+          });
+
+          // 3. Mark IP assigned
+          await tx.iPPool.update({
+            where: { ipId: ipRecord.ipId },
+            data: { status: 'ASSIGNED', assignedVmId: newVm.vmId },
+          });
+
+          // 4. Initial backup record if enabled
+          if (enableBackups) {
+            await tx.backup.create({
+              data: {
+                vmId: newVm.vmId,
+                backupType: 'AUTOMATED',
+                backupLocation: `Hyper-V Cluster / Daily Snapshot 0`,
+                backupSizeGb: Number((finalStorage * 0.12).toFixed(1)),
+                status: 'COMPLETED',
+                startedAt: new Date(Date.now() - 3600000),
+                completedAt: new Date(),
+              },
+            });
+          }
+
+          // 5. Activity Log
+          await tx.activityLog.create({
+            data: {
+              userId,
+              vmId: newVm.vmId,
+              action: 'DEPLOY_VM',
+              status: 'SUCCESS',
+              details: `Successfully provisioned ${cleanVmName} (${finalCpu} vCPU / ${finalRam} GB RAM / ${finalStorage} GB SSD)`,
+            },
+          });
+        });
+      } catch (dbErr) {
+        console.error(`[DB COMMIT ERROR] Failed to record VM '${cleanVmName}' in DB after Hyper-V creation:`, dbErr.message);
+
+        // COMPENSATING ROLLBACK TRANSACTION:
+        // The VM was physically created on Hyper-V, but DB failed. Immediately destroy
+        // the orphan VM on Hyper-V so physical resources are never leaked!
+        try {
+          console.warn(`[COMPENSATING ROLLBACK] Destroying orphan Hyper-V VM '${cleanVmName}'...`);
+          await hypervService.destroyVM(cleanVmName);
+          console.log(`[COMPENSATING ROLLBACK] Successfully destroyed orphan VM '${cleanVmName}' on Hyper-V.`);
+        } catch (rollbackErr) {
+          console.error(`[COMPENSATING ROLLBACK FAILED] Failed to destroy orphan VM '${cleanVmName}':`, rollbackErr.message);
+        }
+
+        activeProvisioningSlots.delete(subscription.subscriptionId);
+        return res.status(500).json({
+          error: 'Database commit failed during VM registration. Hyper-V resources were rolled back cleanly. Please try again.',
+          code: 'DB_COMMIT_FAILED',
+        });
+      } finally {
+        activeProvisioningSlots.delete(subscription.subscriptionId);
+      }
+
+      // =========================================================================
+      // STEP 4: ASYNC NOTIFICATIONS & 1-CLICK APPS
+      // =========================================================================
       sendVmProvisionedEmail({
         email: req.user?.email,
         fullName: req.user?.fullName,
         vmName: cleanVmName,
-        ipAddress: readyVm?.ipAddress || ipRecord?.ipAddress || 'Allocated via DHCP',
+        ipAddress: ipRecord?.ipAddress || 'Allocated via DHCP',
         username: adminUsername,
         password: isWindows ? (effectiveAdminPassword || 'None (Direct Login)') : effectiveAdminPassword,
         os: image?.name || (isWindows ? 'Windows 10 Pro' : 'Linux'),
@@ -687,7 +755,6 @@ export async function deployVM(req, res) {
         console.warn('[VM Provision Email Warning]:', mailErr.message);
       });
 
-      // Trigger automated 1-Click App installation if requested (Linux only)
       if (appId && !isWindows) {
         import('../services/appStoreService.js').then(({ installAppOnVM }) => {
           installAppOnVM({ vmId: newVm.vmId, userId, appId }).catch((appErr) => {
@@ -696,58 +763,25 @@ export async function deployVM(req, res) {
         }).catch(() => {});
       }
 
+      const readyVm = await prisma.virtualMachine.findUnique({
+        where: { vmId: newVm.vmId },
+        include: { plan: true, image: true, ipPool: true, subscription: true },
+      });
+
       return res.status(201).json({
         success: true,
         message: `Virtual machine ${cleanVmName} created and started in Hyper-V.`,
         vm: readyVm,
         pricing,
       });
-    } catch (provisionErr) {
-      console.error(`[VM PROVISION ERROR] ${cleanVmName}:`, provisionErr.message);
-
-      // Clean up IP assignment
-      if (ipRecord) {
-        await prisma.iPPool.update({
-          where: { ipId: ipRecord.ipId },
-          data: { status: 'AVAILABLE', assignedVmId: null },
-        }).catch(() => {});
-      }
-
-      // Mark VM as TERMINATED and FAILED so it does not ghost in the user's dashboard table
-      await prisma.virtualMachine.update({
-        where: { vmId: newVm.vmId },
-        data: {
-          status: 'TERMINATED',
-          provisioningStatus: 'FAILED',
-          provisioningError: provisionErr.message,
-          terminatedAt: new Date(),
-        },
-      }).catch(() => {});
-
-      return res.status(500).json({
-        error: sanitizeInfrastructureError(provisionErr),
-      });
+    } catch (unexpectedErr) {
+      activeProvisioningSlots.delete(subscription.subscriptionId);
+      console.error('[VM Controller] Unexpected error in deployVM:', unexpectedErr);
+      return res.status(500).json({ error: sanitizeInfrastructureError(unexpectedErr) });
     }
-  } catch (error) {
-    console.error('[VM Controller] Error deploying VM:', error);
-    if (newVm?.vmId) {
-      await prisma.virtualMachine.update({
-        where: { vmId: newVm.vmId },
-        data: {
-          status: 'TERMINATED',
-          provisioningStatus: 'FAILED',
-          provisioningError: error.message,
-          terminatedAt: new Date(),
-        },
-      }).catch(() => {});
-    }
-    if (ipRecord?.ipId) {
-      await prisma.iPPool.update({
-        where: { ipId: ipRecord.ipId },
-        data: { status: 'AVAILABLE', assignedVmId: null },
-      }).catch(() => {});
-    }
-    return res.status(500).json({ error: sanitizeInfrastructureError(error) });
+  } catch (outerErr) {
+    console.error('[VM Controller] Outer error deploying VM:', outerErr);
+    return res.status(500).json({ error: sanitizeInfrastructureError(outerErr) });
   }
 }
 

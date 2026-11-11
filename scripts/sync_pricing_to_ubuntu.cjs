@@ -4,6 +4,7 @@ const path = require('path');
 const filesToSync = [
   'controllers/authController.js',
   'controllers/vmController.js',
+  'services/hypervService.js',
   'services/pricingService.js',
   'services/trialService.js',
   'services/emailService.js',
