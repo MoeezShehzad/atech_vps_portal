@@ -54,6 +54,9 @@ conn.on('ready', () => {
 
       const script = [
         'set -e',
+        'echo "=== UPDATING OS IMAGE TEMPLATE PATHS IN DATABASE ==="',
+        'cd /home/ubuntu/atech_vps_portal',
+        'node prisma/seed.js',
         'echo "=== CHECKING FRONTEND BUILD ON UBUNTU ==="',
         'cd /home/ubuntu/atech_vps_portal/public',
         'npm run build',
@@ -64,7 +67,7 @@ conn.on('ready', () => {
         'pm2 status'
       ].join('\n');
 
-      console.log('Executing build and restart on Ubuntu...');
+      console.log('Executing update, build and restart on Ubuntu...');
       conn.exec(script, (execErr, stream) => {
         if (execErr) {
           console.error('Exec error:', execErr);

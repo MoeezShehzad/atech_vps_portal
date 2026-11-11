@@ -109,28 +109,28 @@ async function main() {
       name: 'Ubuntu 22.04 LTS (Jammy Jellyfish)',
       osFamily: 'Linux',
       version: '22.04',
-      templatePath: 'D:\\00_Master_Template\\ubuntu-22.04.5-live-server-amd64.iso',
+      templatePath: 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx',
       isActive: true,
     },
     {
       name: 'Ubuntu 24.04 LTS (Noble Numbat)',
       osFamily: 'Linux',
       version: '24.04',
-      templatePath: 'D:\\00_Master_Template\\ubuntu-24.04-live-server-amd64.iso',
+      templatePath: 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx',
       isActive: true,
     },
     {
       name: 'Debian 12 Bookworm',
       osFamily: 'Linux',
       version: '12.5',
-      templatePath: 'D:\\00_Master_Template\\debian-12-generic.iso',
+      templatePath: 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx',
       isActive: true,
     },
     {
       name: 'Windows Server 2022 Datacenter',
       osFamily: 'Windows',
       version: '2022',
-      templatePath: 'D:\\00_Master_Template\\win-server-2022.iso',
+      templatePath: 'D:\\00_Master_Template\\Windows 10 Pro.vhdx',
       isActive: true,
     },
   ];
@@ -141,7 +141,7 @@ async function main() {
       await prisma.oSImage.create({ data: img });
       console.log(`[SEED] Created OS Image: ${img.name}`);
     } else {
-      console.log(`[SEED] OS Image already exists: ${img.name}`);
+      await prisma.oSImage.update({ where: { imageId: existing.imageId }, data: { templatePath: img.templatePath, isActive: img.isActive } }); console.log(`[SEED] Updated OS Image: ${img.name} -> ${img.templatePath}`);
     }
   }
 

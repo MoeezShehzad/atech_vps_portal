@@ -29,8 +29,16 @@ try {
     }
 
     if (-not (Test-Path $TemplatePath)) {
-        Write-Error "Template file not found at: '$TemplatePath'"
-        exit 1
+        if (Test-Path "D:\00_Master_Template\Ubuntu Server 24.04 LTS.vhdx") {
+            Write-Output "[TEMPLATE] Specified template '$TemplatePath' not found. Falling back to default: 'D:\00_Master_Template\Ubuntu Server 24.04 LTS.vhdx'"
+            $TemplatePath = "D:\00_Master_Template\Ubuntu Server 24.04 LTS.vhdx"
+        } elseif (Test-Path "D:\00_Master_Template\Windows 10 Pro.vhdx") {
+            Write-Output "[TEMPLATE] Specified template '$TemplatePath' not found. Falling back to default: 'D:\00_Master_Template\Windows 10 Pro.vhdx'"
+            $TemplatePath = "D:\00_Master_Template\Windows 10 Pro.vhdx"
+        } else {
+            Write-Error "Template file not found at: '$TemplatePath'"
+            exit 1
+        }
     }
 
     # Auto-resolve virtual switch if specified switch does not exist

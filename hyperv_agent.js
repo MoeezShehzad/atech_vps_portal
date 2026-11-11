@@ -1,3 +1,4 @@
+import fs from 'fs';
 // ==============================================================================
 // Service: hyperv_agent.js
 // Purpose: Windows Host Hyper-V Agent - Receives commands from Ubuntu Portal
@@ -18,7 +19,27 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.HYPERV_AGENT_PORT || 5050;
 const HOST = '0.0.0.0';
 const SCRIPTS_DIR = path.join(__dirname, 'scripts', 'hyperv');
-const DEFAULT_TEMPLATE = 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx';
+
+const DEFAULT_LINUX_TEMPLATE = 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx';
+const DEFAULT_WINDOWS_TEMPLATE = 'D:\\00_Master_Template\\Windows 10 Pro.vhdx';
+
+function resolveTemplatePath(requestedPath, osFamily) {
+  if (requestedPath && fs.existsSync(requestedPath)) {
+    return requestedPath;
+  }
+  const isWin = (osFamily && osFamily.toLowerCase() === 'windows') ||
+    (requestedPath && requestedPath.toLowerCase().includes('win'));
+  if (isWin && fs.existsSync(DEFAULT_WINDOWS_TEMPLATE)) {
+    console.log(`[TEMPLATE RESOLVER] Fallback to Windows template: ${DEFAULT_WINDOWS_TEMPLATE}`);
+    return DEFAULT_WINDOWS_TEMPLATE;
+  }
+  if (fs.existsSync(DEFAULT_LINUX_TEMPLATE)) {
+    console.log(`[TEMPLATE RESOLVER] Fallback to Linux template: ${DEFAULT_LINUX_TEMPLATE}`);
+    return DEFAULT_LINUX_TEMPLATE;
+  }
+  return requestedPath || DEFAULT_LINUX_TEMPLATE;
+}
+
 
 function checkPortOpen(host, port, timeout = 2500) {
   return new Promise((resolve) => {
@@ -318,8 +339,10 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'vmName is required' }));
       }
 
+      const effectiveTemplate = resolveTemplatePath(data.templatePath, data.osFamily);
+
       const isWindows = (data.osFamily && data.osFamily.toLowerCase() === 'windows') ||
-        (data.templatePath && (data.templatePath.toLowerCase().includes('windows') || data.templatePath.toLowerCase().endsWith('.iso')));
+        (effectiveTemplate && effectiveTemplate.toLowerCase().includes('win'));
 
       const effectiveAdminUser = (data.adminUsername && data.adminUsername.toLowerCase() !== 'ubuntu') 
         ? data.adminUsername 
@@ -333,7 +356,7 @@ const server = http.createServer(async (req, res) => {
         AdminUsername: effectiveAdminUser,
         AdminPassword: data.adminPassword || '',
         SSHPublicKey: data.sshPublicKey || '',
-        TemplatePath: data.templatePath || DEFAULT_TEMPLATE,
+        TemplatePath: effectiveTemplate,
         SwitchName: data.switchName || process.env.HYPERV_SWITCH_NAME || 'External_vSwitch',
       });
 
