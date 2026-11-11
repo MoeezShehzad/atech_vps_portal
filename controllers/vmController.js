@@ -44,7 +44,7 @@ async function resolveWorkspaceContext(req, userId) {
   if (!orgHeader || orgHeader === 'personal') {
     if (!isCompanyUser) {
       const personalVmCount = await prisma.virtualMachine.count({
-        where: { userId, status: { not: 'TERMINATED' } },
+        where: { userId, status: { notIn: ['TERMINATED', 'FAILED'] } },
       });
       if (personalVmCount === 0) {
         const activeMembership = await prisma.organizationMember.findFirst({
@@ -173,7 +173,7 @@ export async function getUserVMs(req, res) {
     const vms = await prisma.virtualMachine.findMany({
       where: {
         userId: effectiveUserId,
-        status: { not: 'TERMINATED' },
+        status: { notIn: ['TERMINATED', 'FAILED'] },
       },
       include: {
         plan: true,
@@ -588,7 +588,8 @@ export async function deployVM(req, res) {
       });
     }
 
-    // 3. Create VM in MS SQL Server
+    // 3. Create VM in MS SQL Server with unique pending hyperv identifier
+    const pendingHypervId = `pending-${cleanVmName}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
     newVm = await prisma.virtualMachine.create({
       data: {
         userId,
@@ -598,6 +599,7 @@ export async function deployVM(req, res) {
         hostId: host.hostId,
         vmName: cleanVmName,
         hostname: `${cleanVmName}.atc-cloud.net`,
+        hypervVmId: pendingHypervId,
         cpuCores: finalCpu,
         ramGb: finalRam,
         storageGb: finalStorage,
@@ -711,13 +713,14 @@ export async function deployVM(req, res) {
         }).catch(() => {});
       }
 
-      // Mark VM as FAILED with detailed message
+      // Mark VM as TERMINATED and FAILED so it does not ghost in the user's dashboard table
       await prisma.virtualMachine.update({
         where: { vmId: newVm.vmId },
         data: {
-          status: 'FAILED',
+          status: 'TERMINATED',
           provisioningStatus: 'FAILED',
           provisioningError: provisionErr.message,
+          terminatedAt: new Date(),
         },
       }).catch(() => {});
 
@@ -731,9 +734,10 @@ export async function deployVM(req, res) {
       await prisma.virtualMachine.update({
         where: { vmId: newVm.vmId },
         data: {
-          status: 'FAILED',
+          status: 'TERMINATED',
           provisioningStatus: 'FAILED',
           provisioningError: error.message,
+          terminatedAt: new Date(),
         },
       }).catch(() => {});
     }
