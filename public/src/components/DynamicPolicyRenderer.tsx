@@ -103,6 +103,22 @@ export default function DynamicPolicyRenderer({
       );
     }
 
+    // Red callout box if red note / critical warning
+    const isRedNoteBox =
+      text.startsWith('[NOTE]') ||
+      text.startsWith('[RED NOTE]') ||
+      text.startsWith('CRITICAL NOTE:') ||
+      text.startsWith('IMPORTANT NOTE:') ||
+      text.startsWith('RED NOTE:');
+    if (isRedNoteBox) {
+      const cleanNoteText = text.replace(/^(\[RED NOTE\]|\[NOTE\]|RED NOTE:)\s*/i, '');
+      return (
+        <div key={pIdx} className="my-5 p-5 rounded-2xl bg-red-500/10 border-2 border-red-500/40 text-red-700 dark:text-red-300 text-xs sm:text-sm leading-relaxed font-semibold shadow-xs">
+          {renderFormattedText(cleanNoteText)}
+        </div>
+      );
+    }
+
     // Callout box if uppercase warning
     const isWarningBox = text.startsWith('MANDATORY') || text.startsWith('THIS AGREEMENT CONTAINS') || text.startsWith('CUSTOMER EXPRESSLY ACKNOWLEDGES');
     if (isWarningBox) {
