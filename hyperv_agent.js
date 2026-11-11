@@ -20,6 +20,7 @@ const PORT = process.env.HYPERV_AGENT_PORT || 5050;
 const HOST = '0.0.0.0';
 const SCRIPTS_DIR = path.join(__dirname, 'scripts', 'hyperv');
 
+const DEFAULT_TEMPLATE = 'D:\\\\00_Master_Template\\\\Ubuntu Server 24.04 LTS.vhdx';
 const DEFAULT_LINUX_TEMPLATE = 'D:\\00_Master_Template\\Ubuntu Server 24.04 LTS.vhdx';
 const DEFAULT_WINDOWS_TEMPLATE = 'D:\\00_Master_Template\\Windows 10 Pro.vhdx';
 
