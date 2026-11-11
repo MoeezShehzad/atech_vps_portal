@@ -52,6 +52,7 @@ export async function getPublicPolicy(req, res) {
         effectiveAt: true,
         publishedAt: true,
         updatedAt: true,
+        isCurrent: true,
       },
     });
 

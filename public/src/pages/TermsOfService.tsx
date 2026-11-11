@@ -98,31 +98,6 @@ export default function TermsOfService() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         
-        {/* ARCHIVE NOTICE BANNER (IF VIEWING HISTORICAL VERSION) */}
-        {dbPolicy && !dbPolicy.isCurrent && (
-          <div className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <div className="text-xs sm:text-sm text-amber-900 dark:text-amber-200">
-                <strong>Historical Archive Notice:</strong> You are viewing archived version{' '}
-                <span className="font-mono font-bold">{dbPolicy.version}</span>.
-                {dbPolicy.summaryOfChanges && (
-                  <span className="block text-xs mt-0.5 text-amber-800 dark:text-amber-300">
-                    Reason/Summary: {dbPolicy.summaryOfChanges}
-                  </span>
-                )}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleSelectVersion('')}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 transition-colors cursor-pointer"
-            >
-              Switch to Live Version
-            </button>
-          </div>
-        )}
-
         {/* ENTERPRISE HERO */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 shadow-sm mb-10">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6 mb-6">
