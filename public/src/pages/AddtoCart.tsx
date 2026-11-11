@@ -32,14 +32,14 @@ export default function ServerConfigure() {
 
   // Get passed plan from Pricing.tsx or use default
   const selectedPlan = location.state?.selectedPlan || {
-    planId: 2,
-    name: 'VPS L+',
-    cpuCores: 6,
-    ramGb: 8,
-    storageGb: 240,
+    planId: 1,
+    name: 'VPS Basic',
+    cpuCores: 2,
+    ramGb: 4,
+    storageGb: 120,
     storageType: 'SSD',
-    monthlyPrice: 21,
-    promoPriceMonthly: 6,
+    monthlyPrice: 6.99,
+    promoPriceMonthly: 5.94,
   };
 
   const isUpgrade = Boolean(location.state?.isUpgrade);

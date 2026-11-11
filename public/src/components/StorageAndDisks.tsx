@@ -23,6 +23,7 @@ import {
 import { apiCall } from '../services/api';
 import { useToast } from './Toast';
 import { TableSkeleton } from './TableSkeleton';
+import { getRatesForPlan } from '../services/pricingApi';
 
 interface VirtualDisk {
   id: string;
@@ -66,7 +67,7 @@ export default function StorageAndDisks() {
           diskName: `${vm.name.toLowerCase()}-disk0`,
           vmId: vm.vmId,
           vmName: vm.name,
-          capacityGb: vm.storageGb || vm.diskGB || 40,
+          capacityGb: vm.storageGb || vm.diskGB || 120,
           type: 'Enterprise SSD',
           bus: 'SCSI Controller (0:0)',
           status: isOnline ? 'ONLINE' : 'OFFLINE',
@@ -118,6 +119,11 @@ export default function StorageAndDisks() {
       active = false;
     };
   }, [isExpandOpen, selectedDisk, newCapacity, instances]);
+
+  const currentVm = instances.find((v) => v.vmId === selectedDisk?.vmId);
+  const vmRates = getRatesForPlan(currentVm?.plan || currentVm?.planId);
+  const storageRate = vmRates.storagePerGbMonth;
+  const maxDiskCapacity = selectedDisk ? Math.min(2000, Math.max(selectedDisk.capacityGb + 500, 1000)) : 1000;
 
   const totalAllocatedGb = disks.reduce((acc, d) => acc + d.capacityGb, 0);
 
@@ -353,26 +359,24 @@ export default function StorageAndDisks() {
                   Select Storage Add-On Tier
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { addGb: 25, label: '+25 GB SSD', monthly: '$2.50/mo' },
-                    { addGb: 50, label: '+50 GB SSD', monthly: '$5.00/mo' },
-                    { addGb: 100, label: '+100 GB SSD', monthly: '$10.00/mo' },
-                    { addGb: 250, label: '+250 GB SSD', monthly: '$25.00/mo' },
-                  ].map((tier) => {
-                    const isSelected = newCapacity === selectedDisk.capacityGb + tier.addGb;
+                  {[25, 50, 100, 250].map((addGb) => {
+                    const isSelected = newCapacity === selectedDisk.capacityGb + addGb;
+                    const tierCost = (addGb * storageRate).toFixed(2);
                     return (
                       <button
                         type="button"
-                        key={tier.addGb}
-                        onClick={() => setNewCapacity(selectedDisk.capacityGb + tier.addGb)}
+                        key={addGb}
+                        onClick={() => setNewCapacity(Math.min(maxDiskCapacity, selectedDisk.capacityGb + addGb))}
                         className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                           isSelected
                             ? 'border-blue-600 bg-blue-50/70 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/20'
                             : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600'
                         }`}
                       >
-                        <div className="font-bold text-xs">{tier.label}</div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">{tier.monthly}</div>
+                        <div className="font-bold text-xs">+{addGb} GB SSD</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                          +${tierCost}/mo
+                        </div>
                       </button>
                     );
                   })}
@@ -388,7 +392,7 @@ export default function StorageAndDisks() {
                 <input
                   type="range"
                   min={selectedDisk.capacityGb}
-                  max={selectedDisk.capacityGb + 500}
+                  max={maxDiskCapacity}
                   step="5"
                   value={newCapacity}
                   onChange={(e) => setNewCapacity(Number(e.target.value))}
@@ -397,7 +401,7 @@ export default function StorageAndDisks() {
                 <div className="flex justify-between text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                   <span>Current: {selectedDisk.capacityGb} GB</span>
                   <span>Expansion: +{newCapacity - selectedDisk.capacityGb} GB</span>
-                  <span>Max: {selectedDisk.capacityGb + 500} GB</span>
+                  <span>Max: {maxDiskCapacity} GB</span>
                 </div>
               </div>
 
@@ -428,7 +432,7 @@ export default function StorageAndDisks() {
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500 pt-0.5">
-                    * Next renewal automatically unifies into your monthly VPS bill at ${expandQuote.newPrice ? expandQuote.newPrice.toFixed(2) : '0.00'}/mo.
+                    * Next renewal automatically unifies into your monthly VPS bill at ${expandQuote?.newPrice ? expandQuote.newPrice.toFixed(2) : (currentVm?.plan?.monthlyPrice ? Number(currentVm.plan.monthlyPrice).toFixed(2) : '6.99')}/mo.
                   </p>
                 </div>
               )}

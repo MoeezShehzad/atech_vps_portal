@@ -24,7 +24,16 @@ export const DEFAULT_SPEC_RATES = {
   maxSnapshots: 1,
 };
 
-export function getRatesForPlan(planOrId?: number | string | VPSPlan | null) {
+export interface BasePlanSpecs {
+  planId?: number;
+  name?: string;
+  monthlyPrice: string | number;
+  cpuCores: number;
+  ramGb: number;
+  storageGb: number;
+}
+
+export function getRatesForPlan(planOrId?: number | string | Partial<VPSPlan> | null) {
   if (!planOrId) return DEFAULT_SPEC_RATES;
   if (typeof planOrId === 'number' || typeof planOrId === 'string') {
     return PLAN_SPEC_RATES[planOrId] || DEFAULT_SPEC_RATES;
@@ -38,7 +47,7 @@ export function getRatesForPlan(planOrId?: number | string | VPSPlan | null) {
  * Calculates customized plan price based on the selected base plan's specific rates.
  */
 export function calculatePlanCustomPrice(
-  plan: VPSPlan,
+  plan: BasePlanSpecs,
   targetSpecs: { cpuCores: number; ramGb: number; storageGb: number }
 ) {
   const basePrice = Number(plan.monthlyPrice) || 0;

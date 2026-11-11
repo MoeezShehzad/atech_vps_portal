@@ -29,18 +29,18 @@ export default function Checkout() {
   // Retrieve incoming server configuration or fallback defaults
   const orderData = location.state?.configurationOrder || {
     plan: {
-      name: 'VPS M+',
-      monthlyPrice: 11,
-      cpuCores: 4,
-      ramGb: 6,
-      storageGb: 160,
+      name: 'VPS Basic',
+      monthlyPrice: 6.99,
+      cpuCores: 2,
+      ramGb: 4,
+      storageGb: 120,
       storageType: 'SSD',
     },
     os: { name: 'Ubuntu 22.04 LTS', fee: 0 },
     location: { name: 'Illinois, United States (US Central)', flag: '🇺🇸' },
     term: { label: '1 Month', id: '1m' },
     addons: [],
-    monthlyTotal: 11.00,
+    monthlyTotal: 6.99,
   };
 
   const isYearly = orderData.isYearly || orderData.term?.id === '12m';

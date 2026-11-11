@@ -52,6 +52,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
+import { calculatePlanCustomPrice } from '../services/pricingApi';
 import Sidebar from '../components/Sidebar';
 import AccountSettings from '../components/AccountSettings';
 import NotificationBell from '../components/NotificationBell';
@@ -2387,7 +2388,7 @@ export default function Dashboard() {
                 <input
                   type="range"
                   min="1"
-                  max="16"
+                  max="32"
                   step="1"
                   value={resizeCpu}
                   onChange={(e) => setResizeCpu(Number(e.target.value))}
@@ -2412,7 +2413,7 @@ export default function Dashboard() {
                 <input
                   type="range"
                   min="2"
-                  max="64"
+                  max="128"
                   step="2"
                   value={resizeRam}
                   onChange={(e) => setResizeRam(Number(e.target.value))}
@@ -2437,7 +2438,7 @@ export default function Dashboard() {
                 <input
                   type="range"
                   min={resizingInstance.diskGB}
-                  max="1000"
+                  max="2000"
                   step="10"
                   value={resizeStorage}
                   onChange={(e) => setResizeStorage(Number(e.target.value))}
@@ -2445,9 +2446,9 @@ export default function Dashboard() {
                 />
                 <div className="flex justify-between text-[10px] text-slate-400">
                   <span>{resizingInstance.diskGB} GB (Current)</span>
-                  <span>250 GB</span>
                   <span>500 GB</span>
                   <span>1 TB</span>
+                  <span>2 TB (Max)</span>
                 </div>
                 <p className="text-[10px] text-slate-400 italic">
                   * Dynamic expansion: Virtual disks can be scaled up dynamically without data loss. Disk shrinking is not supported to protect file system data.
@@ -3141,7 +3142,7 @@ export default function Dashboard() {
                       <input
                         type="number"
                         min="20"
-                        max="500"
+                        max="2000"
                         step="10"
                         value={customStorage}
                         onChange={(e) => setCustomStorage(Number(e.target.value))}
@@ -3153,18 +3154,23 @@ export default function Dashboard() {
                   {(() => {
                     const plan = catalogPlans.find((p) => p.planId === selectedPlanId) || catalogPlans[0];
                     if (!plan) return null;
+                    const customCalc = calculatePlanCustomPrice(plan, {
+                      cpuCores: customCpu,
+                      ramGb: customRam,
+                      storageGb: customStorage,
+                    });
+                    const delta = customCalc.diffMonthly;
+                    const backupFee = deployBackupsEnabled ? 2.00 : 0.00;
+                    const total = Number((customCalc.totalMonthlyPrice + backupFee).toFixed(2));
                     const extraCpu = Math.max(0, customCpu - plan.cpuCores);
                     const extraRam = Math.max(0, customRam - plan.ramGb);
                     const extraStorage = Math.max(0, customStorage - plan.storageGb);
-                    const delta = extraCpu * 2.5 + extraRam * 1.5 + extraStorage * 0.10;
-                    const backupFee = deployBackupsEnabled ? 2.00 : 0.00;
-                    const total = Number(plan.monthlyPrice) + delta + backupFee;
 
                     return (
                       <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 space-y-1.5">
                         <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                           <span>Base Plan ({plan.name})</span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-200">${plan.monthlyPrice}/mo</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-200">${Number(plan.monthlyPrice).toFixed(2)}/mo</span>
                         </div>
                         {delta > 0 && (
                           <div className="flex items-center justify-between text-[11px] text-blue-600 dark:text-blue-400 font-medium">

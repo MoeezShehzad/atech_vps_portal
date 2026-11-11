@@ -11,9 +11,11 @@ const filesToSync = [
   'prisma/seed.js',
   'seed_data.js',
   'public/src/services/pricingApi.ts',
+  'public/src/components/StorageAndDisks.tsx',
   'public/src/pages/Pricing.tsx',
   'public/src/pages/Home.tsx',
   'public/src/pages/AddtoCart.tsx',
+  'public/src/pages/Checkout.tsx',
   'public/src/pages/Dashboard.tsx',
   'public/src/pages/AdminDashboard.tsx'
 ];
