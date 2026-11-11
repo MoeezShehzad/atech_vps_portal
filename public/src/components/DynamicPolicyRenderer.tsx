@@ -103,18 +103,18 @@ export default function DynamicPolicyRenderer({
       );
     }
 
-    // Red callout box if red note / critical warning
+    // Red note callout box (matches NOTE:, [NOTE], RED NOTE:, etc.)
     const isRedNoteBox =
+      text.startsWith('NOTE:') ||
+      text.startsWith('**NOTE:**') ||
+      text.startsWith('NOTE :') ||
       text.startsWith('[NOTE]') ||
       text.startsWith('[RED NOTE]') ||
-      text.startsWith('CRITICAL NOTE:') ||
-      text.startsWith('IMPORTANT NOTE:') ||
       text.startsWith('RED NOTE:');
     if (isRedNoteBox) {
-      const cleanNoteText = text.replace(/^(\[RED NOTE\]|\[NOTE\]|RED NOTE:)\s*/i, '');
       return (
-        <div key={pIdx} className="my-5 p-5 rounded-2xl bg-red-500/10 border-2 border-red-500/40 text-red-700 dark:text-red-300 text-xs sm:text-sm leading-relaxed font-semibold shadow-xs">
-          {renderFormattedText(cleanNoteText)}
+        <div key={pIdx} className="my-5 p-5 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 text-xs sm:text-sm leading-relaxed font-semibold shadow-xs">
+          {renderFormattedText(text)}
         </div>
       );
     }
