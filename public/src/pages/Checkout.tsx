@@ -191,6 +191,7 @@ export default function Checkout() {
         if (!customerInfo.address.trim()) newErrors.address = 'Street address is required';
         if (!customerInfo.city.trim()) newErrors.city = 'City is required';
         if (!customerInfo.zip.trim()) newErrors.zip = 'Postal code is required';
+        if (!customerInfo.termsAccepted) newErrors.termsAccepted = 'You must agree to the Terms and Conditions before proceeding.';
       } else {
         if (!customerInfo.firstName.trim()) newErrors.firstName = 'First name is required';
         if (!customerInfo.lastName.trim()) newErrors.lastName = 'Last name is required';
@@ -203,7 +204,7 @@ export default function Checkout() {
         if (!customerInfo.address.trim()) newErrors.address = 'Street address is required';
         if (!customerInfo.city.trim()) newErrors.city = 'City is required';
         if (!customerInfo.zip.trim()) newErrors.zip = 'Postal code is required';
-        if (!customerInfo.termsAccepted) newErrors.termsAccepted = 'You must accept terms & conditions';
+        if (!customerInfo.termsAccepted) newErrors.termsAccepted = 'You must agree to the Terms and Conditions before proceeding.';
       }
     }
 
@@ -555,6 +556,59 @@ export default function Checkout() {
                           placeholder="e.g. 10001 or 25000"
                         />
                       </div>
+
+                      <div className="sm:col-span-2 pt-2">
+                        <label className="flex items-start gap-3 cursor-pointer group select-none">
+                          <input
+                            type="checkbox"
+                            checked={customerInfo.termsAccepted}
+                            onChange={(e) => {
+                              setCustomerInfo({ ...customerInfo, termsAccepted: e.target.checked });
+                              if (e.target.checked && errors.termsAccepted) {
+                                const newErrors = { ...errors };
+                                delete newErrors.termsAccepted;
+                                setErrors(newErrors);
+                              }
+                            }}
+                            className="mt-0.5 w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <span className="text-slate-600 text-xs font-medium leading-relaxed">
+                            I agree to the{' '}
+                            <a
+                              href="/terms"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-700 underline font-semibold"
+                            >
+                              Terms and Conditions
+                            </a>
+                            ,{' '}
+                            <a
+                              href="/privacy"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-700 underline font-semibold"
+                            >
+                              Privacy Policy
+                            </a>
+                            , and{' '}
+                            <a
+                              href="/refund-policy"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-700 underline font-semibold"
+                            >
+                              Refund Policy
+                            </a>
+                          </span>
+                        </label>
+                        {errors.termsAccepted && (
+                          <p className="text-red-500 text-[10px] font-bold mt-1.5 flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-red-500 inline-block" />
+                            {errors.termsAccepted}
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     <div className="pt-6 flex justify-between items-center border-t border-slate-100">
@@ -563,7 +617,12 @@ export default function Checkout() {
                       </button>
                       <button
                         onClick={nextStep}
-                        className="px-6 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-blue-500/20 transition-all"
+                        disabled={!customerInfo.termsAccepted}
+                        className={`px-6 py-3.5 rounded-full font-extrabold text-xs uppercase tracking-wider transition-all ${
+                          customerInfo.termsAccepted
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 cursor-pointer active:scale-95'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                        }`}
                       >
                         Continue to Order Review
                       </button>
@@ -698,18 +757,56 @@ export default function Checkout() {
                       </div>
 
                       <div className="sm:col-span-2 pt-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <label className="flex items-start gap-3 cursor-pointer group select-none">
                           <input
                             type="checkbox"
                             checked={customerInfo.termsAccepted}
-                            onChange={(e) => setCustomerInfo({ ...customerInfo, termsAccepted: e.target.checked })}
-                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                            onChange={(e) => {
+                              setCustomerInfo({ ...customerInfo, termsAccepted: e.target.checked });
+                              if (e.target.checked && errors.termsAccepted) {
+                                const newErrors = { ...errors };
+                                delete newErrors.termsAccepted;
+                                setErrors(newErrors);
+                              }
+                            }}
+                            className="mt-0.5 w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
                           />
-                          <span className="text-slate-600 text-xs font-medium">
-                            I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Terms of Service</a>, <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Privacy Policy</a>, and <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Refund Policy</a>
+                          <span className="text-slate-600 text-xs font-medium leading-relaxed">
+                            I agree to the{' '}
+                            <a
+                              href="/terms"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-700 underline font-semibold"
+                            >
+                              Terms and Conditions
+                            </a>
+                            ,{' '}
+                            <a
+                              href="/privacy"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-700 underline font-semibold"
+                            >
+                              Privacy Policy
+                            </a>
+                            , and{' '}
+                            <a
+                              href="/refund-policy"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-700 underline font-semibold"
+                            >
+                              Refund Policy
+                            </a>
                           </span>
                         </label>
-                        {errors.termsAccepted && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.termsAccepted}</p>}
+                        {errors.termsAccepted && (
+                          <p className="text-red-500 text-[10px] font-bold mt-1.5 flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-red-500 inline-block" />
+                            {errors.termsAccepted}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -719,7 +816,12 @@ export default function Checkout() {
                       </button>
                       <button
                         onClick={nextStep}
-                        className="px-6 py-3.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-blue-500/20 transition-all"
+                        disabled={!customerInfo.termsAccepted}
+                        className={`px-6 py-3.5 rounded-full font-extrabold text-xs uppercase tracking-wider transition-all ${
+                          customerInfo.termsAccepted
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 cursor-pointer active:scale-95'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                        }`}
                       >
                         Continue to Order Review
                       </button>
