@@ -230,7 +230,11 @@ Cloud Infrastructure and Technical Services
 
 These Terms and Conditions, together with the applicable subscription agreement, Service Level Agreement (SLA), Privacy Policy, and Acceptable Use Policy, constitute the governing terms for ATC Cloud Services.
 
-By purchasing or using ATC Cloud Services, customers acknowledge that they have read, understood, and agreed to these Terms and Conditions.`
+By purchasing or using ATC Cloud Services, customers acknowledge that they have read, understood, and agreed to these Terms and Conditions.
+
+NOTE: We are currently updating the Terms and Conditions governing ATC's Cloud, Storage, and related services. The revised Terms and Conditions will be published on this portal within the next few days. We will also make reasonable efforts to distribute the updated document to clients via email.
+
+All clients will be required to review and formally accept the updated Terms and Conditions to continue using ATC's Cloud, Storage, and related services. Continued use of the services will be subject to the applicable terms and conditions.`
     },
     {
       policyType: 'privacy-policy',

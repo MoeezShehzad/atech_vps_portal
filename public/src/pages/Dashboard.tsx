@@ -2989,6 +2989,12 @@ export default function Dashboard() {
                       </option>
                     ))}
                   </select>
+                  {catalogImages.find((img) => img.imageId === selectedImageId)?.name?.toLowerCase().includes('datacenter') && (
+                    <div className="mt-2 p-2.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
+                      <span className="font-bold shrink-0">Note:</span>
+                      <span>For optimum / best performance on Windows Server Datacenter, we recommend using at least <strong>4 vCPU</strong> and <strong>8 GB RAM</strong>.</span>
+                    </div>
+                  )}
                 </div>
               )}
 
