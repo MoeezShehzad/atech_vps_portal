@@ -8,8 +8,8 @@ conn.on('ready', () => {
     async function run() {
       await prisma.vPSPlan.updateMany({ where: { name: 'VPS Basic' }, data: { maxSnapshots: 1 } });
       await prisma.vPSPlan.updateMany({ where: { name: 'VPS Pro' }, data: { maxSnapshots: 2 } });
-      await prisma.vPSPlan.updateMany({ where: { name: 'VPS Enterprise' }, data: { maxSnapshots: 5 } });
-      await prisma.vPSPlan.updateMany({ where: { name: 'VPS Ultra Compute' }, data: { maxSnapshots: 7 } });
+      await prisma.vPSPlan.updateMany({ where: { name: 'VPS Enterprise' }, data: { maxSnapshots: 3 } });
+      await prisma.vPSPlan.updateMany({ where: { name: 'VPS Ultra Compute' }, data: { maxSnapshots: 5 } });
       const plans = await prisma.vPSPlan.findMany({ select: { name: true, maxSnapshots: true } });
       console.log('SUCCESS_DB_SNAPSHOTS:', plans);
       await prisma.\\$disconnect();
