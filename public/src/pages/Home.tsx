@@ -119,7 +119,7 @@ const ONE_CLICK_APPS = [
   { name: 'Ubuntu 24.04', category: 'Linux OS', icon: '🐧' },
   { name: 'Debian 12', category: 'Linux OS', icon: '🌀' },
   { name: 'AlmaLinux 9', category: 'Enterprise OS', icon: '🛡️' },
-  { name: 'Windows Server', category: 'Windows OS', icon: '🪟' },
+  { name: 'Windows Server 2025', category: 'Windows OS', icon: '🪟' },
   { name: 'Nginx Engine', category: 'Web Server', icon: '🚀' },
   { name: 'Node.js LTS', category: 'Runtime', icon: '🟢' },
   { name: 'PostgreSQL', category: 'Database', icon: '🐘' },

@@ -1284,7 +1284,7 @@ export default function Checkout() {
                 <div className="flex justify-between text-slate-600">
                   <span>OS: {orderData.os?.name || 'Ubuntu 22.04'}</span>
                   <span className="font-bold text-slate-900">
-                    {orderData.os?.fee ? `$${orderData.os.fee}/mo` : 'Included'}
+                    {orderData.os?.fee ? `+$${Number(orderData.os.fee).toFixed(2)}/mo` : 'Included'}
                   </span>
                 </div>
 
