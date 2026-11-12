@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Tag, Check, X, ShieldAlert, AlertCircle, Zap, Search, Server, Boxes } from 'lucide-react';
+import { Tag, Check, X, ShieldAlert, AlertCircle, Zap, Search, Server, Boxes, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../services/api';
 
@@ -23,7 +23,14 @@ const BILLING_TERMS = [
   { id: '24m', label: '24 Months (2 Years)', desc: 'Best multi-year value with 15% savings.', monthlyPriceRatio: 0.85, discountText: 'Save 15%', nonRefundable: true },
 ];
 
-const ADDONS: { id: string; name: string; desc: string; price: number }[] = [];
+const ADDONS = [
+  {
+    id: 'extra-ipv4',
+    name: 'Additional Public IPv4 Address',
+    desc: '1 Dedicated Static IPv4 address with DDoS protection and custom PTR reverse DNS',
+    price: 4.99,
+  },
+];
 
 export default function ServerConfigure() {
   const navigate = useNavigate();
@@ -48,7 +55,14 @@ export default function ServerConfigure() {
   const [selectedOs, setSelectedOs] = useState('ubuntu-22');
   const [selectedLocation, setSelectedLocation] = useState('us-central');
   const [selectedTerm, setSelectedTerm] = useState('12m');
-  const [selectedAddons] = useState<string[]>([]);
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
+
+  // Toggle Addon
+  const toggleAddon = (addonId: string) => {
+    setSelectedAddons((prev) =>
+      prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]
+    );
+  };
 
   // 1-Click Apps Selection during checkout
   const [imageType, setImageType] = useState<'os' | 'apps'>('os');
@@ -472,6 +486,59 @@ export default function ServerConfigure() {
                         <p className="text-[11px] text-slate-500 mt-1 leading-snug">{term.desc}</p>
                       </div>
                     </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* 4. OPTIONAL FEATURES & IP ADD-ONS */}
+            <section className="space-y-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950">4. Optional Features & Add-ons</h3>
+                <p className="text-xs text-slate-500">
+                  Select optional networking and infrastructure add-ons for your cloud instance.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {ADDONS.map((addon) => {
+                  const isChecked = selectedAddons.includes(addon.id);
+                  return (
+                    <label
+                      key={addon.id}
+                      className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${
+                        isChecked
+                          ? 'border-blue-600 bg-blue-50/50 shadow-sm ring-1 ring-blue-600'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleAddon(addon.id)}
+                          className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0 border border-blue-100">
+                          <Globe className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-slate-900">{addon.name}</p>
+                            {isChecked && (
+                              <span className="text-[10px] bg-blue-600 text-white font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                <Check className="w-3 h-3" /> Added
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">{addon.desc}</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 pl-3">
+                        <span className="text-xs font-bold text-slate-900 block">+${addon.price.toFixed(2)}/mo</span>
+                        <span className="text-[10px] text-slate-400">Dedicated IP</span>
+                      </div>
+                    </label>
                   );
                 })}
               </div>
