@@ -10,7 +10,7 @@ const OS_OPTIONS = [
   { id: 'debian-12', name: 'Debian 12', category: 'Linux', icon: '🌀', fee: 0, imageId: 2 },
   { id: 'alma-9', name: 'AlmaLinux 9', category: 'Linux', icon: '💿', fee: 0, imageId: 2 },
   { id: 'rocky-9', name: 'Rocky Linux 9', category: 'Linux', icon: '⛰️', fee: 0, imageId: 2 },
-  { id: 'win-2025', name: 'Windows Server 2025', category: 'Windows', icon: '🪟', fee: 10, imageId: 2 },
+  { id: 'win-2025', name: 'Windows Server 2025', category: 'Windows', icon: '🪟', fee: 9.99, imageId: 4 },
 ];
 
 const DATACENTER_LOCATIONS = [
@@ -334,7 +334,7 @@ export default function ServerConfigure() {
                           </div>
                         </div>
                         <span className="text-xs font-semibold text-slate-600">
-                          {os.fee === 0 ? 'Free' : `+$${os.fee}/mo`}
+                          {os.fee === 0 ? 'Free' : `+$${Number(os.fee).toFixed(2)}/mo`}
                         </span>
                       </button>
                     );

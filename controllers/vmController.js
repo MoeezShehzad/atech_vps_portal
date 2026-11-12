@@ -750,7 +750,7 @@ export async function deployVM(req, res) {
         ipAddress: ipRecord?.ipAddress || 'Allocated via DHCP',
         username: adminUsername,
         password: isWindows ? (effectiveAdminPassword || 'None (Direct Login)') : effectiveAdminPassword,
-        os: image?.name || (isWindows ? 'Windows 10 Pro' : 'Linux'),
+        os: image?.name || (isWindows ? 'Windows Server 2025' : 'Linux'),
       }).catch((mailErr) => {
         console.warn('[VM Provision Email Warning]:', mailErr.message);
       });

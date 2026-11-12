@@ -127,21 +127,25 @@ async function main() {
       isActive: true,
     },
     {
-      name: 'Windows Server 2022 Datacenter',
+      name: 'Windows Server 2025 Datacenter',
       osFamily: 'Windows',
-      version: '2022',
+      version: '2025',
       templatePath: 'D:\\00_Master_Template\\Windows 10 Pro.vhdx',
       isActive: true,
     },
   ];
 
   for (const img of images) {
-    const existing = await prisma.oSImage.findFirst({ where: { name: img.name } });
+    let existing = await prisma.oSImage.findFirst({ where: { name: img.name } });
+    if (!existing && img.osFamily === 'Windows') {
+      existing = await prisma.oSImage.findFirst({ where: { osFamily: 'Windows' } });
+    }
     if (!existing) {
       await prisma.oSImage.create({ data: img });
       console.log(`[SEED] Created OS Image: ${img.name}`);
     } else {
-      await prisma.oSImage.update({ where: { imageId: existing.imageId }, data: { templatePath: img.templatePath, isActive: img.isActive } }); console.log(`[SEED] Updated OS Image: ${img.name} -> ${img.templatePath}`);
+      await prisma.oSImage.update({ where: { imageId: existing.imageId }, data: { name: img.name, version: img.version, templatePath: img.templatePath, isActive: img.isActive } });
+      console.log(`[SEED] Updated OS Image: ${img.name} -> ${img.templatePath}`);
     }
   }
 
