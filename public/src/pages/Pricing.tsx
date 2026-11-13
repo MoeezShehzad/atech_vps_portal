@@ -22,8 +22,19 @@ const enrichDbPlan = (plan: VPSPlan): ExtendedPlan => {
   else if (plan.planId === 3) tag = 'BEST VALUE';
   else if (plan.planId === 4) tag = 'HIGH COMPUTE';
 
+  // Resolve snapshot count accurately based on plan tier (Basic: 1, Pro: 2, Enterprise: 3, Ultra: 5)
+  let resolvedSnapshots = plan.maxSnapshots;
+  if (!resolvedSnapshots || resolvedSnapshots <= 1) {
+    const n = (plan.name || '').toLowerCase();
+    if (n.includes('ultra') || plan.planId === 4) resolvedSnapshots = 5;
+    else if (n.includes('enterprise') || plan.planId === 3) resolvedSnapshots = 3;
+    else if (n.includes('pro') || plan.planId === 2) resolvedSnapshots = 2;
+    else resolvedSnapshots = 1;
+  }
+
   return {
     ...plan,
+    maxSnapshots: resolvedSnapshots,
     monthlyPrice: regular,
     regularPriceMonthly: regular,
     promoPriceMonthly: promo,

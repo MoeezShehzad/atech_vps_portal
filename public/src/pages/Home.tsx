@@ -159,6 +159,13 @@ export default function Home() {
             else if (p.name.includes('Enterprise')) tag = 'BEST VALUE';
             else if (p.name.includes('Ultra')) tag = 'HIGH COMPUTE';
 
+            const snapCount = (p.maxSnapshots && p.maxSnapshots > 1)
+              ? p.maxSnapshots
+              : p.name?.includes('Ultra') ? 5
+              : p.name?.includes('Enterprise') ? 3
+              : p.name?.includes('Pro') ? 2
+              : (idx === 3 ? 5 : idx === 2 ? 3 : idx === 1 ? 2 : 1);
+
             return {
               planId: p.planId,
               name: p.name,
@@ -169,8 +176,8 @@ export default function Home() {
               storage: p.storageGb >= 1000 ? `${p.storageGb >= 1024 && p.storageGb % 1024 === 0 ? p.storageGb / 1024 : Math.round(p.storageGb / 1000)} TB SSD` : `${p.storageGb} GB SSD`,
               storageGb: p.storageGb,
               storageType: p.storageType || 'SSD',
-              snapshots: `${p.maxSnapshots || (idx === 0 ? 1 : idx === 1 ? 2 : idx === 2 ? 3 : 5)} Included Snapshot${(p.maxSnapshots || 1) > 1 ? 's' : ''}`,
-              maxSnapshots: p.maxSnapshots,
+              snapshots: `${snapCount} Included Snapshot${snapCount > 1 ? 's' : ''}`,
+              maxSnapshots: snapCount,
               price: reg,
               monthlyPrice: reg,
               regularPriceMonthly: reg,
