@@ -333,6 +333,7 @@ export default function Dashboard() {
   const [customCpu, setCustomCpu] = useState<number>(2);
   const [customRam, setCustomRam] = useState<number>(4);
   const [customStorage, setCustomStorage] = useState<number>(50);
+  const [secondaryStorageGb, setSecondaryStorageGb] = useState<number>(0);
   const [deployUsername, setDeployUsername] = useState('ubuntu');
   const [deployPassword, setDeployPassword] = useState('root');
   const [showPassword, setShowPassword] = useState(false);
@@ -712,6 +713,7 @@ export default function Dashboard() {
         customCpu,
         customRam,
         customStorage,
+        secondaryStorageGb: secondaryStorageGb > 0 ? secondaryStorageGb : undefined,
         username: isSelectedWindows ? 'user' : (deployUsername.trim() || 'ubuntu'),
         password: isSelectedWindows ? '' : (deployPassword.trim() || 'root'),
         authMethod: isSelectedWindows ? 'password' : authMethod,
@@ -742,6 +744,7 @@ export default function Dashboard() {
       setDeployPassword('');
       setCustomSSHPublicKey('');
       setDeployBackupsEnabled(false);
+      setSecondaryStorageGb(0);
       await fetchVMs();
     } catch (err: any) {
       toast.error(err.message || 'Check cluster capacity', 'Deployment Failed');
@@ -3109,6 +3112,65 @@ export default function Dashboard() {
                   })()}
                 </>
               )}
+
+              {/* PRIMARY OS STORAGE (50/100/150/200 GB) + SECONDARY SYNOLOGY NAS (120/250/500 GB / 1 TB) */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                    Primary OS Storage (Enterprise NVMe SSD)
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[50, 100, 150, 200].map((osGb) => (
+                      <button
+                        type="button"
+                        key={osGb}
+                        onClick={() => setCustomStorage(osGb)}
+                        className={`py-2 px-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                          customStorage === osGb
+                            ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                        }`}
+                      >
+                        {osGb} GB SSD
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                      Additional Block Storage Volume
+                    </label>
+                    <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">
+                      Persistent Cloud Volume
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[
+                      { gb: 0, label: 'None', price: '$0' },
+                      { gb: 120, label: '120 GB', price: '+$2.40/mo' },
+                      { gb: 250, label: '250 GB', price: '+$4.99/mo' },
+                      { gb: 500, label: '500 GB', price: '+$8.99/mo' },
+                      { gb: 1000, label: '1 TB', price: '+$15.99/mo' },
+                    ].map((nasOpt) => (
+                      <button
+                        type="button"
+                        key={nasOpt.gb}
+                        onClick={() => setSecondaryStorageGb(nasOpt.gb)}
+                        className={`py-2 px-2 rounded-lg border text-center transition-all cursor-pointer ${
+                          secondaryStorageGb === nasOpt.gb
+                            ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 ring-1 ring-purple-500/30'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="text-xs font-bold">{nasOpt.label}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{nasOpt.price}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
               {/* SERVER AUTHENTICATION (PASSWORD vs SSH PUBLIC KEY) */}
               <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">

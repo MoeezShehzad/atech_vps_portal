@@ -75,6 +75,14 @@ export async function getNotifications(req, res) {
         title = 'Root Password Changed';
         type = 'warning';
         category = 'security';
+      } else if (log.action.includes('STORAGE_THRESHOLD')) {
+        title = 'Storage Capacity Threshold Alert';
+        type = 'warning';
+        category = 'infrastructure';
+      } else if (log.action.includes('VOLUME')) {
+        title = 'Cloud Block Storage Volume';
+        type = 'success';
+        category = 'infrastructure';
       }
 
       items.push({

@@ -560,6 +560,144 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify(result));
     }
 
+    // 11. Create Secondary NAS Volume (E:\STORAGE-VOLUMES)
+    if (req.method === 'POST' && pathname === '/api/hyperv/volumes/create') {
+      const data = await parseJsonBody(req);
+      const { volumeName, userId, sizeGb, vmName, volumesRoot } = data;
+      if (!volumeName || !userId || !sizeGb) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'volumeName, userId, and sizeGb are required' }));
+      }
+      invalidateAgentCaches();
+      const result = await runPowerShell('Create-Volume.ps1', {
+        VolumeName: volumeName,
+        UserId: Number(userId),
+        SizeGB: Number(sizeGb),
+        VolumesRoot: volumesRoot || process.env.HYPERV_VOLUMES_ROOT || 'E:\\STORAGE-VOLUMES',
+        VMName: vmName || '',
+      });
+      invalidateAgentCaches();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(result));
+    }
+
+    // 12. Attach Secondary NAS Volume to VM
+    if (req.method === 'POST' && pathname === '/api/hyperv/volumes/attach') {
+      const data = await parseJsonBody(req);
+      const { vmName, vhdxPath } = data;
+      if (!vmName || !vhdxPath) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'vmName and vhdxPath are required' }));
+      }
+      invalidateAgentCaches();
+      const result = await runPowerShell('Attach-Volume.ps1', {
+        VMName: vmName,
+        VhdxPath: vhdxPath,
+      });
+      invalidateAgentCaches();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(result));
+    }
+
+    // 13. Detach Secondary NAS Volume from VM (Preserves VHDX file)
+    if (req.method === 'POST' && pathname === '/api/hyperv/volumes/detach') {
+      const data = await parseJsonBody(req);
+      const { vmName, vhdxPath } = data;
+      if (!vmName || !vhdxPath) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'vmName and vhdxPath are required' }));
+      }
+      invalidateAgentCaches();
+      const result = await runPowerShell('Detach-Volume.ps1', {
+        VMName: vmName,
+        VhdxPath: vhdxPath,
+      });
+      invalidateAgentCaches();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(result));
+    }
+
+    // 14. Resize Secondary NAS Volume
+    if (req.method === 'POST' && pathname === '/api/hyperv/volumes/resize') {
+      const data = await parseJsonBody(req);
+      const { vhdxPath, sizeGb } = data;
+      if (!vhdxPath || !sizeGb) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'vhdxPath and sizeGb are required' }));
+      }
+      invalidateAgentCaches();
+      const result = await runPowerShell('Resize-Volume.ps1', {
+        VhdxPath: vhdxPath,
+        SizeGB: Number(sizeGb),
+      });
+      invalidateAgentCaches();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(result));
+    }
+
+    // 15. Permanently Delete Secondary NAS Volume
+    if (req.method === 'POST' && pathname === '/api/hyperv/volumes/delete') {
+      const data = await parseJsonBody(req);
+      const { vhdxPath, vmName } = data;
+      if (!vhdxPath) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'vhdxPath is required' }));
+      }
+      invalidateAgentCaches();
+      const result = await runPowerShell('Delete-Volume.ps1', {
+        VhdxPath: vhdxPath,
+        VMName: vmName || '',
+      });
+      invalidateAgentCaches();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(result));
+    }
+
+    // 16. Clone / Backup Secondary NAS Volume on E:\STORAGE-VOLUMES
+    if (req.method === 'POST' && pathname === '/api/hyperv/volumes/clone') {
+      const data = await parseJsonBody(req);
+      const { sourceVhdxPath, newVolumeName, userId, volumesRoot } = data;
+      if (!sourceVhdxPath || !newVolumeName || !userId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'sourceVhdxPath, newVolumeName, and userId are required' }));
+      }
+      invalidateAgentCaches();
+      const result = await runPowerShell('Clone-Volume.ps1', {
+        SourceVhdxPath: sourceVhdxPath,
+        NewVolumeName: newVolumeName,
+        UserId: Number(userId),
+        VolumesRoot: volumesRoot || process.env.HYPERV_VOLUMES_ROOT || 'E:\\STORAGE-VOLUMES',
+      });
+      invalidateAgentCaches();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(result));
+    }
+
+    // 17. Fast Disk Usage Stats for VHDX Paths (Zero-PowerShell fs.statSync)
+    if (req.method === 'POST' && pathname === '/api/hyperv/volumes/stats') {
+      const data = await parseJsonBody(req);
+      const paths = Array.isArray(data.paths) ? data.paths : [];
+      const statsMap = {};
+      for (const p of paths) {
+        try {
+          if (p && fs.existsSync(p)) {
+            const st = fs.statSync(p);
+            statsMap[p] = {
+              exists: true,
+              usedBytes: st.size,
+              usedGb: Number((st.size / (1024 * 1024 * 1024)).toFixed(2)),
+            };
+          } else {
+            statsMap[p] = { exists: false, usedBytes: 0, usedGb: 0 };
+          }
+        } catch (_) {
+          statsMap[p] = { exists: false, usedBytes: 0, usedGb: 0 };
+        }
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ status: 'SUCCESS', stats: statsMap }));
+    }
+
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Endpoint not found' }));
   } catch (error) {
@@ -578,7 +716,7 @@ server.listen(PORT, HOST, () => {
   console.log(`================================================================`);
 
   // Forward localhost:5000 and localhost:5174 to Ubuntu VM for Google OAuth & local portal access
-  const VM_IP = process.env.UBUNTU_VM_IP || '172.24.210.109';
+  const VM_IP = process.env.UBUNTU_VM_IP || '172.25.194.67';
   [5000, 5174].forEach((fwdPort) => {
     try {
       const bridge = net.createServer((socket) => {

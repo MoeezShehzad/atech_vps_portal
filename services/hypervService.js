@@ -99,7 +99,7 @@ class HyperVService {
    */
   async dispatchToHost(endpoint, method = 'POST', body = null) {
     const isLongOp = endpoint.includes('/create') || endpoint.includes('/rebuild');
-    const isMediumOp = endpoint.includes('/destroy') || endpoint.includes('/power') || endpoint.includes('/resize');
+    const isMediumOp = endpoint.includes('/destroy') || endpoint.includes('/power') || endpoint.includes('/resize') || endpoint.includes('/volumes/');
     const timeoutMs = isLongOp ? 180000 : (isMediumOp ? 60000 : 25000);
 
     const host = await this.findReachableHost();
@@ -334,6 +334,7 @@ class HyperVService {
    * Rebuild VM with clean OS image
    */
   async rebuildVM({ vmName, ramMb, cpuCount, diskGb, templatePath, adminUsername, adminPassword, sshPublicKey }) {
+
     return await this.dispatchToHost('/api/hyperv/rebuild', 'POST', {
       vmName,
       ramMb,
@@ -344,6 +345,84 @@ class HyperVService {
       adminPassword,
       sshPublicKey,
     });
+  }
+
+  /**
+   * Create a secondary Synology NAS volume (E:\STORAGE-VOLUMES) and optionally attach it to a VM
+   */
+  async createVolume({ volumeName, userId, sizeGb, vmName = '', volumesRoot }) {
+    console.log(`[HYPER-V] Creating secondary NAS volume '${volumeName}' (${sizeGb} GB) for user #${userId}`);
+    return await this.dispatchToHost('/api/hyperv/volumes/create', 'POST', {
+      volumeName,
+      userId,
+      sizeGb,
+      vmName,
+      volumesRoot,
+    });
+  }
+
+  /**
+   * Hot-attach a secondary NAS volume to a VM
+   */
+  async attachVolume({ vmName, vhdxPath }) {
+    console.log(`[HYPER-V] Attaching secondary volume '${vhdxPath}' to VM '${vmName}'`);
+    return await this.dispatchToHost('/api/hyperv/volumes/attach', 'POST', {
+      vmName,
+      vhdxPath,
+    });
+  }
+
+  /**
+   * Safely detach a secondary NAS volume from a VM (preserves VHDX file)
+   */
+  async detachVolume({ vmName, vhdxPath }) {
+    console.log(`[HYPER-V] Detaching secondary volume '${vhdxPath}' from VM '${vmName}'`);
+    return await this.dispatchToHost('/api/hyperv/volumes/detach', 'POST', {
+      vmName,
+      vhdxPath,
+    });
+  }
+
+  /**
+   * Expand a secondary NAS volume
+   */
+  async resizeVolume({ vhdxPath, sizeGb }) {
+    console.log(`[HYPER-V] Expanding secondary volume '${vhdxPath}' to ${sizeGb} GB`);
+    return await this.dispatchToHost('/api/hyperv/volumes/resize', 'POST', {
+      vhdxPath,
+      sizeGb,
+    });
+  }
+
+  /**
+   * Permanently delete a secondary NAS volume from E:\STORAGE-VOLUMES
+   */
+  async deleteVolume({ vhdxPath, vmName = '' }) {
+    console.log(`[HYPER-V] Permanently deleting secondary volume '${vhdxPath}'`);
+    return await this.dispatchToHost('/api/hyperv/volumes/delete', 'POST', {
+      vhdxPath,
+      vmName,
+    });
+  }
+
+  /**
+   * Clone / Snapshot a secondary NAS volume on E:\STORAGE-VOLUMES
+   */
+  async cloneVolume({ sourceVhdxPath, newVolumeName, userId, volumesRoot }) {
+    console.log(`[HYPER-V] Cloning secondary volume '${sourceVhdxPath}' -> '${newVolumeName}'`);
+    return await this.dispatchToHost('/api/hyperv/volumes/clone', 'POST', {
+      sourceVhdxPath,
+      newVolumeName,
+      userId,
+      volumesRoot,
+    });
+  }
+
+  /**
+   * Fetch fast VHDX physical usage stats from host
+   */
+  async getVolumeStats(paths = []) {
+    return await this.dispatchToHost('/api/hyperv/volumes/stats', 'POST', { paths });
   }
 }
 

@@ -22,6 +22,7 @@ import authRoutes from './routes/authRoutes.js';
 import contactRoutes from './routes/contact.js';
 import pricingRoutes from './routes/pricing.js';
 import vmRoutes from './routes/vmRoutes.js';
+import volumeRoutes from './routes/volumeRoutes.js';
 import sshKeyRoutes from './routes/sshKeyRoutes.js';
 import securityRoutes from './routes/securityRoutes.js';
 import billingRoutes from './routes/billingRoutes.js';
@@ -170,6 +171,7 @@ app.use('/api/user', userRoutes); // Alias for compatibility
 app.use('/api/contact', contactRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/vms', vmRoutes);
+app.use('/api/volumes', volumeRoutes);
 app.use('/api/ssh-keys', sshKeyRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/logs', securityRoutes); // Alias for convenience

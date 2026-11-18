@@ -376,6 +376,14 @@ export default function TermsOfService() {
                 REGARDLESS OF THE CAUSE, INCLUDING HARDWARE MALFUNCTION, POWER FAILURE, HOST REBOOT, OPERATING SYSTEM FAULT, RANSOMWARE, SECURITY BREACH, 
                 ADMINISTRATIVE ERROR, OR TERMINATION FOR DEFAULT.
               </p>
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-amber-300 dark:border-amber-800/70 text-xs sm:text-sm text-amber-950 dark:text-amber-200 space-y-1.5">
+                <strong className="block font-bold text-amber-900 dark:text-amber-300">
+                  Storage Volume Detachment, Force-Delete &amp; Customer Action Liability Waiver:
+                </strong>
+                <p className="leading-relaxed">
+                  Customer expressly acknowledges and agrees that any detachment, force-detachment (while processes or file handles remain active), unmounting, partitioning, re-formatting, mount-path overwriting, or permanent deletion of primary OS disks or secondary attachable cloud block storage volumes initiated by Customer or Customer&apos;s users is performed strictly at Customer&apos;s sole risk. <strong>ATC shall not be responsible or liable under any circumstances for any filesystem corruption, unmerged snapshot data loss, or deletion of data caused by Customer action or Customer mistake.</strong>
+                </p>
+              </div>
             </section>
 
             <section id="atc-8" className="space-y-4">

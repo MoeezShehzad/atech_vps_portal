@@ -102,6 +102,14 @@ try {
 
     # 5. Hardware Configuration
     Set-VMProcessor -VMName $VMName -Count $CPUCount
+
+    # Route VM Checkpoints / Snapshots to Secondary Synology NAS (E:\SYNOLOGY-SNAPSHOTS)
+    if (Test-Path "E:\") {
+        $NasSnapshotDir = Join-Path -Path "E:\SYNOLOGY-SNAPSHOTS" -ChildPath $VMName
+        New-Item -Path $NasSnapshotDir -ItemType Directory -Force | Out-Null
+        Set-VM -Name $VMName -SnapshotFileLocation $NasSnapshotDir -ErrorAction SilentlyContinue
+        Write-Output "[SNAPSHOTS] Configured VM snapshot storage on Synology NAS: $NasSnapshotDir"
+    }
     $TargetMaxBytes = [int64]$RAMMB * 1MB
     $StartupBytes = [Math]::Min([int64]2048 * 1MB, $TargetMaxBytes)
     $MinBytes = [Math]::Min([int64]512 * 1MB, $TargetMaxBytes)

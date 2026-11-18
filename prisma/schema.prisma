@@ -44,6 +44,7 @@ model User {
   policyVersions  LegalPolicyVersion[]
   ownedOrganizations Organization[]  @relation("OrgOwner")
   orgMemberships     OrganizationMember[]
+  storageVolumes     StorageVolume[]
 
   @@map("Users")
 }
@@ -185,6 +186,7 @@ model VirtualMachine {
   snapshots        VMSnapshot[]
   backups          Backup[]
   provisioningJobs ProvisioningJob[]
+  storageVolumes   StorageVolume[]
   activityLogs     ActivityLog[]
 
   @@index([userId], map: "idx_vms_user_id")
@@ -563,4 +565,26 @@ model OrganizationMember {
   @@index([userId], map: "IX_OrgMembers_User")
   @@index([invitedEmail], map: "IX_OrgMembers_Email")
   @@map("OrganizationMembers")
+}
+
+model StorageVolume {
+  volumeId     Int      @id @default(autoincrement()) @map("volume_id")
+  userId       Int      @map("user_id")
+  vmId         Int?     @map("vm_id")
+  name         String   @db.VarChar(100)
+  sizeGb       Int      @map("size_gb")
+  storageType  String   @default("Synology NAS (iSCSI)") @map("storage_type") @db.VarChar(50)
+  vhdxPath     String   @map("vhdx_path") @db.VarChar(500)
+  status       String   @default("AVAILABLE") @db.VarChar(30)
+  busInfo      String?  @default("SCSI Controller") @map("bus_info") @db.VarChar(100)
+  monthlyPrice Decimal  @default(0) @map("monthly_price") @db.Decimal(10, 2)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User            @relation(fields: [userId], references: [userId], onUpdate: NoAction, onDelete: NoAction)
+  vm   VirtualMachine? @relation(fields: [vmId], references: [vmId], onUpdate: NoAction, onDelete: NoAction)
+
+  @@index([userId], map: "idx_storage_volumes_user_id")
+  @@index([vmId], map: "idx_storage_volumes_vm_id")
+  @@map("Storage_Volumes")
 }

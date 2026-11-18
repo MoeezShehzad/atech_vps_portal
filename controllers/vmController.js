@@ -17,6 +17,7 @@ import {
 import firewallService from '../services/firewallService.js';
 import { generateGuacamoleToken, buildRdpConnectionPayload } from '../services/guacamoleService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
+import { autoExpandPrimaryOsFilesystem } from './volumeController.js';
 
 // Concurrency lock: prevents double-click race conditions on active subscription slots
 const activeProvisioningSlots = new Set();
@@ -184,6 +185,7 @@ export async function getUserVMs(req, res) {
         ipPool: true,
         subscription: true,
         backups: true,
+        storageVolumes: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -377,6 +379,16 @@ export async function getUserVMs(req, res) {
         vCPU: vm.cpuCores,
         ramGB: vm.ramGb,
         diskGB: vm.storageGb,
+        secondaryVolumes: (vm.storageVolumes || []).map((sv) => ({
+          volumeId: sv.volumeId,
+          name: sv.name,
+          sizeGb: sv.sizeGb,
+          storageType: sv.storageType,
+          vhdxPath: sv.vhdxPath,
+          status: sv.status,
+          busInfo: sv.busInfo,
+          monthlyPrice: Number(sv.monthlyPrice || 0),
+        })),
         bandwidthGb: vm.plan?.bandwidthMbps || 80,
         bandwidthUsedGb: parseFloat(Math.min(vm.plan?.bandwidthMbps || 80, (((vm.vmId * 7.3 + 14.2) % ((vm.plan?.bandwidthMbps || 80) * 0.7)) + 4.2)).toFixed(1)),
         backupEnabled: Boolean(vm.backupEnabled),
@@ -438,7 +450,7 @@ export async function deployVM(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { planId, imageId, vmName, customCpu, customRam, customStorage, username, password, authMethod, sshKeyId, sshPublicKey, appId, enableBackups } = req.body;
+    const { planId, imageId, vmName, customCpu, customRam, customStorage, secondaryStorageGb, attachVolumeId, username, password, authMethod, sshKeyId, sshPublicKey, appId, enableBackups } = req.body;
     const adminPassword = (password && password.trim()) ? password.trim() : '';
 
     let resolvedPublicKey = '';
@@ -741,6 +753,55 @@ export async function deployVM(req, res) {
       }
 
       // =========================================================================
+      // STEP 3B: PROVISION OR ATTACH SECONDARY SYNOLOGY NAS VOLUME (E:\)
+      // =========================================================================
+      try {
+        if (attachVolumeId) {
+          const existingVol = await prisma.storageVolume.findFirst({
+            where: { volumeId: Number(attachVolumeId), userId, vmId: null },
+          });
+          if (existingVol) {
+            await hypervService.attachVolume({
+              vmName: cleanVmName,
+              vhdxPath: existingVol.vhdxPath,
+            });
+            await prisma.storageVolume.update({
+              where: { volumeId: existingVol.volumeId },
+              data: { vmId: newVm.vmId, status: 'ATTACHED', busInfo: 'SCSI Controller (0:1)' },
+            });
+          }
+        } else if (secondaryStorageGb && Number(secondaryStorageGb) >= 50) {
+          const secSize = Number(secondaryStorageGb);
+          const volLabel = `${cleanVmName}-nas-${secSize}gb`;
+          const uniqueStem = `u${userId}-${volLabel}-${Date.now().toString().slice(-4)}`;
+          const hvVol = await hypervService.createVolume({
+            volumeName: uniqueStem,
+            userId,
+            sizeGb: secSize,
+            vmName: cleanVmName,
+          });
+          const volumesRoot = process.env.HYPERV_VOLUMES_ROOT || 'E:\\STORAGE-VOLUMES';
+          const vhdxPath = hvVol?.VhdxPath || `${volumesRoot}\\user_${userId}\\${uniqueStem}.vhdx`;
+          const tierPrices = { 120: 2.40, 250: 4.99, 500: 8.99, 1000: 15.99 };
+          await prisma.storageVolume.create({
+            data: {
+              userId,
+              vmId: newVm.vmId,
+              name: volLabel,
+              sizeGb: secSize,
+              storageType: 'Synology NAS (iSCSI)',
+              vhdxPath,
+              status: 'ATTACHED',
+              busInfo: 'SCSI Controller (0:1)',
+              monthlyPrice: tierPrices[secSize] || Number((secSize * 0.016).toFixed(2)),
+            },
+          });
+        }
+      } catch (volErr) {
+        console.warn(`[Deploy VM] Non-fatal warning attaching secondary NAS volume to ${cleanVmName}:`, volErr.message);
+      }
+
+      // =========================================================================
       // STEP 4: ASYNC NOTIFICATIONS & 1-CLICK APPS
       // =========================================================================
       sendVmProvisionedEmail({
@@ -986,6 +1047,9 @@ export async function resizeVM(req, res) {
     });
 
     // Update Virtual Machine in DB
+    if (targetStorage > vm.storageGb && req.body.autoExpandFs !== false) {
+      autoExpandPrimaryOsFilesystem(vm).catch(() => {});
+    }
     const updatedVm = await prisma.virtualMachine.update({
       where: { vmId },
       data: {
@@ -1150,6 +1214,12 @@ export async function destroyVM(req, res) {
     await prisma.activityLog.updateMany({
       where: { vmId },
       data: { vmId: null },
+    }).catch(() => {});
+
+    // 5b. Safely preserve & detach any secondary Synology NAS volumes (data stays intact on E:\)
+    await prisma.storageVolume.updateMany({
+      where: { vmId },
+      data: { vmId: null, status: 'AVAILABLE', busInfo: 'Unattached (Available)' },
     }).catch(() => {});
 
     // 6. Delete the VirtualMachine record from DB
@@ -1800,6 +1870,21 @@ export async function rebuildVMInstance(req, res) {
       sshPublicKey: sshPublicKey || '',
     });
 
+    // Re-attach any secondary Synology NAS volumes that belonged to this VM prior to OS rebuild
+    try {
+      const attachedVolumes = await prisma.storageVolume.findMany({
+        where: { vmId },
+      });
+      for (const vol of attachedVolumes) {
+        await hypervService.attachVolume({
+          vmName: vm.vmName,
+          vhdxPath: vol.vhdxPath,
+        });
+      }
+    } catch (reattachErr) {
+      console.warn(`[Rebuild VM] Notice re-attaching secondary volumes for ${vm.vmName}:`, reattachErr.message);
+    }
+
     // Mark completed
     await prisma.virtualMachine.update({
       where: { vmId },
@@ -1924,7 +2009,7 @@ export async function createVMBackup(req, res) {
       data: {
         vmId,
         backupType: 'MANUAL',
-        backupLocation: `ATC Cloud Storage / ${snapName}`,
+        backupLocation: `ATC Cloud Recovery Vault / ${snapName}`,
         backupSizeGb: Number((vm.storageGb * 0.16).toFixed(1)),
         status: 'COMPLETED',
         startedAt: new Date(),

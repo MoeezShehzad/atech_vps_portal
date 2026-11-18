@@ -1,6 +1,7 @@
 # ==============================================================================
 # Script: Snapshot-VPS.ps1
 # Purpose: Create, list, restore, and delete Hyper-V Checkpoints (Snapshots)
+#          Routed to Secondary Synology NAS Storage (E:\SYNOLOGY-SNAPSHOTS)
 # ==============================================================================
 
 param (
@@ -12,13 +13,15 @@ param (
     [string]$Action,
 
     [Parameter(Mandatory=$false)]
-    [string]$SnapshotName = ""
+    [string]$SnapshotName = "",
+
+    [Parameter(Mandatory=$false)]
+    [string]$SnapshotsRoot = "E:\SYNOLOGY-SNAPSHOTS"
 )
 
 $ErrorActionPreference = "Stop"
 
 try {
-    # Check if VM exists
     $vm = Get-VM -Name $VMName -ErrorAction SilentlyContinue
     if (-not $vm) {
         Write-Output "[]"
@@ -27,6 +30,13 @@ try {
 
     switch ($Action.ToUpper()) {
         "CREATE" {
+            # Ensure snapshot files are stored on the Synology NAS (E:\) if available
+            if (Test-Path (Split-Path -Path $SnapshotsRoot -Qualifier)) {
+                $VmNasSnapDir = Join-Path -Path $SnapshotsRoot -ChildPath $VMName
+                New-Item -Path $VmNasSnapDir -ItemType Directory -Force | Out-Null
+                Set-VM -Name $VMName -SnapshotFileLocation $VmNasSnapDir -ErrorAction SilentlyContinue
+            }
+
             $snapName = if ([string]::IsNullOrWhiteSpace($SnapshotName)) { "Snapshot_$(Get-Date -Format 'yyyyMMdd_HHmmss')" } else { $SnapshotName }
             Checkpoint-VM -Name $VMName -SnapshotName $snapName
             $created = Get-VMSnapshot -VMName $VMName -Name $snapName | Select-Object -First 1
@@ -34,6 +44,7 @@ try {
                 status = "SUCCESS"
                 vmName = $VMName
                 snapshotName = $snapName
+                storageLocation = "Synology NAS (E:\SYNOLOGY-SNAPSHOTS\$VMName)"
                 createdAt = (Get-Date -Date $created.CreationTime -Format "o")
                 id = $created.Id.ToString()
             }
@@ -54,6 +65,7 @@ try {
                     snapshotName = $s.Name
                     createdAt = (Get-Date -Date $s.CreationTime -Format "o")
                     snapshotType = $s.SnapshotType.ToString()
+                    storageLocation = "Synology NAS (E:\SYNOLOGY-SNAPSHOTS\$VMName)"
                 }
             }
             Write-Output ($list | ConvertTo-Json -Compress)
