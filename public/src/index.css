@@ -1,6 +1,14 @@
 @import "tailwindcss";
 
 @font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-var.woff2') format('woff2');
+}
+
+@font-face {
   font-family: 'Poppins';
   font-style: normal;
   font-weight: 300;
@@ -51,9 +59,9 @@
 }
 
 @theme {
-  --font-sans: 'Poppins', sans-serif;
-  --font-poppins: 'Poppins', sans-serif;
-  --font-mono: 'Poppins', sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-poppins: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Inter', system-ui, -apple-system, sans-serif;
 
   --color-atc-blue: #2e75b5;
   --color-atc-blue-hover: #246299;
@@ -77,7 +85,9 @@
 
 /* iOS-Style Ultra-Smooth Spring Transition */
 html {
-  font-family: 'Poppins', sans-serif !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   color-scheme: light dark;
 }
 
