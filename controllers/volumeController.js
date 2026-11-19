@@ -14,12 +14,13 @@ import { Client as SSHClient } from 'ssh2';
 import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
 import { decryptVmPassword } from '../services/cryptoService.js';
+import { getRatesForPlan } from '../services/pricingService.js';
 
 export const PLAN_NAS_QUOTA_GB = {
-  1: 120,   // VPS Basic: 50 GB OS + 120 GB Synology NAS
-  2: 250,   // VPS Pro: 100 GB OS + 250 GB Synology NAS
-  3: 500,   // VPS Enterprise: 150 GB OS + 500 GB Synology NAS
-  4: 1000,  // VPS Ultra Compute: 200 GB OS + 1 TB (1000 GB) Synology NAS
+  1: 125,   // VPS Basic: 100 GB OS + 125 GB Secondary Block Storage
+  2: 250,   // VPS Pro: 100 GB OS + 250 GB Secondary Block Storage
+  3: 500,   // VPS Enterprise: 100 GB OS + 500 GB Secondary Block Storage
+  4: 1000,  // VPS Ultra Compute: 100 GB OS + 1 TB (1000 GB) Secondary Block Storage
 };
 
 export const PLAN_QOS_MAX_IOPS = {
@@ -31,12 +32,12 @@ export const PLAN_QOS_MAX_IOPS = {
 
 const thresholdAlertCooldown = new Map();
 
-function getPlanNasQuota(planId, cpuCores = 2) {
+export function getPlanNasQuota(planId, cpuCores = 2) {
   if (PLAN_NAS_QUOTA_GB[planId]) return PLAN_NAS_QUOTA_GB[planId];
   if (cpuCores >= 16) return 1000;
   if (cpuCores >= 8) return 500;
   if (cpuCores >= 4) return 250;
-  return 120;
+  return 125;
 }
 
 function getPlanMaxIops(planId, cpuCores = 2) {
@@ -104,6 +105,8 @@ async function getUserNasQuotaSummary(userId) {
 
   const usedQuotaGb = volumes.reduce((sum, v) => sum + Number(v.sizeGb || 0), 0);
   const remainingQuotaGb = Math.max(0, totalQuotaGb - usedQuotaGb);
+  const primaryPlan = activeSubs[0]?.plan || activeVms[0]?.plan || null;
+  const rates = getRatesForPlan(primaryPlan);
 
   return {
     totalQuotaGb,
@@ -112,6 +115,8 @@ async function getUserNasQuotaSummary(userId) {
     maxIops,
     activeVms,
     hasActiveVpsOrSub: activeSubs.length > 0 || activeVms.length > 0,
+    storagePerGbMonth: rates.storagePerGbMonth,
+    planName: primaryPlan?.name || 'Standard Plan',
   };
 }
 
@@ -209,7 +214,7 @@ function runSshScript(host, username, password, scriptContent, timeoutMs = 25000
  * (Protection #1: prevents "Disappearing Data" when mounting over /var/www or /data),
  * mount with UUID & x-systemd.device-timeout=10s (Protection #5 & #6).
  */
-async function autoFormatAndMountOnGuest(vm, volumeName, filesystem = 'ext4', customMountPath = '') {
+export async function autoFormatAndMountOnGuest(vm, volumeName, filesystem = 'ext4', customMountPath = '') {
   const ip = await resolveVmIp(vm);
   if (!ip) return null;
 
@@ -933,7 +938,7 @@ export async function resizeVolume(req, res) {
 
     const volume = await prisma.storageVolume.findFirst({
       where: { volumeId, userId },
-      include: { vm: { include: { ipPool: true } } },
+      include: { vm: { include: { ipPool: true, plan: true, subscription: { include: { plan: true } } } } },
     });
     if (!volume) {
       return res.status(404).json({ error: 'Storage volume not found.' });
@@ -943,13 +948,37 @@ export async function resizeVolume(req, res) {
         error: `New capacity (${targetSize} GB) must be larger than current volume size (${volume.sizeGb} GB). Shrinking is not supported.`,
       });
     }
-
-    const additionalGbNeeded = targetSize - volume.sizeGb;
-    const quota = await getUserNasQuotaSummary(userId);
-    if (additionalGbNeeded > quota.remainingQuotaGb) {
+    if (targetSize > 2000) {
       return res.status(400).json({
-        error: `Expanding by +${additionalGbNeeded} GB exceeds your remaining storage pool quota (${quota.remainingQuotaGb} GB available).`,
+        error: 'Maximum single volume capacity is 2,000 GB (2 TB).',
       });
+    }
+
+    const additionalGb = targetSize - volume.sizeGb;
+
+    // Resolve active subscription & plan pricing rules
+    let activeSub = volume.vm?.subscription || null;
+    if (!activeSub) {
+      activeSub = await prisma.subscription.findFirst({
+        where: { userId, status: { in: ['ACTIVE', 'TRIAL'] } },
+        include: { plan: true },
+        orderBy: { endDate: 'desc' },
+      });
+    }
+    const effectivePlan = activeSub?.plan || volume.vm?.plan || null;
+    const rates = getRatesForPlan(effectivePlan);
+    const ratePerGbMonth = rates.storagePerGbMonth;
+    const monthlyDelta = Number((additionalGb * ratePerGbMonth).toFixed(2));
+
+    // Calculate prorated charge for remaining days in current billing cycle
+    let dueToday = monthlyDelta;
+    if (activeSub && activeSub.status === 'TRIAL') {
+      dueToday = 0;
+    } else if (activeSub && activeSub.endDate) {
+      const nowMs = Date.now();
+      const endMs = new Date(activeSub.endDate).getTime();
+      const remainingDays = Math.max(1, Math.min(30, Math.ceil((endMs - nowMs) / (1000 * 60 * 60 * 24))));
+      dueToday = Number(((monthlyDelta / 30) * remainingDays).toFixed(2));
     }
 
     await hypervService.resizeVolume({
@@ -962,12 +991,52 @@ export async function resizeVolume(req, res) {
       fsExpanded = await autoExpandSecondaryVolumeFilesystem(volume.vm, volume);
     }
 
+    const newVolumeMonthlyPrice = Number((Number(volume.monthlyPrice || 0) + monthlyDelta).toFixed(2));
     const updated = await prisma.storageVolume.update({
       where: { volumeId },
       data: {
         sizeGb: targetSize,
+        monthlyPrice: newVolumeMonthlyPrice,
       },
     });
+
+    // Update subscription recurring monthly price & create prorated invoice/payment
+    if (activeSub && monthlyDelta > 0) {
+      const newSubMonthly = Number((Number(activeSub.monthlyPrice || 0) + monthlyDelta).toFixed(2));
+      await prisma.subscription.update({
+        where: { subscriptionId: activeSub.subscriptionId },
+        data: { monthlyPrice: newSubMonthly },
+      }).catch(() => {});
+
+      if (dueToday > 0) {
+        const inv = await prisma.invoice.create({
+          data: {
+            userId,
+            subscriptionId: activeSub.subscriptionId,
+            invoiceNumber: `INV-STG-${Date.now().toString().slice(-6)}`,
+            amount: dueToday,
+            currency: 'USD',
+            status: 'PAID',
+            dueDate: new Date(),
+            paidAt: new Date(),
+          },
+        }).catch(() => null);
+
+        if (inv) {
+          await prisma.payment.create({
+            data: {
+              invoiceId: inv.invoiceId,
+              userId,
+              amount: dueToday,
+              paymentMethod: 'CARD',
+              transactionId: `TXN-STG-${Date.now()}`,
+              status: 'COMPLETED',
+              paidAt: new Date(),
+            },
+          }).catch(() => {});
+        }
+      }
+    }
 
     await prisma.activityLog.create({
       data: {
@@ -975,16 +1044,22 @@ export async function resizeVolume(req, res) {
         vmId: volume.vmId,
         action: 'RESIZE_VOLUME',
         status: 'SUCCESS',
-        details: `Expanded block storage volume '${volume.name}' from ${volume.sizeGb} GB to ${targetSize} GB${fsExpanded ? ' (Filesystem auto-expanded online)' : ''}`,
+        details: `Expanded block storage volume '${volume.name}' from ${volume.sizeGb} GB to ${targetSize} GB (+${additionalGb} GB @ $${ratePerGbMonth}/GB/mo, +$${monthlyDelta.toFixed(2)}/mo)${fsExpanded ? ' (Filesystem auto-expanded online)' : ''}`,
       },
     }).catch(() => {});
 
     return res.json({
       success: true,
       message: fsExpanded
-        ? `Storage volume '${volume.name}' expanded to ${targetSize} GB and filesystem resized online!`
-        : `Storage volume '${volume.name}' expanded to ${targetSize} GB.`,
+        ? `Storage volume '${volume.name}' expanded to ${targetSize} GB (+$${monthlyDelta.toFixed(2)}/mo) and filesystem resized online!`
+        : `Storage volume '${volume.name}' expanded to ${targetSize} GB (+$${monthlyDelta.toFixed(2)}/mo).`,
       volume: updated,
+      pricing: {
+        additionalGb,
+        ratePerGbMonth,
+        monthlyDelta,
+        dueToday,
+      },
     });
   } catch (err) {
     console.error('[Volume Controller] Error resizing volume:', err);

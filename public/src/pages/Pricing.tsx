@@ -327,11 +327,21 @@ export default function Pricing() {
                       <span className="font-medium text-slate-800">{plan.ramGb} GB RAM</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <span className="font-medium text-slate-800">
-                        {plan.storageGb >= 1000
-                          ? `${plan.storageGb >= 1024 && plan.storageGb % 1024 === 0 ? plan.storageGb / 1024 : Math.round(plan.storageGb / 1000)} TB`
-                          : `${plan.storageGb} GB`}{' '}
-                        {plan.storageType || 'SSD'}
+                      <span className="font-medium text-slate-800">100 GB Primary OS SSD (Root)</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="font-medium text-blue-700">
+                        +{' '}
+                        {(() => {
+                          const secGb =
+                            plan.planId === 4 ? 1000 :
+                            plan.planId === 3 ? 500 :
+                            plan.planId === 2 ? 250 :
+                            plan.planId === 1 ? 125 :
+                            plan.storageGb;
+                          return secGb >= 1000 ? '1 TB' : `${secGb} GB`;
+                        })()}{' '}
+                        Secondary Block Storage
                       </span>
                     </li>
                     <li className="flex items-center gap-1.5 text-blue-600 font-normal">

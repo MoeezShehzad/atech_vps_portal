@@ -57,6 +57,8 @@ interface StorageQuota {
   totalQuotaGb: number;
   usedQuotaGb: number;
   remainingQuotaGb: number;
+  storagePerGbMonth?: number;
+  planName?: string;
 }
 
 interface StorageThresholdAlert {
@@ -690,11 +692,11 @@ export default function StorageAndDisks() {
                             </button>
                           )}
 
-                          {quota.remainingQuotaGb > 0 && (
+                          {vol.sizeGb < 2000 && (
                             <button
                               onClick={() => {
                                 setExpandingVolume(vol);
-                                setNewVolSizeGb(vol.sizeGb + Math.min(10, quota.remainingQuotaGb));
+                                setNewVolSizeGb(Math.min(2000, vol.sizeGb + 25));
                                 setAutoExpandVolFs(true);
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
@@ -1218,7 +1220,7 @@ export default function StorageAndDisks() {
               Expand Block Storage Volume
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              Volume: <strong className="font-poppins tabular-nums">{expandingVolume.name}</strong> (Current: {expandingVolume.sizeGb} GB • Available Pool: {quota.remainingQuotaGb} GB)
+              Volume: <strong className="font-poppins tabular-nums">{expandingVolume.name}</strong> (Current: {expandingVolume.sizeGb} GB)
             </p>
 
             <form onSubmit={handleExpandVolSubmit} className="space-y-4">
@@ -1229,15 +1231,37 @@ export default function StorageAndDisks() {
                 <input
                   type="number"
                   min={expandingVolume.sizeGb + 1}
-                  max={expandingVolume.sizeGb + quota.remainingQuotaGb}
+                  max={2000}
                   value={newVolSizeGb}
                   onChange={(e) => setNewVolSizeGb(Number(e.target.value))}
                   className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-poppins tabular-nums font-semibold tracking-tight text-slate-900 dark:text-white"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Max expandable size using your remaining pool: {expandingVolume.sizeGb + quota.remainingQuotaGb} GB
+                  Expandable up to 2,000 GB (2 TB). Billed according to your plan's per-GB storage rate.
                 </p>
               </div>
+
+              {newVolSizeGb > expandingVolume.sizeGb && (() => {
+                const addGb = Math.max(0, newVolSizeGb - expandingVolume.sizeGb);
+                const rate = quota.storagePerGbMonth ?? 0.024;
+                const monthlyAdd = (addGb * rate).toFixed(2);
+                return (
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                      <span>Additional Capacity</span>
+                      <span className="font-semibold tabular-nums">+{addGb} GB</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                      <span>Plan Storage Rate ({quota.planName || 'Active Plan'})</span>
+                      <span className="font-semibold tabular-nums">${rate.toFixed(4)} / GB / mo</span>
+                    </div>
+                    <div className="pt-1.5 mt-1.5 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between text-slate-900 dark:text-white font-semibold">
+                      <span>Recurring Monthly Addition</span>
+                      <span className="text-blue-600 dark:text-blue-400 tabular-nums">+${monthlyAdd} / mo</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {expandingVolume.status === 'ATTACHED' && (
                 <label className="flex items-start gap-2.5 p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/40 border border-blue-200/70 dark:border-blue-900/50 cursor-pointer">

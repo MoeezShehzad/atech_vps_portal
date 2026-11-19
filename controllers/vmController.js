@@ -17,7 +17,7 @@ import {
 import firewallService from '../services/firewallService.js';
 import { generateGuacamoleToken, buildRdpConnectionPayload } from '../services/guacamoleService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
-import { autoExpandPrimaryOsFilesystem } from './volumeController.js';
+import { autoExpandPrimaryOsFilesystem, getPlanNasQuota, autoFormatAndMountOnGuest } from './volumeController.js';
 
 // Concurrency lock: prevents double-click race conditions on active subscription slots
 const activeProvisioningSlots = new Set();
@@ -572,7 +572,8 @@ export async function deployVM(req, res) {
 
     const finalCpu = Math.max(1, Math.min(maxAllowedCpu, customCpu ? Number(customCpu) : (subscription.plan?.cpuCores || plan.cpuCores)));
     const finalRam = Math.max(1, Math.min(maxAllowedRam, customRam ? Number(customRam) : (subscription.plan?.ramGb || plan.ramGb)));
-    const finalStorage = Math.max(10, Math.min(maxAllowedStorage, customStorage ? Number(customStorage) : (subscription.plan?.storageGb || plan.storageGb)));
+    // Primary OS Root Storage defaults to 100 GB SSD across all packages; secondary block storage is provisioned separately
+    const finalStorage = Math.max(10, Math.min(maxAllowedStorage, customStorage ? Number(customStorage) : 100));
 
     const pricing = calculateCustomPrice(plan, {
       cpuCores: finalCpu,
@@ -753,9 +754,10 @@ export async function deployVM(req, res) {
       }
 
       // =========================================================================
-      // STEP 3B: PROVISION OR ATTACH SECONDARY SYNOLOGY NAS VOLUME (E:\)
+      // STEP 3B: AUTO-PROVISION & AUTO-MOUNT PLAN SECONDARY BLOCK STORAGE VOLUME
       // =========================================================================
       try {
+        let attachedVolRecord = null;
         if (attachVolumeId) {
           const existingVol = await prisma.storageVolume.findFirst({
             where: { volumeId: Number(attachVolumeId), userId, vmId: null },
@@ -765,14 +767,17 @@ export async function deployVM(req, res) {
               vmName: cleanVmName,
               vhdxPath: existingVol.vhdxPath,
             });
-            await prisma.storageVolume.update({
+            attachedVolRecord = await prisma.storageVolume.update({
               where: { volumeId: existingVol.volumeId },
               data: { vmId: newVm.vmId, status: 'ATTACHED', busInfo: 'SCSI Controller (0:1)' },
             });
           }
-        } else if (secondaryStorageGb && Number(secondaryStorageGb) >= 50) {
-          const secSize = Number(secondaryStorageGb);
-          const volLabel = `${cleanVmName}-nas-${secSize}gb`;
+        } else {
+          // Automatically provision the plan's included Secondary Block Storage (125 / 250 / 500 / 1000 GB)
+          const secSize = (secondaryStorageGb && Number(secondaryStorageGb) >= 10)
+            ? Number(secondaryStorageGb)
+            : getPlanNasQuota(subscription.planId || plan.planId, finalCpu);
+          const volLabel = `${cleanVmName}-storage-${secSize}gb`;
           const uniqueStem = `u${userId}-${volLabel}-${Date.now().toString().slice(-4)}`;
           const hvVol = await hypervService.createVolume({
             volumeName: uniqueStem,
@@ -782,23 +787,54 @@ export async function deployVM(req, res) {
           });
           const volumesRoot = process.env.HYPERV_VOLUMES_ROOT || 'E:\\STORAGE-VOLUMES';
           const vhdxPath = hvVol?.VhdxPath || `${volumesRoot}\\user_${userId}\\${uniqueStem}.vhdx`;
-          const tierPrices = { 120: 2.40, 250: 4.99, 500: 8.99, 1000: 15.99 };
-          await prisma.storageVolume.create({
+          attachedVolRecord = await prisma.storageVolume.create({
             data: {
               userId,
               vmId: newVm.vmId,
               name: volLabel,
               sizeGb: secSize,
-              storageType: 'Synology NAS (iSCSI)',
+              storageType: 'Cloud Block Storage',
               vhdxPath,
               status: 'ATTACHED',
               busInfo: 'SCSI Controller (0:1)',
-              monthlyPrice: tierPrices[secSize] || Number((secSize * 0.016).toFixed(2)),
+              monthlyPrice: 0, // Included in subscription plan; expansions are billed per GB
             },
           });
         }
+
+        // For Linux VMs, asynchronously wait for boot/SSH and auto-format + mount the secondary storage at /data/<volumeName>
+        if (attachedVolRecord && !isWindows) {
+          const targetVmId = newVm.vmId;
+          const targetVolId = attachedVolRecord.volumeId;
+          const targetVolName = attachedVolRecord.name;
+          (async () => {
+            for (let attempt = 1; attempt <= 10; attempt++) {
+              await new Promise((r) => setTimeout(r, 15000)); // wait 15s between boot checks
+              try {
+                const freshVm = await prisma.virtualMachine.findUnique({
+                  where: { vmId: targetVmId },
+                  include: { ipPool: true },
+                });
+                if (!freshVm || freshVm.status === 'TERMINATED') break;
+                const mounted = await autoFormatAndMountOnGuest(freshVm, targetVolName, 'ext4', '/data');
+                if (mounted && mounted.mountPoint) {
+                  const shortUuid = mounted.uuid ? ` • UUID=${mounted.uuid.slice(0, 8)}` : '';
+                  const busInfo = `${mounted.device} -> ${mounted.mountPoint} (${mounted.filesystem}${shortUuid})`;
+                  await prisma.storageVolume.update({
+                    where: { volumeId: targetVolId },
+                    data: { busInfo },
+                  }).catch(() => {});
+                  console.log(`[Deploy VM] Auto-mounted secondary storage '${targetVolName}' on ${cleanVmName} at ${mounted.mountPoint}`);
+                  break;
+                }
+              } catch (mountErr) {
+                console.warn(`[Deploy VM] Auto-mount attempt ${attempt}/10 on ${cleanVmName}:`, mountErr.message);
+              }
+            }
+          })();
+        }
       } catch (volErr) {
-        console.warn(`[Deploy VM] Non-fatal warning attaching secondary NAS volume to ${cleanVmName}:`, volErr.message);
+        console.warn(`[Deploy VM] Non-fatal warning attaching secondary storage volume to ${cleanVmName}:`, volErr.message);
       }
 
       // =========================================================================
