@@ -8,7 +8,6 @@ import {
   HardDrive,
   Plus,
   Server,
-  ShieldCheck,
   Sliders,
   RefreshCw,
   Database,
@@ -450,12 +449,6 @@ export default function StorageAndDisks() {
             <h1 className="text-2xl font-bold text-blue-950 dark:text-white font-poppins">
               Storage & Virtual Disks
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-400">
-              Primary OS SSD (50–200 GB)
-            </span>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400">
-              Block Storage Pool ({quota.remainingQuotaGb} GB Free of {quota.totalQuotaGb} GB)
-            </span>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Allocate custom-sized block volumes from your cloud storage pool with 1-click formatting, live usage monitoring, and instant volume clones.
@@ -502,7 +495,7 @@ export default function StorageAndDisks() {
       )}
 
       {/* Top Storage Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
           <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
             <span>Cloud Block Storage Pool</span>
@@ -510,7 +503,7 @@ export default function StorageAndDisks() {
               <Database className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-poppins tabular-nums">
             {quota.usedQuotaGb} / {quota.totalQuotaGb}{' '}
             <span className="text-sm font-sans font-medium text-slate-500 dark:text-slate-400">GB Allocated</span>
           </div>
@@ -534,25 +527,10 @@ export default function StorageAndDisks() {
               <HardDrive className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+          <div className="text-2xl font-bold text-slate-900 dark:text-white font-poppins tabular-nums">
             {totalOsGb} <span className="text-sm font-sans font-medium text-slate-500 dark:text-slate-400">GB NVMe/SSD</span>
           </div>
           <p className="text-[11px] text-slate-400 dark:text-slate-500">Dedicated OS Boot Disks (50 / 100 / 150 / 200 GB)</p>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
-            <span>Snapshots & Data Protection</span>
-            <div className="p-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-lg font-bold text-slate-900 dark:text-white font-poppins">
-            Cloud Recovery Vault
-          </div>
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-            Persistent block volumes • Capacity alerts at 80%
-          </p>
         </div>
       </div>
 
@@ -627,7 +605,7 @@ export default function StorageAndDisks() {
                             <Database className="w-4 h-4" />
                           </div>
                           <div>
-                            <div className="font-bold text-slate-900 dark:text-white font-mono">{vol.name}</div>
+                            <div className="font-bold text-slate-900 dark:text-white font-poppins tabular-nums">{vol.name}</div>
                             <div className="text-[11px] text-slate-400 dark:text-slate-500">{vol.storageType}</div>
                           </div>
                         </div>
@@ -645,11 +623,11 @@ export default function StorageAndDisks() {
                       <td className="py-4 px-6">
                         <div className="space-y-1.5 min-w-[140px]">
                           <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-mono font-bold text-slate-900 dark:text-white">
+                            <span className="font-poppins tabular-nums font-bold text-slate-900 dark:text-white">
                               {usedGb} / {vol.sizeGb} GB
                             </span>
                             <span
-                              className={`font-mono font-bold ${
+                              className={`font-poppins tabular-nums font-bold ${
                                 pct >= 90
                                   ? 'text-rose-600 dark:text-rose-400'
                                   : pct >= 80
@@ -668,7 +646,7 @@ export default function StorageAndDisks() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-6 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                      <td className="py-4 px-6 font-poppins tabular-nums text-[11px] text-slate-600 dark:text-slate-300">
                         {vol.busInfo}
                       </td>
                       <td className="py-4 px-6">
@@ -776,7 +754,7 @@ export default function StorageAndDisks() {
               High-performance boot volumes dedicated to each instance (50 GB, 100 GB, 150 GB, or 200 GB tiers)
             </p>
           </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-poppins tabular-nums bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg">
             {osDisks.length} OS Disk{osDisks.length === 1 ? '' : 's'}
           </span>
         </div>
@@ -811,7 +789,7 @@ export default function StorageAndDisks() {
                           <HardDrive className="w-4 h-4" />
                         </div>
                         <div>
-                          <div className="font-bold text-slate-900 dark:text-white font-mono">{disk.diskName}</div>
+                          <div className="font-bold text-slate-900 dark:text-white font-poppins tabular-nums">{disk.diskName}</div>
                           <div className="text-[11px] text-slate-400 dark:text-slate-500">{disk.type}</div>
                         </div>
                       </div>
@@ -825,11 +803,11 @@ export default function StorageAndDisks() {
                     <td className="py-4 px-6">
                       <div className="space-y-1.5 min-w-[140px]">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-mono font-bold text-slate-900 dark:text-white">
+                          <span className="font-poppins tabular-nums font-bold text-slate-900 dark:text-white">
                             {disk.usedGb} / {disk.capacityGb} GB
                           </span>
                           <span
-                            className={`font-mono font-bold ${
+                            className={`font-poppins tabular-nums font-bold ${
                               disk.usagePercent >= 90
                                 ? 'text-rose-600 dark:text-rose-400'
                                 : disk.usagePercent >= 80
@@ -848,7 +826,7 @@ export default function StorageAndDisks() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                    <td className="py-4 px-6 font-poppins tabular-nums text-[11px] text-slate-500 dark:text-slate-400">
                       {disk.bus}
                     </td>
                     <td className="py-4 px-6">
@@ -997,7 +975,7 @@ export default function StorageAndDisks() {
                         value={volName}
                         onChange={(e) => setVolName(e.target.value)}
                         placeholder={`vol-${volSizeGb}gb`}
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-poppins tabular-nums text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
                       />
                     </div>
                   </div>
@@ -1017,7 +995,7 @@ export default function StorageAndDisks() {
                         <select
                           value={selectedExistingVolumeId}
                           onChange={(e) => setSelectedExistingVolumeId(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white"
+                          className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-poppins tabular-nums text-slate-900 dark:text-white"
                         >
                           {availableVolumes.map((v) => (
                             <option key={v.volumeId} value={v.volumeId}>
@@ -1126,7 +1104,7 @@ export default function StorageAndDisks() {
                             value={customMountPath}
                             onChange={(e) => setCustomMountPath(e.target.value)}
                             placeholder={`/mnt/${volName.trim() || `vol-${volSizeGb}gb`}`}
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-poppins tabular-nums text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
                           />
                           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                             {MOUNT_PATH_PRESETS.map((p) => {
@@ -1140,7 +1118,7 @@ export default function StorageAndDisks() {
                                   type="button"
                                   key={p.label}
                                   onClick={() => setCustomMountPath(fullTarget)}
-                                  className={`px-2.5 py-1 rounded text-[10px] font-mono border transition-colors cursor-pointer ${
+                                  className={`px-2.5 py-1 rounded text-[10px] font-poppins tabular-nums border transition-colors cursor-pointer ${
                                     isSelected
                                       ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold'
                                       : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
@@ -1153,7 +1131,7 @@ export default function StorageAndDisks() {
                           </div>
                           <div className="mt-2 px-3 py-1.5 rounded-lg bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 text-[11px] text-emerald-800 dark:text-emerald-300">
                             Target folder path:{' '}
-                            <strong className="font-mono">
+                            <strong className="font-poppins tabular-nums">
                               {customMountPath.trim() || `/mnt/${(volName.trim() || `vol-${volSizeGb}gb`).toLowerCase().replace(/[^a-z0-9-_]/g, '-')}`}
                             </strong>
                           </div>
@@ -1240,7 +1218,7 @@ export default function StorageAndDisks() {
               Expand Block Storage Volume
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              Volume: <strong className="font-mono">{expandingVolume.name}</strong> (Current: {expandingVolume.sizeGb} GB • Available Pool: {quota.remainingQuotaGb} GB)
+              Volume: <strong className="font-poppins tabular-nums">{expandingVolume.name}</strong> (Current: {expandingVolume.sizeGb} GB • Available Pool: {quota.remainingQuotaGb} GB)
             </p>
 
             <form onSubmit={handleExpandVolSubmit} className="space-y-4">
@@ -1254,7 +1232,7 @@ export default function StorageAndDisks() {
                   max={expandingVolume.sizeGb + quota.remainingQuotaGb}
                   value={newVolSizeGb}
                   onChange={(e) => setNewVolSizeGb(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono font-bold text-slate-900 dark:text-white"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-poppins tabular-nums font-bold text-slate-900 dark:text-white"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
                   Max expandable size using your remaining pool: {expandingVolume.sizeGb + quota.remainingQuotaGb} GB
@@ -1326,7 +1304,7 @@ export default function StorageAndDisks() {
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white font-poppins">Expand Primary OS Disk</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Target: <strong className="font-mono text-slate-800 dark:text-slate-200">{selectedOsDisk.diskName}</strong> (Current: {selectedOsDisk.capacityGb} GB)
+                  Target: <strong className="font-poppins tabular-nums text-slate-800 dark:text-slate-200">{selectedOsDisk.diskName}</strong> (Current: {selectedOsDisk.capacityGb} GB)
                 </p>
               </div>
             </div>
@@ -1355,7 +1333,7 @@ export default function StorageAndDisks() {
                         }`}
                       >
                         <div className="font-bold text-xs">{tierGb} GB OS SSD</div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-poppins tabular-nums mt-0.5">
                           {isDisabled ? 'Current / Lower' : `+$${tierCost}/mo`}
                         </div>
                       </button>
@@ -1384,15 +1362,15 @@ export default function StorageAndDisks() {
               <div className="bg-slate-50 dark:bg-slate-800/80 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 space-y-2 text-xs">
                 <div className="flex justify-between text-slate-500 dark:text-slate-400">
                   <span>Current OS Capacity:</span>
-                  <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">{selectedOsDisk.capacityGb} GB</span>
+                  <span className="font-poppins tabular-nums font-semibold text-slate-700 dark:text-slate-300">{selectedOsDisk.capacityGb} GB</span>
                 </div>
                 <div className="flex justify-between text-slate-500 dark:text-slate-400">
                   <span>New OS Capacity:</span>
-                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{newOsCapacity} GB</span>
+                  <span className="font-poppins tabular-nums font-bold text-blue-600 dark:text-blue-400">{newOsCapacity} GB</span>
                 </div>
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between items-center">
                   <span className="font-bold text-slate-900 dark:text-white">Prorated Due Today:</span>
-                  <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+                  <span className="text-base font-bold text-emerald-600 dark:text-emerald-400 font-poppins tabular-nums">
                     {quoteLoading
                       ? '...'
                       : expandQuote
@@ -1453,7 +1431,7 @@ export default function StorageAndDisks() {
                   Volume Currently In Use
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Target: <strong className="font-mono text-slate-800 dark:text-slate-200">{forceDetachModal.volume.name}</strong> ({forceDetachModal.volume.sizeGb} GB)
+                  Target: <strong className="font-poppins tabular-nums text-slate-800 dark:text-slate-200">{forceDetachModal.volume.name}</strong> ({forceDetachModal.volume.sizeGb} GB)
                 </p>
               </div>
             </div>
@@ -1525,7 +1503,7 @@ export default function StorageAndDisks() {
                   Permanently Delete Block Volume
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Volume: <strong className="font-mono text-slate-800 dark:text-slate-200">{deleteConfirmVolume.name}</strong> ({deleteConfirmVolume.sizeGb} GB)
+                  Volume: <strong className="font-poppins tabular-nums text-slate-800 dark:text-slate-200">{deleteConfirmVolume.name}</strong> ({deleteConfirmVolume.sizeGb} GB)
                 </p>
               </div>
             </div>
@@ -1533,7 +1511,7 @@ export default function StorageAndDisks() {
             <div className="space-y-3 text-xs">
               <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
                 Are you sure you want to permanently delete storage volume{' '}
-                <strong className="font-mono text-slate-900 dark:text-white">{deleteConfirmVolume.name}</strong>? This will erase the volume and return{' '}
+                <strong className="font-poppins tabular-nums text-slate-900 dark:text-white">{deleteConfirmVolume.name}</strong>? This will erase the volume and return{' '}
                 <strong>{deleteConfirmVolume.sizeGb} GB</strong> back to your available Cloud Block Storage Pool.
               </p>
 

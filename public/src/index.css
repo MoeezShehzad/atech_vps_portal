@@ -53,6 +53,7 @@
 @theme {
   --font-sans: 'Poppins', sans-serif;
   --font-poppins: 'Poppins', sans-serif;
+  --font-mono: 'Poppins', sans-serif;
 
   --color-atc-blue: #2e75b5;
   --color-atc-blue-hover: #246299;
@@ -145,6 +146,12 @@ body {
   font-family: 'Poppins', sans-serif !important;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Scoped Inter font for the redesigned Home Page dashboard */
+.font-inter,
+.font-inter * {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 
 /* Preserve Monospace strictly for code and terminal components */
