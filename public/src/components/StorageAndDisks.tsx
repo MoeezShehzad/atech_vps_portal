@@ -72,15 +72,6 @@ interface StorageThresholdAlert {
 
 const PRIMARY_OS_TIERS = [50, 100, 150, 200];
 
-const MOUNT_PATH_PRESETS = [
-  { label: '/mnt (Default)', base: '/mnt' },
-  { label: '/data', base: '/data' },
-  { label: '/backups', base: '/backups' },
-  { label: '/var/www', base: '/var/www' },
-  { label: '/var/lib/docker', base: '/var/lib/docker' },
-  { label: '/var/lib/mysql', base: '/var/lib/mysql' },
-];
-
 export default function StorageAndDisks() {
   const { toast } = useToast();
   const [instances, setInstances] = useState<any[]>([]);
@@ -1108,29 +1099,9 @@ export default function StorageAndDisks() {
                             placeholder={`/mnt/${volName.trim() || `vol-${volSizeGb}gb`}`}
                             className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-poppins tabular-nums text-slate-900 dark:text-white focus:outline-none focus:border-blue-600"
                           />
-                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                            {MOUNT_PATH_PRESETS.map((p) => {
-                              const activeFolderName = (volName.trim() || `vol-${volSizeGb}gb`).toLowerCase().replace(/[^a-z0-9-_]/g, '-');
-                              const fullTarget = ['docker', 'mysql'].some((k) => p.base.includes(k))
-                                ? p.base
-                                : `${p.base}/${activeFolderName}`;
-                              const isSelected = (customMountPath || `/mnt/${activeFolderName}`) === fullTarget;
-                              return (
-                                <button
-                                  type="button"
-                                  key={p.label}
-                                  onClick={() => setCustomMountPath(fullTarget)}
-                                  className={`px-2.5 py-1 rounded text-[10px] font-poppins tabular-nums border transition-colors cursor-pointer ${
-                                    isSelected
-                                      ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold tracking-tight'
-                                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                                  }`}
-                                >
-                                  {p.label}
-                                </button>
-                              );
-                            })}
-                          </div>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                            Enter any directory path (e.g. <span className="font-mono">/mnt/my-storage</span> or <span className="font-mono">/data/my-storage</span>). If the folder does not exist yet on your server, it will be created automatically when attached.
+                          </p>
                           <div className="mt-2 px-3 py-1.5 rounded-lg bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 text-[11px] text-emerald-800 dark:text-emerald-300">
                             Target folder path:{' '}
                             <strong className="font-poppins tabular-nums">

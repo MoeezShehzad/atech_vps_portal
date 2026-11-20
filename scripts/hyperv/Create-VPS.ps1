@@ -110,10 +110,8 @@ try {
         Set-VM -Name $VMName -SnapshotFileLocation $NasSnapshotDir -ErrorAction SilentlyContinue
         Write-Output "[SNAPSHOTS] Configured VM snapshot storage on Synology NAS: $NasSnapshotDir"
     }
-    $TargetMaxBytes = [int64]$RAMMB * 1MB
-    $StartupBytes = [Math]::Min([int64]2048 * 1MB, $TargetMaxBytes)
-    $MinBytes = [Math]::Min([int64]512 * 1MB, $TargetMaxBytes)
-    Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $true -StartupBytes $StartupBytes -MinimumBytes $MinBytes -MaximumBytes $TargetMaxBytes -Buffer 20
+    $StaticRamBytes = [int64]$RAMMB * 1MB
+    Set-VMMemory -VMName $VMName -DynamicMemoryEnabled $false -StartupBytes $StaticRamBytes
 
     # 6. Firmware & Secure Boot Configuration
     # Disable Secure Boot for Linux / ISO to prevent "unsigned image hash not allowed" boot failures
