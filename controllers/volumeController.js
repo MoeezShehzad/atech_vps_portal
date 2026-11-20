@@ -31,6 +31,7 @@ export const PLAN_QOS_MAX_IOPS = {
 };
 
 const thresholdAlertCooldown = new Map();
+const userHostStatsCache = new Map(); // userId -> { stats, timestamp, refreshing }
 
 export function getPlanNasQuota(planId, cpuCores = 2) {
   if (PLAN_NAS_QUOTA_GB[planId]) return PLAN_NAS_QUOTA_GB[planId];
@@ -135,6 +136,11 @@ function parseOutputField(result, fieldName) {
 }
 
 async function resolveVmIp(vm) {
+  // Strict Stopped-VM Guard: never wait on SSH/live IP queries for stopped or provisioning VMs
+  if (vm?.status && !['RUNNING', 'ONLINE'].includes(String(vm.status).toUpperCase())) {
+    return null;
+  }
+
   const poolIp = vm.ipPool?.find(
     (ip) => ip.ipAddress && !ip.ipAddress.startsWith('DHCP') && ip.ipAddress !== '127.0.0.1'
   )?.ipAddress;
@@ -581,11 +587,34 @@ export async function getUserVolumes(req, res) {
       (vm) => `D:\\CUSTOMER-VMS\\${vm.vmName}\\Virtual Hard Disks\\${vm.vmName}-disk0.vhdx`
     );
     const nasPaths = volumes.map((v) => v.vhdxPath).filter(Boolean);
+    const allPaths = [...osPaths, ...nasPaths];
+    const forceFresh = req.query?.fresh === '1';
+    const nowMs = Date.now();
+    const cachedEntry = userHostStatsCache.get(userId);
+
+    const refreshHostStats = async () => {
+      try {
+        const stRes = await hypervService.getVolumeStats(allPaths);
+        const freshStats = (stRes && stRes.stats) ? stRes.stats : {};
+        userHostStatsCache.set(userId, { stats: freshStats, timestamp: Date.now(), refreshing: false });
+        return freshStats;
+      } catch (_) {
+        if (cachedEntry) cachedEntry.refreshing = false;
+        return cachedEntry?.stats || {};
+      }
+    };
+
     let hostStats = {};
-    try {
-      const stRes = await hypervService.getVolumeStats([...osPaths, ...nasPaths]);
-      if (stRes && stRes.stats) hostStats = stRes.stats;
-    } catch (_) {}
+    if (!forceFresh && cachedEntry && cachedEntry.stats) {
+      // Stale-While-Revalidate: return immediately (<5ms), refresh in background if >60s old
+      hostStats = cachedEntry.stats;
+      if (nowMs - cachedEntry.timestamp > 60000 && !cachedEntry.refreshing) {
+        cachedEntry.refreshing = true;
+        refreshHostStats();
+      }
+    } else if (allPaths.length > 0) {
+      hostStats = await refreshHostStats();
+    }
 
     const formattedVolumes = volumes.map((v) => {
       const st = hostStats[v.vhdxPath];

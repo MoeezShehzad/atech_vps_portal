@@ -249,17 +249,40 @@ function parseJsonBody(req) {
 let bulkStatusCache = { data: null, timestamp: 0 };
 let bulkStatusPromise = null;
 const metricsCache = new Map();
+const volumeStatsCache = new Map();
 
 function invalidateAgentCaches() {
   bulkStatusCache = { data: null, timestamp: 0 };
   bulkStatusPromise = null;
   metricsCache.clear();
+  volumeStatsCache.clear();
+}
+
+function triggerBackgroundBulkStatusRefresh() {
+  if (bulkStatusPromise) return bulkStatusPromise;
+  bulkStatusPromise = (async () => {
+    try {
+      const result = await runPowerShell('Get-VPS.ps1', { VMName: '' });
+      bulkStatusCache = { data: result, timestamp: Date.now() };
+      return result;
+    } catch (err) {
+      return bulkStatusCache.data;
+    } finally {
+      bulkStatusPromise = null;
+    }
+  })();
+  return bulkStatusPromise;
 }
 
 async function getCachedStatus(vmName) {
   const now = Date.now();
+  const STALE_TTL_MS = 30000; // Background refresh after 30s, serve stale immediately (<5ms)
+
   if (vmName) {
-    if (bulkStatusCache.data && now - bulkStatusCache.timestamp < 3500) {
+    if (bulkStatusCache.data) {
+      if (now - bulkStatusCache.timestamp > STALE_TTL_MS) {
+        triggerBackgroundBulkStatusRefresh();
+      }
       let list = Array.isArray(bulkStatusCache.data) ? bulkStatusCache.data : [bulkStatusCache.data];
       const match = list.find((v) => v && v.VMName && v.VMName.toLowerCase() === vmName.toLowerCase());
       if (match) return match;
@@ -267,27 +290,24 @@ async function getCachedStatus(vmName) {
     return await runPowerShell('Get-VPS.ps1', { VMName: vmName });
   }
 
-  // Bulk query (all VMs)
-  if (bulkStatusCache.data && now - bulkStatusCache.timestamp < 3500) {
+  // Bulk query (all VMs): Stale-While-Revalidate so page loads never wait 3-5s for PowerShell
+  if (bulkStatusCache.data) {
+    if (now - bulkStatusCache.timestamp > STALE_TTL_MS) {
+      triggerBackgroundBulkStatusRefresh();
+    }
     return bulkStatusCache.data;
   }
 
-  if (bulkStatusPromise) {
-    return await bulkStatusPromise;
-  }
-
-  bulkStatusPromise = (async () => {
-    try {
-      const result = await runPowerShell('Get-VPS.ps1', { VMName: '' });
-      bulkStatusCache = { data: result, timestamp: Date.now() };
-      return result;
-    } finally {
-      bulkStatusPromise = null;
-    }
-  })();
-
-  return await bulkStatusPromise;
+  return await triggerBackgroundBulkStatusRefresh();
 }
+
+// Enterprise Background Poller: keep VM status warm in RAM every 30s
+setInterval(() => {
+  triggerBackgroundBulkStatusRefresh();
+}, 30000);
+setTimeout(() => {
+  triggerBackgroundBulkStatusRefresh();
+}, 1500);
 
 async function getCachedMetrics(vmName) {
   const now = Date.now();
@@ -673,22 +693,34 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify(result));
     }
 
-    // 17. Fast Disk Usage Stats for VHDX Paths (Zero-PowerShell fs.statSync)
+    // 17. Fast Disk Usage Stats for VHDX Paths (Zero-PowerShell fs.statSync + 15s RAM Cache)
     if (req.method === 'POST' && pathname === '/api/hyperv/volumes/stats') {
       const data = await parseJsonBody(req);
       const paths = Array.isArray(data.paths) ? data.paths : [];
+      const forceFresh = Boolean(data.fresh);
+      const now = Date.now();
       const statsMap = {};
       for (const p of paths) {
+        if (!p) continue;
+        const cached = volumeStatsCache.get(p);
+        if (!forceFresh && cached && now - cached.timestamp < 15000) {
+          statsMap[p] = cached.stat;
+          continue;
+        }
         try {
-          if (p && fs.existsSync(p)) {
+          if (fs.existsSync(p)) {
             const st = fs.statSync(p);
-            statsMap[p] = {
+            const statObj = {
               exists: true,
               usedBytes: st.size,
               usedGb: Number((st.size / (1024 * 1024 * 1024)).toFixed(2)),
             };
+            statsMap[p] = statObj;
+            volumeStatsCache.set(p, { stat: statObj, timestamp: now });
           } else {
-            statsMap[p] = { exists: false, usedBytes: 0, usedGb: 0 };
+            const statObj = { exists: false, usedBytes: 0, usedGb: 0 };
+            statsMap[p] = statObj;
+            volumeStatsCache.set(p, { stat: statObj, timestamp: now });
           }
         } catch (_) {
           statsMap[p] = { exists: false, usedBytes: 0, usedGb: 0 };

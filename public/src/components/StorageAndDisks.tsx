@@ -72,18 +72,33 @@ interface StorageThresholdAlert {
 
 const PRIMARY_OS_TIERS = [50, 100, 150, 200];
 
+interface StoragePageCache {
+  instances: any[];
+  osDisks: PrimaryOsDisk[];
+  volumes: SecondaryVolume[];
+  quota: StorageQuota;
+  alerts: StorageThresholdAlert[];
+  timestamp: number;
+}
+
+let storagePageCache: StoragePageCache | null = null;
+
 export default function StorageAndDisks() {
   const { toast } = useToast();
-  const [instances, setInstances] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [osDisks, setOsDisks] = useState<PrimaryOsDisk[]>([]);
-  const [volumes, setVolumes] = useState<SecondaryVolume[]>([]);
-  const [thresholdAlerts, setThresholdAlerts] = useState<StorageThresholdAlert[]>([]);
-  const [quota, setQuota] = useState<StorageQuota>({
-    totalQuotaGb: 120,
-    usedQuotaGb: 0,
-    remainingQuotaGb: 120,
-  });
+  const [instances, setInstances] = useState<any[]>(() => storagePageCache?.instances || []);
+  const [loading, setLoading] = useState<boolean>(() => !storagePageCache);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [osDisks, setOsDisks] = useState<PrimaryOsDisk[]>(() => storagePageCache?.osDisks || []);
+  const [volumes, setVolumes] = useState<SecondaryVolume[]>(() => storagePageCache?.volumes || []);
+  const [thresholdAlerts, setThresholdAlerts] = useState<StorageThresholdAlert[]>(() => storagePageCache?.alerts || []);
+  const [quota, setQuota] = useState<StorageQuota>(
+    () =>
+      storagePageCache?.quota || {
+        totalQuotaGb: 125,
+        usedQuotaGb: 0,
+        remainingQuotaGb: 125,
+      }
+  );
 
   // 1. Expand Primary OS Disk modal states
   const [isExpandOsOpen, setIsExpandOsOpen] = useState(false);
@@ -122,12 +137,23 @@ export default function StorageAndDisks() {
 
   const availableVolumes = volumes.filter((v) => v.status === 'AVAILABLE');
 
-  const fetchStorageData = async () => {
+  const fetchStorageData = async (opts?: { silent?: boolean; forceFresh?: boolean }) => {
+    const isSilent = Boolean(opts?.silent && storagePageCache);
+    const forceFresh = Boolean(opts?.forceFresh);
     try {
-      setLoading(true);
+      if (isSilent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       const [vmsRes, volsRes] = await Promise.all([
         apiCall('/vms'),
-        apiCall('/volumes').catch(() => ({ volumes: [], quota: null, osDiskStats: [], alerts: [] })),
+        apiCall(forceFresh ? '/volumes?fresh=1' : '/volumes').catch(() => ({
+          volumes: [],
+          quota: null,
+          osDiskStats: [],
+          alerts: [],
+        })),
       ]);
 
       const vms = vmsRes.vms || [];
@@ -140,7 +166,7 @@ export default function StorageAndDisks() {
 
       const primaryList: PrimaryOsDisk[] = vms.map((vm: any) => {
         const isOnline = String(vm.status || '').toUpperCase() === 'RUNNING';
-        const cap = vm.storageGb || vm.diskGB || 50;
+        const cap = vm.storageGb || vm.diskGB || 100;
         const st = osStatsMap.get(Number(vm.vmId));
         const usedGb = st ? st.usedGb : Number((cap * 0.18).toFixed(1));
         const usagePercent = st ? st.usagePercent : Math.min(100, Math.round((usedGb / cap) * 100));
@@ -162,27 +188,39 @@ export default function StorageAndDisks() {
 
       const loadedVols: SecondaryVolume[] = volsRes.volumes || [];
       setVolumes(loadedVols);
-      setThresholdAlerts(Array.isArray(volsRes.alerts) ? volsRes.alerts : []);
+      const loadedAlerts = Array.isArray(volsRes.alerts) ? volsRes.alerts : [];
+      setThresholdAlerts(loadedAlerts);
 
-      if (volsRes.quota) {
-        setQuota(volsRes.quota);
-      } else {
-        const used = loadedVols.reduce((acc, v) => acc + v.sizeGb, 0);
-        setQuota({
-          totalQuotaGb: 120,
-          usedQuotaGb: used,
-          remainingQuotaGb: Math.max(0, 120 - used),
-        });
-      }
+      const resolvedQuota: StorageQuota = volsRes.quota
+        ? volsRes.quota
+        : (() => {
+            const used = loadedVols.reduce((acc, v) => acc + v.sizeGb, 0);
+            return {
+              totalQuotaGb: 125,
+              usedQuotaGb: used,
+              remainingQuotaGb: Math.max(0, 125 - used),
+            };
+          })();
+      setQuota(resolvedQuota);
+
+      storagePageCache = {
+        instances: vms,
+        osDisks: primaryList,
+        volumes: loadedVols,
+        quota: resolvedQuota,
+        alerts: loadedAlerts,
+        timestamp: Date.now(),
+      };
     } catch (err: any) {
-      toast.error(err.message || 'Failed to fetch storage resources');
+      if (!isSilent) toast.error(err.message || 'Failed to fetch storage resources');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchStorageData();
+    fetchStorageData({ silent: Boolean(storagePageCache) });
   }, []);
 
   useEffect(() => {
@@ -450,12 +488,12 @@ export default function StorageAndDisks() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={fetchStorageData}
-            disabled={loading}
+            onClick={() => fetchStorageData({ forceFresh: true, silent: true })}
+            disabled={loading || refreshing}
             className="p-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-xs cursor-pointer"
-            title="Refresh storage"
+            title="Refresh live storage stats"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading || refreshing ? 'animate-spin' : ''}`} />
           </button>
 
           <button
