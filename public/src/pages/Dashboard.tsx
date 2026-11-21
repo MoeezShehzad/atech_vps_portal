@@ -634,7 +634,7 @@ export default function Dashboard() {
     if (plan) {
       setCustomCpu(plan.cpuCores);
       setCustomRam(plan.ramGb);
-      setCustomStorage(plan.storageGb);
+      setCustomStorage(100);
     }
   };
 
@@ -649,7 +649,7 @@ export default function Dashboard() {
     setSelectedPlanId(plan.planId);
     setCustomCpu(plan.cpuCores);
     setCustomRam(plan.ramGb);
-    setCustomStorage(plan.storageGb);
+    setCustomStorage(100);
     setNewHostname(`vps-${plan.name.toLowerCase().replace(/\s+/g, '-')}-${Math.floor(Math.random() * 899 + 100)}`);
     setIsDeployOpen(true);
   };
@@ -1327,7 +1327,7 @@ export default function Dashboard() {
       setSelectedPlanId(targetPlan.planId);
       setCustomCpu(targetPlan.cpuCores);
       setCustomRam(targetPlan.ramGb);
-      setCustomStorage(targetPlan.storageGb);
+      setCustomStorage(100);
     }
     const randId = Math.floor(1000 + Math.random() * 9000);
     setNewHostname(`srv-vps-${randId}`);
@@ -3001,7 +3001,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      Using Active Plan Slot: <strong className="text-emerald-700 dark:text-emerald-400">{activeSlot.planName}</strong> ({activeSlot.specs?.cpuCores} vCPU, {activeSlot.specs?.ramGb}GB RAM, {activeSlot.specs?.storageGb}GB SSD)
+                      Using Active Plan Slot: <strong className="text-emerald-700 dark:text-emerald-400">{activeSlot.planName}</strong> ({activeSlot.specs?.cpuCores} vCPU, {activeSlot.specs?.ramGb}GB RAM, 100GB OS SSD + {activeSlot.planId === 4 || (activeSlot.specs?.cpuCores || 0) >= 16 ? '1TB' : activeSlot.planId === 3 || (activeSlot.specs?.cpuCores || 0) >= 8 ? '500GB' : activeSlot.planId === 2 || (activeSlot.specs?.cpuCores || 0) >= 4 ? '250GB' : '125GB'} Block Storage)
                     </span>
                   </div>
                   <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 shrink-0">$0.00 / Prepaid</span>
@@ -3112,65 +3112,6 @@ export default function Dashboard() {
                   })()}
                 </>
               )}
-
-              {/* PRIMARY OS STORAGE (50/100/150/200 GB) + SECONDARY SYNOLOGY NAS (120/250/500 GB / 1 TB) */}
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                    Primary OS Storage (Enterprise NVMe SSD)
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[50, 100, 150, 200].map((osGb) => (
-                      <button
-                        type="button"
-                        key={osGb}
-                        onClick={() => setCustomStorage(osGb)}
-                        className={`py-2 px-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                          customStorage === osGb
-                            ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 ring-1 ring-blue-500/30'
-                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
-                        }`}
-                      >
-                        {osGb} GB SSD
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-                      Additional Block Storage Volume
-                    </label>
-                    <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">
-                      Persistent Cloud Volume
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {[
-                      { gb: 0, label: 'None', price: '$0' },
-                      { gb: 120, label: '120 GB', price: '+$2.40/mo' },
-                      { gb: 250, label: '250 GB', price: '+$4.99/mo' },
-                      { gb: 500, label: '500 GB', price: '+$8.99/mo' },
-                      { gb: 1000, label: '1 TB', price: '+$15.99/mo' },
-                    ].map((nasOpt) => (
-                      <button
-                        type="button"
-                        key={nasOpt.gb}
-                        onClick={() => setSecondaryStorageGb(nasOpt.gb)}
-                        className={`py-2 px-2 rounded-lg border text-center transition-all cursor-pointer ${
-                          secondaryStorageGb === nasOpt.gb
-                            ? 'border-purple-600 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 ring-1 ring-purple-500/30'
-                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="text-xs font-bold">{nasOpt.label}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">{nasOpt.price}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
 
               {/* SERVER AUTHENTICATION (PASSWORD vs SSH PUBLIC KEY) */}
               <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700/80 space-y-3">
