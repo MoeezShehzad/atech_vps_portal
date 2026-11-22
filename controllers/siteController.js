@@ -453,7 +453,7 @@ export async function getConsoleSession(req, res) {
     if (!site) return res.status(404).json({ error: 'Website container not found.' });
 
     const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
-    const ticket = jwt.sign(
+    const jwtTicket = jwt.sign(
       {
         userId,
         siteId,
@@ -464,6 +464,8 @@ export async function getConsoleSession(req, res) {
       secret,
       { expiresIn: '15m' }
     );
+    const { registerConsoleTicket } = await import('../services/terminalService.js');
+    const ticket = registerConsoleTicket(jwtTicket, 15 * 60 * 1000);
 
     return res.json({
       success: true,

@@ -16,6 +16,7 @@ import {
 } from '../services/emailService.js';
 import firewallService from '../services/firewallService.js';
 import { generateGuacamoleToken, buildRdpConnectionPayload } from '../services/guacamoleService.js';
+import { registerConsoleTicket } from '../services/terminalService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
 import { autoExpandPrimaryOsFilesystem, getPlanNasQuota, autoFormatAndMountOnGuest } from './volumeController.js';
 
@@ -1571,7 +1572,7 @@ export async function getConsoleSession(req, res) {
     }
 
     const secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || 'access-secret';
-    const ticket = jwt.sign(
+    const jwtTicket = jwt.sign(
       {
         userId,
         effectiveUserId: vm.userId,
@@ -1586,6 +1587,7 @@ export async function getConsoleSession(req, res) {
       secret,
       { expiresIn: '5m' }
     );
+    const ticket = registerConsoleTicket(jwtTicket, 5 * 60 * 1000);
 
     // Record web console access in audit trail
     await prisma.securityLog.create({

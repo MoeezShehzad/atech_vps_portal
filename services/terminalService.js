@@ -1,4 +1,5 @@
 import { decryptVmPassword, decodeResourceId } from './cryptoService.js';
+import crypto from 'crypto';
 import net from 'net';
 import { WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
@@ -6,6 +7,31 @@ import { Client as SSHClient } from 'ssh2';
 import prisma from '../lib/prisma.js';
 import hypervService from './hypervService.js';
 import { sendVmFailureAlertToSupport } from './emailService.js';
+
+// Short opaque ticket store so WebSocket URLs never expose long base64 JWTs / internal IPs to external WAF/IPS
+const consoleTicketStore = new Map();
+
+export function registerConsoleTicket(jwtToken, ttlMs = 5 * 60 * 1000) {
+  const now = Date.now();
+  for (const [k, v] of consoleTicketStore.entries()) {
+    if (v.expiresAt <= now) consoleTicketStore.delete(k);
+  }
+  const shortId = crypto.randomBytes(12).toString('hex');
+  consoleTicketStore.set(shortId, { jwtToken, expiresAt: now + ttlMs });
+  return shortId;
+}
+
+function resolveConsoleTicket(rawTicket) {
+  if (!rawTicket) return null;
+  const entry = consoleTicketStore.get(rawTicket);
+  if (entry) {
+    if (entry.expiresAt > Date.now()) {
+      return entry.jwtToken;
+    }
+    consoleTicketStore.delete(rawTicket);
+  }
+  return rawTicket;
+}
 
 export function setupTerminalWebSocket(server) {
   const wss = new WebSocketServer({ noServer: true });
@@ -31,7 +57,8 @@ export function setupTerminalWebSocket(server) {
   });
 
   wss.on('connection', async (ws, request, url) => {
-    const ticket = url.searchParams.get('ticket') || url.searchParams.get('token');
+    const rawTicket = url.searchParams.get('ticket') || url.searchParams.get('token');
+    const ticket = resolveConsoleTicket(rawTicket);
     const rawVmId = url.searchParams.get('vmId');
     const vmIdParam = rawVmId ? decodeResourceId(rawVmId) : null;
 
