@@ -39,6 +39,9 @@ export default function WebConsoleModal({
   const xtermInstance = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const httpSessionIdRef = useRef<string | null>(null);
+  const httpInputBufferRef = useRef<string>('');
+  const httpFlushTimerRef = useRef<any>(null);
   const pendingInputQueue = useRef<string[]>([]);
 
   const displayName = siteName || vmName || 'Web Terminal';
@@ -54,16 +57,122 @@ export default function WebConsoleModal({
 
   const isMountedRef = useRef(true);
 
+  const flushHttpInput = useCallback(async () => {
+    const sid = httpSessionIdRef.current;
+    const chunk = httpInputBufferRef.current;
+    if (!sid || !chunk) return;
+    httpInputBufferRef.current = '';
+    try {
+      const res = await apiCall('/ws/terminal-http', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'poll', sessionId: sid, input: chunk }),
+      });
+      if (!isMountedRef.current) return;
+      if (res?.output && xtermInstance.current) {
+        xtermInstance.current.write(res.output);
+      }
+      if (res?.closed) {
+        httpSessionIdRef.current = null;
+        setConnectionStatus('disconnected');
+        onSessionEndRef.current?.();
+      }
+    } catch {}
+  }, []);
+
+  const startHttpFallbackSession = useCallback(
+    async (ticket: string) => {
+      if (!xtermInstance.current || !isMountedRef.current) return;
+      const term = xtermInstance.current;
+      try {
+        const openRes = await apiCall('/ws/terminal-http', {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'open',
+            ticket,
+            vmId,
+            siteId,
+            cols: term.cols || 100,
+            rows: term.rows || 30,
+          }),
+        });
+        if (!isMountedRef.current) return;
+        if (!openRes || !openRes.sessionId) {
+          throw new Error(openRes?.error || 'HTTPS terminal fallback failed to initialize.');
+        }
+
+        const sid = openRes.sessionId;
+        httpSessionIdRef.current = sid;
+        setConnectionStatus('connected');
+
+        if (openRes.output) {
+          term.write(openRes.output);
+        }
+
+        try {
+          fitAddonRef.current?.fit();
+          term.focus();
+          terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
+        } catch {}
+
+        while (pendingInputQueue.current.length > 0) {
+          const item = pendingInputQueue.current.shift();
+          if (item) httpInputBufferRef.current += item;
+        }
+        if (httpInputBufferRef.current) {
+          flushHttpInput();
+        }
+
+        // Long-poll loop for streaming SSH output over standard HTTPS / HTTP3
+        const pollLoop = async () => {
+          while (isMountedRef.current && httpSessionIdRef.current === sid) {
+            try {
+              const res = await apiCall('/ws/terminal-http', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'poll', sessionId: sid, waitMs: 6000 }),
+              });
+              if (!isMountedRef.current || httpSessionIdRef.current !== sid) break;
+              if (res?.output && xtermInstance.current) {
+                xtermInstance.current.write(res.output);
+              }
+              if (res?.closed) {
+                httpSessionIdRef.current = null;
+                setConnectionStatus('disconnected');
+                onSessionEndRef.current?.();
+                break;
+              }
+            } catch {
+              await new Promise((r) => setTimeout(r, 600));
+            }
+          }
+        };
+        pollLoop();
+      } catch (err: any) {
+        if (!isMountedRef.current) return;
+        setConnectionStatus('disconnected');
+        term.write(`\r\n\x1b[31m[Console Error]\x1b[0m ${err.message || 'Connection to SSH terminal gateway failed.'}\r\n`);
+      }
+    },
+    [vmId, siteId, flushHttpInput]
+  );
+
   // Stable connect / reconnect function
   const connectSession = useCallback(async () => {
     if (!xtermInstance.current || !isMountedRef.current) return;
     const term = xtermInstance.current;
 
-    // Close any previous socket cleanly without triggering onclose loop
+    // Close any previous socket or HTTP fallback session cleanly
     if (socketRef.current) {
       socketRef.current.onclose = null;
       socketRef.current.close();
       socketRef.current = null;
+    }
+    if (httpSessionIdRef.current) {
+      const oldSid = httpSessionIdRef.current;
+      httpSessionIdRef.current = null;
+      apiCall('/ws/terminal-http', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'close', sessionId: oldSid }),
+      }).catch(() => {});
     }
 
     setConnectionStatus('connecting');
@@ -95,8 +204,18 @@ export default function WebConsoleModal({
 
       const ws = new WebSocket(wsUrl);
       socketRef.current = ws;
+      let wsOpened = false;
+      let fallbackTriggered = false;
+
+      const triggerHttpFallback = () => {
+        if (fallbackTriggered || !isMountedRef.current) return;
+        fallbackTriggered = true;
+        socketRef.current = null;
+        startHttpFallbackSession(session.ticket);
+      };
 
       ws.onopen = () => {
+        wsOpened = true;
         if (!isMountedRef.current) return;
         setConnectionStatus('connected');
 
@@ -151,12 +270,21 @@ export default function WebConsoleModal({
       ws.onerror = (err) => {
         console.warn('[WebConsole] WebSocket error:', err);
         if (!isMountedRef.current) return;
+        if (!wsOpened) {
+          ws.onclose = null;
+          triggerHttpFallback();
+          return;
+        }
         setConnectionStatus('disconnected');
         term.write('\r\n\x1b[31m[WebSocket Error] Connection to SSH terminal gateway failed.\x1b[0m\r\n');
       };
 
       ws.onclose = () => {
         if (!isMountedRef.current) return;
+        if (!wsOpened) {
+          triggerHttpFallback();
+          return;
+        }
         setConnectionStatus('disconnected');
         onSessionEndRef.current?.();
       };
@@ -170,7 +298,7 @@ export default function WebConsoleModal({
         term.write(`\r\n\x1b[31m[Console Error]\x1b[0m ${err.message || 'Unable to establish console session'}\x1b[0m\r\n`);
       }
     }
-  }, [vmId, vmIp]);
+  }, [vmId, siteId, vmIp, startHttpFallbackSession]);
 
   // Terminal instance initialization — runs strictly ONCE when modal opens
   useEffect(() => {
@@ -218,10 +346,16 @@ export default function WebConsoleModal({
       } catch {}
     };
 
-    // Forward keystrokes to remote SSH stdin or buffer if still connecting
+    // Forward keystrokes to remote SSH stdin (WebSocket or HTTPS Fallback) or buffer if still connecting
     const onDataDisposable = term.onData((data) => {
       if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
         socketRef.current.send(data);
+      } else if (httpSessionIdRef.current) {
+        httpInputBufferRef.current += data;
+        if (httpFlushTimerRef.current) clearTimeout(httpFlushTimerRef.current);
+        httpFlushTimerRef.current = setTimeout(() => {
+          flushHttpInput();
+        }, 12);
       } else {
         pendingInputQueue.current.push(data);
       }
@@ -302,6 +436,15 @@ export default function WebConsoleModal({
           lastRows = term.rows;
           if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+          } else if (httpSessionIdRef.current) {
+            apiCall('/ws/terminal-http', {
+              method: 'POST',
+              body: JSON.stringify({
+                action: 'poll',
+                sessionId: httpSessionIdRef.current,
+                resize: { cols: term.cols, rows: term.rows },
+              }),
+            }).catch(() => {});
           }
         }
       } catch {}
@@ -360,6 +503,14 @@ export default function WebConsoleModal({
       if (socketRef.current) {
         socketRef.current.onclose = null;
         socketRef.current.close();
+      }
+      if (httpSessionIdRef.current) {
+        const sid = httpSessionIdRef.current;
+        httpSessionIdRef.current = null;
+        apiCall('/ws/terminal-http', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'close', sessionId: sid }),
+        }).catch(() => {});
       }
       term.dispose();
     };

@@ -35,7 +35,7 @@ import geoRoutes from './routes/geoRoutes.js';
 import siteRoutes from './routes/siteRoutes.js';
 import policyRoutes from './routes/policyRoutes.js';
 import companyRoutes from './routes/companyRoutes.js';
-import { setupTerminalWebSocket } from './services/terminalService.js';
+import { setupTerminalWebSocket, setupTerminalHttpFallback } from './services/terminalService.js';
 import { setupGuacamoleWebSocket } from './services/guacamoleService.js';
 import { startTicketAutomationWorker } from './services/ticketAutomationService.js';
 import { startTrialAutomationWorker } from './services/trialService.js';
@@ -185,6 +185,7 @@ app.use('/api/geo', geoRoutes);
 app.use('/api/sites', siteRoutes);
 app.use('/api/policies', policyRoutes);
 app.use('/api/company', companyRoutes);
+setupTerminalHttpFallback(app);
 
 // Public announcements route for website navbar ticker (Cached for 5 minutes)
 app.get('/api/announcements', async (req, res) => {

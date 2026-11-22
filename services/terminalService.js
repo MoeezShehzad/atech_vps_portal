@@ -56,7 +56,161 @@ export function setupTerminalWebSocket(server) {
     }
   });
 
-  wss.on('connection', async (ws, request, url) => {
+  wss.on('connection', (ws, request, url) => {
+    handleTerminalConnection(ws, request, url);
+  });
+
+  return wss;
+}
+
+// ============================================================================
+// HTTPS Terminal Transport Fallback (Bypasses ISP TCP WebSocket DPI Resets)
+// ============================================================================
+const httpTerminalSessions = new Map();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [sid, sess] of httpTerminalSessions.entries()) {
+    if (now - sess.lastActive > 90000) {
+      sess.close();
+      httpTerminalSessions.delete(sid);
+    }
+  }
+}, 30000);
+
+export function setupTerminalHttpFallback(app) {
+  app.post('/api/ws/terminal-http', async (req, res) => {
+    try {
+      const { action, ticket, vmId, siteId, sessionId, input, resize, cols, rows, waitMs } = req.body || {};
+
+      if (action === 'open') {
+        const sid = crypto.randomBytes(12).toString('hex');
+        const adapter = {
+          OPEN: 1,
+          readyState: 1,
+          outChunks: [],
+          waiters: new Set(),
+          listeners: { message: [], close: [] },
+          lastActive: Date.now(),
+          send(data) {
+            if (this.readyState !== 1) return;
+            this.outChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+            if (this.waiters.size > 0) {
+              const payload = this.outChunks.splice(0).join('');
+              for (const w of this.waiters) w(payload, false);
+              this.waiters.clear();
+            }
+          },
+          close() {
+            if (this.readyState === 3) return;
+            this.readyState = 3;
+            const payload = this.outChunks.splice(0).join('');
+            for (const w of this.waiters) w(payload, true);
+            this.waiters.clear();
+            for (const fn of this.listeners.close) {
+              try { fn(); } catch (_) {}
+            }
+            httpTerminalSessions.delete(sid);
+          },
+          on(evt, fn) {
+            if (this.listeners[evt]) this.listeners[evt].push(fn);
+          },
+          emitInput(msg) {
+            for (const fn of this.listeners.message) {
+              try { fn(msg); } catch (_) {}
+            }
+          },
+        };
+
+        httpTerminalSessions.set(sid, adapter);
+
+        const synthUrl = new URL('http://localhost/api/ws/terminal');
+        if (ticket) synthUrl.searchParams.set('ticket', String(ticket));
+        if (vmId) synthUrl.searchParams.set('vmId', String(vmId));
+        if (siteId) synthUrl.searchParams.set('siteId', String(siteId));
+
+        handleTerminalConnection(adapter, req, synthUrl);
+
+        if (cols && rows) {
+          adapter.emitInput(JSON.stringify({ type: 'resize', cols: Number(cols), rows: Number(rows) }));
+        }
+
+        // Wait briefly for initial SSH prompt / banner output
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const initialOutput = adapter.outChunks.splice(0).join('');
+        return res.json({
+          success: true,
+          sessionId: sid,
+          output: initialOutput,
+          closed: adapter.readyState !== 1,
+        });
+      }
+
+      if (action === 'poll') {
+        const adapter = httpTerminalSessions.get(sessionId);
+        if (!adapter) {
+          return res.json({ success: true, output: '', closed: true });
+        }
+        adapter.lastActive = Date.now();
+
+        if (resize && resize.cols && resize.rows) {
+          adapter.emitInput(JSON.stringify({ type: 'resize', cols: Number(resize.cols), rows: Number(resize.rows) }));
+        }
+        if (typeof input === 'string' && input.length > 0) {
+          adapter.emitInput(input);
+          // Coalesce 30ms so fast keystroke echo comes back in the same HTTP response
+          await new Promise((r) => setTimeout(r, 30));
+        }
+
+        if (adapter.outChunks.length > 0 || adapter.readyState !== 1 || !waitMs) {
+          return res.json({
+            success: true,
+            output: adapter.outChunks.splice(0).join(''),
+            closed: adapter.readyState !== 1,
+          });
+        }
+
+        // Long-poll up to 8s waiting for new SSH output bytes
+        const timeoutMs = Math.min(8000, Math.max(100, Number(waitMs) || 6000));
+        const result = await new Promise((resolve) => {
+          let done = false;
+          const timer = setTimeout(() => {
+            if (done) return;
+            done = true;
+            adapter.waiters.delete(waiter);
+            resolve({ output: adapter.outChunks.splice(0).join(''), closed: adapter.readyState !== 1 });
+          }, timeoutMs);
+
+          const waiter = (chunk, isClosed) => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            resolve({ output: chunk, closed: isClosed });
+          };
+          adapter.waiters.add(waiter);
+        });
+
+        return res.json({
+          success: true,
+          output: result.output,
+          closed: result.closed,
+        });
+      }
+
+      if (action === 'close') {
+        const adapter = httpTerminalSessions.get(sessionId);
+        if (adapter) adapter.close();
+        return res.json({ success: true, closed: true });
+      }
+
+      return res.status(400).json({ error: 'Invalid terminal action' });
+    } catch (err) {
+      return res.status(500).json({ error: err.message || 'Terminal HTTP transport error' });
+    }
+  });
+}
+
+async function handleTerminalConnection(ws, request, url) {
     const rawTicket = url.searchParams.get('ticket') || url.searchParams.get('token');
     const ticket = resolveConsoleTicket(rawTicket);
     const rawVmId = url.searchParams.get('vmId');
@@ -450,7 +604,4 @@ export function setupTerminalWebSocket(server) {
 
     // Start SSH connection
     connectSSH(targetUser, targetPassword, false);
-  });
-
-  return wss;
 }
