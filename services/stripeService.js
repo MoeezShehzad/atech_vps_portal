@@ -95,7 +95,8 @@ export function decryptSensitive(ciphertext) {
 }
 
 export function isStripeLiveMode() {
-  return (process.env.STRIPE_SECRET_KEY || '').startsWith('sk_live_');
+  const key = (process.env.STRIPE_SECRET_KEY || '').trim();
+  return key.startsWith('sk_live_') || key.startsWith('rk_live_');
 }
 
 export function encodeStripePaymentMethodRef({ stripeCustomerId, stripePaymentMethodId }) {

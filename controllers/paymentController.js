@@ -145,11 +145,16 @@ export async function createIntent(req, res) {
       return res.status(priceErr.statusCode || 400).json({ success: false, error: priceErr.message });
     }
 
-    const stripeCustomer = await getOrCreateStripeCustomer({
-      email: req.user?.email,
-      name: req.user?.fullName,
-      userId,
-    });
+    let stripeCustomer = null;
+    try {
+      stripeCustomer = await getOrCreateStripeCustomer({
+        email: req.user?.email,
+        name: req.user?.fullName,
+        userId,
+      });
+    } catch (custErr) {
+      console.warn('[Stripe Customer Warning] Continuing without Stripe Customer (check rk_live_ Customers:Write permission):', custErr.message);
+    }
 
     const intentMetadata = {
       userId: String(userId),
@@ -177,7 +182,7 @@ export async function createIntent(req, res) {
       const chargeResult = await chargeSavedPaymentMethod({
         amount: pricing.authorizedAmount,
         currency,
-        customerId: stripeRef.stripeCustomerId || stripeCustomer.id,
+        customerId: stripeRef.stripeCustomerId || stripeCustomer?.id,
         paymentMethodId: stripeRef.stripePaymentMethodId,
         customerEmail: req.user?.email,
         customerName: savedMethod.cardholderName || req.user?.fullName,
@@ -199,10 +204,10 @@ export async function createIntent(req, res) {
     const intent = await createPaymentIntent({
       amount: pricing.authorizedAmount,
       currency,
-      customerId: stripeCustomer.id,
+      customerId: stripeCustomer?.id || null,
       customerEmail: req.user?.email,
       customerName: req.user?.fullName,
-      setupFutureUsage: 'off_session',
+      setupFutureUsage: stripeCustomer?.id ? 'off_session' : null,
       metadata: intentMetadata,
     });
 
