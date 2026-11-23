@@ -33,6 +33,73 @@ import { useToast } from './Toast';
 import { jsPDF } from 'jspdf';
 import { formatDate } from '../utils/dateFormatter';
 import { TableSkeleton } from './TableSkeleton';
+import atcLogoUrl from '../assets/ATC_Logo.png';
+
+function formatUSCentralDate(dateInput?: string | Date | null): string {
+  const d = dateInput ? new Date(dateInput) : new Date();
+  if (isNaN(d.getTime())) return formatDate(dateInput as any);
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(d);
+}
+
+function formatUSCentralTime(dateInput?: string | Date | null): string {
+  const d = dateInput ? new Date(dateInput) : new Date();
+  if (isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+    timeZoneName: 'short',
+  }).format(d);
+}
+
+function formatUSCentralDateTime(dateInput?: string | Date | null): string {
+  const d = dateInput ? new Date(dateInput) : new Date();
+  if (isNaN(d.getTime())) return formatDate(dateInput as any);
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+    timeZoneName: 'short',
+  }).format(d);
+}
+
+function loadImageForPdf(src: string): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(null);
+        ctx.drawImage(img, 0, 0);
+        resolve({
+          dataUrl: canvas.toDataURL('image/png'),
+          width: canvas.width,
+          height: canvas.height,
+        });
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
 
 interface Invoice {
   invoiceId: string;
@@ -201,17 +268,26 @@ export default function BillingAndInvoices() {
       const mutedSlate = [100, 116, 139]; // #64748b
       const lightBg = [248, 250, 252]; // #f8fafc
 
-      // Company Header - Full Name: Analytical Technical Consulting
+      // Company Header with ATC Logo - Full Name: Analytical Technical Consulting
+      const logoImg = await loadImageForPdf(atcLogoUrl);
+      let headerTextX = 20;
+      if (logoImg && logoImg.height > 0) {
+        const logoHeight = 14;
+        const logoWidth = Math.min(28, (logoImg.width / logoImg.height) * logoHeight);
+        doc.addImage(logoImg.dataUrl, 'PNG', 20, 16, logoWidth, logoHeight);
+        headerTextX = 20 + logoWidth + 4;
+      }
+
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
+      doc.setFontSize(14);
       doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
-      doc.text('Analytical Technical Consulting (ATC)', 20, 24);
+      doc.text('Analytical Technical Consulting (ATC)', headerTextX, 22);
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8.5);
       doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
-      doc.text('Cloud Infrastructure & Enterprise Systems', 20, 30);
-      doc.text('Support & Inquiries: customer-support@atechconsult.com', 20, 35);
+      doc.text('Cloud Infrastructure & Enterprise Systems', headerTextX, 27.5);
+      doc.text('Support & Inquiries: customer-support@atechconsult.com', headerTextX, 32.5);
 
       // Invoice Header on Right
       doc.setFont('helvetica', 'bold');
@@ -254,6 +330,7 @@ export default function BillingAndInvoices() {
       doc.text(`${inv.customer?.city || 'Dallas'}, ${inv.customer?.country || 'United States'}`, 24, 72);
 
       // Right Card: Invoice Details
+      const invoiceTimestampSource = inv.paidDate || inv.issueDate;
       doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
       doc.roundedRect(110, 50, 80, 26, 2, 2, 'F');
       doc.setFontSize(7.5);
@@ -263,8 +340,8 @@ export default function BillingAndInvoices() {
       doc.setFontSize(8.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(darkSlate[0], darkSlate[1], darkSlate[2]);
-      doc.text(`Issue Date: ${formatDate(inv.issueDate)}`, 114, 62);
-      doc.text(`Payment: ${inv.transactionId ? 'Card Gateway (' + inv.transactionId + ')' : 'Direct Card (•••• 4242)'}`, 114, 67);
+      doc.text(`Issue Date: ${formatUSCentralDate(invoiceTimestampSource)}`, 114, 62);
+      doc.text(`Timestamp: ${formatUSCentralTime(invoiceTimestampSource)} (US Central)`, 114, 67);
       doc.text('Status: Verified & Settled', 114, 72);
 
       // Table Header
@@ -745,21 +822,24 @@ export default function BillingAndInvoices() {
             {/* Printable Invoice Body */}
             <div className="pt-6 space-y-6 font-sans">
               {/* Header */}
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-extrabold text-xl font-poppins">
-                    <Server className="w-6 h-6" /> Analytical Technical Consulting (ATC)
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex items-start gap-3">
+                  <img src={atcLogoUrl} alt="ATC Logo" className="h-10 w-auto object-contain shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-blue-600 dark:text-blue-400 font-extrabold text-lg font-poppins leading-tight">
+                      Analytical Technical Consulting (ATC)
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Cloud Infrastructure & Enterprise Hosting Services<br />
+                      customer-support@atechconsult.com
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Cloud Infrastructure & Enterprise Hosting Services<br />
-                    customer-support@atechconsult.com
-                  </p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <div className="text-xs text-slate-400 uppercase font-bold tracking-wider">Invoice</div>
                   <div className="text-lg font-mono font-bold text-slate-900 dark:text-white">{selectedInvoice.invoiceNumber}</div>
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Date: {formatDate(selectedInvoice.issueDate)}
+                    {formatUSCentralDateTime(selectedInvoice.paidDate || selectedInvoice.issueDate)} (US Central)
                   </div>
                   <span className="inline-block mt-2 px-3 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400">
                     PAID IN FULL
