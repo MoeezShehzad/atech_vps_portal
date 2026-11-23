@@ -831,7 +831,7 @@ export default function BillingAndInvoices() {
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       Cloud Infrastructure & Enterprise Hosting Services<br />
-                      customer-support@atechconsult.com
+                      <span className="whitespace-nowrap">customer-support@atechconsult.com</span>
                     </p>
                   </div>
                 </div>
@@ -905,7 +905,7 @@ export default function BillingAndInvoices() {
                 <div className="font-semibold flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
                   <ShieldCheck className="w-4 h-4" /> Payment Confirmed & Verified
                 </div>
-                <div>Transaction ID: <span className="font-mono font-semibold">{selectedInvoice.transactionId}</span></div>
+                <div>Invoice Reference: <span className="font-mono font-semibold">{selectedInvoice.invoiceNumber}</span> • Settled in full</div>
               </div>
             </div>
           </div>
