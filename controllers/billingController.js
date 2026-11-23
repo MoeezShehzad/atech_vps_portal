@@ -344,7 +344,7 @@ export async function getRevealedPaymentMethod(req, res) {
     if (pm.encryptedCardNumber) {
       try {
         const decrypted = decryptSensitive(pm.encryptedCardNumber);
-        if (decrypted && decrypted !== '***-REDACTED-***') {
+        if (decrypted && decrypted !== '***-REDACTED-***' && !decrypted.startsWith('{')) {
           // Format with spaces every 4 digits: 4111 1111 1111 1111
           fullCardNumber = decrypted.replace(/(\d{4})(?=\d)/g, '$1 ');
         }

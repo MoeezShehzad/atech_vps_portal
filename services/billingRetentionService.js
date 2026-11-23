@@ -11,7 +11,12 @@
 
 import prisma from '../lib/prisma.js';
 import hypervService from './hypervService.js';
-import { processTestCardCharge } from './stripeService.js';
+import {
+  chargeSavedPaymentMethod,
+  decodeStripePaymentMethodRef,
+  isStripeLiveMode,
+  processTestCardCharge,
+} from './stripeService.js';
 import {
   sendBillingSuspendedEmail,
   sendRetentionWarningEmail,
@@ -182,21 +187,42 @@ export async function reactivateSubscription(subscriptionId, userId = null, { pa
   // Process payment charge
   if (defaultCard) {
     try {
-      const stripeRes = await processTestCardCharge({
-        amount: chargeAmount,
-        currency: 'usd',
-        cardBrand: defaultCard.cardBrand,
-        last4: defaultCard.last4,
-        expMonth: defaultCard.expMonth,
-        expYear: defaultCard.expYear,
-        customerEmail: sub.user.email,
-        customerName: sub.user.fullName,
-        metadata: {
-          userId: String(sub.userId),
-          subscriptionId: String(sub.subscriptionId),
-          type: 'ONE_CLICK_REACTIVATION',
-        },
-      });
+      const stripeRef = decodeStripePaymentMethodRef(defaultCard.encryptedCardNumber);
+      let stripeRes = null;
+      if (stripeRef && stripeRef.stripePaymentMethodId && stripeRef.stripeCustomerId) {
+        stripeRes = await chargeSavedPaymentMethod({
+          amount: chargeAmount,
+          currency: 'usd',
+          customerId: stripeRef.stripeCustomerId,
+          paymentMethodId: stripeRef.stripePaymentMethodId,
+          customerEmail: sub.user.email,
+          customerName: sub.user.fullName,
+          offSession: true,
+          metadata: {
+            userId: String(sub.userId),
+            subscriptionId: String(sub.subscriptionId),
+            type: 'ONE_CLICK_REACTIVATION',
+          },
+        });
+      } else if (!isStripeLiveMode()) {
+        stripeRes = await processTestCardCharge({
+          amount: chargeAmount,
+          currency: 'usd',
+          cardBrand: defaultCard.cardBrand,
+          last4: defaultCard.last4,
+          expMonth: defaultCard.expMonth,
+          expYear: defaultCard.expYear,
+          customerEmail: sub.user.email,
+          customerName: sub.user.fullName,
+          metadata: {
+            userId: String(sub.userId),
+            subscriptionId: String(sub.subscriptionId),
+            type: 'ONE_CLICK_REACTIVATION',
+          },
+        });
+      } else {
+        throw new Error('Saved card does not have a live Stripe PaymentMethod token attached.');
+      }
       if (stripeRes && stripeRes.transactionId) {
         txnId = stripeRes.transactionId;
       }

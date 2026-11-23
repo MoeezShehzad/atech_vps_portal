@@ -94,34 +94,189 @@ export function decryptSensitive(ciphertext) {
   return null;
 }
 
+export function isStripeLiveMode() {
+  return (process.env.STRIPE_SECRET_KEY || '').startsWith('sk_live_');
+}
+
+export function encodeStripePaymentMethodRef({ stripeCustomerId, stripePaymentMethodId }) {
+  if (!stripePaymentMethodId) return '';
+  return encryptSensitive(
+    JSON.stringify({
+      type: 'stripe_pm',
+      stripeCustomerId: stripeCustomerId || null,
+      stripePaymentMethodId,
+    })
+  );
+}
+
+export function decodeStripePaymentMethodRef(encryptedCardNumber) {
+  if (!encryptedCardNumber) return null;
+  try {
+    const decrypted = decryptSensitive(encryptedCardNumber);
+    if (!decrypted || !decrypted.startsWith('{')) return null;
+    const parsed = JSON.parse(decrypted);
+    if (parsed && parsed.type === 'stripe_pm' && parsed.stripePaymentMethodId) {
+      return {
+        stripeCustomerId: parsed.stripeCustomerId || null,
+        stripePaymentMethodId: parsed.stripePaymentMethodId,
+      };
+    }
+  } catch (_) {
+    // Legacy non-JSON encrypted card record
+  }
+  return null;
+}
+
+export function formatCardBrand(brand) {
+  const b = String(brand || 'card').toLowerCase();
+  if (b === 'visa') return 'Visa';
+  if (b === 'mastercard') return 'Mastercard';
+  if (b === 'amex' || b === 'american_express') return 'American Express';
+  if (b === 'discover') return 'Discover';
+  if (b === 'diners') return 'Diners Club';
+  if (b === 'jcb') return 'JCB';
+  if (b === 'unionpay') return 'UnionPay';
+  return b.charAt(0).toUpperCase() + b.slice(1);
+}
+
 /**
- * Create a Stripe PaymentIntent for cards (Visa, Mastercard, Amex)
+ * Find or create a Stripe Customer for the user so PaymentMethods can be saved & reused
  */
-export async function createPaymentIntent({ amount, currency = 'usd', customerEmail, customerName, metadata = {} }) {
-  if (!stripe) {
+export async function getOrCreateStripeCustomer({ email, name, userId }) {
+  const stripeClient = getStripe();
+  if (!stripeClient) {
+    throw new Error('Stripe is not configured. STRIPE_SECRET_KEY is missing.');
+  }
+
+  if (email) {
+    const existing = await stripeClient.customers.list({ email, limit: 1 });
+    if (existing.data && existing.data.length > 0) {
+      return existing.data[0];
+    }
+  }
+
+  return await stripeClient.customers.create({
+    email: email || undefined,
+    name: name || undefined,
+    metadata: {
+      userId: userId ? String(userId) : '',
+    },
+  });
+}
+
+/**
+ * Create a Stripe PaymentIntent for cards (Visa, Mastercard, Amex, Discover)
+ */
+export async function createPaymentIntent({
+  amount,
+  currency = 'usd',
+  customerId = null,
+  customerEmail,
+  customerName,
+  setupFutureUsage = 'off_session',
+  metadata = {},
+}) {
+  const stripeClient = getStripe();
+  if (!stripeClient) {
     throw new Error('Stripe is not configured. STRIPE_SECRET_KEY is missing.');
   }
 
   const cents = Math.max(50, Math.round(Number(amount) * 100)); // Minimum Stripe amount is $0.50
 
-  const paymentIntent = await (getStripe() || stripe).paymentIntents.create({
+  const payload = {
     amount: cents,
     currency: currency.toLowerCase(),
-    receipt_email: customerEmail,
+    payment_method_types: ['card'],
+    receipt_email: customerEmail || undefined,
     description: `ATC Cloud VPS - ${metadata.planName || 'Cloud VPS Subscription'}`,
     metadata: {
       ...metadata,
       customerName: customerName || '',
       customerEmail: customerEmail || '',
     },
-    automatic_payment_methods: {
-      enabled: true,
-    },
-  });
+  };
+
+  if (customerId) {
+    payload.customer = customerId;
+    if (setupFutureUsage) {
+      payload.setup_future_usage = setupFutureUsage;
+    }
+  }
+
+  const paymentIntent = await stripeClient.paymentIntents.create(payload);
 
   return {
     clientSecret: paymentIntent.client_secret,
     paymentIntentId: paymentIntent.id,
+    status: paymentIntent.status,
+    amount: (cents / 100).toFixed(2),
+    currency: paymentIntent.currency.toUpperCase(),
+  };
+}
+
+/**
+ * Retrieve and expand a Stripe PaymentIntent for server-side verification
+ */
+export async function retrievePaymentIntent(paymentIntentId) {
+  const stripeClient = getStripe();
+  if (!stripeClient) {
+    throw new Error('Stripe is not configured. STRIPE_SECRET_KEY is missing.');
+  }
+
+  return await stripeClient.paymentIntents.retrieve(paymentIntentId, {
+    expand: ['payment_method', 'latest_charge'],
+  });
+}
+
+/**
+ * Charge a real saved Stripe PaymentMethod (supports both interactive Checkout & off-session renewals)
+ */
+export async function chargeSavedPaymentMethod({
+  amount,
+  currency = 'usd',
+  customerId,
+  paymentMethodId,
+  customerEmail,
+  customerName,
+  metadata = {},
+  offSession = false,
+}) {
+  const stripeClient = getStripe();
+  if (!stripeClient) {
+    throw new Error('Stripe is not configured. STRIPE_SECRET_KEY is missing.');
+  }
+
+  const cents = Math.max(50, Math.round(Number(amount) * 100));
+
+  const payload = {
+    amount: cents,
+    currency: currency.toLowerCase(),
+    customer: customerId,
+    payment_method: paymentMethodId,
+    payment_method_types: ['card'],
+    confirm: true,
+    receipt_email: customerEmail || undefined,
+    description: `ATC Cloud VPS - ${metadata.planName || 'Cloud VPS Subscription'}`,
+    metadata: {
+      ...metadata,
+      customerName: customerName || '',
+      customerEmail: customerEmail || '',
+    },
+  };
+
+  if (offSession) {
+    payload.off_session = true;
+  }
+
+  const paymentIntent = await stripeClient.paymentIntents.create(payload);
+
+  return {
+    success: paymentIntent.status === 'succeeded',
+    requiresAction: paymentIntent.status === 'requires_action',
+    paymentIntentId: paymentIntent.id,
+    transactionId: paymentIntent.id,
+    clientSecret: paymentIntent.client_secret,
+    status: paymentIntent.status,
     amount: (cents / 100).toFixed(2),
     currency: paymentIntent.currency.toUpperCase(),
   };
@@ -131,26 +286,31 @@ export async function createPaymentIntent({ amount, currency = 'usd', customerEm
  * Confirm/Process Payment Intent with payment method (Token or PaymentMethodId)
  */
 export async function confirmPaymentIntent(paymentIntentId, paymentMethodId = null) {
-  if (!stripe) {
+  const stripeClient = getStripe();
+  if (!stripeClient) {
     throw new Error('Stripe is not configured. STRIPE_SECRET_KEY is missing.');
   }
 
   if (paymentMethodId) {
-    return await stripe.paymentIntents.confirm(paymentIntentId, {
+    return await stripeClient.paymentIntents.confirm(paymentIntentId, {
       payment_method: paymentMethodId,
     });
   }
 
-  return await stripe.paymentIntents.retrieve(paymentIntentId);
+  return await stripeClient.paymentIntents.retrieve(paymentIntentId);
 }
 
 /**
- * Create a Test Charge directly using token or test cards (Visa, Mastercard, Amex)
+ * Legacy sandbox helper (blocked in live mode; use Stripe Elements / chargeSavedPaymentMethod instead)
  */
 export async function processTestCardCharge({ amount, currency = 'usd', cardBrand, last4, expMonth, expYear, customerEmail, customerName, metadata = {} }) {
   const stripeClient = getStripe();
   if (!stripeClient) {
     throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY in your .env configuration.');
+  }
+
+  if (isStripeLiveMode()) {
+    throw new Error('Live mode requires a tokenized Stripe PaymentMethod. Test card IDs cannot be used in live mode.');
   }
 
   const cents = Math.max(50, Math.round(Number(amount) * 100));
@@ -163,7 +323,7 @@ export async function processTestCardCharge({ amount, currency = 'usd', cardBran
   else if (brandLower.includes('discover')) testPaymentMethod = 'pm_card_discover';
 
   // Create and confirm payment intent directly in sandbox
-  const paymentIntent = await stripe.paymentIntents.create({
+  const paymentIntent = await stripeClient.paymentIntents.create({
     amount: cents,
     currency: currency.toLowerCase(),
     payment_method: testPaymentMethod,

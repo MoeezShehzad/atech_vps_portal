@@ -6,13 +6,91 @@
 import prisma from '../lib/prisma.js';
 import {
   stripe,
+  getOrCreateStripeCustomer,
   createPaymentIntent,
-  confirmPaymentIntent,
-  processTestCardCharge,
+  retrievePaymentIntent,
+  chargeSavedPaymentMethod,
+  encodeStripePaymentMethodRef,
+  decodeStripePaymentMethodRef,
+  formatCardBrand,
   processDirectBankTransfer,
   encryptSensitive,
 } from '../services/stripeService.js';
 import { sendInvoiceReceiptEmail } from '../services/emailService.js';
+
+/**
+ * Shared Server-Side Anti-Tampering Price Verification for Card Checkout
+ */
+async function calculateCardOrderPricing({ planId, term = '1m', couponCode, submittedAmount }) {
+  const plan = await prisma.vPSPlan.findFirst({
+    where: { planId: Number(planId) || 1 },
+  });
+
+  if (!plan) {
+    const err = new Error('Selected VPS plan not found.');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const baseMonthly = Number(plan.monthlyPrice);
+  const isYearlyOrder = term === '12m' || term === 'yearly';
+  const isMultiYearOrder = term === '24m';
+  let expectedSubtotal = baseMonthly;
+  if (isYearlyOrder) {
+    expectedSubtotal = Number((baseMonthly * 12 * 0.95).toFixed(2));
+  } else if (isMultiYearOrder) {
+    expectedSubtotal = Number((baseMonthly * 24 * 0.85).toFixed(2));
+  }
+
+  let couponDiscount = 0;
+  if (couponCode) {
+    const promo = await prisma.promoCode.findUnique({
+      where: { code: String(couponCode).trim().toUpperCase() },
+    });
+    const now = new Date();
+    if (
+      promo &&
+      promo.isActive &&
+      (!promo.expiresAt || new Date(promo.expiresAt) > now) &&
+      (!promo.validFrom || new Date(promo.validFrom) <= now) &&
+      promo.timesUsed < promo.maxUses &&
+      (!promo.applicablePlanId || promo.applicablePlanId === plan.planId)
+    ) {
+      if (promo.discountType === 'PERCENT') {
+        couponDiscount = Number(((expectedSubtotal * Number(promo.discountValue)) / 100).toFixed(2));
+      } else {
+        couponDiscount = Math.min(expectedSubtotal, Number(promo.discountValue));
+      }
+    }
+  }
+
+  const netSubtotal = Math.max(0.50, Number((expectedSubtotal - couponDiscount).toFixed(2)));
+  // Adjustment #4: When customer pays from credit card, charge 1.5% fee on whole amount, TAX is 0%.
+  const expectedFee = Number((netSubtotal * 0.015).toFixed(2));
+  const expectedTotal = Number((netSubtotal + expectedFee).toFixed(2));
+  const minAuthorizedPrice = Math.max(0.50, expectedTotal);
+
+  const numericSubmitted = Number(submittedAmount);
+  if (!Number.isFinite(numericSubmitted) || numericSubmitted < (minAuthorizedPrice - 0.50)) {
+    const err = new Error('Order price validation failed. The submitted amount does not match the configured plan pricing.');
+    err.statusCode = 400;
+    err.isTampering = true;
+    err.minAuthorizedPrice = minAuthorizedPrice;
+    throw err;
+  }
+
+  const authorizedAmount = Number(Math.max(0.50, numericSubmitted).toFixed(2));
+
+  return {
+    plan,
+    netSubtotal,
+    couponDiscount,
+    expectedFee,
+    expectedTotal,
+    minAuthorizedPrice,
+    authorizedAmount,
+  };
+}
 
 /**
  * 1. GET /api/payments/config - Returns Stripe Publishable Key
@@ -29,27 +107,103 @@ export function getPaymentConfig(req, res) {
 }
 
 /**
- * 2. POST /api/payments/create-intent - Prepares Stripe PaymentIntent
+ * 2. POST /api/payments/create-intent - Prepares a real Stripe PaymentIntent (Live & Test mode)
  */
 export async function createIntent(req, res) {
   try {
-    const { amount, currency = 'USD', planName, planId } = req.body;
-    const user = req.user;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Authentication required to initialize payment.' });
+    }
+
+    const {
+      amount,
+      currency = 'USD',
+      planName,
+      planId,
+      term = '1m',
+      couponCode,
+      useSavedMethod = false,
+    } = req.body;
 
     if (!amount || Number(amount) <= 0) {
       return res.status(400).json({ success: false, error: 'Valid payment amount is required.' });
     }
 
+    let pricing;
+    try {
+      pricing = await calculateCardOrderPricing({
+        planId,
+        term,
+        couponCode,
+        submittedAmount: amount,
+      });
+    } catch (priceErr) {
+      if (priceErr.isTampering) {
+        console.warn(`[SECURITY ALERT] Price tampering attempt detected for User #${userId}: submitted $${amount}, required min $${priceErr.minAuthorizedPrice}`);
+      }
+      return res.status(priceErr.statusCode || 400).json({ success: false, error: priceErr.message });
+    }
+
+    const stripeCustomer = await getOrCreateStripeCustomer({
+      email: req.user?.email,
+      name: req.user?.fullName,
+      userId,
+    });
+
+    const intentMetadata = {
+      userId: String(userId),
+      planId: String(pricing.plan.planId),
+      planName: planName || pricing.plan.name || 'VPS Plan',
+      term: String(term || '1m'),
+      couponCode: couponCode ? String(couponCode).trim().toUpperCase() : '',
+    };
+
+    if (useSavedMethod) {
+      const savedMethod = await prisma.userPaymentMethod.findFirst({
+        where: { userId, isDefault: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      const stripeRef = savedMethod ? decodeStripePaymentMethodRef(savedMethod.encryptedCardNumber) : null;
+      if (!stripeRef || !stripeRef.stripePaymentMethodId) {
+        return res.status(400).json({
+          success: false,
+          requiresNewCard: true,
+          error: 'Your saved card needs to be re-entered once for live Stripe verification.',
+        });
+      }
+
+      const chargeResult = await chargeSavedPaymentMethod({
+        amount: pricing.authorizedAmount,
+        currency,
+        customerId: stripeRef.stripeCustomerId || stripeCustomer.id,
+        paymentMethodId: stripeRef.stripePaymentMethodId,
+        customerEmail: req.user?.email,
+        customerName: savedMethod.cardholderName || req.user?.fullName,
+        metadata: intentMetadata,
+        offSession: false,
+      });
+
+      return res.json({
+        success: true,
+        paymentIntentId: chargeResult.paymentIntentId,
+        clientSecret: chargeResult.clientSecret,
+        status: chargeResult.status,
+        requiresAction: chargeResult.requiresAction,
+        amount: chargeResult.amount,
+        currency: chargeResult.currency,
+      });
+    }
+
     const intent = await createPaymentIntent({
-      amount,
+      amount: pricing.authorizedAmount,
       currency,
-      customerEmail: user?.email,
-      customerName: user?.fullName,
-      metadata: {
-        userId: user?.userId ? String(user.userId) : '',
-        planId: planId ? String(planId) : '',
-        planName: planName || 'VPS Plan',
-      },
+      customerId: stripeCustomer.id,
+      customerEmail: req.user?.email,
+      customerName: req.user?.fullName,
+      setupFutureUsage: 'off_session',
+      metadata: intentMetadata,
     });
 
     return res.json({ success: true, ...intent });
@@ -60,8 +214,8 @@ export async function createIntent(req, res) {
 }
 
 /**
- * 3. POST /api/payments/process-card - Process Card Checkout via Stripe
- * Supports Visa, Mastercard, and American Express
+ * 3. POST /api/payments/process-card - Verify confirmed Stripe PaymentIntent & finalize VPS order
+ * Supports Visa, Mastercard, American Express, and Discover in both Live and Test mode
  */
 export async function processCardPayment(req, res) {
   try {
@@ -71,55 +225,123 @@ export async function processCardPayment(req, res) {
     }
 
     const {
+      paymentIntentId,
       planId,
       amount,
-      cardBrand = 'Visa',
-      cardNumber,
-      cardExpiry,
-      cardCvc,
       cardName,
-      customerInfo,
-      useSavedMethod,
       term = '1m',
       couponCode,
     } = req.body;
+
+    if (!paymentIntentId || typeof paymentIntentId !== 'string' || !paymentIntentId.startsWith('pi_')) {
+      return res.status(400).json({
+        success: false,
+        error: 'A confirmed Stripe paymentIntentId is required. Please complete card verification via Stripe Checkout.',
+      });
+    }
 
     if (!amount || Number(amount) <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid order amount.' });
     }
 
-    // Check if user has an existing default payment method
-    const savedMethod = await prisma.userPaymentMethod.findFirst({
-      where: { userId, isDefault: true },
-      orderBy: { createdAt: 'desc' },
+    // Idempotency guard: if this PaymentIntent was already recorded, return existing confirmation
+    const existingPayment = await prisma.payment.findUnique({
+      where: { transactionId: paymentIntentId },
+      include: { invoice: true },
     });
+    if (existingPayment && existingPayment.userId === userId) {
+      return res.status(200).json({
+        success: true,
+        message: 'Payment already verified and processed via Stripe.',
+        transactionId: existingPayment.transactionId,
+        invoiceNumber: existingPayment.invoice?.invoiceNumber || '',
+        subscriptionId: existingPayment.invoice?.subscriptionId,
+        cardBrand: 'Card',
+        last4: '••••',
+        subtotal: Number(existingPayment.invoice?.subtotal || existingPayment.amount),
+        processingFee: Number((Number(existingPayment.amount) - Number(existingPayment.invoice?.subtotal || existingPayment.amount)).toFixed(2)),
+        tax: 0,
+        amount: Number(existingPayment.amount).toFixed(2),
+        currency: existingPayment.currency || 'USD',
+      });
+    }
 
-    const isReusingSaved = Boolean((useSavedMethod || (!cardNumber && !cardCvc)) && savedMethod);
+    // 1. Server-Side Anti-Tampering Price Verification
+    let pricing;
+    try {
+      pricing = await calculateCardOrderPricing({
+        planId,
+        term,
+        couponCode,
+        submittedAmount: amount,
+      });
+    } catch (priceErr) {
+      if (priceErr.isTampering) {
+        console.warn(`[SECURITY ALERT] Price tampering attempt detected for User #${userId}: submitted $${amount}, required min $${priceErr.minAuthorizedPrice}`);
+      }
+      return res.status(priceErr.statusCode || 400).json({ success: false, error: priceErr.message });
+    }
 
-    let effectiveBrand = cardBrand;
-    let effectiveLast4 = '4242';
-    let effectiveExpMonth = '12';
-    let effectiveExpYear = '2028';
-    let effectiveCardName = cardName || req.user.fullName || 'Authorized Customer';
+    const { plan, netSubtotal, couponDiscount, expectedFee, minAuthorizedPrice } = pricing;
 
-    if (isReusingSaved) {
-      effectiveBrand = savedMethod.cardBrand;
-      effectiveLast4 = savedMethod.last4;
-      effectiveExpMonth = savedMethod.expMonth;
-      effectiveExpYear = savedMethod.expYear;
-      effectiveCardName = savedMethod.cardholderName || req.user.fullName || 'Authorized Customer';
-      console.log(`[CHECKOUT CHARGE] Charging saved card ${effectiveBrand} (•••• ${effectiveLast4}) for user #${userId}`);
-    } else {
-      const cleanCard = String(cardNumber || '').replace(/[\s-]/g, '');
-      effectiveLast4 = cleanCard.length >= 4 ? cleanCard.slice(-4) : '4242';
-      const [expMonth, expYear] = String(cardExpiry || '12/28').split('/').map((s) => s.trim());
-      effectiveExpMonth = expMonth || '12';
-      effectiveExpYear = expYear || '2028';
-      effectiveCardName = cardName || req.user.fullName || 'Authorized Customer';
+    // 2. Verify the real Stripe PaymentIntent directly with Stripe API
+    const paymentIntent = await retrievePaymentIntent(paymentIntentId);
 
-      // Save as default payment method if user doesn't already have one
-      if (cleanCard && cleanCard.length >= 13) {
-        try {
+    if (!paymentIntent || paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({
+        success: false,
+        error: `Card payment has not succeeded yet (status: ${paymentIntent?.status || 'unknown'}). Please try again.`,
+      });
+    }
+
+    if (paymentIntent.metadata?.userId && String(paymentIntent.metadata.userId) !== String(userId)) {
+      return res.status(403).json({
+        success: false,
+        error: 'PaymentIntent ownership mismatch.',
+      });
+    }
+
+    const minExpectedCents = Math.round((minAuthorizedPrice - 0.50) * 100);
+    if ((paymentIntent.amount_received || 0) < minExpectedCents) {
+      return res.status(400).json({
+        success: false,
+        error: 'Paid amount does not match the required order total.',
+      });
+    }
+
+    // Extract verified card metadata from Stripe PaymentMethod / Charge
+    const pmObj = typeof paymentIntent.payment_method === 'object' ? paymentIntent.payment_method : null;
+    const chargeCard = paymentIntent.latest_charge && typeof paymentIntent.latest_charge === 'object'
+      ? paymentIntent.latest_charge.payment_method_details?.card
+      : null;
+    const cardInfo = pmObj?.card || chargeCard || {};
+
+    const effectiveBrand = formatCardBrand(cardInfo.brand || 'Card');
+    const effectiveLast4 = String(cardInfo.last4 || '0000').slice(-4);
+    const effectiveExpMonth = String(cardInfo.exp_month || 12).padStart(2, '0');
+    const effectiveExpYear = String(cardInfo.exp_year || new Date().getFullYear() + 3);
+    const effectiveCardName = cardName || pmObj?.billing_details?.name || req.user.fullName || 'Authorized Customer';
+    const stripePaymentMethodId = pmObj?.id || (typeof paymentIntent.payment_method === 'string' ? paymentIntent.payment_method : null);
+    const stripeCustomerId = typeof paymentIntent.customer === 'string'
+      ? paymentIntent.customer
+      : (paymentIntent.customer?.id || null);
+
+    // Save tokenized Stripe PaymentMethod reference (no raw PAN or CVC stored)
+    if (stripePaymentMethodId) {
+      try {
+        const existingSaved = await prisma.userPaymentMethod.findFirst({
+          where: { userId, isDefault: true },
+          orderBy: { createdAt: 'desc' },
+        });
+        const existingStripeRef = existingSaved ? decodeStripePaymentMethodRef(existingSaved.encryptedCardNumber) : null;
+
+        if (!existingSaved || !existingStripeRef) {
+          if (existingSaved) {
+            await prisma.userPaymentMethod.updateMany({
+              where: { userId, isDefault: true },
+              data: { isDefault: false },
+            });
+          }
           await prisma.userPaymentMethod.create({
             data: {
               userId,
@@ -128,94 +350,33 @@ export async function processCardPayment(req, res) {
               expMonth: effectiveExpMonth,
               expYear: effectiveExpYear,
               cardholderName: effectiveCardName,
-              encryptedCardNumber: encryptSensitive(cleanCard),
-              encryptedCvc: encryptSensitive(String(cardCvc || '123')),
-              isDefault: !savedMethod,
+              encryptedCardNumber: encodeStripePaymentMethodRef({ stripeCustomerId, stripePaymentMethodId }),
+              encryptedCvc: '',
+              isDefault: true,
             },
           });
-        } catch (_) {}
-      }
-    }
-
-    // 1. Fetch Plan details from Database
-    const plan = await prisma.vPSPlan.findFirst({
-      where: { planId: Number(planId) || 1 },
-    });
-
-    if (!plan) {
-      return res.status(404).json({ success: false, error: 'Selected VPS plan not found.' });
-    }
-
-    // Server-Side Anti-Tampering Price Verification
-    const baseMonthly = Number(plan.monthlyPrice);
-    const isYearlyOrder = term === '12m' || term === 'yearly';
-    const isMultiYearOrder = term === '24m';
-    let expectedSubtotal = baseMonthly;
-    if (isYearlyOrder) {
-      expectedSubtotal = Number((baseMonthly * 12 * 0.95).toFixed(2));
-    } else if (isMultiYearOrder) {
-      expectedSubtotal = Number((baseMonthly * 24 * 0.85).toFixed(2));
-    }
-
-    let couponDiscount = 0;
-    if (couponCode) {
-      const promo = await prisma.promoCode.findUnique({
-        where: { code: String(couponCode).trim().toUpperCase() },
-      });
-      const now = new Date();
-      if (
-        promo &&
-        promo.isActive &&
-        (!promo.expiresAt || new Date(promo.expiresAt) > now) &&
-        (!promo.validFrom || new Date(promo.validFrom) <= now) &&
-        promo.timesUsed < promo.maxUses &&
-        (!promo.applicablePlanId || promo.applicablePlanId === plan.planId)
-      ) {
-        if (promo.discountType === 'PERCENT') {
-          couponDiscount = Number(((expectedSubtotal * Number(promo.discountValue)) / 100).toFixed(2));
-        } else {
-          couponDiscount = Math.min(expectedSubtotal, Number(promo.discountValue));
+        } else if (existingStripeRef.stripePaymentMethodId !== stripePaymentMethodId) {
+          await prisma.userPaymentMethod.create({
+            data: {
+              userId,
+              cardBrand: effectiveBrand,
+              last4: effectiveLast4,
+              expMonth: effectiveExpMonth,
+              expYear: effectiveExpYear,
+              cardholderName: effectiveCardName,
+              encryptedCardNumber: encodeStripePaymentMethodRef({ stripeCustomerId, stripePaymentMethodId }),
+              encryptedCvc: '',
+              isDefault: false,
+            },
+          });
         }
+      } catch (savePmErr) {
+        console.warn('[Save Stripe PaymentMethod Warning]:', savePmErr.message);
       }
     }
 
-    const netSubtotal = Math.max(0.50, Number((expectedSubtotal - couponDiscount).toFixed(2)));
-    // Adjustment #4: When customer pays from credit card, charge 1.5% fee on whole amount, TAX is 0%.
-    const expectedFee = Number((netSubtotal * 0.015).toFixed(2));
-    const expectedTotal = Number((netSubtotal + expectedFee).toFixed(2));
-
-    const minAuthorizedPrice = Math.max(0.50, expectedTotal);
-    if (Number(amount) < (minAuthorizedPrice - 0.50)) {
-      console.warn(`[SECURITY ALERT] Price tampering attempt detected for User #${userId}: submitted $${amount}, required min $${minAuthorizedPrice}`);
-      return res.status(400).json({
-        success: false,
-        error: 'Order price validation failed. The submitted amount does not match the configured plan pricing.',
-      });
-    }
-
-    // 2. Process Charge through Stripe Engine (PCI-DSS compliant sandbox)
-    const stripeResult = await processTestCardCharge({
-      amount,
-      currency: 'usd',
-      cardBrand: effectiveBrand,
-      last4: effectiveLast4,
-      expMonth: effectiveExpMonth,
-      expYear: effectiveExpYear,
-      customerEmail: req.user.email,
-      customerName: effectiveCardName,
-      metadata: {
-        userId: String(userId),
-        planId: String(plan.planId),
-        planName: plan.name,
-      },
-    });
-
-    if (!stripeResult.success) {
-      return res.status(400).json({
-        success: false,
-        error: 'Card authorization failed. Please check your card details or try a different card.',
-      });
-    }
+    const paidAmount = Number((paymentIntent.amount_received / 100).toFixed(2));
+    const paidCurrency = (paymentIntent.currency || 'usd').toUpperCase();
 
     // 3. Create active Subscription in MS SQL with term awareness (Yearly = 365 days, non-refundable)
     const isYearly = term === '12m' || term === 'yearly';
@@ -228,8 +389,8 @@ export async function processCardPayment(req, res) {
         status: 'ACTIVE',
         startDate: now,
         endDate: new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000),
-        monthlyPrice: isYearly ? Number((Number(amount) / 12).toFixed(2)) : Number(amount),
-        currency: 'USD',
+        monthlyPrice: isYearly ? Number((paidAmount / 12).toFixed(2)) : paidAmount,
+        currency: paidCurrency,
       },
     });
 
@@ -253,8 +414,8 @@ export async function processCardPayment(req, res) {
         subtotal: Number(req.body.subtotal || netSubtotal),
         tax: 0,
         discount: couponDiscount,
-        total: Number(amount),
-        currency: 'USD',
+        total: paidAmount,
+        currency: paidCurrency,
         status: 'PAID',
         issueDate: now,
         paidDate: now,
@@ -262,25 +423,15 @@ export async function processCardPayment(req, res) {
       },
     });
 
-    // 5. Record Payment with Encrypted Security Token
-    const encryptedCardRef = encryptSensitive(
-      JSON.stringify({
-        brand: effectiveBrand,
-        last4: effectiveLast4,
-        cardholder: effectiveCardName,
-        stripeChargeId: stripeResult.transactionId,
-        authorizedAt: now.toISOString(),
-      })
-    );
-
+    // 5. Record Payment
     await prisma.payment.create({
       data: {
         userId,
         invoiceId: invoice.invoiceId,
         paymentGateway: 'STRIPE_CARD',
-        transactionId: stripeResult.transactionId,
-        amount: Number(amount),
-        currency: 'USD',
+        transactionId: paymentIntent.id,
+        amount: paidAmount,
+        currency: paidCurrency,
         status: 'COMPLETED',
         paymentDate: now,
       },
@@ -292,7 +443,7 @@ export async function processCardPayment(req, res) {
         userId,
         action: 'PAYMENT_RECEIVED',
         status: 'SUCCESS',
-        details: `Payment of $${Number(amount).toFixed(2)} USD processed via ${effectiveBrand} (•••• ${effectiveLast4}) for ${invoiceNumber}`,
+        details: `Payment of $${paidAmount.toFixed(2)} ${paidCurrency} processed via ${effectiveBrand} (•••• ${effectiveLast4}) for ${invoiceNumber}`,
       },
     }).catch(() => {});
 
@@ -301,18 +452,18 @@ export async function processCardPayment(req, res) {
       email: req.user.email,
       fullName: req.user.fullName || effectiveCardName,
       invoiceNumber,
-      amount: Number(amount),
+      amount: paidAmount,
       subtotal: Number(req.body.subtotal || netSubtotal),
       processingFee: expectedFee,
       tax: 0,
       planName: plan.name,
-      currency: 'USD',
+      currency: paidCurrency,
     }).catch((mailErr) => console.warn('[Invoice Receipt Email Warning]:', mailErr.message));
 
     return res.status(200).json({
       success: true,
       message: 'Payment authorized and processed successfully via Stripe.',
-      transactionId: stripeResult.transactionId,
+      transactionId: paymentIntent.id,
       invoiceNumber,
       subscriptionId: subscription.subscriptionId,
       cardBrand: effectiveBrand,
@@ -320,8 +471,8 @@ export async function processCardPayment(req, res) {
       subtotal: Number(req.body.subtotal || netSubtotal),
       processingFee: expectedFee,
       tax: 0,
-      amount: Number(amount).toFixed(2),
-      currency: 'USD',
+      amount: paidAmount.toFixed(2),
+      currency: paidCurrency,
     });
   } catch (err) {
     console.error('[Card Payment Processing Error]:', err);
@@ -543,6 +694,8 @@ export async function getSavedPaymentMethod(req, res) {
       return res.json({ success: true, hasSavedMethod: false, method: null });
     }
 
+    const stripeRef = decodeStripePaymentMethodRef(pm.encryptedCardNumber);
+
     return res.json({
       success: true,
       hasSavedMethod: true,
@@ -553,6 +706,7 @@ export async function getSavedPaymentMethod(req, res) {
         expMonth: pm.expMonth,
         expYear: pm.expYear,
         holderName: pm.cardholderName,
+        isStripeBacked: Boolean(stripeRef && stripeRef.stripePaymentMethodId),
       },
     });
   } catch (err) {
@@ -599,15 +753,15 @@ export async function handleStripeWebhook(req, res) {
           where: { transactionId: paymentIntent.id },
           include: { invoice: true },
         });
-        if (paymentRecord && paymentRecord.paymentStatus !== 'Completed') {
+        if (paymentRecord && paymentRecord.status !== 'COMPLETED') {
           await prisma.$transaction([
             prisma.payment.update({
               where: { paymentId: paymentRecord.paymentId },
-              data: { paymentStatus: 'Completed' },
+              data: { status: 'COMPLETED', paymentDate: new Date() },
             }),
             prisma.invoice.update({
               where: { invoiceId: paymentRecord.invoiceId },
-              data: { invoiceStatus: 'Paid', paidDate: new Date() },
+              data: { status: 'PAID', paidDate: new Date() },
             }),
           ]);
           console.log(`[Stripe Webhook] Reconciled payment and invoice as Paid for ${paymentIntent.id}`);
@@ -623,7 +777,7 @@ export async function handleStripeWebhook(req, res) {
       try {
         await prisma.payment.updateMany({
           where: { transactionId: paymentIntent.id },
-          data: { paymentStatus: 'Failed' },
+          data: { status: 'FAILED' },
         });
       } catch (dbErr) {
         console.error('[Stripe Webhook DB Error]:', dbErr);

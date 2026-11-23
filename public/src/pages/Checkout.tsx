@@ -1,9 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, MapPin, Lock, Eye, EyeOff, CreditCard, Building2 } from 'lucide-react';
+import { loadStripe, type Stripe } from '@stripe/stripe-js';
+import {
+  Elements,
+  CardNumberElement,
+  CardExpiryElement,
+  CardCvcElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../services/api';
 import { ModernFloatingInput } from '../components/ModernFormControls';
+
+const STRIPE_ELEMENT_OPTIONS = {
+  style: {
+    base: {
+      fontSize: '13px',
+      color: '#0f172a',
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      fontWeight: '600',
+      '::placeholder': {
+        color: '#94a3b8',
+        fontWeight: '500',
+      },
+    },
+    invalid: {
+      color: '#dc2626',
+    },
+  },
+};
 
 type StepId = 'details' | 'review' | 'payment';
 
@@ -20,8 +47,42 @@ const STEPS: Step[] = [
 ];
 
 export default function Checkout() {
+  const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [stripeConfigError, setStripeConfigError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    apiCall('/payments/config')
+      .then((res) => {
+        if (!active) return;
+        if (res?.publishableKey) {
+          setStripePromise(loadStripe(res.publishableKey));
+        } else {
+          setStripeConfigError('Stripe publishable key is not configured on the server.');
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setStripeConfigError('Unable to load Stripe payment configuration.');
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return (
+    <Elements stripe={stripePromise}>
+      <CheckoutContent stripeConfigError={stripeConfigError} />
+    </Elements>
+  );
+}
+
+function CheckoutContent({ stripeConfigError }: { stripeConfigError: string }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const stripe = useStripe();
+  const elements = useElements();
 
   // 1. Connect real AuthContext state
   const { user, isAuthenticated, loading } = useAuth();
@@ -94,8 +155,9 @@ export default function Checkout() {
     expMonth: string;
     expYear: string;
     holderName?: string;
+    isStripeBacked?: boolean;
   } | null>(null);
-  const [useSavedCard, setUseSavedCard] = useState(true);
+  const [useSavedCard, setUseSavedCard] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -103,7 +165,7 @@ export default function Checkout() {
         .then((res) => {
           if (res && res.hasSavedMethod && res.method) {
             setSavedPaymentMethod(res.method);
-            setUseSavedCard(true);
+            setUseSavedCard(Boolean(res.method.isStripeBacked));
           }
         })
         .catch(() => {});
@@ -111,8 +173,16 @@ export default function Checkout() {
   }, [isAuthenticated]);
 
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'bank_transfer'>('card');
-  const [selectedCardBrand, setSelectedCardBrand] = useState<'Visa' | 'Mastercard' | 'American Express'>('Visa');
-  const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvc: '', name: '' });
+  const [selectedCardBrand, setSelectedCardBrand] = useState<'Visa' | 'Mastercard' | 'American Express' | 'Discover' | ''>('');
+  const [cardDetails, setCardDetails] = useState({ name: '' });
+  const [stripeCardState, setStripeCardState] = useState({
+    numberComplete: false,
+    expiryComplete: false,
+    cvcComplete: false,
+    numberError: '',
+    expiryError: '',
+    cvcError: '',
+  });
   const [bankDetails, setBankDetails] = useState({
     bankName: '',
     sortCode: '',
@@ -146,31 +216,6 @@ export default function Checkout() {
 
   const stepOrder: StepId[] = ['details', 'review', 'payment'];
   const currentIndex = stepOrder.indexOf(currentStep);
-
-  // Auto-detect card brand from card number
-  const handleCardNumberChange = (rawVal: string) => {
-    const clean = rawVal.replace(/[^0-9]/g, '').slice(0, 16);
-    // Auto-spacing every 4 digits
-    const formatted = clean.replace(/(\d{4})/g, '$1 ').trim();
-
-    if (clean.startsWith('4')) {
-      setSelectedCardBrand('Visa');
-    } else if (/^5[1-5]/.test(clean) || /^2[2-7]/.test(clean)) {
-      setSelectedCardBrand('Mastercard');
-    } else if (/^3[47]/.test(clean)) {
-      setSelectedCardBrand('American Express');
-    }
-
-    setCardDetails((prev) => ({ ...prev, number: formatted }));
-  };
-
-  const handleExpiryChange = (rawVal: string) => {
-    let clean = rawVal.replace(/[^0-9]/g, '').slice(0, 4);
-    if (clean.length >= 3) {
-      clean = `${clean.slice(0, 2)}/${clean.slice(2)}`;
-    }
-    setCardDetails((prev) => ({ ...prev, expiry: clean }));
-  };
 
   const handleSortCodeChange = (rawVal: string) => {
     let clean = rawVal.replace(/[^0-9]/g, '').slice(0, 6);
@@ -208,15 +253,17 @@ export default function Checkout() {
     }
 
     if (currentStep === 'payment' && paymentMethod === 'card') {
-      if (savedPaymentMethod && useSavedCard) {
+      if (savedPaymentMethod?.isStripeBacked && useSavedCard) {
         setErrors({});
         return true;
       }
       if (!cardDetails.name.trim()) newErrors.cardName = 'Cardholder name is required';
-      const cleanNum = cardDetails.number.replace(/\s+/g, '');
-      if (!cleanNum || cleanNum.length < 13) newErrors.cardNumber = 'Valid card number is required';
-      if (!cardDetails.expiry.trim() || !cardDetails.expiry.includes('/')) newErrors.cardExpiry = 'Valid expiration (MM/YY) is required';
-      if (!cardDetails.cvc.trim() || cardDetails.cvc.length < 3) newErrors.cardCvc = 'Valid CVC code is required';
+      if (stripeCardState.numberError) newErrors.cardNumber = stripeCardState.numberError;
+      else if (!stripeCardState.numberComplete) newErrors.cardNumber = 'Valid card number is required';
+      if (stripeCardState.expiryError) newErrors.cardExpiry = stripeCardState.expiryError;
+      else if (!stripeCardState.expiryComplete) newErrors.cardExpiry = 'Valid expiration (MM/YY) is required';
+      if (stripeCardState.cvcError) newErrors.cardCvc = stripeCardState.cvcError;
+      else if (!stripeCardState.cvcComplete) newErrors.cardCvc = 'Valid CVC code is required';
     }
 
     if (currentStep === 'payment' && paymentMethod === 'bank_transfer') {
@@ -280,29 +327,101 @@ export default function Checkout() {
 
     try {
       if (paymentMethod === 'card') {
-        const payload: any = {
-          planId: orderData.plan?.planId || 1,
-          amount: finalPayableAmount,
-          subtotal: orderSubtotal,
-          processingFee: cardFee,
-          term: orderData.term?.id || '1m',
-          couponCode: orderData.appliedCoupon?.code,
-          customerInfo,
-        };
-
-        if (savedPaymentMethod && useSavedCard) {
-          payload.useSavedMethod = true;
-        } else {
-          payload.cardBrand = selectedCardBrand;
-          payload.cardNumber = cardDetails.number;
-          payload.cardExpiry = cardDetails.expiry;
-          payload.cardCvc = cardDetails.cvc;
-          payload.cardName = cardDetails.name || `${customerInfo.firstName} ${customerInfo.lastName}`.trim();
+        if (stripeConfigError) {
+          throw new Error(stripeConfigError);
+        }
+        if (!stripe || !elements) {
+          throw new Error('Stripe secure payment form is still initializing. Please wait a moment and try again.');
         }
 
+        const isUsingSavedStripeCard = Boolean(savedPaymentMethod?.isStripeBacked && useSavedCard);
+
+        // Step 1: Create (or confirm for saved card) a real Stripe PaymentIntent on the backend
+        const intentRes = await apiCall('/payments/create-intent', {
+          method: 'POST',
+          body: JSON.stringify({
+            planId: orderData.plan?.planId || 1,
+            planName: orderData.plan?.name || 'VPS Plan',
+            amount: finalPayableAmount,
+            currency: 'USD',
+            term: orderData.term?.id || '1m',
+            couponCode: orderData.appliedCoupon?.code,
+            useSavedMethod: isUsingSavedStripeCard,
+          }),
+        });
+
+        if (!intentRes?.success || !intentRes?.paymentIntentId) {
+          if (intentRes?.requiresNewCard) {
+            setUseSavedCard(false);
+          }
+          throw new Error(intentRes?.error || 'Failed to initialize Stripe payment.');
+        }
+
+        let confirmedPaymentIntentId = intentRes.paymentIntentId as string;
+
+        // Step 2: Confirm payment client-side with Stripe.js (handles tokenization & 3D Secure / SCA)
+        if (isUsingSavedStripeCard) {
+          if (intentRes.requiresAction || intentRes.status === 'requires_action') {
+            const scaResult = await stripe.confirmCardPayment(intentRes.clientSecret);
+            if (scaResult.error) {
+              throw new Error(scaResult.error.message || 'Card authentication failed.');
+            }
+            if (scaResult.paymentIntent?.status !== 'succeeded') {
+              throw new Error(`Card payment was not completed (status: ${scaResult.paymentIntent?.status || 'unknown'}).`);
+            }
+            confirmedPaymentIntentId = scaResult.paymentIntent.id;
+          } else if (intentRes.status !== 'succeeded') {
+            throw new Error(`Saved card charge did not succeed (status: ${intentRes.status || 'unknown'}).`);
+          }
+        } else {
+          const cardNumberElement = elements.getElement(CardNumberElement);
+          if (!cardNumberElement) {
+            throw new Error('Card input element is not ready. Please try again.');
+          }
+
+          const cardholderName = cardDetails.name.trim() || `${customerInfo.firstName} ${customerInfo.lastName}`.trim() || user?.fullName || '';
+
+          const confirmResult = await stripe.confirmCardPayment(intentRes.clientSecret, {
+            payment_method: {
+              card: cardNumberElement,
+              billing_details: {
+                name: cardholderName || undefined,
+                email: (isAuthenticated ? user?.email : customerInfo.email) || undefined,
+                phone: customerInfo.phone || undefined,
+                address: {
+                  line1: customerInfo.address || undefined,
+                  city: customerInfo.city || undefined,
+                  postal_code: customerInfo.zip || undefined,
+                },
+              },
+            },
+          });
+
+          if (confirmResult.error) {
+            throw new Error(confirmResult.error.message || 'Card authorization failed. Please check your card details.');
+          }
+
+          if (confirmResult.paymentIntent?.status !== 'succeeded') {
+            throw new Error(`Payment did not complete (status: ${confirmResult.paymentIntent?.status || 'unknown'}).`);
+          }
+
+          confirmedPaymentIntentId = confirmResult.paymentIntent.id;
+        }
+
+        // Step 3: Verify PaymentIntent on backend and finalize Subscription, Invoice, & Receipt
         const res = await apiCall('/payments/process-card', {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            paymentIntentId: confirmedPaymentIntentId,
+            planId: orderData.plan?.planId || 1,
+            amount: finalPayableAmount,
+            subtotal: orderSubtotal,
+            processingFee: cardFee,
+            term: orderData.term?.id || '1m',
+            couponCode: orderData.appliedCoupon?.code,
+            cardName: cardDetails.name.trim() || `${customerInfo.firstName} ${customerInfo.lastName}`.trim(),
+            customerInfo,
+          }),
         });
 
         if (res.success) {
@@ -883,7 +1002,12 @@ export default function Checkout() {
                 {/* 1. CREDIT / DEBIT CARD PANEL */}
                 {paymentMethod === 'card' && (
                   <div className="space-y-4 text-xs pt-2">
-                    {savedPaymentMethod && useSavedCard ? (
+                    {stripeConfigError && (
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium">
+                        {stripeConfigError}
+                      </div>
+                    )}
+                    {savedPaymentMethod?.isStripeBacked && useSavedCard ? (
                       /* Saved Card on File Banner */
                       <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border-2 border-blue-600 space-y-2.5">
                         <div className="flex items-center justify-between">
@@ -905,7 +1029,7 @@ export default function Checkout() {
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-600">
-                          Your saved card on file will be charged directly for this cloud instance order.
+                          Your saved Stripe card on file will be charged securely for this cloud instance order.
                         </p>
                         <button
                           type="button"
@@ -917,7 +1041,7 @@ export default function Checkout() {
                       </div>
                     ) : (
                       <>
-                        {savedPaymentMethod && (
+                        {savedPaymentMethod?.isStripeBacked && (
                           <div className="flex items-center justify-between pb-1">
                             <button
                               type="button"
@@ -939,84 +1063,162 @@ export default function Checkout() {
                             placeholder="e.g. Alex Morgan"
                           />
 
-                          {/* Row 1: Card number (6 cols), Expiration (3 cols), Security code (3 cols) */}
+                          {/* Row 1: Stripe CardNumberElement (6 cols), CardExpiryElement (3 cols), CardCvcElement (3 cols) */}
                           <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                             {/* Card Number */}
                             <div className="md:col-span-6">
-                              <ModernFloatingInput
-                                label="Card Number"
-                                required
-                                value={cardDetails.number}
-                                onChange={(e) => handleCardNumberChange(e.target.value)}
-                                maxLength={19}
-                                icon={<CreditCard className="w-4 h-4" />}
-                                error={errors.cardNumber}
-                                placeholder="4242 •••• •••• 4242"
-                                className="font-mono tracking-wider pr-28"
-                                rightElement={
-                                  <div className="flex items-center gap-1 select-none pointer-events-none">
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
-                                      selectedCardBrand === 'Visa'
-                                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60'
-                                    }`}>
-                                      VISA
-                                    </span>
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
-                                      selectedCardBrand === 'Mastercard'
-                                        ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60'
-                                    }`}>
-                                      MC
-                                    </span>
-                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
-                                      selectedCardBrand === 'American Express'
-                                        ? 'bg-sky-500 text-white border-sky-500 shadow-xs'
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60'
-                                    }`}>
-                                      AMEX
-                                    </span>
-                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60">
-                                      DISC
-                                    </span>
-                                  </div>
-                                }
-                              />
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
+                                Card Number <span className="text-red-500">*</span>
+                              </label>
+                              <div
+                                className={`relative flex items-center rounded-xl border bg-white px-3.5 py-3 transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-600 ${
+                                  errors.cardNumber ? 'border-red-400' : 'border-slate-200'
+                                }`}
+                              >
+                                <CreditCard className="w-4 h-4 text-slate-400 mr-2.5 shrink-0" />
+                                <div className="flex-1 min-w-0 pr-24">
+                                  <CardNumberElement
+                                    options={{ ...STRIPE_ELEMENT_OPTIONS, showIcon: false }}
+                                    onChange={(e) => {
+                                      const brandMap: Record<string, 'Visa' | 'Mastercard' | 'American Express' | 'Discover' | ''> = {
+                                        visa: 'Visa',
+                                        mastercard: 'Mastercard',
+                                        amex: 'American Express',
+                                        discover: 'Discover',
+                                      };
+                                      setSelectedCardBrand(brandMap[e.brand] || '');
+                                      setStripeCardState((prev) => ({
+                                        ...prev,
+                                        numberComplete: e.complete,
+                                        numberError: e.error?.message || '',
+                                      }));
+                                      if (e.error?.message) {
+                                        setErrors((prev) => ({ ...prev, cardNumber: e.error!.message }));
+                                      } else {
+                                        setErrors((prev) => {
+                                          const next = { ...prev };
+                                          delete next.cardNumber;
+                                          return next;
+                                        });
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <div className="absolute right-2.5 flex items-center gap-1 select-none pointer-events-none">
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                                    selectedCardBrand === 'Visa'
+                                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                      : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+                                  }`}>
+                                    VISA
+                                  </span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                                    selectedCardBrand === 'Mastercard'
+                                      ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                                      : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+                                  }`}>
+                                    MC
+                                  </span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                                    selectedCardBrand === 'American Express'
+                                      ? 'bg-sky-500 text-white border-sky-500 shadow-xs'
+                                      : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+                                  }`}>
+                                    AMEX
+                                  </span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-black tracking-tight border transition-all ${
+                                    selectedCardBrand === 'Discover'
+                                      ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
+                                      : 'bg-slate-100 text-slate-400 border-slate-200 opacity-60'
+                                  }`}>
+                                    DISC
+                                  </span>
+                                </div>
+                              </div>
+                              {errors.cardNumber && (
+                                <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardNumber}</p>
+                              )}
                             </div>
 
                             {/* Expiration Date */}
                             <div className="md:col-span-3">
-                              <ModernFloatingInput
-                                label="Expiration Date"
-                                required
-                                value={cardDetails.expiry}
-                                onChange={(e) => handleExpiryChange(e.target.value)}
-                                maxLength={5}
-                                error={errors.cardExpiry}
-                                placeholder="MM / YY"
-                                className="font-mono"
-                              />
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
+                                Expiration Date <span className="text-red-500">*</span>
+                              </label>
+                              <div
+                                className={`rounded-xl border bg-white px-3.5 py-3 transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-600 ${
+                                  errors.cardExpiry ? 'border-red-400' : 'border-slate-200'
+                                }`}
+                              >
+                                <CardExpiryElement
+                                  options={STRIPE_ELEMENT_OPTIONS}
+                                  onChange={(e) => {
+                                    setStripeCardState((prev) => ({
+                                      ...prev,
+                                      expiryComplete: e.complete,
+                                      expiryError: e.error?.message || '',
+                                    }));
+                                    if (e.error?.message) {
+                                      setErrors((prev) => ({ ...prev, cardExpiry: e.error!.message }));
+                                    } else {
+                                      setErrors((prev) => {
+                                        const next = { ...prev };
+                                        delete next.cardExpiry;
+                                        return next;
+                                      });
+                                    }
+                                  }}
+                                />
+                              </div>
+                              {errors.cardExpiry && (
+                                <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardExpiry}</p>
+                              )}
                             </div>
 
                             {/* Security code */}
                             <div className="md:col-span-3">
-                              <ModernFloatingInput
-                                label="Security Code"
-                                type="password"
-                                required
-                                value={cardDetails.cvc}
-                                onChange={(e) => setCardDetails({ ...cardDetails, cvc: e.target.value.replace(/[^0-9]/g, '').slice(0, 4) })}
-                                maxLength={4}
-                                error={errors.cardCvc}
-                                placeholder="CVC"
-                                className="font-mono pr-12"
-                                rightElement={
-                                  <span className="text-slate-400 text-xs pointer-events-none select-none flex items-center gap-0.5 font-mono font-bold">
-                                    💳123
-                                  </span>
-                                }
-                              />
+                              <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
+                                Security Code <span className="text-red-500">*</span>
+                              </label>
+                              <div
+                                className={`relative rounded-xl border bg-white px-3.5 py-3 transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-600 ${
+                                  errors.cardCvc ? 'border-red-400' : 'border-slate-200'
+                                }`}
+                              >
+                                <div className="pr-8">
+                                  <CardCvcElement
+                                    options={STRIPE_ELEMENT_OPTIONS}
+                                    onChange={(e) => {
+                                      setStripeCardState((prev) => ({
+                                        ...prev,
+                                        cvcComplete: e.complete,
+                                        cvcError: e.error?.message || '',
+                                      }));
+                                      if (e.error?.message) {
+                                        setErrors((prev) => ({ ...prev, cardCvc: e.error!.message }));
+                                      } else {
+                                        setErrors((prev) => {
+                                          const next = { ...prev };
+                                          delete next.cardCvc;
+                                          return next;
+                                        });
+                                      }
+                                    }}
+                                  />
+                                </div>
+                                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[11px] pointer-events-none select-none font-mono font-bold">
+                                  CVC
+                                </span>
+                              </div>
+                              {errors.cardCvc && (
+                                <p className="text-red-500 text-[10px] font-bold mt-1">{errors.cardCvc}</p>
+                              )}
                             </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 pt-0.5">
+                            <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>Secured by Stripe PCI-DSS Level 1 tokenization. Your raw card details never touch our servers.</span>
                           </div>
                         </div>
                       </>
