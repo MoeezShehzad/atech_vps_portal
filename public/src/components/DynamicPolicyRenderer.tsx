@@ -103,6 +103,22 @@ export default function DynamicPolicyRenderer({
       );
     }
 
+    // Red note callout box (matches NOTE:, [NOTE], RED NOTE:, etc.)
+    const isRedNoteBox =
+      text.startsWith('NOTE:') ||
+      text.startsWith('**NOTE:**') ||
+      text.startsWith('NOTE :') ||
+      text.startsWith('[NOTE]') ||
+      text.startsWith('[RED NOTE]') ||
+      text.startsWith('RED NOTE:');
+    if (isRedNoteBox) {
+      return (
+        <div key={pIdx} className="my-5 p-5 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 text-xs sm:text-sm leading-relaxed font-semibold shadow-xs">
+          {renderFormattedText(text)}
+        </div>
+      );
+    }
+
     // Callout box if uppercase warning
     const isWarningBox = text.startsWith('MANDATORY') || text.startsWith('THIS AGREEMENT CONTAINS') || text.startsWith('CUSTOMER EXPRESSLY ACKNOWLEDGES');
     if (isWarningBox) {
