@@ -834,6 +834,7 @@ export default function BillingAndInvoices() {
                   <ShieldCheck className="w-4 h-4" /> Payment Confirmed & Verified
                 </div>
                 <div>Transaction ID: <span className="font-mono font-semibold">{selectedInvoice.transactionId}</span></div>
+                <div className="pt-1">Link to Terms of Contract: <a href="https://www.atechconsult.com/Terms&Conditions" target="_blank" rel="noopener noreferrer" className="underline font-semibold text-blue-600 dark:text-blue-400 break-all">https://www.atechconsult.com/Terms&Conditions</a></div>
               </div>
             </div>
           </div>
