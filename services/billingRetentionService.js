@@ -21,6 +21,7 @@ import {
   sendBillingSuspendedEmail,
   sendRetentionWarningEmail,
   sendReactivationSuccessEmail,
+  sendFinalTerminationEmail,
 } from './emailService.js';
 
 export const RETENTION_PERIOD_DAYS = 90;
@@ -461,6 +462,18 @@ export async function checkBillingRetentionLifecycle() {
               details: `90-day data preservation period expired for subscription #${sub.subscriptionId}. Associated resources permanently decommissioned per cloud data retention policy.`,
             },
           }).catch(() => {});
+
+          // Dispatch Final Day-90 Decommission & Data Erasure Notice Email
+          if (sub.user?.email) {
+            const primaryVm = sub.virtualMachines?.[0];
+            sendFinalTerminationEmail({
+              email: sub.user.email,
+              fullName: sub.user.fullName,
+              vmName: primaryVm ? primaryVm.vmName : sub.plan?.name,
+              planName: sub.plan?.name || 'Cloud VPS',
+              retentionDays: RETENTION_PERIOD_DAYS,
+            }).catch((mailErr) => console.warn('[Final Termination Email Warning]:', mailErr.message));
+          }
         } catch (decommErr) {
           console.error(`[Decommissioning Error] Sub #${sub.subscriptionId}:`, decommErr.message);
         }

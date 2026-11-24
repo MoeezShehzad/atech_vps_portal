@@ -11,7 +11,7 @@ import os from 'os';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 import hypervService from '../services/hypervService.js';
-import { sendTicketReplyNotification, sendInvoiceReceiptEmail } from '../services/emailService.js';
+import { sendTicketReplyNotification, sendInvoiceReceiptEmail, sendRefundConfirmationEmail } from '../services/emailService.js';
 import { calculateTicketMetrics } from '../services/ticketAutomationService.js';
 import { sanitizeAuditDetails } from './securityController.js';
 import { createStripeRefund } from '../services/stripeService.js';
@@ -1624,7 +1624,7 @@ export async function processAdminRefund(req, res) {
     if (invoiceId) {
       targetInvoice = await prisma.invoice.findUnique({
         where: { invoiceId },
-        include: { payments: true, user: true },
+        include: { payments: true, user: true, subscription: { include: { plan: true } } },
       });
       if (targetInvoice && targetInvoice.payments?.length > 0) {
         targetPayment = targetInvoice.payments[0];
@@ -1632,7 +1632,7 @@ export async function processAdminRefund(req, res) {
     } else if (paymentId) {
       targetPayment = await prisma.payment.findUnique({
         where: { paymentId },
-        include: { invoice: true, user: true },
+        include: { invoice: { include: { subscription: { include: { plan: true } } } }, user: true },
       });
       if (targetPayment) targetInvoice = targetPayment.invoice;
     }
@@ -1713,6 +1713,20 @@ export async function processAdminRefund(req, res) {
       if (vm.vmName) {
         hypervService.powerAction(vm.vmName, 'stop').catch(() => {});
       }
+    }
+
+    // Dispatch Official Refund Confirmation Email to Customer (Non-blocking)
+    const refundRecipient = targetInvoice?.user || targetPayment?.user;
+    if (refundRecipient?.email) {
+      sendRefundConfirmationEmail({
+        email: refundRecipient.email,
+        fullName: refundRecipient.fullName,
+        invoiceNumber: targetInvoice?.invoiceNumber || '',
+        refundAmount,
+        currency: (targetPayment?.currency || targetInvoice?.currency || 'USD').trim().toUpperCase(),
+        planName: targetInvoice?.subscription?.plan?.name || 'Cloud VPS Service',
+        reason,
+      }).catch((mailErr) => console.warn('[Refund Email Dispatch Warning]:', mailErr.message));
     }
 
     return res.json({
