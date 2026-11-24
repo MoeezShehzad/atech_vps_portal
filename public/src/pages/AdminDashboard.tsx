@@ -748,6 +748,14 @@ export default function AdminDashboard() {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Link to Terms of Contract: https://www.atechconsult.com/Terms&Conditions', 105, 269, { align: 'center' });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
       doc.text('Thank you for choosing Analytical Technical Consulting (ATC) Cloud Infrastructure.', 105, 275, { align: 'center' });
       doc.text('For questions, contact customer-support@atechconsult.com', 105, 280, { align: 'center' });
 
@@ -4998,6 +5006,12 @@ export default function AdminDashboard() {
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Terms of Contract Notice */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Link to Terms of Contract: </span>
+              <a href="https://www.atechconsult.com/Terms&Conditions" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline font-medium break-all">https://www.atechconsult.com/Terms&Conditions</a>
             </div>
 
             {/* Bottom Modal Actions */}

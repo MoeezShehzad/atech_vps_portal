@@ -575,7 +575,7 @@ export default function Checkout() {
                           <span className="text-slate-600 text-xs font-medium leading-relaxed">
                             I agree to the{' '}
                             <a
-                              href="/terms"
+                              href="/Terms&Conditions"
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 hover:text-blue-700 underline font-semibold"
@@ -774,7 +774,7 @@ export default function Checkout() {
                           <span className="text-slate-600 text-xs font-medium leading-relaxed">
                             I agree to the{' '}
                             <a
-                              href="/terms"
+                              href="/Terms&Conditions"
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-blue-600 hover:text-blue-700 underline font-semibold"
@@ -1340,7 +1340,11 @@ export default function Checkout() {
                   </div>
 
                   <div className="p-3 bg-blue-50 border border-blue-200/70 rounded-xl text-blue-900 text-[11px] leading-relaxed">
-                    📧 An official VAT invoice and payment confirmation has been dispatched to your email address.
+                    <div>📧 An official VAT invoice and payment confirmation has been dispatched to your email address.</div>
+                    <div className="mt-1">
+                      <span className="font-semibold">Link to Terms of Contract: </span>
+                      <a href="https://www.atechconsult.com/Terms&Conditions" target="_blank" rel="noopener noreferrer" className="text-blue-700 underline font-semibold break-all">https://www.atechconsult.com/Terms&Conditions</a>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-2">

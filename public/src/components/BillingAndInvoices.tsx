@@ -353,6 +353,14 @@ export default function BillingAndInvoices() {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Link to Terms of Contract: https://www.atechconsult.com/Terms&Conditions', 105, 269, { align: 'center' });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
       doc.text('Analytical Technical Consulting (ATC) • Thank you for your business!', 105, 275, { align: 'center' });
       doc.text('For questions or support, contact customer-support@atechconsult.com', 105, 280, { align: 'center' });
 

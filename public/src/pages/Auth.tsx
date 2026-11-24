@@ -235,7 +235,7 @@ export default function Auth({ initialMode }: AuthProps) {
       return;
     }
     if (!agreeTerms) {
-      setSignupError('You must review and agree to the Terms of Service & Privacy Policy.');
+      setSignupError('You must review and agree to the Terms and Conditions & Privacy Policy.');
       return;
     }
 
@@ -984,8 +984,8 @@ export default function Auth({ initialMode }: AuthProps) {
                         />
                         <label htmlFor="agree-terms" className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                           I agree to the Analytical Technical Consulting (ATC){' '}
-                          <Link to="/terms" className="text-blue-600 font-semibold hover:underline">
-                            Terms of Service
+                          <Link to="/Terms&Conditions" className="text-blue-600 font-semibold hover:underline">
+                            Terms and Conditions
                           </Link>
                           ,{' '}
                           <Link to="/privacy" className="text-blue-600 font-semibold hover:underline">
@@ -1171,7 +1171,7 @@ export default function Auth({ initialMode }: AuthProps) {
       <footer className="relative z-20 w-full max-w-[1220px] mx-auto px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
         <p>© {new Date().getFullYear()} Analytical Technical Consulting (ATC). All rights reserved.</p>
         <div className="flex items-center gap-5">
-          <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+          <Link to="/Terms&Conditions" className="hover:text-white transition-colors">Terms and Conditions</Link>
           <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
           <Link to="/refund-policy" className="hover:text-white transition-colors">Refund Policy</Link>
         </div>

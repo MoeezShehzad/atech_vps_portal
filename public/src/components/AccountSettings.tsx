@@ -1157,8 +1157,8 @@ export default function AccountSettings() {
 
             <p className="text-[11px] text-slate-400 dark:text-slate-500 pt-1">
               Cancellation and retention terms are governed by our{' '}
-              <Link to="/terms#atc-9" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">
-                Terms of Service
+              <Link to="/Terms&Conditions" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">
+                Terms and Conditions
               </Link>.
             </p>
           </div>

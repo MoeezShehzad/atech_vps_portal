@@ -15,6 +15,7 @@ export default function TermsOfService() {
   const [loadingVer, setLoadingVer] = useState(false);
 
   useEffect(() => {
+    document.title = 'Terms and Conditions | Analytical Technical Consulting (ATC)';
     fetch('/api/policies/terms-of-service')
       .then((res) => res.json())
       .then((data) => {

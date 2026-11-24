@@ -57,10 +57,10 @@ export interface PolicyVersion {
 const POLICY_TARGETS = [
   {
     type: 'terms-of-service',
-    label: 'Terms of Service',
+    label: 'Terms and Conditions',
     description: 'Cloud infrastructure terms, SLA, acceptable use, and 90-day preservation.',
     icon: Scale,
-    publicUrl: '/terms-of-service',
+    publicUrl: '/Terms&Conditions',
   },
   {
     type: 'privacy-policy',
@@ -773,7 +773,7 @@ export default function AdminPoliciesTab() {
                     required
                     value={formTitle}
                     onChange={(e) => setFormTitle(e.target.value)}
-                    placeholder="e.g. Terms of Service & Cloud Agreement"
+                    placeholder="e.g. Cloud Services – Terms and Conditions"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-medium text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   />
                 </div>

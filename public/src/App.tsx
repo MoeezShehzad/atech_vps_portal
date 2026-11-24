@@ -211,7 +211,9 @@ function AppContent() {
             <Route path="/accept-invite" element={<AcceptInvite />} />
             <Route path="/configure" element={<AddtoCart />} />
             <Route path="/checkout" element={<Checkout />} />
-            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/Terms&Conditions" element={<TermsOfService />} />
+            <Route path="/terms" element={<Navigate to="/Terms&Conditions" replace />} />
+            <Route path="/terms-of-service" element={<Navigate to="/Terms&Conditions" replace />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />
 

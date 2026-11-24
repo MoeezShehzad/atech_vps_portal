@@ -624,7 +624,8 @@ export async function sendInvoiceReceiptEmail({ email, fullName, invoiceNumber, 
         </table>
       </div>
 
-      <p style="font-size:13px;color:#64748b;margin-bottom:0;">You can view and download your full printable PDF invoice anytime from the Billing & Invoices section.</p>
+      <p style="font-size:13px;color:#64748b;margin-bottom:8px;">You can view and download your full printable PDF invoice anytime from the Billing & Invoices section.</p>
+      <p style="font-size:12px;color:#334155;margin-bottom:0;"><strong>Link to Terms of Contract:</strong> <a href="https://www.atechconsult.com/Terms&Conditions" style="color:#2563eb;text-decoration:underline;">https://www.atechconsult.com/Terms&Conditions</a></p>
     `,
     ctaText: 'View Invoices in Portal',
     ctaUrl: invoiceUrl,
@@ -735,6 +736,9 @@ export async function sendSpecificationResizeReceiptEmail({
     <p style="font-size:12px;color:#64748b;line-height:1.5;">
       Your next monthly invoice will be unified automatically into a single renewal on ${formattedNextDate}. 
       You can review and download the official PDF receipt from your customer billing portal.
+    </p>
+    <p style="font-size:12px;color:#334155;line-height:1.5;margin-top:8px;">
+      <strong>Link to Terms of Contract:</strong> <a href="https://www.atechconsult.com/Terms&Conditions" style="color:#2563eb;text-decoration:underline;">https://www.atechconsult.com/Terms&Conditions</a>
     </p>
   `;
 
@@ -1009,6 +1013,9 @@ export async function sendTrialConvertedPaidEmail({ email, fullName, invoiceNumb
       <p style="font-size:13px;line-height:1.6;color:#64748b;">
         Your official tax invoice receipt has been generated and is available for download in your portal.
       </p>
+      <p style="font-size:12px;line-height:1.6;color:#334155;">
+        <strong>Link to Terms of Contract:</strong> <a href="https://www.atechconsult.com/Terms&Conditions" style="color:#2563eb;text-decoration:underline;">https://www.atechconsult.com/Terms&Conditions</a>
+      </p>
     `,
     ctaText: 'View Invoice & Server Dashboard',
     ctaUrl: `${APP_URL}/dashboard?tab=billing`,
@@ -1213,6 +1220,9 @@ export async function sendReactivationSuccessEmail({ email, fullName, vmName, pl
 
       <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:20px;">
         You can now power on your instance and launch the Web Terminal console from your dashboard:
+      </p>
+      <p style="font-size:12px;line-height:1.6;color:#334155;margin-bottom:20px;">
+        <strong>Link to Terms of Contract:</strong> <a href="https://www.atechconsult.com/Terms&Conditions" style="color:#2563eb;text-decoration:underline;">https://www.atechconsult.com/Terms&Conditions</a>
       </p>
     `,
     ctaText: 'Open VPS Dashboard',
