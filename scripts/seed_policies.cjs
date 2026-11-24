@@ -13,7 +13,7 @@ async function seedPolicies() {
       policyType: 'terms-of-service',
       title: 'Cloud Services – Terms and Conditions',
       version: 'v2.0',
-      summaryOfChanges: 'Official ATC Cloud Services Terms and Conditions (all 18 legal articles).',
+      summaryOfChanges: 'Official ATC Cloud Services Terms and Conditions (all 20 legal articles).',
       status: 'PUBLISHED',
       isCurrent: true,
       effectiveAt: new Date('2026-11-11T00:00:00.000Z'),
@@ -53,23 +53,22 @@ Service specifications will be determined by the customer's selected subscriptio
 
 ---
 
-## 3. Customer Account and Responsibilities
+## 3. Account Credentials, Password Security, and Confidentiality
 
 Customers are responsible for:
 
 - Providing accurate registration and billing information.
-- Maintaining the confidentiality of account credentials.
-- Protecting passwords, access keys, and administrative accounts.
-- Managing users and assigning appropriate access permissions.
-- Ensuring that their applications and data comply with applicable laws.
-- Maintaining their own application-level security.
-- Notifying ATC immediately of suspected unauthorized account access.
+- **Confidentiality of Account Credentials:** Customers are responsible for maintaining the confidentiality and security of all ATC Cloud, VPN, and associated account credentials. Login credentials must not be shared with unauthorized individuals, third parties, or personnel outside the customer's organization. Internal access must be restricted to authorized employees or administrators responsible for managing ATC Cloud and VPN services.
+- **Password Complexity Requirements:** Customers must use strong, unique passwords containing a combination of uppercase and lowercase letters, numbers, and special characters. Passwords must meet ATC's minimum security requirements and must not be reused across multiple accounts.
+- **Password Rotation Policy:** Customers are required to change their passwords no earlier than 30 days and no later than 90 days after the previous password change, unless an immediate change is necessary due to suspected unauthorized access or a security breach.
+- **Customer Accountability:** Customers are responsible for all activities performed using their assigned credentials and must immediately notify ATC (**admin@atechconsult.com**) of any suspected credential compromise, unauthorized access, or security incident.
+- **Security Best Practices:** ATC strongly recommends enabling multi-factor authentication (MFA) wherever supported and assigning individual user accounts rather than sharing administrator credentials.
 
 Customers are responsible for activities performed through their accounts, subject to applicable law.
 
 ---
 
-## 4. Acceptable Use Policy
+## 4. Suspension or Termination of Services Due to Suspicious Activities or Legal Enforcement
 
 Customers must not use ATC Cloud Services for:
 
@@ -82,22 +81,93 @@ Customers must not use ATC Cloud Services for:
 - Unauthorized cryptocurrency mining or resource abuse, where prohibited by the service plan.
 - Activities that compromise the security, stability, or availability of ATC infrastructure.
 
+**Right to Suspend or Terminate Services:** Analytical Technical Consulting (ATC) reserves the right, at its sole reasonable discretion, to immediately suspend, restrict, or terminate any customer's Cloud, VPN, hosting, storage, or associated services, without prior notice or customer authorization, if ATC detects or reasonably suspects illegal activities, unauthorized access, cybersecurity threats, fraudulent activities, misuse of infrastructure, or violations of ATC's Terms and Conditions.
+
+**Compliance with Law Enforcement and Regulatory Authorities:** ATC reserves the right to immediately suspend or terminate customer services upon receiving a legally valid order, directive, or enforceable request from authorized law enforcement agencies, courts, or regulatory authorities in the United States or any other applicable jurisdiction.
+
+**No Prior Notification Required:** Where immediate action is necessary to protect ATC's infrastructure, comply with applicable laws, or prevent potential security threats, ATC may take such action without providing advance notification or obtaining the customer's consent.
+
+**Refund and Compensation Policy:** To the maximum extent permitted by applicable law, customers shall not be entitled to refunds, credits, reimbursement, or compensation for service interruptions, suspensions, or terminations resulting from the customer's unlawful activities, security violations, or breaches of ATC's Terms and Conditions. Any prepaid fees shall remain non-refundable, except where otherwise required by applicable law or expressly stated in the applicable service agreement.
+
+**Limitation of Liability:** To the maximum extent permitted by applicable law, ATC shall not be liable for business interruptions, loss of revenue, operational disruptions, or other damages resulting from suspensions or terminations carried out in good faith and in accordance with applicable laws and these Terms and Conditions.
+
 ATC reserves the right to investigate reported violations and restrict, suspend, or terminate services when reasonably necessary and legally permitted.
 
 ---
 
-## 5. Service Availability and Maintenance
+## 5. Scheduled Maintenance, Emergency Maintenance, Service Availability, and Limitation of Liability
 
-- ATC will make commercially reasonable efforts to maintain cloud infrastructure availability.
-- Scheduled maintenance may be required for infrastructure upgrades, security updates, and hardware replacement.
-- Customers will receive advance notice of planned maintenance when reasonably practicable.
-- Emergency maintenance may be performed without advance notice when necessary to protect infrastructure.
-- Actual uptime commitments, if any, will be defined in a separate Service Level Agreement (SLA).
-- ATC does not guarantee uninterrupted or error-free service unless expressly agreed in writing.
+**Scheduled Maintenance:** ATC reserves the right to perform scheduled maintenance on its data center infrastructure, cloud platforms, VPN services, network equipment, storage systems, servers, and associated hardware and software. Such maintenance may include infrastructure upgrades, security patches, system optimization, hardware replacement, preventive maintenance, and other activities necessary to maintain or improve service reliability, performance, security, and operational efficiency.
+
+**Advance Maintenance Notifications:** ATC will make commercially reasonable efforts to provide customers with advance notification of scheduled maintenance whenever reasonably practicable. However, ATC does not guarantee that advance notification will be provided for every maintenance activity, particularly when operational circumstances, security concerns, or technical requirements demand immediate action.
+
+**Emergency and Unscheduled Maintenance:** ATC reserves the right to perform emergency, corrective, or unscheduled maintenance at any time, with or without prior notification or customer approval, when ATC reasonably determines that immediate intervention is necessary to protect its infrastructure, address security vulnerabilities, prevent hardware or software failures, restore services, or maintain the stability and integrity of its data center operations.
+
+**Potential Service Interruptions:** Customers acknowledge and accept that scheduled or emergency maintenance may result in temporary service interruptions, reduced performance, network connectivity issues, system restarts, or temporary unavailability of Cloud, VPN, hosting, storage, or other subscribed services. ATC will make commercially reasonable efforts to minimize service disruptions and restore normal operations as promptly as reasonably practicable.
+
+**Customer Acknowledgment and Responsibilities:** Customers acknowledge that infrastructure maintenance, system upgrades, and emergency technical interventions are essential components of providing secure, reliable, and efficient IT services. Customers are responsible for planning their business operations accordingly and maintaining appropriate application-level redundancy, backups, and disaster recovery arrangements unless such services are expressly included in their ATC subscription agreement.
+
+**Refunds, Credits, and Compensation:** To the maximum extent permitted by applicable law and subject to any expressly agreed Service Level Agreement (SLA), customers shall not be entitled to refunds, service credits, reimbursement, or financial compensation solely because of temporary or permanent service interruptions or performance degradation resulting from scheduled maintenance or emergency maintenance performed in good faith for legitimate operational, security, or infrastructure management purposes.
+
+**Service Level Agreement (SLA):** Any guaranteed uptime percentage, availability commitment, maintenance window, service credit, or specific performance obligation shall be governed exclusively by a separate written SLA executed or otherwise expressly agreed upon by ATC and the customer. In the event of any conflict between these Terms and Conditions and an applicable SLA, the SLA shall prevail with respect to the specific service commitments covered by that agreement.
+
+**No Guarantee of Uninterrupted Services:** Unless expressly agreed in writing, ATC does not warrant or guarantee that its Cloud, VPN, data center, hosting, network, or related services will operate continuously, without interruption, without errors, or without technical difficulties. In the event of any disaster—including but not limited to natural disasters, fire, flooding, power failures, hardware failures, network disruptions, or other unforeseen circumstances—the Customer shall assume responsibility for any resulting losses, including data loss, business interruption, revenue loss, and recovery expenses, unless specific protections, recovery obligations, or compensation provisions are expressly defined in a separate, mutually executed Service Level Agreement (SLA).
+
+Unless otherwise expressly agreed in writing, ATC shall not be obligated to provide disaster recovery, data restoration, compensation, refunds, or additional recovery services at its own expense. The Customer is responsible for maintaining adequate backups, disaster recovery arrangements, and appropriate business insurance. These limitations shall apply to the maximum extent permitted by applicable law.
+
+**Limitation of Liability:** To the maximum extent permitted by applicable law and subject to any applicable SLA, ATC shall not be liable for indirect, incidental, consequential, or special damages, including loss of business opportunities, revenue, profits, or productivity, arising from scheduled or emergency maintenance, temporary service interruptions, or reasonable infrastructure protection measures. Nothing in this provision shall exclude or limit liability that cannot lawfully be excluded or limited.
+
+**Services Not Covered Under the SLA:** Unless expressly specified in a written SLA or other applicable service agreement, ATC shall have no obligation to provide additional services, technical support, maintenance, compensation, refunds, service credits, or other benefits beyond the scope of the customer's subscribed services. ATC’s services are strictly limited to the provision of cloud infrastructure, allocated computing resources, and VPN connectivity as specified in the Customer’s subscription agreement, and do not include private and/or static IP addresses unless separately purchased and paid for by the Customer in billing.
+
+The Customer shall be solely responsible for the installation, configuration, administration, maintenance, security, monitoring, patching, troubleshooting, and management of their operating systems, databases, applications, and software hosted within the ATC cloud environment.
+
+ATC shall not be responsible for providing technical support or resolving issues related to Customer-managed systems, software, applications, or configurations unless such services are expressly included in a separate, mutually agreed SLA.
+
+Should the Customer require additional technical assistance from ATC, a separate support request or service ticket must be submitted. Such services shall be subject to availability, applicable service charges, and separate billing in accordance with ATC’s prevailing rates.
+
+The Customer shall bear all costs and risks associated with the management and operation of their own systems, applications, and data, subject to ATC’s expressly agreed contractual obligations and applicable law.
+
+ATC shall not be responsible for service commitments, performance guarantees, or additional obligations that are not expressly included in the agreed SLA or service contract. Any additional services requested by the customer shall be subject to ATC's approval, availability of resources, and applicable additional charges.
+
+To the maximum extent permitted by applicable law, ATC shall not be liable for losses, damages, service interruptions, or other claims arising from matters expressly excluded from the agreed scope of services, except where liability cannot legally be excluded or where otherwise required under the applicable service agreement.
+
+ATC does not guarantee uninterrupted or error-free service unless expressly agreed in writing.
 
 ---
 
-## 6. Data Ownership and Privacy
+## 6. Disaster Recovery (DR), Data Backup, Restoration, and Point-in-Time Recovery (PITR)
+
+**Service Scope and Customer Responsibilities:** Customers are solely responsible for implementing, maintaining, monitoring, and verifying their own data backup, disaster recovery (DR), data restoration, and Point-in-Time Recovery (PITR) solutions unless such services are expressly included in their ATC subscription agreement and governed by a separate, specifically defined Service Level Agreement (SLA).
+
+**Separate SLA Requirements:** Disaster Recovery (DR), automated backups, backup retention, data restoration, Point-in-Time Recovery (PITR), Recovery Point Objective (RPO), and Recovery Time Objective (RTO) are not included in ATC's standard Cloud, VPS, VPN, dedicated hosting, or infrastructure services unless explicitly purchased, documented, and agreed upon in writing.
+
+**Exclusion of Liability:** Unless otherwise specified in an applicable written SLA, ATC shall have no contractual obligation to provide backup restoration, disaster recovery activation, point-in-time data recovery, or related technical assistance. To the maximum extent permitted by applicable law, ATC shall not be liable for data loss, corruption, unavailability, or recovery failures arising from services that the customer has not subscribed to, except where liability cannot legally be excluded.
+
+**Additional Services and Charges:** Any backup, disaster recovery, restoration, or PITR services requested outside the customer's existing subscription or SLA shall be subject to ATC's technical assessment, resource availability, written approval, and applicable additional service charges. ATC does not guarantee successful data recovery where no valid or recoverable backup exists.
+
+---
+
+## 7. Cloud/VPN Services – Customer Insurance Requirements, Risk Allocation, and Limitation of Liability
+
+**Customer Insurance Responsibilities:** All customers subscribing to ATC Cloud, VPN, VPS, dedicated hosting, storage, or other data center services shall be responsible for obtaining and maintaining adequate insurance coverage, at their own expense, throughout the duration of their service agreement. Such coverage shall include, where applicable, Commercial General Liability (CGL), Professional Liability, Cyber Liability, Business Interruption, Workers' Compensation, Employers' Liability, and any other insurance required by applicable laws or the nature of the customer's business operations.
+
+**Umbrella and Additional Liability Insurance:** ATC strongly recommends that customers maintain Commercial Umbrella or Excess Liability Insurance to provide additional financial protection against claims, lawsuits, business interruptions, third-party liabilities, and other unforeseen circumstances that may arise from their business operations or reliance on cloud-based infrastructure.
+
+**Data Center Disasters and Unforeseen Events:** Customers acknowledge that data center and cloud infrastructure operations may be affected by unforeseen circumstances, including but not limited to natural disasters, fire, flooding, severe weather, power failures, network outages, hardware malfunctions, cybersecurity incidents, telecommunications disruptions, and other events beyond ATC's reasonable control. ATC shall make commercially reasonable efforts to maintain reliable infrastructure and restore affected services as promptly as reasonably practicable.
+
+**Customer Business Risk and Insurance Coverage:** Customers acknowledge that ATC provides Cloud, VPN, hosting, and infrastructure services on a subscription or rental basis and does not automatically provide insurance coverage for the customer's business operations, employees, customers, applications, data, revenue, or financial losses. Customers are responsible for evaluating their business risks and obtaining appropriate insurance protection against potential losses or liabilities.
+
+**Limitation of ATC Liability:** To the maximum extent permitted by applicable law, and subject to any expressly agreed Service Level Agreement (SLA), ATC shall not be liable for indirect, incidental, special, or consequential damages, including loss of business, revenue, profits, customers, or business opportunities arising from data center disasters, infrastructure failures, or service interruptions. Any direct liability shall be subject to the limitations and exclusions expressly established in the applicable service agreement.
+
+**Claims and Legal Proceedings:** To the maximum extent permitted by applicable law, customers agree not to seek compensation from ATC for losses arising solely from events beyond ATC's reasonable control or risks expressly assumed by the customer under these Terms and Conditions. Nothing in this provision shall prevent a customer from exercising legal rights or pursuing claims that cannot lawfully be waived or excluded.
+
+**No Automatic Refund or Compensation:** Unless expressly provided in a separate written SLA or required by applicable law, ATC shall not be obligated to provide refunds, service credits, reimbursements, or financial compensation for interruptions or losses resulting from qualifying force majeure events or circumstances expressly excluded from ATC's contractual responsibilities.
+
+**Customer Acknowledgment:** By subscribing to or using ATC's Cloud, VPN, hosting, or data center services, customers acknowledge that they are responsible for maintaining appropriate business insurance coverage and implementing reasonable business continuity, data protection, and risk management measures appropriate to their operations.
+
+---
+
+## 8. Data Ownership and Privacy
 
 - Customers retain ownership of their data, applications, and content.
 - ATC does not claim ownership of customer data hosted on its infrastructure.
@@ -108,20 +178,7 @@ ATC reserves the right to investigate reported violations and restrict, suspend,
 
 ---
 
-## 7. Backup and Data Recovery
-
-- Customers are responsible for maintaining appropriate backups unless backup services are expressly included in their subscription.
-
-Where ATC provides backup services:
-
-- Backup frequency and retention periods will follow the selected service plan.
-- Restoration requests will be handled according to the applicable service agreement.
-- Backup availability and recovery objectives will be defined in the relevant SLA or service documentation.
-- ATC recommends that customers maintain independent copies of critical business data.
-
----
-
-## 8. Security Responsibilities
+## 9. Security Responsibilities
 
 - ATC will maintain reasonable infrastructure-level security controls.
 - Customers are responsible for securing their virtual machines, applications, databases, operating systems, and user accounts unless ATC has expressly agreed to manage those components.
@@ -129,7 +186,7 @@ Where ATC provides backup services:
 
 ---
 
-## 9. Subscription Fees and Payment
+## 10. Subscription Fees and Payment
 
 - Cloud services are billed according to the selected subscription or service agreement.
 - Fees, billing frequency, and payment deadlines will be communicated before service activation.
@@ -139,7 +196,7 @@ Where ATC provides backup services:
 
 ---
 
-## 10. Resource Usage and Service Limits
+## 11. Resource Usage and Service Limits
 
 Customers must operate within their allocated resources, including:
 
@@ -156,7 +213,7 @@ Any additional resource requirements must be approved and may be subject to addi
 
 ---
 
-## 11. Suspension and Termination
+## 12. Suspension and Termination
 
 ATC may suspend or terminate services in circumstances including:
 
@@ -173,7 +230,7 @@ Upon termination, customers should retrieve their data before the applicable dat
 
 ---
 
-## 12. Limitation of Liability
+## 13. Limitation of Liability
 
 To the maximum extent permitted by applicable law, ATC will not be liable for indirect, incidental, special, consequential, or punitive damages, including loss of profits, business interruption, or loss of business opportunities.
 
@@ -183,7 +240,7 @@ Nothing in these Terms excludes liability that cannot legally be excluded.
 
 ---
 
-## 13. Third-Party Services
+## 14. Third-Party Services
 
 Certain services may depend on third-party software, hardware, telecommunications providers, licensing arrangements, or external infrastructure.
 
@@ -191,7 +248,7 @@ Such services may be subject to separate third-party terms and conditions. ATC i
 
 ---
 
-## 14. Changes to Services and Terms
+## 15. Changes to Services and Terms
 
 ATC reserves the right to update its services, infrastructure, pricing, and these Terms and Conditions.
 
@@ -201,13 +258,13 @@ Continued use of the services after the effective date of an update constitutes 
 
 ---
 
-## 15. Force Majeure
+## 16. Force Majeure
 
 ATC will not be responsible for delays or failures caused by circumstances beyond its reasonable control, including natural disasters, power outages, telecommunications failures, cyberattacks, government actions, war, and other extraordinary events.
 
 ---
 
-## 16. Governing Law and Jurisdiction
+## 17. Governing Law and Jurisdiction
 
 These Terms and Conditions will be governed by the laws of the State of Illinois, United States, unless otherwise required by applicable law or specified in a separate written agreement.
 
@@ -215,7 +272,7 @@ Any disputes will be handled by the courts of competent jurisdiction, subject to
 
 ---
 
-## 17. Contact and Support
+## 18. Contact and Support
 
 For cloud service inquiries, technical support, billing questions, or contractual matters, customers may contact:
 
@@ -226,15 +283,19 @@ Cloud Infrastructure and Technical Services
 
 ---
 
-## 18. Final Agreement
+## 19. Storage Volume Detachment, Force-Delete & Customer Action Liability Waiver
+
+Customer expressly acknowledges and agrees that any detachment, force-detachment (while processes or file handles remain active), unmounting, partitioning, re-formatting, mount-path overwriting, or permanent deletion of primary OS disks or secondary attachable cloud block storage volumes initiated by Customer or Customer's users is performed strictly at Customer's sole risk. **ATC shall not be responsible or liable under any circumstances for any filesystem corruption, unmerged snapshot chain data loss, or deletion of data caused by Customer action or Customer mistake.**
+
+---
+
+## 20. Final Agreement
 
 These Terms and Conditions, together with the applicable subscription agreement, Service Level Agreement (SLA), Privacy Policy, and Acceptable Use Policy, constitute the governing terms for ATC Cloud Services.
 
 By purchasing or using ATC Cloud Services, customers acknowledge that they have read, understood, and agreed to these Terms and Conditions.
 
-NOTE: We are currently updating the Terms and Conditions governing ATC's Cloud, Storage, and related services. The revised Terms and Conditions will be published on this portal within the next few days. We will also make reasonable efforts to distribute the updated document to clients via email.
-
-All clients will be required to review and formally accept the updated Terms and Conditions to continue using ATC's Cloud, Storage, and related services. Continued use of the services will be subject to the applicable terms and conditions.`
+NOTE: We are currently updating the Terms and Conditions governing ATC's Cloud, Storage, and related services. The revised Terms and Conditions will be published on this portal within the next few days. We will also make reasonable efforts to distribute the updated document to clients via email. All clients will be required to review and formally accept the updated Terms and Conditions to continue using ATC's Cloud, Storage, and related services. Continued use of the services will be subject to the applicable terms and conditions.`
     },
     {
       policyType: 'privacy-policy',
