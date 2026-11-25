@@ -19,6 +19,7 @@ import { generateGuacamoleToken, buildRdpConnectionPayload } from '../services/g
 import { registerConsoleTicket } from '../services/terminalService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
 import { autoExpandPrimaryOsFilesystem, getPlanNasQuota, autoFormatAndMountOnGuest } from './volumeController.js';
+import { logVmEvent, extractClientIp, extractActorContext } from '../services/auditLogService.js';
 
 // Concurrency lock: prevents double-click race conditions on active subscription slots
 const activeProvisioningSlots = new Set();
@@ -931,10 +932,29 @@ export async function powerAction(req, res) {
     } catch (hvErr) {
       console.warn(`[Hyper-V Power Notice] ${vm.vmName} ${normAction}:`, hvErr.message);
       const msg = (hvErr.message || '').toLowerCase();
-      // If action is STOP/FORCE_STOP and machine is already off or stopped, treat as success
-      if ((normAction === 'STOP' || normAction === 'FORCE_STOP') && (msg.includes('off') || msg.includes('not running') || msg.includes('stopped'))) {
+      // Never treat host-agent offline / connectivity / permission errors as a successful power state!
+      const isHostError =
+        msg.includes('offline') ||
+        msg.includes('unreachable') ||
+        msg.includes('hyperv_agent') ||
+        msg.includes('econnrefused') ||
+        msg.includes('fetch failed') ||
+        msg.includes('timed out') ||
+        msg.includes('timeout') ||
+        msg.includes('permission denied');
+
+      // Only treat explicit Hyper-V "already in target state" messages as success
+      if (
+        !isHostError &&
+        (normAction === 'STOP' || normAction === 'FORCE_STOP') &&
+        (msg.includes('already off') || msg.includes('turned off') || msg.includes('is off') || msg.includes('not running') || msg.includes('already stopped'))
+      ) {
         powerResult = { Status: 'SUCCESS', State: 'Off' };
-      } else if (normAction === 'START' && (msg.includes('already running') || msg.includes('running'))) {
+      } else if (
+        !isHostError &&
+        normAction === 'START' &&
+        (msg.includes('already running') || msg.includes('is already in the specified state'))
+      ) {
         powerResult = { Status: 'SUCCESS', State: 'Running' };
       } else {
         // Dispatch urgent alert to customer support
@@ -978,6 +998,19 @@ export async function powerAction(req, res) {
         details: `Executed power action ${normAction} on ${vm.vmName}`,
       },
     });
+
+    const actorCtx = extractActorContext(req);
+    logVmEvent({
+      ...actorCtx,
+      vmId,
+      vmName: vm.vmName,
+      category: 'lifecycle',
+      level: 'INFO',
+      action: `POWER_${normAction}`,
+      status: 'SUCCESS',
+      details: { newStatus, message: `Executed power action ${normAction} on ${vm.vmName}` },
+      skipDb: true,
+    }).catch(() => {});
 
     return res.json({
       success: true,
@@ -1154,6 +1187,19 @@ export async function resizeVM(req, res) {
       },
     });
 
+    const resizeActor = extractActorContext(req);
+    logVmEvent({
+      ...resizeActor,
+      vmId,
+      vmName: vm.vmName,
+      category: 'provisioning',
+      level: 'INFO',
+      action: 'RESIZE_SPECS',
+      status: 'SUCCESS',
+      details: { targetCpu, targetRam, targetStorage, dueToday: priceInfo.dueToday, newMonthlyRate: priceInfo.newPrice },
+      skipDb: true,
+    }).catch(() => {});
+
     // Send Enterprise Email Receipt (asynchronous / non-blocking)
     try {
       const user = await prisma.user.findUnique({
@@ -1294,6 +1340,19 @@ export async function destroyVM(req, res) {
         status: 'SUCCESS',
         details: `Permanently destroyed virtual machine ${vm.vmName} and released IP. ${isSubscriptionActive ? 'Active subscription slot preserved for re-deployment.' : ''}`,
       },
+    }).catch(() => {});
+
+    const destroyActor = extractActorContext(req);
+    logVmEvent({
+      ...destroyActor,
+      vmId: null,
+      vmName: vm.vmName,
+      category: 'lifecycle',
+      level: 'WARN',
+      action: 'DESTROY_VM',
+      status: 'SUCCESS',
+      details: { releasedPublicIp: vm.publicIp || null, subscriptionActive: isSubscriptionActive },
+      skipDb: true,
     }).catch(() => {});
 
     return res.json({
@@ -1492,14 +1551,13 @@ export async function getConsoleSession(req, res) {
       ? vm.ipPool[0].ipAddress 
       : null;
 
-    // Always verify live guest IP from Hyper-V agent so DHCP subnet changes after reboot are picked up immediately
-    {
+    // Helper to refresh live guest IP from Hyper-V agent and sync DB
+    const refreshLiveGuestIp = async () => {
       try {
         const live = await hypervService.getStatus(vm.vmName);
         if (live && live.IPAddresses && live.IPAddresses.length > 0) {
           const liveIp = live.IPAddresses.find((ip) => ip && ip !== '127.0.0.1' && !ip.includes(':'));
           if (liveIp) {
-            targetIp = liveIp;
             if (vm.ipPool && vm.ipPool.length > 0) {
               if (vm.ipPool[0].ipAddress !== liveIp) {
                 await prisma.iPPool.update({
@@ -1519,9 +1577,20 @@ export async function getConsoleSession(req, res) {
                 },
               }).catch((err) => console.error('[iPPool create error]:', err.message));
             }
+            return liveIp;
           }
         }
       } catch {}
+      return null;
+    };
+
+    // Fast path: if DB already has a valid IP, issue the ticket immediately (0ms wait)
+    // and refresh Hyper-V IP in the background so startup doesn't stall for 2-6 seconds.
+    if (targetIp) {
+      refreshLiveGuestIp().catch(() => {});
+    } else {
+      const liveIp = await refreshLiveGuestIp();
+      if (liveIp) targetIp = liveIp;
     }
 
     if (!targetIp) {
@@ -1558,6 +1627,18 @@ export async function getConsoleSession(req, res) {
         },
       }).catch(() => {});
 
+      const rdpActor = extractActorContext(req);
+      logVmEvent({
+        ...rdpActor,
+        vmId,
+        vmName: vm.vmName,
+        category: 'console-sessions',
+        level: 'INFO',
+        action: 'CONSOLE_RDP_OPEN',
+        status: 'SUCCESS',
+        details: { protocol: 'RDP_GUACAMOLE', targetIp, rdpUser: vm.adminUser || 'user' },
+      }).catch(() => {});
+
       return res.json({
         success: true,
         isWindows: true,
@@ -1590,14 +1671,27 @@ export async function getConsoleSession(req, res) {
     const ticket = registerConsoleTicket(jwtTicket, 5 * 60 * 1000);
 
     // Record web console access in audit trail
+    const sshActor = extractActorContext(req);
     await prisma.securityLog.create({
       data: {
         userId,
         action: 'WEB_CONSOLE_ACCESS',
-        ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+        ipAddress: sshActor.actorIp,
         result: 'SUCCESS',
         details: `Established SSH Web Console terminal bridge for VM '${vm.vmName}' (${targetIp})`,
       },
+    }).catch(() => {});
+
+    logVmEvent({
+      ...sshActor,
+      vmId,
+      vmName: vm.vmName,
+      category: 'console-sessions',
+      level: 'INFO',
+      action: 'CONSOLE_SSH_TICKET',
+      status: 'SUCCESS',
+      details: { protocol: 'SSH', targetIp, sshUser: vm.adminUser || 'ubuntu' },
+      skipDb: true,
     }).catch(() => {});
 
     return res.json({
@@ -2289,6 +2383,20 @@ export async function addVMFirewallRule(req, res) {
       },
     }).catch(() => {});
 
+    logVmEvent({
+      userId,
+      vmId,
+      vmName: vm.vmName,
+      category: 'activity',
+      level: 'INFO',
+      action: 'FIREWALL_ADD_RULE',
+      status: 'SUCCESS',
+      actor: req.user?.email || `user:${userId}`,
+      actorIp: extractClientIp(req),
+      details: { rule },
+      skipDb: true,
+    }).catch(() => {});
+
     return res.status(201).json({ success: true, rule });
   } catch (err) {
     console.error('[addVMFirewallRule Error]:', err);
@@ -2322,6 +2430,20 @@ export async function deleteVMFirewallRule(req, res) {
         status: 'SUCCESS',
         details: `Deleted firewall rule ${ruleId} from VM '${vm.vmName}'`,
       },
+    }).catch(() => {});
+
+    logVmEvent({
+      userId,
+      vmId,
+      vmName: vm.vmName,
+      category: 'activity',
+      level: 'INFO',
+      action: 'FIREWALL_DELETE_RULE',
+      status: 'SUCCESS',
+      actor: req.user?.email || `user:${userId}`,
+      actorIp: extractClientIp(req),
+      details: { ruleId },
+      skipDb: true,
     }).catch(() => {});
 
     return res.json({ success: true, message: 'Firewall rule removed successfully' });
@@ -2361,5 +2483,76 @@ export async function reactivateVMInstance(req, res) {
   } catch (err) {
     console.error('[reactivateVMInstance Error]:', err.message);
     return res.status(400).json({ error: err.message });
+  }
+}
+
+/**
+ * 25. GET /api/vms/:id/logs - Customer-Facing Unified VM Audit & Host Log Viewer
+ *     Merges structured host logs from D:\CUSTOMER-VMS\<VMName>\Logs\ with
+ *     control-plane Activity_Logs from the database (strictly RBAC-scoped).
+ */
+export async function getVMLogs(req, res) {
+  try {
+    const userId = req.user?.userId;
+    const vmId = decodeResourceId(req.params.id);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const authResult = await getAuthorizedVm(vmId, userId, {
+      allowedRoles: ['owner', 'admin', 'devops', 'member', 'viewer'],
+    });
+    if (authResult.error) return res.status(authResult.status || 403).json({ error: authResult.error });
+    const { vm } = authResult;
+
+    const category = String(req.query.category || 'all');
+    const level = String(req.query.level || '');
+    const search = String(req.query.search || '');
+    const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 500);
+
+    // Fetch per-VM host JSONL logs + database Activity_Logs in parallel
+    const [hostRes, dbLogs] = await Promise.all([
+      hypervService
+        .getVmLogs(vm.vmName, { category, level, search, limit, includeArchived: false })
+        .catch(() => ({ logs: [], total: 0, hostOffline: true })),
+      prisma.activityLog
+        .findMany({
+          where: { vmId: Number(vm.vmId) },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          include: { user: { select: { email: true, fullName: true } } },
+        })
+        .catch(() => []),
+    ]);
+
+    const normalizedDbLogs = dbLogs.map((row) => ({
+      timestamp: row.createdAt?.toISOString?.() || new Date().toISOString(),
+      vmName: vm.vmName,
+      category: 'activity',
+      level: row.status === 'FAILED' ? 'ERROR' : 'INFO',
+      action: row.action,
+      status: row.status,
+      source: 'portal-db',
+      actor: row.user?.email || (row.userId ? `user:${row.userId}` : null),
+      details: row.details,
+    }));
+
+    const hostLogs = Array.isArray(hostRes?.logs) ? hostRes.logs : [];
+    const combined =
+      category === 'all' || category === 'activity'
+        ? [...hostLogs, ...normalizedDbLogs]
+        : hostLogs;
+
+    combined.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+
+    return res.json({
+      success: true,
+      vmName: vm.vmName,
+      category,
+      hostOnline: !hostRes?.hostOffline,
+      total: combined.length,
+      logs: combined.slice(0, limit),
+    });
+  } catch (err) {
+    console.error('[getVMLogs Error]:', err);
+    return res.status(500).json({ error: 'Failed to retrieve VM logs' });
   }
 }

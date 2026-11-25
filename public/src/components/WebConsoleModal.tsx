@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import {
   X,
@@ -38,10 +39,14 @@ export default function WebConsoleModal({
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermInstance = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const webglAddonRef = useRef<WebglAddon | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const httpSessionIdRef = useRef<string | null>(null);
+  const httpUseSseRef = useRef<boolean>(false);
   const httpInputBufferRef = useRef<string>('');
-  const httpFlushTimerRef = useRef<any>(null);
+  const httpFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingInputQueue = useRef<string[]>([]);
 
   const displayName = siteName || vmName || 'Web Terminal';
@@ -52,6 +57,9 @@ export default function WebConsoleModal({
   }, [onSessionEnd]);
 
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
+  const [transportMode, setTransportMode] = useState<'ws' | 'sse' | 'http' | null>(null);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [rendererMode, setRendererMode] = useState<'webgl' | 'dom'>('dom');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
 
@@ -65,7 +73,11 @@ export default function WebConsoleModal({
     try {
       const res = await apiCall('/ws/terminal-http', {
         method: 'POST',
-        body: JSON.stringify({ action: 'poll', sessionId: sid, input: chunk }),
+        body: JSON.stringify({
+          action: httpUseSseRef.current ? 'input' : 'poll',
+          sessionId: sid,
+          input: chunk,
+        }),
       });
       if (!isMountedRef.current) return;
       if (res?.output && xtermInstance.current) {
@@ -73,6 +85,10 @@ export default function WebConsoleModal({
       }
       if (res?.closed) {
         httpSessionIdRef.current = null;
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
         setConnectionStatus('disconnected');
         onSessionEndRef.current?.();
       }
@@ -122,8 +138,9 @@ export default function WebConsoleModal({
           flushHttpInput();
         }
 
-        // Long-poll loop for streaming SSH output over standard HTTPS / HTTP3
-        const pollLoop = async () => {
+        const startPollLoop = async () => {
+          httpUseSseRef.current = false;
+          setTransportMode('http');
           while (isMountedRef.current && httpSessionIdRef.current === sid) {
             try {
               const res = await apiCall('/ws/terminal-http', {
@@ -141,11 +158,53 @@ export default function WebConsoleModal({
                 break;
               }
             } catch {
-              await new Promise((r) => setTimeout(r, 600));
+              await new Promise((r) => setTimeout(r, 400));
             }
           }
         };
-        pollLoop();
+
+        // Prefer real-time SSE streaming over repeated HTTP POST polling
+        if (typeof EventSource !== 'undefined') {
+          try {
+            const es = new EventSource(`/api/ws/terminal-http/stream?sessionId=${encodeURIComponent(sid)}`);
+            eventSourceRef.current = es;
+            httpUseSseRef.current = true;
+            setTransportMode('sse');
+            let sseConnected = false;
+
+            es.onopen = () => {
+              sseConnected = true;
+            };
+
+            es.onmessage = (evt) => {
+              if (!isMountedRef.current || httpSessionIdRef.current !== sid) return;
+              try {
+                const payload = JSON.parse(evt.data);
+                if (payload.o && xtermInstance.current) {
+                  xtermInstance.current.write(payload.o);
+                }
+                if (payload.closed) {
+                  es.close();
+                  eventSourceRef.current = null;
+                  httpSessionIdRef.current = null;
+                  setConnectionStatus('disconnected');
+                  onSessionEndRef.current?.();
+                }
+              } catch {}
+            };
+
+            es.onerror = () => {
+              if (!sseConnected && isMountedRef.current && httpSessionIdRef.current === sid) {
+                es.close();
+                eventSourceRef.current = null;
+                startPollLoop();
+              }
+            };
+            return;
+          } catch {}
+        }
+
+        startPollLoop();
       } catch (err: any) {
         if (!isMountedRef.current) return;
         setConnectionStatus('disconnected');
@@ -160,7 +219,15 @@ export default function WebConsoleModal({
     if (!xtermInstance.current || !isMountedRef.current) return;
     const term = xtermInstance.current;
 
-    // Close any previous socket or HTTP fallback session cleanly
+    // Close any previous socket, SSE stream, ping timer, or HTTP fallback session cleanly
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
     if (socketRef.current) {
       socketRef.current.onclose = null;
       socketRef.current.close();
@@ -169,6 +236,7 @@ export default function WebConsoleModal({
     if (httpSessionIdRef.current) {
       const oldSid = httpSessionIdRef.current;
       httpSessionIdRef.current = null;
+      httpUseSseRef.current = false;
       apiCall('/ws/terminal-http', {
         method: 'POST',
         body: JSON.stringify({ action: 'close', sessionId: oldSid }),
@@ -176,6 +244,8 @@ export default function WebConsoleModal({
     }
 
     setConnectionStatus('connecting');
+    setTransportMode(null);
+    setLatencyMs(null);
     term.write('\r\n\x1b[36m[Console]\x1b[0m Requesting secure session ticket...\r\n');
 
     try {
@@ -203,6 +273,7 @@ export default function WebConsoleModal({
       }
 
       const ws = new WebSocket(wsUrl);
+      ws.binaryType = 'arraybuffer';
       socketRef.current = ws;
       let wsOpened = false;
       let fallbackTriggered = false;
@@ -218,12 +289,16 @@ export default function WebConsoleModal({
         wsOpened = true;
         if (!isMountedRef.current) return;
         setConnectionStatus('connected');
+        setTransportMode('ws');
 
-        // Immediate fit & focus
+        // Immediate fit, focus & PTY size sync
         try {
           fitAddonRef.current?.fit();
           term.focus();
           terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
+          if (term.cols && term.rows && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+          }
         } catch {}
 
         // Flush any early typed keystrokes while ticket was granting or WS was connecting
@@ -234,36 +309,40 @@ export default function WebConsoleModal({
           }
         }
 
-        setTimeout(() => {
-          if (!isMountedRef.current) return;
-          try {
-            fitAddonRef.current?.fit();
-            term.focus();
-            terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
-            if (term.cols && term.rows && ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-            }
-          } catch {}
-        }, 80);
+        // Measure live WebSocket RTT every 10s
+        const sendPing = () => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping', t: Date.now() }));
+          }
+        };
+        sendPing();
+        pingIntervalRef.current = setInterval(sendPing, 10000);
       };
 
       let initialPromptFocused = false;
       ws.onmessage = (event) => {
-        term.write(event.data);
+        if (event.data instanceof ArrayBuffer) {
+          // Fast path: raw binary SSH output directly into xterm without UTF-8 re-encoding
+          term.write(new Uint8Array(event.data));
+        } else if (typeof event.data === 'string') {
+          if (event.data.charCodeAt(0) === 123 && event.data.startsWith('{"type":"pong"')) {
+            try {
+              const parsed = JSON.parse(event.data);
+              if (typeof parsed.t === 'number') {
+                setLatencyMs(Math.max(1, Date.now() - parsed.t));
+              }
+              return;
+            } catch {}
+          }
+          term.write(event.data);
+        }
+
         if (!initialPromptFocused) {
           initialPromptFocused = true;
           try {
-            fitAddonRef.current?.fit();
             term.focus();
             terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
           } catch {}
-          setTimeout(() => {
-            try {
-              fitAddonRef.current?.fit();
-              term.focus();
-              terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
-            } catch {}
-          }, 60);
         }
       };
 
@@ -280,6 +359,10 @@ export default function WebConsoleModal({
       };
 
       ws.onclose = () => {
+        if (pingIntervalRef.current) {
+          clearInterval(pingIntervalRef.current);
+          pingIntervalRef.current = null;
+        }
         if (!isMountedRef.current) return;
         if (!wsOpened) {
           triggerHttpFallback();
@@ -311,7 +394,9 @@ export default function WebConsoleModal({
       cursorStyle: 'block',
       fontSize: 13,
       lineHeight: 1.25,
-      scrollback: 2000,
+      scrollback: 3000,
+      scrollSensitivity: 3,
+      fastScrollSensitivity: 5,
       fontFamily: '"Fira Code", Menlo, Monaco, "Courier New", monospace',
       theme: {
         background: '#090d16',
@@ -334,13 +419,30 @@ export default function WebConsoleModal({
     currentContainer.innerHTML = '';
     term.open(currentContainer);
 
+    // Enable GPU-accelerated WebGL rendering with automatic DOM fallback
+    try {
+      const webglAddon = new WebglAddon();
+      webglAddon.onContextLoss(() => {
+        try {
+          webglAddon.dispose();
+        } catch {}
+        webglAddonRef.current = null;
+        if (isMountedRef.current) setRendererMode('dom');
+      });
+      term.loadAddon(webglAddon);
+      webglAddonRef.current = webglAddon;
+      setRendererMode('webgl');
+    } catch {
+      webglAddonRef.current = null;
+      setRendererMode('dom');
+    }
+
     xtermInstance.current = term;
     fitAddonRef.current = fitAddon;
 
-    // Helper to reliably fit and focus the terminal helper textarea
-    const triggerFitAndFocus = () => {
+    // Focus helper (no forced layout reflow)
+    const triggerFocus = () => {
       try {
-        fitAddon.fit();
         term.focus();
         currentContainer.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
       } catch {}
@@ -355,7 +457,7 @@ export default function WebConsoleModal({
         if (httpFlushTimerRef.current) clearTimeout(httpFlushTimerRef.current);
         httpFlushTimerRef.current = setTimeout(() => {
           flushHttpInput();
-        }, 12);
+        }, 4);
       } else {
         pendingInputQueue.current.push(data);
       }
@@ -419,15 +521,15 @@ export default function WebConsoleModal({
     };
     currentContainer.addEventListener('contextmenu', handleContextMenu);
 
-    // Container interaction focus listeners
+    // Container interaction focus listeners (focus only — no layout reflow on every click)
     const handlePointerFocus = () => {
-      triggerFitAndFocus();
+      triggerFocus();
     };
     currentContainer.addEventListener('mousedown', handlePointerFocus);
-    currentContainer.addEventListener('pointerdown', handlePointerFocus);
 
     let lastCols = 0;
     let lastRows = 0;
+    let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     const sendResize = () => {
       try {
         fitAddon.fit();
@@ -440,7 +542,7 @@ export default function WebConsoleModal({
             apiCall('/ws/terminal-http', {
               method: 'POST',
               body: JSON.stringify({
-                action: 'poll',
+                action: httpUseSseRef.current ? 'input' : 'poll',
                 sessionId: httpSessionIdRef.current,
                 resize: { cols: term.cols, rows: term.rows },
               }),
@@ -450,54 +552,54 @@ export default function WebConsoleModal({
       } catch {}
     };
 
-    // ResizeObserver watches modal container animations and window changes continuously
+    const scheduleResize = () => {
+      if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
+      resizeDebounceTimer = setTimeout(() => {
+        requestAnimationFrame(sendResize);
+      }, 60);
+    };
+
+    // Debounced ResizeObserver avoids reflow thrashing during CSS modal/fullscreen transitions
     const resizeObserver = new ResizeObserver((entries) => {
       if (!entries || entries.length === 0) return;
       const entry = entries[0];
       if (entry.contentRect.width > 50 && entry.contentRect.height > 50) {
-        sendResize();
+        scheduleResize();
       }
     });
     resizeObserver.observe(currentContainer);
 
     const handleWindowResize = () => {
-      sendResize();
-      triggerFitAndFocus();
+      scheduleResize();
     };
     window.addEventListener('resize', handleWindowResize);
 
-    // Focus sequence: immediate, animation frame, and after CSS modal transition completes
-    triggerFitAndFocus();
-    requestAnimationFrame(triggerFitAndFocus);
-    setTimeout(triggerFitAndFocus, 100);
-    setTimeout(triggerFitAndFocus, 250);
-    setTimeout(triggerFitAndFocus, 500);
-
-    // Continuous focus guard while ticket is granted and SSH establishes
-    const focusInterval = setInterval(() => {
-      if (!isMountedRef.current) return;
-      const ta = currentContainer.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
-      if (ta && document.activeElement !== ta) {
-        triggerFitAndFocus();
-      }
-    }, 200);
-    const stopFocusTimer = setTimeout(() => {
-      clearInterval(focusInterval);
-    }, 4000);
+    // One-time initial fit & focus
+    requestAnimationFrame(() => {
+      sendResize();
+      triggerFocus();
+    });
 
     // Initial connection
     connectSession();
 
     return () => {
       isMountedRef.current = false;
-      clearInterval(focusInterval);
-      clearTimeout(stopFocusTimer);
+      if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
+      if (httpFlushTimerRef.current) clearTimeout(httpFlushTimerRef.current);
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
       window.removeEventListener('resize', handleWindowResize);
       window.removeEventListener('paste', handleNativePaste);
       currentContainer.removeEventListener('paste', handleNativePaste);
       currentContainer.removeEventListener('contextmenu', handleContextMenu);
       currentContainer.removeEventListener('mousedown', handlePointerFocus);
-      currentContainer.removeEventListener('pointerdown', handlePointerFocus);
       resizeObserver.disconnect();
       onDataDisposable.dispose();
       if (socketRef.current) {
@@ -512,9 +614,13 @@ export default function WebConsoleModal({
           body: JSON.stringify({ action: 'close', sessionId: sid }),
         }).catch(() => {});
       }
+      try {
+        webglAddonRef.current?.dispose();
+        webglAddonRef.current = null;
+      } catch {}
       term.dispose();
     };
-  }, [vmId]); // Strictly runs once per vmId
+  }, [vmId, siteId]); // Strictly runs once per target session
 
   const handleReconnect = () => {
     if (xtermInstance.current) {
@@ -575,10 +681,10 @@ export default function WebConsoleModal({
 
       {/* 2. FULL / RESTORED CONSOLE MODAL */}
       <div 
-        className={`fixed inset-0 z-[120] transition-opacity duration-200 ${
+        className={`fixed inset-0 z-[120] transition-opacity duration-150 ${
           isMinimized 
             ? 'pointer-events-none opacity-0' 
-            : 'bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 md:p-6 opacity-100'
+            : 'bg-slate-950/85 flex items-center justify-center p-3 md:p-6 opacity-100'
         }`}
       >
         <div 
@@ -662,6 +768,25 @@ export default function WebConsoleModal({
               }>
                 {connectionStatus.toUpperCase()}
               </strong>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {transportMode && (
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                  transportMode === 'ws'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                }`}>
+                  {transportMode === 'ws'
+                    ? `WS${latencyMs !== null ? ` · ${latencyMs}ms` : ''}`
+                    : transportMode === 'sse'
+                    ? 'HTTP SSE'
+                    : 'HTTP POLL'}
+                </span>
+              )}
+              <span className="text-[10px] text-slate-500 uppercase">
+                {rendererMode === 'webgl' ? 'WebGL GPU' : 'DOM'}
+              </span>
             </div>
           </div>
         </div>

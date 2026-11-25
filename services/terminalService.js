@@ -1,12 +1,36 @@
 import { decryptVmPassword, decodeResourceId } from './cryptoService.js';
 import crypto from 'crypto';
 import net from 'net';
+import { StringDecoder } from 'string_decoder';
 import { WebSocketServer } from 'ws';
 import jwt from 'jsonwebtoken';
 import { Client as SSHClient } from 'ssh2';
 import prisma from '../lib/prisma.js';
 import hypervService from './hypervService.js';
 import { sendVmFailureAlertToSupport } from './emailService.js';
+import { logVmEvent, extractClientIp } from './auditLogService.js';
+
+// Fast hardware-accelerated SSH cipher preference (avoids slow legacy ciphers & zlib compression lag)
+const FAST_SSH_ALGORITHMS = {
+  cipher: [
+    'aes128-gcm@openssh.com',
+    'aes256-gcm@openssh.com',
+    'chacha20-poly1305@openssh.com',
+    'aes128-ctr',
+    'aes192-ctr',
+    'aes256-ctr',
+  ],
+  compress: ['none'],
+};
+
+function sendStreamChunk(ws, data) {
+  if (ws.readyState !== ws.OPEN) return;
+  if (ws.isHttpAdapter) {
+    ws.send(data);
+  } else {
+    ws.send(data, { binary: true });
+  }
+}
 
 // Short opaque ticket store so WebSocket URLs never expose long base64 JWTs / internal IPs to external WAF/IPS
 const consoleTicketStore = new Map();
@@ -34,7 +58,8 @@ function resolveConsoleTicket(rawTicket) {
 }
 
 export function setupTerminalWebSocket(server) {
-  const wss = new WebSocketServer({ noServer: true });
+  // Disable perMessageDeflate so interactive keystrokes & SSH packets are never delayed by zlib buffering
+  const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
 
   server.on('upgrade', (request, socket, head) => {
     try {
@@ -65,6 +90,7 @@ export function setupTerminalWebSocket(server) {
 
 // ============================================================================
 // HTTPS Terminal Transport Fallback (Bypasses ISP TCP WebSocket DPI Resets)
+// Supports real-time Server-Sent Events (SSE) output + low-latency POST input
 // ============================================================================
 const httpTerminalSessions = new Map();
 
@@ -79,22 +105,80 @@ setInterval(() => {
 }, 30000);
 
 export function setupTerminalHttpFallback(app) {
+  // Real-time SSE output stream for HTTP fallback (replaces slow repeated POST long-polling)
+  app.get('/api/ws/terminal-http/stream', (req, res) => {
+    const sid = String(req.query.sessionId || '');
+    const adapter = httpTerminalSessions.get(sid);
+    if (!adapter || adapter.readyState !== 1) {
+      return res.status(404).end();
+    }
+
+    if (req.socket) req.socket.setNoDelay(true);
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    adapter.lastActive = Date.now();
+    adapter.sseClients.add(res);
+
+    // Flush any buffered output immediately
+    if (adapter.outChunks.length > 0) {
+      const payload = adapter.outChunks.splice(0).join('');
+      res.write(`data: ${JSON.stringify({ o: payload })}\n\n`);
+      res.flush?.();
+    }
+
+    const keepalive = setInterval(() => {
+      if (res.writableEnded) return clearInterval(keepalive);
+      adapter.lastActive = Date.now();
+      res.write(': ping\n\n');
+      res.flush?.();
+    }, 20000);
+
+    req.on('close', () => {
+      clearInterval(keepalive);
+      adapter.sseClients.delete(res);
+    });
+  });
+
   app.post('/api/ws/terminal-http', async (req, res) => {
     try {
+      if (req.socket) req.socket.setNoDelay(true);
       const { action, ticket, vmId, siteId, sessionId, input, resize, cols, rows, waitMs } = req.body || {};
 
       if (action === 'open') {
         const sid = crypto.randomBytes(12).toString('hex');
+        const decoder = new StringDecoder('utf8');
         const adapter = {
+          isHttpAdapter: true,
           OPEN: 1,
           readyState: 1,
           outChunks: [],
           waiters: new Set(),
+          sseClients: new Set(),
           listeners: { message: [], close: [] },
           lastActive: Date.now(),
           send(data) {
             if (this.readyState !== 1) return;
-            this.outChunks.push(typeof data === 'string' ? data : data.toString('utf-8'));
+            const str = typeof data === 'string' ? data : decoder.write(data);
+            if (!str) return;
+            this.lastActive = Date.now();
+
+            // Push directly to any attached SSE stream with zero polling delay
+            if (this.sseClients.size > 0) {
+              const frame = `data: ${JSON.stringify({ o: str })}\n\n`;
+              for (const client of this.sseClients) {
+                if (!client.writableEnded) {
+                  client.write(frame);
+                  client.flush?.();
+                }
+              }
+              return;
+            }
+
+            this.outChunks.push(str);
             if (this.waiters.size > 0) {
               const payload = this.outChunks.splice(0).join('');
               for (const w of this.waiters) w(payload, false);
@@ -104,7 +188,17 @@ export function setupTerminalHttpFallback(app) {
           close() {
             if (this.readyState === 3) return;
             this.readyState = 3;
+            const tail = decoder.end();
+            if (tail) this.outChunks.push(tail);
             const payload = this.outChunks.splice(0).join('');
+            for (const client of this.sseClients) {
+              if (!client.writableEnded) {
+                if (payload) client.write(`data: ${JSON.stringify({ o: payload })}\n\n`);
+                client.write(`data: ${JSON.stringify({ closed: true })}\n\n`);
+                client.end();
+              }
+            }
+            this.sseClients.clear();
             for (const w of this.waiters) w(payload, true);
             this.waiters.clear();
             for (const fn of this.listeners.close) {
@@ -135,8 +229,26 @@ export function setupTerminalHttpFallback(app) {
           adapter.emitInput(JSON.stringify({ type: 'resize', cols: Number(cols), rows: Number(rows) }));
         }
 
-        // Wait briefly for initial SSH prompt / banner output
-        await new Promise((resolve) => setTimeout(resolve, 400));
+        // Return immediately as soon as initial banner/prompt arrives (max 120ms instead of fixed 400ms sleep)
+        if (adapter.outChunks.length === 0 && adapter.readyState === 1) {
+          await new Promise((resolve) => {
+            let done = false;
+            const timer = setTimeout(() => {
+              if (done) return;
+              done = true;
+              adapter.waiters.delete(waiter);
+              resolve();
+            }, 120);
+            const waiter = (chunk) => {
+              if (chunk) adapter.outChunks.unshift(chunk);
+              if (done) return;
+              done = true;
+              clearTimeout(timer);
+              resolve();
+            };
+            adapter.waiters.add(waiter);
+          });
+        }
         const initialOutput = adapter.outChunks.splice(0).join('');
         return res.json({
           success: true,
@@ -144,6 +256,22 @@ export function setupTerminalHttpFallback(app) {
           output: initialOutput,
           closed: adapter.readyState !== 1,
         });
+      }
+
+      // Fast fire-and-forget input/resize action when SSE stream handles output
+      if (action === 'input') {
+        const adapter = httpTerminalSessions.get(sessionId);
+        if (!adapter) {
+          return res.json({ success: true, closed: true });
+        }
+        adapter.lastActive = Date.now();
+        if (resize && resize.cols && resize.rows) {
+          adapter.emitInput(JSON.stringify({ type: 'resize', cols: Number(resize.cols), rows: Number(resize.rows) }));
+        }
+        if (typeof input === 'string' && input.length > 0) {
+          adapter.emitInput(input);
+        }
+        return res.json({ success: true, closed: adapter.readyState !== 1 });
       }
 
       if (action === 'poll') {
@@ -158,8 +286,26 @@ export function setupTerminalHttpFallback(app) {
         }
         if (typeof input === 'string' && input.length > 0) {
           adapter.emitInput(input);
-          // Coalesce 30ms so fast keystroke echo comes back in the same HTTP response
-          await new Promise((r) => setTimeout(r, 30));
+          // Wait up to 15ms and return IMMEDIATELY as soon as echo arrives (no fixed 30ms sleep)
+          if (adapter.outChunks.length === 0 && adapter.readyState === 1 && adapter.sseClients.size === 0) {
+            await new Promise((resolve) => {
+              let done = false;
+              const timer = setTimeout(() => {
+                if (done) return;
+                done = true;
+                adapter.waiters.delete(waiter);
+                resolve();
+              }, 15);
+              const waiter = (chunk) => {
+                if (chunk) adapter.outChunks.unshift(chunk);
+                if (done) return;
+                done = true;
+                clearTimeout(timer);
+                resolve();
+              };
+              adapter.waiters.add(waiter);
+            });
+          }
         }
 
         if (adapter.outChunks.length > 0 || adapter.readyState !== 1 || !waitMs) {
@@ -286,6 +432,15 @@ async function handleTerminalConnection(ws, request, url) {
       let ptyRows = 30;
       let ptyCols = 100;
 
+      sshConn.on('connect', () => {
+        if (sshConn._sock) {
+          try {
+            sshConn._sock.setNoDelay(true);
+            sshConn._sock.setKeepAlive(true, 10000);
+          } catch (e) {}
+        }
+      });
+
       sshConn.on('ready', () => {
         // Spawn docker exec interactive shell directly inside tenant container
         const execCmd = `docker exec -it site_${site.id} /bin/bash 2>/dev/null || docker exec -it site_${site.id} /bin/sh`;
@@ -300,10 +455,10 @@ async function handleTerminalConnection(ws, request, url) {
 
           shellStream = stream;
           stream.on('data', (data) => {
-            if (ws.readyState === ws.OPEN) ws.send(data.toString('utf-8'));
+            sendStreamChunk(ws, data);
           });
           stream.stderr.on('data', (data) => {
-            if (ws.readyState === ws.OPEN) ws.send(data.toString('utf-8'));
+            sendStreamChunk(ws, data);
           });
           stream.on('close', () => {
             if (ws.readyState === ws.OPEN) ws.close();
@@ -330,6 +485,13 @@ async function handleTerminalConnection(ws, request, url) {
               }
               return;
             }
+            if (str.startsWith('{"type":"ping"')) {
+              const parsed = JSON.parse(str);
+              if (ws.readyState === ws.OPEN && !ws.isHttpAdapter) {
+                ws.send(JSON.stringify({ type: 'pong', t: parsed.t }));
+              }
+              return;
+            }
           } catch {}
         }
         if (shellStream && shellStream.writable) {
@@ -350,6 +512,9 @@ async function handleTerminalConnection(ws, request, url) {
         username: process.env.ATC_WORKER_USER || 'ubuntu',
         password: process.env.ATC_WORKER_PASS || 'root',
         readyTimeout: 10000,
+        keepaliveInterval: 10000,
+        algorithms: FAST_SSH_ALGORITHMS,
+        tryKeyboard: false,
       });
 
       return;
@@ -434,6 +599,11 @@ async function handleTerminalConnection(ws, request, url) {
     function connectSSH(user, pass, isFallback = false) {
       const sshConn = new SSHClient();
       activeConn = sshConn;
+      const sessionId = crypto.randomBytes(8).toString('hex');
+      const clientIp = extractClientIp(request);
+      let sessionOpenedAt = null;
+      let sessionClosedLogged = false;
+      let bytesOut = 0;
 
       sshConn.on('connect', () => {
         if (sshConn._sock) {
@@ -467,6 +637,19 @@ async function handleTerminalConnection(ws, request, url) {
             }
 
             shellStream = stream;
+            sessionOpenedAt = Date.now();
+            logVmEvent({
+              userId,
+              vmId: vm.vmId,
+              vmName: vm.vmName,
+              category: 'console-sessions',
+              level: 'INFO',
+              action: 'CONSOLE_SSH_OPEN',
+              status: 'SUCCESS',
+              actor: decoded.email || `user:${userId}`,
+              actorIp: clientIp,
+              details: { sessionId, protocol: 'SSH', targetIp, sshUser: user },
+            }).catch(() => {});
 
             // If we connected via fallback, heal targetUser and targetPassword so future logins work seamlessly
             if (isFallback) {
@@ -482,20 +665,34 @@ async function handleTerminalConnection(ws, request, url) {
               if (stream.writable) stream.write(buffered);
             }
 
-            // Pipe remote shell output directly to browser xterm as UTF-8 strings
+            // Pipe remote shell output directly to browser xterm as raw binary frames (zero UTF-8 re-encode overhead)
             stream.on('data', (data) => {
-              if (ws.readyState === ws.OPEN) {
-                ws.send(data.toString('utf-8'));
-              }
+              bytesOut += data.length || 0;
+              sendStreamChunk(ws, data);
             });
 
             stream.stderr.on('data', (data) => {
-              if (ws.readyState === ws.OPEN) {
-                ws.send(data.toString('utf-8'));
-              }
+              bytesOut += data.length || 0;
+              sendStreamChunk(ws, data);
             });
 
             stream.on('close', () => {
+              if (!sessionClosedLogged && sessionOpenedAt) {
+                sessionClosedLogged = true;
+                logVmEvent({
+                  userId,
+                  vmId: vm.vmId,
+                  vmName: vm.vmName,
+                  category: 'console-sessions',
+                  level: 'INFO',
+                  action: 'CONSOLE_SSH_CLOSE',
+                  status: 'SUCCESS',
+                  actor: decoded.email || `user:${userId}`,
+                  actorIp: clientIp,
+                  durationMs: Date.now() - sessionOpenedAt,
+                  details: { sessionId, protocol: 'SSH', targetIp, bytesOut, reason: 'STREAM_CLOSED' },
+                }).catch(() => {});
+              }
               if (ws.readyState === ws.OPEN) {
                 ws.send(`\r\n\r\n\x1b[1;33m[SESSION CLOSED]\x1b[0m Shell process exited or machine powered off.\r\n`);
                 ws.close();
@@ -530,13 +727,46 @@ async function handleTerminalConnection(ws, request, url) {
             ws.send(`\r\n\x1b[33m[Console]\x1b[0m Waiting for guest operating system SSH service to become ready (attempt ${retryCount}/${maxRetries})...\r\n`);
           }
           try { sshConn.end(); } catch (e) {}
+
+          // On first network error, check Hyper-V for a newly leased DHCP IP in case VM rebooted
+          if (retryCount === 1) {
+            try {
+              const live = await hypervService.getStatus(vm.vmName);
+              const liveIp = live?.IPAddresses?.find((ip) => ip && ip !== '127.0.0.1' && !ip.includes(':'));
+              if (liveIp && liveIp !== targetIp) {
+                targetIp = liveIp;
+                if (vm.ipPool && vm.ipPool.length > 0) {
+                  prisma.iPPool.update({ where: { ipId: vm.ipPool[0].ipId }, data: { ipAddress: liveIp } }).catch(() => {});
+                }
+                if (ws.readyState === ws.OPEN) {
+                  ws.send(`\x1b[36m[Console]\x1b[0m Updated guest IP to ${targetIp}, reconnecting...\r\n`);
+                }
+              }
+            } catch {}
+          }
+
           setTimeout(() => {
             if (ws.readyState === ws.OPEN) {
               connectSSH(user, pass, isFallback);
             }
-          }, 3000);
+          }, 1500);
           return;
         }
+
+        // Log console connection failure into per-VM console-sessions.jsonl
+        logVmEvent({
+          userId,
+          vmId: vm.vmId,
+          vmName: vm.vmName,
+          category: 'console-sessions',
+          level: 'ERROR',
+          action: 'CONSOLE_SSH_ERROR',
+          status: 'FAILED',
+          actor: decoded.email || `user:${userId}`,
+          actorIp: clientIp,
+          details: { sessionId, protocol: 'SSH', targetIp, retries: maxRetries },
+          error: err.message,
+        }).catch(() => {});
 
         // Dispatch automated incident alert to customer support
         sendVmFailureAlertToSupport({
@@ -564,12 +794,14 @@ async function handleTerminalConnection(ws, request, url) {
         password: pass,
         readyTimeout: 15000,
         keepaliveInterval: 10000,
+        algorithms: FAST_SSH_ALGORITHMS,
+        tryKeyboard: false,
       });
     }
 
     // Forward browser keystrokes and resize signals to remote shell stream
     ws.on('message', (msg) => {
-      // Check for JSON resize signal (starts with '{' -> 123)
+      // Check for JSON control signal (starts with '{' -> 123)
       if (typeof msg === 'string' ? msg.charCodeAt(0) === 123 : (msg && msg[0] === 123)) {
         try {
           const str = msg.toString();
@@ -581,6 +813,13 @@ async function handleTerminalConnection(ws, request, url) {
               if (shellStream && shellStream.writable) {
                 shellStream.setWindow(ptyRows, ptyCols, 0, 0);
               }
+            }
+            return;
+          }
+          if (str.startsWith('{"type":"ping"')) {
+            const parsed = JSON.parse(str);
+            if (ws.readyState === ws.OPEN && !ws.isHttpAdapter) {
+              ws.send(JSON.stringify({ type: 'pong', t: parsed.t }));
             }
             return;
           }
