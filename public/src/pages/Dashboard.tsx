@@ -374,7 +374,26 @@ export default function Dashboard() {
         `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
       );
     } else {
-      setConsoleVm(inst);
+      const width = Math.min(980, window.screen.availWidth - 80);
+      const height = Math.min(640, window.screen.availHeight - 80);
+      const left = Math.max(20, Math.round((window.screen.availWidth - width) / 2));
+      const top = Math.max(20, Math.round((window.screen.availHeight - height) / 2));
+      const qs = new URLSearchParams({
+        name: inst.name || 'Web Terminal',
+        ip: inst.ip || '',
+      }).toString();
+
+      const popup = window.open(
+        `/console/${inst.secureSlug || inst.vmId}?${qs}`,
+        `ATC_Console_${inst.vmId}`,
+        `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+      );
+      // Graceful fallback to inline modal if browser popup blocker blocks window.open
+      if (!popup || popup.closed) {
+        setConsoleVm(inst);
+      } else {
+        popup.focus();
+      }
     }
   };
 
@@ -3721,7 +3740,7 @@ export default function Dashboard() {
                       onClick={() => {
                         const target = selectedInstance;
                         setSelectedInstance(null);
-                        setConsoleVm(target);
+                        handleOpenConsoleOrDesktop(target);
                       }}
                       className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                     >

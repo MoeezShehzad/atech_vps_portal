@@ -1,5 +1,5 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import atcLogo from './assets/ATC_Logo.png';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -27,6 +27,7 @@ const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
 const StandaloneDesktop = lazy(() => import('./pages/StandaloneDesktop'));
+const StandaloneConsole = lazy(() => import('./pages/StandaloneConsole'));
 const AcceptInvite = lazy(() => import('./pages/AcceptInvite'));
 
 // Lightweight, seamless route suspense fallback
@@ -55,9 +56,9 @@ function AppContent() {
   const { isAuthenticated, user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
-  // Hide Navbar/Footer on Auth pages, Callback route, and Standalone Desktop window
+  // Hide Navbar/Footer on Auth pages, Callback route, Standalone Desktop, and Standalone Console windows
   const isAuthPage = ['/login', '/signup', '/forgot-password', '/auth/callback'].includes(location.pathname);
-  const isDesktopPage = location.pathname.startsWith('/desktop');
+  const isDesktopPage = location.pathname.startsWith('/desktop') || location.pathname.startsWith('/console');
 
   // Check if user is actively logged in
   const isLoggedIn = Boolean(isAuthenticated && user);
@@ -211,7 +212,9 @@ function AppContent() {
             <Route path="/accept-invite" element={<AcceptInvite />} />
             <Route path="/configure" element={<AddtoCart />} />
             <Route path="/checkout" element={<Checkout />} />
-            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/Terms&Conditions" element={<TermsOfService />} />
+            <Route path="/terms" element={<Navigate to="/Terms&Conditions" replace />} />
+            <Route path="/terms-of-service" element={<Navigate to="/Terms&Conditions" replace />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />
 
@@ -231,6 +234,24 @@ function AppContent() {
               element={
                 <ProtectedRoute>
                   <StandaloneDesktop />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* STANDALONE WEB TERMINAL POP-OUT WINDOW */}
+            <Route
+              path="/console/:vmId"
+              element={
+                <ProtectedRoute>
+                  <StandaloneConsole />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/console/site/:siteId"
+              element={
+                <ProtectedRoute>
+                  <StandaloneConsole />
                 </ProtectedRoute>
               }
             />

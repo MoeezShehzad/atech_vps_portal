@@ -25,13 +25,14 @@ import {
 import { apiCall } from '../services/api';
 
 interface WebConsoleModalProps {
-  vmId?: number;
-  siteId?: number;
+  vmId?: number | string;
+  siteId?: number | string;
   vmName?: string;
   siteName?: string;
   vmIp?: string;
   adminUser?: string;
   adminPassword?: string;
+  standalone?: boolean;
   onClose: () => void;
   onSessionEnd?: () => void;
 }
@@ -44,6 +45,7 @@ export default function WebConsoleModal({
   vmIp,
   adminUser: initialUser = 'ubuntu',
   adminPassword: initialPassword = 'root',
+  standalone = false,
   onClose,
   onSessionEnd,
 }: WebConsoleModalProps) {
@@ -73,7 +75,9 @@ export default function WebConsoleModal({
   const [transportMode, setTransportMode] = useState<'ws' | 'sse' | 'http' | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [rendererMode, setRendererMode] = useState<'webgl' | 'dom'>('dom');
-  const [fontSize, setFontSize] = useState<number>(13);
+  const [fontSize, setFontSize] = useState<number>(standalone ? 14 : 13);
+  const [sizeBadge, setSizeBadge] = useState<string | null>(null);
+  const sizeBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showSearch, setShowSearch] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchCaseSensitive, setSearchCaseSensitive] = useState<boolean>(false);
@@ -83,6 +87,21 @@ export default function WebConsoleModal({
   const [isMinimized, setIsMinimized] = useState(false);
 
   const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    if (standalone) {
+      document.title = `${displayName} — ATC Terminal`;
+    }
+  }, [standalone, displayName]);
+
+  const flashSizeBadge = useCallback((cols: number, rows: number) => {
+    if (!cols || !rows) return;
+    setSizeBadge(`${cols}×${rows}`);
+    if (sizeBadgeTimerRef.current) clearTimeout(sizeBadgeTimerRef.current);
+    sizeBadgeTimerRef.current = setTimeout(() => {
+      if (isMountedRef.current) setSizeBadge(null);
+    }, 900);
+  }, []);
 
   const extractBufferText = useCallback((): string => {
     const term = xtermInstance.current;
@@ -102,13 +121,16 @@ export default function WebConsoleModal({
     return lines.join('\n');
   }, []);
 
-  const syncTerminalSize = useCallback(() => {
+  const syncTerminalSize = useCallback((showOverlay = false) => {
     const term = xtermInstance.current;
     const fitAddon = fitAddonRef.current;
     if (!term || !fitAddon) return;
     try {
       fitAddon.fit();
       if (term.cols && term.rows) {
+        if (showOverlay) {
+          flashSizeBadge(term.cols, term.rows);
+        }
         if (socketRef.current?.readyState === WebSocket.OPEN) {
           socketRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
         } else if (httpSessionIdRef.current) {
@@ -123,21 +145,30 @@ export default function WebConsoleModal({
         }
       }
     } catch {}
-  }, []);
+  }, [flashSizeBadge]);
 
   const handleFontSizeChange = useCallback(
     (delta: number) => {
       setFontSize((prev) => {
-        const next = Math.min(22, Math.max(10, prev + delta));
+        const next = Math.min(36, Math.max(10, prev + delta));
         if (xtermInstance.current && next !== prev) {
           xtermInstance.current.options.fontSize = next;
-          requestAnimationFrame(() => syncTerminalSize());
+          requestAnimationFrame(() => syncTerminalSize(true));
         }
         return next;
       });
     },
     [syncTerminalSize]
   );
+
+  const handleFontSizeReset = useCallback(() => {
+    const defaultSize = standalone ? 14 : 13;
+    setFontSize(defaultSize);
+    if (xtermInstance.current) {
+      xtermInstance.current.options.fontSize = defaultSize;
+      requestAnimationFrame(() => syncTerminalSize(true));
+    }
+  }, [standalone, syncTerminalSize]);
 
   const handleClearScreen = useCallback(() => {
     if (xtermInstance.current) {
@@ -548,7 +579,7 @@ export default function WebConsoleModal({
     const term = new XTerm({
       cursorBlink: true,
       cursorStyle: 'block',
-      fontSize: 13,
+      fontSize: standalone ? 14 : 13,
       lineHeight: 1.25,
       scrollback: 3000,
       scrollSensitivity: 3,
@@ -627,7 +658,7 @@ export default function WebConsoleModal({
       }
     });
 
-    // Handle Ctrl+C (Copy if selected), Ctrl+V (Paste), and Ctrl+F (Search in terminal)
+    // Handle Ctrl+F (Search), Ctrl++/-/0 (Zoom), Ctrl+C (Copy if selected), Ctrl+V (Paste)
     term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
       // 0. Search: Ctrl+F / Cmd+F
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
@@ -636,6 +667,31 @@ export default function WebConsoleModal({
           openSearchBar();
         }
         return false;
+      }
+
+      // 0b. Zoom In / Out / Reset: Ctrl++ / Ctrl+= / Ctrl+- / Ctrl+0
+      if (event.ctrlKey || event.metaKey) {
+        if (event.key === '+' || event.key === '=' || event.code === 'NumpadAdd') {
+          if (event.type === 'keydown') {
+            event.preventDefault();
+            handleFontSizeChange(2);
+          }
+          return false;
+        }
+        if (event.key === '-' || event.key === '_' || event.code === 'NumpadSubtract') {
+          if (event.type === 'keydown') {
+            event.preventDefault();
+            handleFontSizeChange(-2);
+          }
+          return false;
+        }
+        if (event.key === '0' || event.code === 'Numpad0') {
+          if (event.type === 'keydown') {
+            event.preventDefault();
+            handleFontSizeReset();
+          }
+          return false;
+        }
       }
 
       // 1. Copy: Ctrl+C / Cmd+C when text is highlighted
@@ -694,14 +750,36 @@ export default function WebConsoleModal({
     };
     currentContainer.addEventListener('contextmenu', handleContextMenu);
 
-    // Container interaction focus listeners (focus only — no layout reflow on every click)
+    // Container interaction focus & Ctrl+Wheel zoom listeners
     const handlePointerFocus = () => {
       triggerFocus();
     };
+    const handleWheelZoom = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        handleFontSizeChange(e.deltaY < 0 ? 2 : -2);
+      }
+    };
+    const handleGlobalKeyZoom = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') {
+        e.preventDefault();
+        handleFontSizeChange(2);
+      } else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') {
+        e.preventDefault();
+        handleFontSizeChange(-2);
+      } else if (e.key === '0' || e.code === 'Numpad0') {
+        e.preventDefault();
+        handleFontSizeReset();
+      }
+    };
     currentContainer.addEventListener('mousedown', handlePointerFocus);
+    currentContainer.addEventListener('wheel', handleWheelZoom, { passive: false });
+    window.addEventListener('keydown', handleGlobalKeyZoom);
 
     let lastCols = 0;
     let lastRows = 0;
+    let hasInitialFit = false;
     let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     const sendResize = () => {
       try {
@@ -709,6 +787,10 @@ export default function WebConsoleModal({
         if (term.cols && term.rows && (term.cols !== lastCols || term.rows !== lastRows)) {
           lastCols = term.cols;
           lastRows = term.rows;
+          if (hasInitialFit) {
+            flashSizeBadge(term.cols, term.rows);
+          }
+          hasInitialFit = true;
           if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
           } else if (httpSessionIdRef.current) {
@@ -768,11 +850,14 @@ export default function WebConsoleModal({
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
+      if (sizeBadgeTimerRef.current) clearTimeout(sizeBadgeTimerRef.current);
       window.removeEventListener('resize', handleWindowResize);
+      window.removeEventListener('keydown', handleGlobalKeyZoom);
       window.removeEventListener('paste', handleNativePaste);
       currentContainer.removeEventListener('paste', handleNativePaste);
       currentContainer.removeEventListener('contextmenu', handleContextMenu);
       currentContainer.removeEventListener('mousedown', handlePointerFocus);
+      currentContainer.removeEventListener('wheel', handleWheelZoom);
       resizeObserver.disconnect();
       onDataDisposable.dispose();
       if (socketRef.current) {
@@ -812,8 +897,8 @@ export default function WebConsoleModal({
 
   return (
     <>
-      {/* 1. MINIMIZED FLOATING DOCK BADGE */}
-      {isMinimized && (
+      {/* 1. MINIMIZED FLOATING DOCK BADGE (modal mode only) */}
+      {!standalone && isMinimized && (
         <div className="fixed bottom-5 right-5 z-[130] bg-[#090d16]/95 border border-slate-700/90 rounded-2xl shadow-2xl p-3 flex items-center gap-3 backdrop-blur-md animate-in slide-in-from-bottom-4 duration-200 select-none">
           <div 
             onClick={handleRestore}
@@ -852,18 +937,26 @@ export default function WebConsoleModal({
         </div>
       )}
 
-      {/* 2. FULL / RESTORED CONSOLE MODAL */}
+      {/* 2. FULL / RESTORED CONSOLE MODAL OR STANDALONE WINDOW */}
       <div 
-        className={`fixed inset-0 z-[120] transition-opacity duration-150 ${
-          isMinimized 
-            ? 'pointer-events-none opacity-0' 
-            : 'bg-slate-950/85 flex items-center justify-center p-3 md:p-6 opacity-100'
-        }`}
+        className={
+          standalone
+            ? 'fixed inset-0 w-screen h-screen bg-[#090d16] flex flex-col overflow-hidden'
+            : `fixed inset-0 z-[120] transition-opacity duration-150 ${
+                isMinimized 
+                  ? 'pointer-events-none opacity-0' 
+                  : 'bg-slate-950/85 flex items-center justify-center p-3 md:p-6 opacity-100'
+              }`
+        }
       >
         <div 
-          className={`bg-[#090d16] border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
-            isFullscreen ? 'w-full h-full rounded-none' : 'w-full max-w-5xl h-[82vh] min-h-[520px]'
-          }`}
+          className={
+            standalone
+              ? 'bg-[#090d16] w-full h-full flex flex-col overflow-hidden'
+              : `bg-[#090d16] border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
+                  isFullscreen ? 'w-full h-full rounded-none' : 'w-full max-w-5xl h-[82vh] min-h-[520px]'
+                }`
+          }
         >
           {/* CONSOLE HEADER BAR */}
           <div className="bg-slate-900/95 border-b border-slate-800 px-4 py-3 flex items-center justify-between select-none">
@@ -892,23 +985,27 @@ export default function WebConsoleModal({
                 <Search className="w-3.5 h-3.5" />
               </button>
 
-              {/* Font Size Controls (A- / A+) */}
+              {/* Font Size Controls (A- / A+ / Ctrl+0 Reset) */}
               <div className="flex items-center bg-slate-800/70 rounded-lg border border-slate-700/60 px-0.5 mx-0.5">
                 <button
-                  onClick={() => handleFontSizeChange(-1)}
+                  onClick={() => handleFontSizeChange(-2)}
                   disabled={fontSize <= 10}
-                  title="Decrease Font Size"
+                  title="Zoom Out (Ctrl + -)"
                   className="p-1 text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
                 >
                   <AArrowDown className="w-3.5 h-3.5" />
                 </button>
-                <span className="text-[10px] font-mono text-slate-300 px-1 min-w-[26px] text-center">
-                  {fontSize}
-                </span>
                 <button
-                  onClick={() => handleFontSizeChange(1)}
-                  disabled={fontSize >= 22}
-                  title="Increase Font Size"
+                  onClick={handleFontSizeReset}
+                  title="Reset Zoom (Ctrl + 0)"
+                  className="text-[10px] font-mono text-slate-300 hover:text-white px-1 min-w-[26px] text-center transition-colors"
+                >
+                  {fontSize}
+                </button>
+                <button
+                  onClick={() => handleFontSizeChange(2)}
+                  disabled={fontSize >= 36}
+                  title="Zoom In (Ctrl + +)"
                   className="p-1 text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
                 >
                   <AArrowUp className="w-3.5 h-3.5" />
@@ -956,24 +1053,28 @@ export default function WebConsoleModal({
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
 
-              <button
-                onClick={() => setIsMinimized(true)}
-                title="Minimize Console"
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
+              {!standalone && (
+                <>
+                  <button
+                    onClick={() => setIsMinimized(true)}
+                    title="Minimize Console"
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
 
-              <button
-                onClick={() => {
-                  setIsFullscreen(!isFullscreen);
-                  setTimeout(() => syncTerminalSize(), 150);
-                }}
-                title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
-              >
-                {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              </button>
+                  <button
+                    onClick={() => {
+                      setIsFullscreen(!isFullscreen);
+                      setTimeout(() => syncTerminalSize(), 150);
+                    }}
+                    title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+                  >
+                    {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                  </button>
+                </>
+              )}
 
               <button
                 onClick={onClose}
@@ -985,8 +1086,15 @@ export default function WebConsoleModal({
             </div>
           </div>
 
-          {/* TERMINAL CANVAS CONTAINER + FLOATING SEARCH BAR */}
+          {/* TERMINAL CANVAS CONTAINER + FLOATING SEARCH BAR + SIZE OVERLAY */}
           <div className="relative flex-1 w-full overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
+            {sizeBadge && (
+              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+                <div className="bg-slate-200/90 text-slate-900 font-mono font-bold text-3xl sm:text-4xl px-6 py-3 rounded-2xl shadow-2xl tracking-tight select-none">
+                  {sizeBadge}
+                </div>
+              </div>
+            )}
             {showSearch && (
               <div className="absolute top-2 right-3 z-20 flex items-center gap-1 bg-slate-900/95 border border-slate-700 rounded-xl shadow-2xl px-2.5 py-1.5">
                 <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
