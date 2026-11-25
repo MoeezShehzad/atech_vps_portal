@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { SearchAddon } from '@xterm/addon-search';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import {
   X,
@@ -10,6 +12,15 @@ import {
   Minus,
   RefreshCw,
   Terminal as TerminalIcon,
+  Search,
+  ChevronUp,
+  ChevronDown,
+  Copy,
+  Check,
+  Download,
+  Eraser,
+  AArrowDown,
+  AArrowUp,
 } from 'lucide-react';
 import { apiCall } from '../services/api';
 
@@ -40,6 +51,8 @@ export default function WebConsoleModal({
   const xtermInstance = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const webglAddonRef = useRef<WebglAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -60,10 +73,153 @@ export default function WebConsoleModal({
   const [transportMode, setTransportMode] = useState<'ws' | 'sse' | 'http' | null>(null);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [rendererMode, setRendererMode] = useState<'webgl' | 'dom'>('dom');
+  const [fontSize, setFontSize] = useState<number>(13);
+  const [showSearch, setShowSearch] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchCaseSensitive, setSearchCaseSensitive] = useState<boolean>(false);
+  const [searchNotFound, setSearchNotFound] = useState<boolean>(false);
+  const [copiedAll, setCopiedAll] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
 
   const isMountedRef = useRef(true);
+
+  const extractBufferText = useCallback((): string => {
+    const term = xtermInstance.current;
+    if (!term) return '';
+    const buffer = term.buffer.active;
+    const lines: string[] = [];
+    for (let i = 0; i < buffer.length; i++) {
+      const line = buffer.getLine(i);
+      if (line) {
+        lines.push(line.translateToString(true));
+      }
+    }
+    // Trim trailing empty lines
+    while (lines.length > 0 && lines[lines.length - 1] === '') {
+      lines.pop();
+    }
+    return lines.join('\n');
+  }, []);
+
+  const syncTerminalSize = useCallback(() => {
+    const term = xtermInstance.current;
+    const fitAddon = fitAddonRef.current;
+    if (!term || !fitAddon) return;
+    try {
+      fitAddon.fit();
+      if (term.cols && term.rows) {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+        } else if (httpSessionIdRef.current) {
+          apiCall('/ws/terminal-http', {
+            method: 'POST',
+            body: JSON.stringify({
+              action: httpUseSseRef.current ? 'input' : 'poll',
+              sessionId: httpSessionIdRef.current,
+              resize: { cols: term.cols, rows: term.rows },
+            }),
+          }).catch(() => {});
+        }
+      }
+    } catch {}
+  }, []);
+
+  const handleFontSizeChange = useCallback(
+    (delta: number) => {
+      setFontSize((prev) => {
+        const next = Math.min(22, Math.max(10, prev + delta));
+        if (xtermInstance.current && next !== prev) {
+          xtermInstance.current.options.fontSize = next;
+          requestAnimationFrame(() => syncTerminalSize());
+        }
+        return next;
+      });
+    },
+    [syncTerminalSize]
+  );
+
+  const handleClearScreen = useCallback(() => {
+    if (xtermInstance.current) {
+      xtermInstance.current.clear();
+      xtermInstance.current.focus();
+    }
+  }, []);
+
+  const handleCopyAll = useCallback(async () => {
+    const text = extractBufferText();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 1500);
+    } catch {}
+    xtermInstance.current?.focus();
+  }, [extractBufferText]);
+
+  const handleDownloadLog = useCallback(() => {
+    const text = extractBufferText();
+    const safeName = displayName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const blob = new Blob([text || '(empty console buffer)\n'], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeName}-console-${stamp}.log`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    xtermInstance.current?.focus();
+  }, [extractBufferText, displayName]);
+
+  const openSearchBar = useCallback(() => {
+    setShowSearch(true);
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }, 20);
+  }, []);
+
+  const closeSearchBar = useCallback(() => {
+    setShowSearch(false);
+    setSearchNotFound(false);
+    try {
+      searchAddonRef.current?.clearDecorations();
+    } catch {}
+    xtermInstance.current?.focus();
+  }, []);
+
+  const runSearch = useCallback(
+    (query: string, direction: 'next' | 'prev' = 'next', caseSensitive = searchCaseSensitive) => {
+      if (!searchAddonRef.current) return;
+      if (!query) {
+        setSearchNotFound(false);
+        try {
+          searchAddonRef.current.clearDecorations();
+        } catch {}
+        return;
+      }
+      const opts = {
+        caseSensitive,
+        incremental: direction === 'next',
+        decorations: {
+          matchBackground: '#334155',
+          matchBorder: '#64748b',
+          matchOverviewRuler: '#38bdf8',
+          activeMatchBackground: '#0284c7',
+          activeMatchBorder: '#38bdf8',
+          activeMatchColorOverviewRuler: '#38bdf8',
+        },
+      };
+      const found =
+        direction === 'prev'
+          ? searchAddonRef.current.findPrevious(query, { ...opts, incremental: false })
+          : searchAddonRef.current.findNext(query, opts);
+      setSearchNotFound(!found);
+    },
+    [searchCaseSensitive]
+  );
 
   const flushHttpInput = useCallback(async () => {
     const sid = httpSessionIdRef.current;
@@ -415,9 +571,17 @@ export default function WebConsoleModal({
     });
 
     const fitAddon = new FitAddon();
+    const searchAddon = new SearchAddon();
+    const webLinksAddon = new WebLinksAddon((_event, uri) => {
+      window.open(uri, '_blank', 'noopener,noreferrer');
+    });
     term.loadAddon(fitAddon);
+    term.loadAddon(searchAddon);
+    term.loadAddon(webLinksAddon);
     currentContainer.innerHTML = '';
     term.open(currentContainer);
+
+    searchAddonRef.current = searchAddon;
 
     // Enable GPU-accelerated WebGL rendering with automatic DOM fallback
     try {
@@ -463,8 +627,17 @@ export default function WebConsoleModal({
       }
     });
 
-    // Handle Ctrl+C (Copy if selected) and Ctrl+V (allow native paste)
+    // Handle Ctrl+C (Copy if selected), Ctrl+V (Paste), and Ctrl+F (Search in terminal)
     term.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      // 0. Search: Ctrl+F / Cmd+F
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+        if (event.type === 'keydown') {
+          event.preventDefault();
+          openSearchBar();
+        }
+        return false;
+      }
+
       // 1. Copy: Ctrl+C / Cmd+C when text is highlighted
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'c') {
         if (term.hasSelection()) {
@@ -705,7 +878,76 @@ export default function WebConsoleModal({
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
+              {/* Search (Ctrl+F) */}
+              <button
+                onClick={() => (showSearch ? closeSearchBar() : openSearchBar())}
+                title="Search Output (Ctrl+F)"
+                className={`p-1.5 rounded-lg transition-all ${
+                  showSearch
+                    ? 'text-sky-400 bg-sky-500/15'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Search className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Font Size Controls (A- / A+) */}
+              <div className="flex items-center bg-slate-800/70 rounded-lg border border-slate-700/60 px-0.5 mx-0.5">
+                <button
+                  onClick={() => handleFontSizeChange(-1)}
+                  disabled={fontSize <= 10}
+                  title="Decrease Font Size"
+                  className="p-1 text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+                >
+                  <AArrowDown className="w-3.5 h-3.5" />
+                </button>
+                <span className="text-[10px] font-mono text-slate-300 px-1 min-w-[26px] text-center">
+                  {fontSize}
+                </span>
+                <button
+                  onClick={() => handleFontSizeChange(1)}
+                  disabled={fontSize >= 22}
+                  title="Increase Font Size"
+                  className="p-1 text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+                >
+                  <AArrowUp className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Clear Screen */}
+              <button
+                onClick={handleClearScreen}
+                title="Clear Screen"
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+              >
+                <Eraser className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Copy All */}
+              <button
+                onClick={handleCopyAll}
+                title={copiedAll ? 'Copied!' : 'Copy All Output'}
+                className={`p-1.5 rounded-lg transition-all ${
+                  copiedAll
+                    ? 'text-emerald-400 bg-emerald-500/15'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                {copiedAll ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              </button>
+
+              {/* Download Session Log */}
+              <button
+                onClick={handleDownloadLog}
+                title="Download Session Log"
+                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="w-px h-4 bg-slate-800 mx-1" />
+
               <button
                 onClick={handleReconnect}
                 title="Reconnect Console"
@@ -725,7 +967,7 @@ export default function WebConsoleModal({
               <button
                 onClick={() => {
                   setIsFullscreen(!isFullscreen);
-                  setTimeout(() => fitAddonRef.current?.fit(), 150);
+                  setTimeout(() => syncTerminalSize(), 150);
                 }}
                 title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
                 className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
@@ -735,7 +977,7 @@ export default function WebConsoleModal({
 
               <button
                 onClick={onClose}
-                title="Close Console (Esc)"
+                title="Close Console"
                 className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all ml-1"
               >
                 <X className="w-4 h-4" />
@@ -743,20 +985,94 @@ export default function WebConsoleModal({
             </div>
           </div>
 
-          {/* TERMINAL CANVAS CONTAINER */}
-          <div 
-            ref={terminalRef} 
-            onClick={() => {
-              xtermInstance.current?.focus();
-              terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
-            }}
-            onMouseDown={() => {
-              xtermInstance.current?.focus();
-              terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
-            }}
-            className="flex-1 w-full p-3 overflow-hidden font-mono cursor-text outline-none"
-            style={{ minHeight: 0 }}
-          />
+          {/* TERMINAL CANVAS CONTAINER + FLOATING SEARCH BAR */}
+          <div className="relative flex-1 w-full overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
+            {showSearch && (
+              <div className="absolute top-2 right-3 z-20 flex items-center gap-1 bg-slate-900/95 border border-slate-700 rounded-xl shadow-2xl px-2.5 py-1.5">
+                <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSearchQuery(val);
+                    runSearch(val, 'next', searchCaseSensitive);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      runSearch(searchQuery, e.shiftKey ? 'prev' : 'next', searchCaseSensitive);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      closeSearchBar();
+                    }
+                  }}
+                  placeholder="Find in terminal..."
+                  className={`bg-transparent text-xs font-mono text-white placeholder-slate-500 outline-none w-44 sm:w-56 ${
+                    searchNotFound && searchQuery ? 'text-rose-400' : ''
+                  }`}
+                />
+                {searchNotFound && searchQuery && (
+                  <span className="text-[10px] font-mono text-rose-400 px-1">No match</span>
+                )}
+                <button
+                  onClick={() => {
+                    const nextCs = !searchCaseSensitive;
+                    setSearchCaseSensitive(nextCs);
+                    runSearch(searchQuery, 'next', nextCs);
+                  }}
+                  title="Match Case"
+                  className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded transition-colors ${
+                    searchCaseSensitive
+                      ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  Aa
+                </button>
+                <button
+                  onClick={() => runSearch(searchQuery, 'prev', searchCaseSensitive)}
+                  title="Previous Match (Shift+Enter)"
+                  className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => runSearch(searchQuery, 'next', searchCaseSensitive)}
+                  title="Next Match (Enter)"
+                  className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={closeSearchBar}
+                  title="Close Search (Esc)"
+                  className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            <div
+              ref={terminalRef}
+              onClick={() => {
+                if (!showSearch) {
+                  xtermInstance.current?.focus();
+                  terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
+                }
+              }}
+              onMouseDown={() => {
+                if (!showSearch) {
+                  xtermInstance.current?.focus();
+                  terminalRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
+                }
+              }}
+              className="flex-1 w-full p-3 overflow-hidden font-mono cursor-text outline-none"
+              style={{ minHeight: 0 }}
+            />
+          </div>
 
           {/* CONSOLE FOOTER STATUS BAR */}
           <div className="bg-slate-950 border-t border-slate-800/80 px-4 py-2 flex items-center justify-between text-[11px] font-mono text-slate-400 select-none">

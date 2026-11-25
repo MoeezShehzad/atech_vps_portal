@@ -10,6 +10,9 @@ import hypervService from './hypervService.js';
 import { sendVmFailureAlertToSupport } from './emailService.js';
 import { logVmEvent, extractClientIp } from './auditLogService.js';
 
+// 10-minute terminal inactivity timeout (applies to WebSocket, HTTP/SSE fallback, and ticket TTL)
+const TERMINAL_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+
 // Fast hardware-accelerated SSH cipher preference (avoids slow legacy ciphers & zlib compression lag)
 const FAST_SSH_ALGORITHMS = {
   cipher: [
@@ -35,7 +38,7 @@ function sendStreamChunk(ws, data) {
 // Short opaque ticket store so WebSocket URLs never expose long base64 JWTs / internal IPs to external WAF/IPS
 const consoleTicketStore = new Map();
 
-export function registerConsoleTicket(jwtToken, ttlMs = 5 * 60 * 1000) {
+export function registerConsoleTicket(jwtToken, ttlMs = TERMINAL_IDLE_TIMEOUT_MS) {
   const now = Date.now();
   for (const [k, v] of consoleTicketStore.entries()) {
     if (v.expiresAt <= now) consoleTicketStore.delete(k);
@@ -63,14 +66,26 @@ export function setupTerminalWebSocket(server) {
 
   server.on('upgrade', (request, socket, head) => {
     try {
+      socket.setTimeout(0);
       socket.setNoDelay(true);
-      socket.setKeepAlive(true, 10000);
+      socket.setKeepAlive(true, 15000);
       const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
       if (url.pathname === '/ws/terminal' || url.pathname === '/api/ws/terminal') {
         wss.handleUpgrade(request, socket, head, (ws) => {
           if (ws._socket) {
+            ws._socket.setTimeout(0);
             ws._socket.setNoDelay(true);
+            ws._socket.setKeepAlive(true, 15000);
           }
+          // Keep proxy/NAT WebSocket alive with low-level ping frames every 25s
+          const wsKeepalive = setInterval(() => {
+            if (ws.readyState === ws.OPEN) {
+              try { ws.ping(); } catch {}
+            } else {
+              clearInterval(wsKeepalive);
+            }
+          }, 25000);
+          ws.on('close', () => clearInterval(wsKeepalive));
           wss.emit('connection', ws, request, url);
         });
       } else if (!url.pathname.includes('guacamole')) {
@@ -97,7 +112,7 @@ const httpTerminalSessions = new Map();
 setInterval(() => {
   const now = Date.now();
   for (const [sid, sess] of httpTerminalSessions.entries()) {
-    if (now - sess.lastActive > 90000) {
+    if (now - sess.lastActive > TERMINAL_IDLE_TIMEOUT_MS) {
       sess.close();
       httpTerminalSessions.delete(sid);
     }
@@ -511,8 +526,9 @@ async function handleTerminalConnection(ws, request, url) {
         port: 22,
         username: process.env.ATC_WORKER_USER || 'ubuntu',
         password: process.env.ATC_WORKER_PASS || 'root',
-        readyTimeout: 10000,
-        keepaliveInterval: 10000,
+        readyTimeout: 20000,
+        keepaliveInterval: 15000,
+        keepaliveCountMax: 40,
         algorithms: FAST_SSH_ALGORITHMS,
         tryKeyboard: false,
       });
@@ -668,11 +684,13 @@ async function handleTerminalConnection(ws, request, url) {
             // Pipe remote shell output directly to browser xterm as raw binary frames (zero UTF-8 re-encode overhead)
             stream.on('data', (data) => {
               bytesOut += data.length || 0;
+              resetIdleTimer();
               sendStreamChunk(ws, data);
             });
 
             stream.stderr.on('data', (data) => {
               bytesOut += data.length || 0;
+              resetIdleTimer();
               sendStreamChunk(ws, data);
             });
 
@@ -792,12 +810,30 @@ async function handleTerminalConnection(ws, request, url) {
         port: 22,
         username: user,
         password: pass,
-        readyTimeout: 15000,
-        keepaliveInterval: 10000,
+        readyTimeout: 20000,
+        keepaliveInterval: 15000,
+        keepaliveCountMax: 40,
         algorithms: FAST_SSH_ALGORITHMS,
         tryKeyboard: false,
       });
     }
+
+    // 10-minute inactivity timeout (resets on any keystroke or terminal output)
+    let idleTimer = null;
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (ws.readyState === ws.OPEN) {
+          ws.send('\r\n\r\n\x1b[1;33m[SESSION TIMEOUT]\x1b[0m Terminal closed after 10 minutes of inactivity.\r\n');
+          ws.close();
+        }
+        try {
+          if (shellStream) shellStream.end();
+          if (activeConn) activeConn.end();
+        } catch {}
+      }, TERMINAL_IDLE_TIMEOUT_MS);
+    };
+    resetIdleTimer();
 
     // Forward browser keystrokes and resize signals to remote shell stream
     ws.on('message', (msg) => {
@@ -826,6 +862,9 @@ async function handleTerminalConnection(ws, request, url) {
         } catch {}
       }
 
+      // Reset 10-minute idle timer on real user input
+      resetIdleTimer();
+
       // Fast-path: keystroke input (zero overhead, direct write)
       if (shellStream && shellStream.writable) {
         shellStream.write(msg);
@@ -835,6 +874,7 @@ async function handleTerminalConnection(ws, request, url) {
     });
 
     ws.on('close', () => {
+      if (idleTimer) clearTimeout(idleTimer);
       try {
         if (shellStream) shellStream.end();
         if (activeConn) activeConn.end();
