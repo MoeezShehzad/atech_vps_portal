@@ -8,9 +8,24 @@ import prisma from '../lib/prisma.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Base uploads directory in portal root
+// Base uploads directory:
+// 1. Explicit env override (UPLOADS_DIR)
+// 2. Production NFS mount (/u003/portal_uploads) when present on Linux
+// 3. Local project fallback (<repo>/uploads)
 const ROOT_DIR = path.resolve(__dirname, '..');
-const UPLOADS_DIR = path.join(ROOT_DIR, 'uploads');
+const PROD_NFS_UPLOADS_DIR = '/u003/portal_uploads';
+
+function resolveUploadsDir() {
+  if (process.env.UPLOADS_DIR && process.env.UPLOADS_DIR.trim()) {
+    return path.resolve(process.env.UPLOADS_DIR.trim());
+  }
+  if (process.platform !== 'win32' && fs.existsSync(PROD_NFS_UPLOADS_DIR)) {
+    return PROD_NFS_UPLOADS_DIR;
+  }
+  return path.join(ROOT_DIR, 'uploads');
+}
+
+export const UPLOADS_DIR = resolveUploadsDir();
 const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars');
 const LOGOS_DIR = path.join(UPLOADS_DIR, 'logos');
 
@@ -247,9 +262,9 @@ export function safelyRemoveUploadedFile(relativeUrl) {
     const relativeFilePath = normalized.replace(/^\/uploads\//, '');
     // Prevent directory traversal
     const safePath = path.normalize(relativeFilePath).replace(/^(\.\.[\/\\])+/, '');
-    const fullPath = path.join(UPLOADS_DIR, safePath);
+    const fullPath = path.resolve(UPLOADS_DIR, safePath);
 
-    if (fullPath.startsWith(UPLOADS_DIR) && fs.existsSync(fullPath)) {
+    if (fullPath.startsWith(UPLOADS_DIR + path.sep) && fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath);
       console.log(`[Upload Clean] Deleted old file: ${fullPath}`);
     }

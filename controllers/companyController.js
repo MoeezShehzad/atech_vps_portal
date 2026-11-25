@@ -987,12 +987,14 @@ export const uploadCompanyLogo = async (req, res) => {
     const org = await getOrCreateUserOrg(userId);
 
     if (!org) {
+      if (req.file?.relativeUrl) safelyRemoveUploadedFile(req.file.relativeUrl);
       return res.status(404).json({ error: 'Organization not found.' });
     }
 
     const isOwner = org.ownerId === userId;
     const member = org.members.find((m) => m.userId === userId);
     if (!isOwner && member?.role !== 'admin') {
+      if (req.file?.relativeUrl) safelyRemoveUploadedFile(req.file.relativeUrl);
       return res.status(403).json({ error: 'Only organization owners and admins can upload company logo.' });
     }
 
