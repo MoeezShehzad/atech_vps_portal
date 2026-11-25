@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
+import ImageLightboxModal from './ImageLightboxModal';
 
 interface SidebarProps {
   activeTab: string;
@@ -47,6 +48,7 @@ export default function Sidebar({
       return false;
     }
   });
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt: string; caption?: string } | null>(null);
 
   const toggleSidebar = () => {
     setCollapsed((prev) => {
@@ -66,7 +68,11 @@ export default function Sidebar({
   const isCompany = user?.accountType === 'company' || Boolean(user?.companyName) || isCompanyWorkspace || isOwner;
 
   // Active Workspace / Identity details
-  const effectiveCompanyLogo = workspaceLogo || user?.companyLogoUrl || user?.organization?.logoUrl || null;
+  // Prefer user.companyLogoUrl when explicitly set (including null when deleted) so live uploads/removals reflect immediately
+  const effectiveCompanyLogo =
+    user?.companyLogoUrl !== undefined
+      ? user.companyLogoUrl
+      : (workspaceLogo ?? user?.organization?.logoUrl ?? null);
   const personAvatar = user?.avatarUrl || null;
 
   const displayCompanyName = workspaceName || user?.companyName || user?.organization?.name || 'Company Organization';
@@ -101,8 +107,8 @@ export default function Sidebar({
       </button>
 
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-        {/* Dynamic Workspace / Identity Badge (Company Logo or Person Avatar) */}
-        <div className={`p-3.5 border-b border-slate-200/80 dark:border-slate-800 transition-all ${collapsed ? 'flex justify-center' : ''}`}>
+        {/* Dynamic Workspace / Identity Badge (Centered Circular Avatar/Logo + Name Below) */}
+        <div className={`border-b border-slate-200/80 dark:border-slate-800 transition-all ${collapsed ? 'p-3 flex justify-center' : 'px-4 py-5'}`}>
           <button
             type="button"
             onClick={() => setActiveTab('settings')}
@@ -113,17 +119,33 @@ export default function Sidebar({
                   : `${displayUserName} • Personal Profile`
                 : 'Account & Profile Settings'
             }
-            className={`w-full group flex items-center rounded-xl p-2.5 transition-all hover:bg-slate-100/80 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200/80 dark:hover:border-slate-700/60 cursor-pointer ${
+            className={`w-full group flex flex-col items-center text-center rounded-2xl transition-all hover:bg-slate-100/80 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200/80 dark:hover:border-slate-700/60 cursor-pointer ${
               activeTab === 'settings'
-                ? 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/60'
-                : 'bg-slate-50/70 dark:bg-slate-950/30'
-            } ${collapsed ? 'justify-center !p-1.5' : 'space-x-3'}`}
+                ? 'bg-blue-50/70 dark:bg-blue-950/35 border-blue-200/80 dark:border-blue-900/60'
+                : 'bg-transparent'
+            } ${collapsed ? 'p-1.5' : 'px-3 py-3'}`}
           >
-            {/* Identity Avatar / Logo Thumbnail */}
-            <div className="relative shrink-0">
-              <div className={`rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800 flex items-center justify-center p-1 shadow-xs transition-transform group-hover:scale-105 ${
-                collapsed ? 'w-10 h-10' : 'w-12 h-12'
-              }`}>
+            {/* Circular Avatar / Logo */}
+            <div
+              className={`relative shrink-0 ${(isCompanyWorkspace ? effectiveCompanyLogo : personAvatar) ? 'cursor-zoom-in' : ''}`}
+              title={(isCompanyWorkspace ? effectiveCompanyLogo : personAvatar) ? 'Click to view full image' : undefined}
+              onClick={(e) => {
+                const imgSrc = isCompanyWorkspace ? effectiveCompanyLogo : personAvatar;
+                if (imgSrc) {
+                  e.stopPropagation();
+                  setPreviewImage({
+                    src: imgSrc,
+                    alt: isCompanyWorkspace ? displayCompanyName : displayUserName,
+                    caption: isCompanyWorkspace ? displayCompanyName : displayUserName,
+                  });
+                }
+              }}
+            >
+              <div
+                className={`rounded-full overflow-hidden border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm transition-all duration-200 group-hover:scale-105 hover:ring-2 hover:ring-blue-500/50 ${
+                  collapsed ? 'w-10 h-10' : 'w-20 h-20'
+                } ${isCompanyWorkspace && effectiveCompanyLogo ? (collapsed ? 'p-1' : 'p-2') : ''}`}
+              >
                 {isCompanyWorkspace ? (
                   effectiveCompanyLogo ? (
                     <img
@@ -132,7 +154,7 @@ export default function Sidebar({
                       className="max-w-full max-h-full object-contain"
                     />
                   ) : (
-                    <div className="w-full h-full bg-linear-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center text-white text-base font-black tracking-tight">
+                    <div className={`w-full h-full bg-linear-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black tracking-tight ${collapsed ? 'text-sm' : 'text-2xl'}`}>
                       {displayCompanyName.charAt(0).toUpperCase()}
                     </div>
                   )
@@ -141,10 +163,10 @@ export default function Sidebar({
                     <img
                       src={personAvatar}
                       alt={displayUserName}
-                      className="w-full h-full object-cover rounded-lg"
+                      className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full bg-linear-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center text-white text-sm font-bold">
+                    <div className={`w-full h-full bg-linear-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold ${collapsed ? 'text-sm' : 'text-2xl'}`}>
                       {(user?.fullName || 'U').charAt(0).toUpperCase()}
                     </div>
                   )
@@ -154,46 +176,44 @@ export default function Sidebar({
               {/* Persona Status / Type Indicator Pill */}
               {isCompanyWorkspace ? (
                 <span
-                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-blue-600 border-2 border-white dark:border-slate-900 flex items-center justify-center text-white shadow-2xs"
+                  className={`absolute rounded-full bg-blue-600 border-2 border-white dark:border-slate-900 flex items-center justify-center text-white shadow-xs ${
+                    collapsed ? '-bottom-0.5 -right-0.5 w-4 h-4' : 'bottom-0.5 right-0.5 w-5 h-5'
+                  }`}
                   title="Company Organization"
                 >
-                  <Building2 className="w-2.5 h-2.5" />
+                  <Building2 className={collapsed ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
                 </span>
               ) : (
                 <span
-                  className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 shadow-2xs"
+                  className={`absolute rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 shadow-xs ${
+                    collapsed ? 'bottom-0 right-0 w-3 h-3' : 'bottom-1 right-1 w-4 h-4'
+                  }`}
                   title="Personal Account Active"
                 />
               )}
             </div>
 
-            {/* Label & Details (Shown when expanded) */}
+            {/* Centered Name (Shown when expanded) */}
             {!collapsed && (
-              <div className="flex-1 min-w-0 text-left">
-                <div className="flex items-center justify-between gap-1">
-                  <p 
-                    className="text-xs font-bold text-slate-900 dark:text-white leading-snug line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
-                    title={isCompanyWorkspace ? displayCompanyName : displayUserName}
-                  >
-                    {isCompanyWorkspace ? displayCompanyName : displayUserName}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5 mt-1">
-                  {isCompanyWorkspace ? (
+              <div className="w-full mt-3 min-w-0">
+                <p
+                  className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                  title={isCompanyWorkspace ? displayCompanyName : displayUserName}
+                >
+                  {isCompanyWorkspace ? displayCompanyName : displayUserName}
+                </p>
+                {isCompanyWorkspace && (
+                  <div className="flex items-center justify-center gap-1.5 mt-1">
                     <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400">
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
                         {displayRole}
                       </span>
-                      <span className="truncate text-slate-400 dark:text-slate-500 font-medium">
+                      <span className="truncate max-w-[110px] text-slate-400 dark:text-slate-500 font-medium">
                         &bull; {user?.fullName?.split(' ')[0] || user?.email?.split('@')[0]}
                       </span>
                     </span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate block font-medium">
-                      {user?.email || 'Personal Account'}
-                    </span>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
           </button>
@@ -268,6 +288,14 @@ export default function Sidebar({
           {!collapsed && <span>Logout</span>}
         </button>
       </div>
+
+      {/* Full-Size Image Lightbox Preview */}
+      <ImageLightboxModal
+        src={previewImage?.src || null}
+        alt={previewImage?.alt || 'Profile Image'}
+        caption={previewImage?.caption}
+        onClose={() => setPreviewImage(null)}
+      />
     </aside>
   );
 }

@@ -51,6 +51,29 @@ export const createAndStoreRefreshToken = async (userId) => {
   return refreshToken;
 };
 
+// Helper to fetch a user's primary organization (for logoUrl & company branding persistence across refreshes)
+const fetchPrimaryOrgForAuth = async (userId) => {
+  try {
+    const org = await prisma.organization.findFirst({
+      where: {
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId, status: 'active' } } },
+        ],
+      },
+      select: {
+        orgId: true,
+        name: true,
+        logo_url: true,
+        ownerId: true,
+      },
+    });
+    return org || null;
+  } catch {
+    return null;
+  }
+};
+
 // 3. Helper to set HttpOnly Cookie
 export const setRefreshTokenCookie = (res, token) => {
   res.cookie('refreshToken', token, {
@@ -658,6 +681,8 @@ export const login = async (req, res) => {
       },
     }).catch(() => {});
 
+    const primaryOrg = await fetchPrimaryOrgForAuth(user.userId);
+
     res.json({
       message: 'Login successful',
       accessToken,
@@ -671,8 +696,18 @@ export const login = async (req, res) => {
         postalCode: user.postalCode,
         country: user.country,
         accountType: user.accountType || 'individual',
-        companyName: user.companyName || null,
+        companyName: user.companyName || primaryOrg?.name || null,
         companySize: user.companySize || null,
+        avatarUrl: user.avatar_url || null,
+        companyLogoUrl: primaryOrg?.logo_url || null,
+        organization: primaryOrg
+          ? {
+              orgId: primaryOrg.orgId,
+              name: primaryOrg.name,
+              logoUrl: primaryOrg.logo_url || null,
+              isOwner: primaryOrg.ownerId === user.userId,
+            }
+          : null,
         roles,
       },
     });
@@ -739,6 +774,8 @@ export const refreshTokenHandler = async (req, res) => {
 
     setRefreshTokenCookie(res, newRefreshToken);
 
+    const primaryOrg = await fetchPrimaryOrgForAuth(storedToken.user.userId);
+
     return res.json({
       accessToken: newAccessToken,
       user: {
@@ -751,8 +788,18 @@ export const refreshTokenHandler = async (req, res) => {
         postalCode: storedToken.user.postalCode,
         country: storedToken.user.country,
         accountType: storedToken.user.accountType || 'individual',
-        companyName: storedToken.user.companyName || null,
+        companyName: storedToken.user.companyName || primaryOrg?.name || null,
         companySize: storedToken.user.companySize || null,
+        avatarUrl: storedToken.user.avatar_url || null,
+        companyLogoUrl: primaryOrg?.logo_url || null,
+        organization: primaryOrg
+          ? {
+              orgId: primaryOrg.orgId,
+              name: primaryOrg.name,
+              logoUrl: primaryOrg.logo_url || null,
+              isOwner: primaryOrg.ownerId === storedToken.user.userId,
+            }
+          : null,
         roles,
       },
     });
@@ -1095,6 +1142,8 @@ export const verifyOtpHandler = async (req, res) => {
       const refreshToken = await createAndStoreRefreshToken(user.userId);
       setRefreshTokenCookie(res, refreshToken);
 
+      const primaryOrg = await fetchPrimaryOrgForAuth(user.userId);
+
       return res.json({
         success: true,
         verified: true,
@@ -1107,8 +1156,18 @@ export const verifyOtpHandler = async (req, res) => {
           email: user.email,
           phone: user.phone,
           accountType: user.accountType || 'individual',
-          companyName: user.companyName || null,
+          companyName: user.companyName || primaryOrg?.name || null,
           companySize: user.companySize || null,
+          avatarUrl: user.avatar_url || null,
+          companyLogoUrl: primaryOrg?.logo_url || null,
+          organization: primaryOrg
+            ? {
+                orgId: primaryOrg.orgId,
+                name: primaryOrg.name,
+                logoUrl: primaryOrg.logo_url || null,
+                isOwner: primaryOrg.ownerId === user.userId,
+              }
+            : null,
           address: user.address,
           city: user.city,
           country: user.country,

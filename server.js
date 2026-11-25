@@ -39,6 +39,7 @@ import { setupGuacamoleWebSocket } from './services/guacamoleService.js';
 import { startTicketAutomationWorker } from './services/ticketAutomationService.js';
 import { startTrialAutomationWorker } from './services/trialService.js';
 import { startBillingRetentionWorker } from './services/billingRetentionService.js';
+import { UPLOADS_DIR } from './middleware/uploadMiddleware.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -114,14 +115,13 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Static uploads directory serving (Avatars, Organization Logos)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+// Resolves automatically to UPLOADS_DIR env -> /u003/portal_uploads (prod NFS) -> ./uploads (local)
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
-app.use('/uploads', express.static(uploadsDir, { maxAge: '7d' }));
-app.use('/api/uploads', express.static(uploadsDir, { maxAge: '7d' }));
+console.log(`[Uploads] Serving static media from: ${UPLOADS_DIR}`);
+app.use('/uploads', express.static(UPLOADS_DIR, { maxAge: '7d' }));
+app.use('/api/uploads', express.static(UPLOADS_DIR, { maxAge: '7d' }));
 
 
 // 4. Rate Limiting Configurations

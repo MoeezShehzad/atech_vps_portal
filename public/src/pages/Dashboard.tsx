@@ -435,6 +435,37 @@ export default function Dashboard() {
     }, 50);
   };
 
+  // Sync sidebar company logo immediately when updated/removed in Account Settings or Team Management
+  useEffect(() => {
+    if (user?.companyLogoUrl !== undefined) {
+      setCurrentOrgLogo(user.companyLogoUrl);
+    }
+  }, [user?.companyLogoUrl]);
+
+  // Auto-select company workspace on fresh login (when localStorage has no workspace set yet)
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+    const isCompanyUser = user.accountType === 'company' || Boolean(user.companyName);
+    let savedWorkspace: string | null = null;
+    try {
+      savedWorkspace = localStorage.getItem('atech_active_workspace_org_id');
+    } catch {}
+
+    if (currentWorkspace === 'personal' || !savedWorkspace) {
+      apiCall('/company/my-organizations')
+        .then((res) => {
+          if (!isMounted || !res?.success || !Array.isArray(res.organizations) || res.organizations.length === 0) return;
+          const firstOrg = res.organizations[0];
+          if (isCompanyUser || !savedWorkspace) {
+            handleWorkspaceSwitch(String(firstOrg.orgId), firstOrg.name, firstOrg.role, firstOrg.logoUrl ?? null);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => { isMounted = false; };
+  }, [user?.userId]);
+
   // 1. Fetch user VMs, subscriptions and saved payment method from API
   const fetchVMs = useCallback(async () => {
     try {

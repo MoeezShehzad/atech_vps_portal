@@ -25,8 +25,8 @@ export interface User {
   companySize?: string;
   role?: string;
   roles?: string[];
-  avatarUrl?: string;
-  companyLogoUrl?: string;
+  avatarUrl?: string | null;
+  companyLogoUrl?: string | null;
   organization?: {
     orgId: number;
     name: string;

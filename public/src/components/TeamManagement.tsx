@@ -21,6 +21,12 @@ import {
   Settings,
 } from 'lucide-react';
 import { apiCall } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import MediaActionModal, {
+  INITIAL_MEDIA_MODAL_STATE,
+  waitMinimumDuration,
+  type MediaModalState,
+} from './MediaActionModal';
 
 export interface CompanyMember {
   memberId: number;
@@ -113,8 +119,10 @@ export default function TeamManagement() {
   const [editCompanySize, setEditCompanySize] = useState('10-49');
   const [editBillingEmail, setEditBillingEmail] = useState('');
   const [editTaxId, setEditTaxId] = useState('');
+  const { user: authUser, updateUser } = useAuth();
   const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [mediaModal, setMediaModal] = useState<MediaModalState>(INITIAL_MEDIA_MODAL_STATE);
   const [ownerPassword, setOwnerPassword] = useState('');
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -212,12 +220,22 @@ export default function TeamManagement() {
 
     if (file.size > 10 * 1024 * 1024) {
       setSettingsError('Logo file size cannot exceed 10MB.');
+      e.target.value = '';
       return;
     }
 
+    const startTime = Date.now();
     try {
       setUploadingLogo(true);
       setSettingsError(null);
+      setMediaModal({
+        open: true,
+        phase: 'processing',
+        action: 'upload',
+        title: 'Uploading Company Logo...',
+        subtitle: 'Optimizing and updating your organization branding.',
+      });
+
       const formData = new FormData();
       formData.append('logo', file);
 
@@ -226,16 +244,49 @@ export default function TeamManagement() {
         body: formData,
       });
 
+      await waitMinimumDuration(startTime, 950);
+
       if (res?.success && res.logoUrl) {
         setEditLogoUrl(res.logoUrl);
         if (profile) {
           setProfile({ ...profile, logoUrl: res.logoUrl });
         }
+        updateUser({
+          companyLogoUrl: res.logoUrl,
+          ...(authUser?.organization
+            ? { organization: { ...authUser.organization, logoUrl: res.logoUrl } }
+            : {}),
+        });
+        setMediaModal({
+          open: true,
+          phase: 'success',
+          action: 'upload',
+          title: 'Company Logo Updated',
+          subtitle: 'Your new brand logo is now live across the portal.',
+        });
+        setTimeout(() => setMediaModal(INITIAL_MEDIA_MODAL_STATE), 750);
       } else {
-        setSettingsError(res?.error || 'Failed to upload logo.');
+        const errMsg = res?.error || 'Failed to upload logo.';
+        setMediaModal({
+          open: true,
+          phase: 'error',
+          action: 'upload',
+          title: 'Upload Failed',
+          subtitle: errMsg,
+        });
+        setSettingsError(errMsg);
       }
     } catch (err: any) {
-      setSettingsError(err?.message || 'Failed to upload logo.');
+      await waitMinimumDuration(startTime, 600);
+      const errMsg = err?.message || 'Failed to upload logo.';
+      setMediaModal({
+        open: true,
+        phase: 'error',
+        action: 'upload',
+        title: 'Upload Failed',
+        subtitle: errMsg,
+      });
+      setSettingsError(errMsg);
     } finally {
       setUploadingLogo(false);
       e.target.value = '';
@@ -243,18 +294,54 @@ export default function TeamManagement() {
   };
 
   const handleRemoveLogoModal = async () => {
+    const startTime = Date.now();
     try {
       setUploadingLogo(true);
       setSettingsError(null);
+      setMediaModal({
+        open: true,
+        phase: 'processing',
+        action: 'delete',
+        title: 'Removing Company Logo...',
+        subtitle: 'Clearing organization branding from storage.',
+      });
+
       const res = await apiCall('/company/logo', { method: 'DELETE' });
+      await waitMinimumDuration(startTime, 800);
+
       if (res?.success) {
         setEditLogoUrl(null);
         if (profile) {
           setProfile({ ...profile, logoUrl: null });
         }
+        updateUser({
+          companyLogoUrl: null,
+          ...(authUser?.organization
+            ? { organization: { ...authUser.organization, logoUrl: null } }
+            : {}),
+        });
+        setMediaModal({
+          open: true,
+          phase: 'success',
+          action: 'delete',
+          title: 'Company Logo Removed',
+          subtitle: 'Workspace branding has been reset to default.',
+        });
+        setTimeout(() => setMediaModal(INITIAL_MEDIA_MODAL_STATE), 700);
+      } else {
+        setMediaModal(INITIAL_MEDIA_MODAL_STATE);
       }
     } catch (err: any) {
-      setSettingsError(err?.message || 'Failed to remove logo.');
+      await waitMinimumDuration(startTime, 500);
+      const errMsg = err?.message || 'Failed to remove logo.';
+      setMediaModal({
+        open: true,
+        phase: 'error',
+        action: 'delete',
+        title: 'Removal Failed',
+        subtitle: errMsg,
+      });
+      setSettingsError(errMsg);
     } finally {
       setUploadingLogo(false);
     }
@@ -1144,6 +1231,12 @@ export default function TeamManagement() {
           </div>
         </div>
       )}
+
+      {/* Smooth Upload / Delete Processing Popup */}
+      <MediaActionModal
+        state={mediaModal}
+        onClose={() => setMediaModal(INITIAL_MEDIA_MODAL_STATE)}
+      />
     </div>
   );
 }

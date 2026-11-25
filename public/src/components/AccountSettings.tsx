@@ -13,6 +13,12 @@ import {
   type CountryOption,
   type GeoItem,
 } from './ModernFormControls';
+import MediaActionModal, {
+  INITIAL_MEDIA_MODAL_STATE,
+  waitMinimumDuration,
+  type MediaModalState,
+} from './MediaActionModal';
+import ImageLightboxModal from './ImageLightboxModal';
 
 interface SSHKeyItem {
   keyId: number;
@@ -70,6 +76,8 @@ export default function AccountSettings() {
   const [companyLogoPreview, setCompanyLogoPreview] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState<boolean>(false);
   const [uploadingLogo, setUploadingLogo] = useState<boolean>(false);
+  const [mediaModal, setMediaModal] = useState<MediaModalState>(INITIAL_MEDIA_MODAL_STATE);
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt: string; caption?: string } | null>(null);
 
   // Geo SQL Tables State
   const [countriesList, setCountriesList] = useState<CountryOption[]>([]);
@@ -354,12 +362,22 @@ export default function AccountSettings() {
 
     if (file.size > 10 * 1024 * 1024) {
       setMessage({ type: 'error', text: 'Avatar image is too large. Please select an image under 10 MB.' });
+      e.target.value = '';
       return;
     }
 
+    const startTime = Date.now();
     try {
       setUploadingAvatar(true);
       setMessage(null);
+      setMediaModal({
+        open: true,
+        phase: 'processing',
+        action: 'upload',
+        title: 'Uploading Profile Picture...',
+        subtitle: 'Saving and syncing your photo across your workspace.',
+      });
+
       const formData = new FormData();
       formData.append('avatar', file);
 
@@ -368,15 +386,42 @@ export default function AccountSettings() {
         body: formData,
       });
 
+      await waitMinimumDuration(startTime, 950);
+
       if (res?.success && res.avatarUrl) {
         setAvatarPreview(res.avatarUrl);
         updateUser({ avatarUrl: res.avatarUrl });
+        setMediaModal({
+          open: true,
+          phase: 'success',
+          action: 'upload',
+          title: 'Profile Picture Updated',
+          subtitle: 'Your new profile photo is now live.',
+        });
         setMessage({ type: 'success', text: 'Profile picture uploaded and saved to webserver.' });
+        setTimeout(() => setMediaModal(INITIAL_MEDIA_MODAL_STATE), 750);
       } else {
-        setMessage({ type: 'error', text: res?.error || 'Failed to upload profile picture.' });
+        const errMsg = res?.error || 'Failed to upload profile picture.';
+        setMediaModal({
+          open: true,
+          phase: 'error',
+          action: 'upload',
+          title: 'Upload Failed',
+          subtitle: errMsg,
+        });
+        setMessage({ type: 'error', text: errMsg });
       }
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'Failed to upload avatar.' });
+      await waitMinimumDuration(startTime, 600);
+      const errMsg = err?.message || 'Failed to upload avatar.';
+      setMediaModal({
+        open: true,
+        phase: 'error',
+        action: 'upload',
+        title: 'Upload Failed',
+        subtitle: errMsg,
+      });
+      setMessage({ type: 'error', text: errMsg });
     } finally {
       setUploadingAvatar(false);
       e.target.value = '';
@@ -384,17 +429,47 @@ export default function AccountSettings() {
   };
 
   const handleRemoveAvatar = async () => {
+    const startTime = Date.now();
     try {
       setUploadingAvatar(true);
       setMessage(null);
+      setMediaModal({
+        open: true,
+        phase: 'processing',
+        action: 'delete',
+        title: 'Removing Profile Picture...',
+        subtitle: 'Cleaning up image and updating your profile.',
+      });
+
       const res = await apiCall('/users/me/avatar', { method: 'DELETE' });
+      await waitMinimumDuration(startTime, 800);
+
       if (res?.success) {
         setAvatarPreview(null);
-        updateUser({ avatarUrl: undefined });
+        updateUser({ avatarUrl: null });
+        setMediaModal({
+          open: true,
+          phase: 'success',
+          action: 'delete',
+          title: 'Profile Picture Removed',
+          subtitle: 'Your profile has been reverted to default.',
+        });
         setMessage({ type: 'success', text: 'Profile picture removed.' });
+        setTimeout(() => setMediaModal(INITIAL_MEDIA_MODAL_STATE), 700);
+      } else {
+        setMediaModal(INITIAL_MEDIA_MODAL_STATE);
       }
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'Failed to remove profile picture.' });
+      await waitMinimumDuration(startTime, 500);
+      const errMsg = err?.message || 'Failed to remove profile picture.';
+      setMediaModal({
+        open: true,
+        phase: 'error',
+        action: 'delete',
+        title: 'Removal Failed',
+        subtitle: errMsg,
+      });
+      setMessage({ type: 'error', text: errMsg });
     } finally {
       setUploadingAvatar(false);
     }
@@ -407,12 +482,22 @@ export default function AccountSettings() {
 
     if (file.size > 10 * 1024 * 1024) {
       setMessage({ type: 'error', text: 'Company logo is too large. Please select an image under 10 MB.' });
+      e.target.value = '';
       return;
     }
 
+    const startTime = Date.now();
     try {
       setUploadingLogo(true);
       setMessage(null);
+      setMediaModal({
+        open: true,
+        phase: 'processing',
+        action: 'upload',
+        title: 'Uploading Company Logo...',
+        subtitle: 'Optimizing and updating your organization branding.',
+      });
+
       const formData = new FormData();
       formData.append('logo', file);
 
@@ -421,15 +506,47 @@ export default function AccountSettings() {
         body: formData,
       });
 
+      await waitMinimumDuration(startTime, 950);
+
       if (res?.success && res.logoUrl) {
         setCompanyLogoPreview(res.logoUrl);
-        updateUser({ companyLogoUrl: res.logoUrl });
+        updateUser({
+          companyLogoUrl: res.logoUrl,
+          ...(authUser?.organization
+            ? { organization: { ...authUser.organization, logoUrl: res.logoUrl } }
+            : {}),
+        });
+        setMediaModal({
+          open: true,
+          phase: 'success',
+          action: 'upload',
+          title: 'Company Logo Updated',
+          subtitle: 'Your new brand logo is now live across the portal.',
+        });
         setMessage({ type: 'success', text: 'Company logo uploaded and saved to webserver.' });
+        setTimeout(() => setMediaModal(INITIAL_MEDIA_MODAL_STATE), 750);
       } else {
-        setMessage({ type: 'error', text: res?.error || 'Failed to upload company logo.' });
+        const errMsg = res?.error || 'Failed to upload company logo.';
+        setMediaModal({
+          open: true,
+          phase: 'error',
+          action: 'upload',
+          title: 'Upload Failed',
+          subtitle: errMsg,
+        });
+        setMessage({ type: 'error', text: errMsg });
       }
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'Failed to upload company logo.' });
+      await waitMinimumDuration(startTime, 600);
+      const errMsg = err?.message || 'Failed to upload company logo.';
+      setMediaModal({
+        open: true,
+        phase: 'error',
+        action: 'upload',
+        title: 'Upload Failed',
+        subtitle: errMsg,
+      });
+      setMessage({ type: 'error', text: errMsg });
     } finally {
       setUploadingLogo(false);
       e.target.value = '';
@@ -437,17 +554,52 @@ export default function AccountSettings() {
   };
 
   const handleRemoveCompanyLogo = async () => {
+    const startTime = Date.now();
     try {
       setUploadingLogo(true);
       setMessage(null);
+      setMediaModal({
+        open: true,
+        phase: 'processing',
+        action: 'delete',
+        title: 'Removing Company Logo...',
+        subtitle: 'Clearing organization branding from storage.',
+      });
+
       const res = await apiCall('/company/logo', { method: 'DELETE' });
+      await waitMinimumDuration(startTime, 800);
+
       if (res?.success) {
         setCompanyLogoPreview(null);
-        updateUser({ companyLogoUrl: undefined });
+        updateUser({
+          companyLogoUrl: null,
+          ...(authUser?.organization
+            ? { organization: { ...authUser.organization, logoUrl: null } }
+            : {}),
+        });
+        setMediaModal({
+          open: true,
+          phase: 'success',
+          action: 'delete',
+          title: 'Company Logo Removed',
+          subtitle: 'Workspace branding has been reset to default.',
+        });
         setMessage({ type: 'success', text: 'Company logo removed.' });
+        setTimeout(() => setMediaModal(INITIAL_MEDIA_MODAL_STATE), 700);
+      } else {
+        setMediaModal(INITIAL_MEDIA_MODAL_STATE);
       }
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'Failed to remove company logo.' });
+      await waitMinimumDuration(startTime, 500);
+      const errMsg = err?.message || 'Failed to remove company logo.';
+      setMediaModal({
+        open: true,
+        phase: 'error',
+        action: 'delete',
+        title: 'Removal Failed',
+        subtitle: errMsg,
+      });
+      setMessage({ type: 'error', text: errMsg });
     } finally {
       setUploadingLogo(false);
     }
@@ -690,7 +842,19 @@ export default function AccountSettings() {
           {/* User Profile Avatar Card */}
           <div className="flex items-start gap-4">
             <div className="relative shrink-0">
-              <div className="w-18 h-18 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden text-slate-400 dark:text-slate-500 font-bold text-xl shadow-xs">
+              <div
+                onClick={() => {
+                  if (avatarPreview && !uploadingAvatar) {
+                    setPreviewImage({
+                      src: avatarPreview,
+                      alt: fullName || 'Profile Picture',
+                      caption: fullName || 'Profile Picture',
+                    });
+                  }
+                }}
+                title={avatarPreview ? 'Click to view full image' : undefined}
+                className={`w-18 h-18 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden text-slate-400 dark:text-slate-500 font-bold text-xl shadow-xs transition-all ${avatarPreview ? 'cursor-zoom-in hover:ring-2 hover:ring-blue-500/50' : ''}`}
+              >
                 {uploadingAvatar ? (
                   <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                 ) : avatarPreview ? (
@@ -738,7 +902,19 @@ export default function AccountSettings() {
           {isCompanyAccount && (
             <div className="flex items-start gap-4 border-t md:border-t-0 md:border-l border-slate-200/80 dark:border-slate-700/80 pt-4 md:pt-0 md:pl-5">
               <div className="relative shrink-0">
-                <div className="w-40 sm:w-48 h-20 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 flex items-center justify-center overflow-hidden text-slate-400 dark:text-slate-500 font-bold shadow-xs">
+                <div
+                  onClick={() => {
+                    if (companyLogoPreview && !uploadingLogo) {
+                      setPreviewImage({
+                        src: companyLogoPreview,
+                        alt: 'Company Logo',
+                        caption: profile?.companyName || authUser?.companyName || 'Company Logo',
+                      });
+                    }
+                  }}
+                  title={companyLogoPreview ? 'Click to view full logo' : undefined}
+                  className={`w-40 sm:w-48 h-20 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 flex items-center justify-center overflow-hidden text-slate-400 dark:text-slate-500 font-bold shadow-xs transition-all ${companyLogoPreview ? 'cursor-zoom-in hover:ring-2 hover:ring-blue-500/50' : ''}`}
+                >
                   {uploadingLogo ? (
                     <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                   ) : companyLogoPreview ? (
@@ -1157,8 +1333,8 @@ export default function AccountSettings() {
 
             <p className="text-[11px] text-slate-400 dark:text-slate-500 pt-1">
               Cancellation and retention terms are governed by our{' '}
-              <Link to="/terms#atc-9" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">
-                Terms of Service
+              <Link to="/Terms&Conditions" className="text-blue-600 dark:text-blue-400 underline underline-offset-2">
+                Terms and Conditions
               </Link>.
             </p>
           </div>
@@ -1356,6 +1532,20 @@ export default function AccountSettings() {
           </div>
         </div>
       )}
+
+      {/* Smooth Upload / Delete Processing Popup */}
+      <MediaActionModal
+        state={mediaModal}
+        onClose={() => setMediaModal(INITIAL_MEDIA_MODAL_STATE)}
+      />
+
+      {/* Full-Size Image Lightbox Preview */}
+      <ImageLightboxModal
+        src={previewImage?.src || null}
+        alt={previewImage?.alt || 'Preview'}
+        caption={previewImage?.caption}
+        onClose={() => setPreviewImage(null)}
+      />
     </div>
   );
 }
