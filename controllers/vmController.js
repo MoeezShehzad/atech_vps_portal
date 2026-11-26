@@ -1584,19 +1584,6 @@ export async function getConsoleSession(req, res) {
       return null;
     };
 
-    // Fast path: if DB already has a valid IP, issue the ticket immediately (0ms wait)
-    // and refresh Hyper-V IP in the background so startup doesn't stall for 2-6 seconds.
-    if (targetIp) {
-      refreshLiveGuestIp().catch(() => {});
-    } else {
-      const liveIp = await refreshLiveGuestIp();
-      if (liveIp) targetIp = liveIp;
-    }
-
-    if (!targetIp) {
-      targetIp = '192.168.2.192'; // Fallback to verified local guest IP if momentarily polling
-    }
-
     const osFamily = (vm.image?.osFamily || '').toLowerCase();
     const imageName = (vm.image?.name || '').toLowerCase();
     const templatePath = (vm.image?.templatePath || '').toLowerCase();
@@ -1608,6 +1595,19 @@ export async function getConsoleSession(req, res) {
       adminUser === 'administrator' ||
       adminUser === 'user'
     );
+
+    // For Windows (Guacamole RDP), always await the live Hyper-V IP before baking it into guacToken
+    // (Guacamole has no SSH-style IP retry loop). For Linux SSH, use the 0ms fast path if DB has a valid IP.
+    if (isWindows || !targetIp) {
+      const liveIp = await refreshLiveGuestIp();
+      if (liveIp) targetIp = liveIp;
+    } else {
+      refreshLiveGuestIp().catch(() => {});
+    }
+
+    if (!targetIp) {
+      targetIp = '192.168.2.192'; // Fallback to verified local guest IP if momentarily polling
+    }
 
     if (isWindows) {
       const rdpPayload = buildRdpConnectionPayload({
