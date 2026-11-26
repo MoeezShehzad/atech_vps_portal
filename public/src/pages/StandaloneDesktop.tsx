@@ -318,9 +318,6 @@ export default function StandaloneDesktop() {
           <div className="flex items-center gap-2">
             <Monitor className="w-4 h-4 text-sky-400" />
             <h1 className="text-sm font-semibold text-white tracking-wide">{vmName}</h1>
-            <span className="text-[11px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-              Windows 10 {activeIp ? `(${activeIp}:3389)` : ''}
-            </span>
           </div>
 
           <div className="h-4 w-px bg-slate-800 hidden sm:block" />

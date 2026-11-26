@@ -5,6 +5,32 @@ import GuacamoleLite from 'guacamole-lite';
 const GUAC_SECRET = process.env.GUACAMOLE_SECRET || process.env.JWT_SECRET || 'atc_cloud_guacamole_master_secret_2026!';
 const GUAC_KEY = crypto.createHash('sha256').update(GUAC_SECRET).digest();
 
+// Short opaque ticket store so Guacamole WebSocket URLs never expose long base64 tokens
+// (prevents ISP/WAF/IPS DPI from resetting WebSocket TCP connections with ERR_CONNECTION_RESET)
+const guacamoleTicketStore = new Map();
+
+export function registerGuacamoleTicket(guacToken, ttlMs = 10 * 60 * 1000) {
+  const now = Date.now();
+  for (const [k, v] of guacamoleTicketStore.entries()) {
+    if (v.expiresAt <= now) guacamoleTicketStore.delete(k);
+  }
+  const shortId = crypto.randomBytes(12).toString('hex');
+  guacamoleTicketStore.set(shortId, { guacToken, expiresAt: now + ttlMs });
+  return shortId;
+}
+
+function resolveGuacamoleTicket(rawToken) {
+  if (!rawToken) return null;
+  const entry = guacamoleTicketStore.get(rawToken);
+  if (entry) {
+    if (entry.expiresAt > Date.now()) {
+      return entry.guacToken;
+    }
+    guacamoleTicketStore.delete(rawToken);
+  }
+  return rawToken;
+}
+
 /**
  * Encrypt a Guacamole connection payload into a secure base64 token
  * readable by guacamole-lite's Crypt decipher.
@@ -91,9 +117,19 @@ export function setupGuacamoleWebSocket(server) {
     try {
       const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
       if (url.pathname === '/ws/guacamole' || url.pathname === '/api/ws/guacamole') {
+        // Resolve short opaque ticket back into the full encrypted Guacamole token for guacamole-lite
+        const rawToken = url.searchParams.get('token');
+        if (rawToken) {
+          const resolved = resolveGuacamoleTicket(rawToken);
+          if (resolved && resolved !== rawToken) {
+            url.searchParams.set('token', resolved);
+            request.url = `${url.pathname}?${url.searchParams.toString()}`;
+          }
+        }
         guacServerInstance.webSocketServer.handleUpgrade(request, socket, head, (ws) => {
           if (ws._socket) {
             ws._socket.setNoDelay(true);
+            ws._socket.setKeepAlive(true, 15000);
           }
           guacServerInstance.webSocketServer.emit('connection', ws, request);
         });
@@ -108,6 +144,7 @@ export function setupGuacamoleWebSocket(server) {
 
 export default {
   generateGuacamoleToken,
+  registerGuacamoleTicket,
   buildRdpConnectionPayload,
   setupGuacamoleWebSocket,
 };

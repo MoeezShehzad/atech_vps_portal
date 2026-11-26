@@ -15,7 +15,7 @@ import {
   sendVmFailureAlertToSupport
 } from '../services/emailService.js';
 import firewallService from '../services/firewallService.js';
-import { generateGuacamoleToken, buildRdpConnectionPayload } from '../services/guacamoleService.js';
+import { generateGuacamoleToken, registerGuacamoleTicket, buildRdpConnectionPayload } from '../services/guacamoleService.js';
 import { registerConsoleTicket } from '../services/terminalService.js';
 import { sanitizeInfrastructureError } from '../lib/errorSanitizer.js';
 import { autoExpandPrimaryOsFilesystem, getPlanNasQuota, autoFormatAndMountOnGuest } from './volumeController.js';
@@ -1616,6 +1616,7 @@ export async function getConsoleSession(req, res) {
         password: decryptVmPassword(vm.adminPassword) || '',
       });
       const guacToken = generateGuacamoleToken(rdpPayload);
+      const guacShortTicket = registerGuacamoleTicket(guacToken);
 
       await prisma.securityLog.create({
         data: {
@@ -1642,8 +1643,8 @@ export async function getConsoleSession(req, res) {
       return res.json({
         success: true,
         isWindows: true,
-        token: guacToken,
-        ticket: guacToken,
+        token: guacShortTicket,
+        ticket: guacShortTicket,
         vmId,
         vmName: vm.vmName,
         ip: targetIp,
