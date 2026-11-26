@@ -287,6 +287,10 @@ export default function WebConsoleModal({
       if (!xtermInstance.current || !isMountedRef.current) return;
       const term = xtermInstance.current;
       try {
+        // Fit terminal and pass exact cols/rows on open so PTY never starts desynced at 100x30
+        try {
+          fitAddonRef.current?.fit();
+        } catch {}
         const openRes = await apiCall('/ws/terminal-http', {
           method: 'POST',
           body: JSON.stringify({
@@ -441,6 +445,12 @@ export default function WebConsoleModal({
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
 
+      try {
+        fitAddonRef.current?.fit();
+      } catch {}
+      const initCols = term.cols || 100;
+      const initRows = term.rows || 30;
+
       if (siteId) {
         session = await apiCall(`/sites/${siteId}/console-session`, { method: 'POST' });
         if (!isMountedRef.current) return;
@@ -448,7 +458,7 @@ export default function WebConsoleModal({
           throw new Error(session?.error || 'Failed to obtain container console session ticket.');
         }
         term.write(`\x1b[32m[Console]\x1b[0m Ticket granted. Attaching to container sandbox (site_${siteId})...\r\n`);
-        wsUrl = `${protocol}//${host}/api/ws/terminal?ticket=${encodeURIComponent(session.ticket)}&siteId=${siteId}`;
+        wsUrl = `${protocol}//${host}/api/ws/terminal?ticket=${encodeURIComponent(session.ticket)}&siteId=${siteId}&cols=${initCols}&rows=${initRows}`;
       } else {
         session = await apiCall(`/vms/${vmId}/console-session`, { method: 'POST' });
         if (!isMountedRef.current) return;
@@ -456,7 +466,7 @@ export default function WebConsoleModal({
           throw new Error(session?.error || 'Failed to obtain console session ticket.');
         }
         term.write(`\x1b[32m[Console]\x1b[0m Ticket granted. Establishing SSH bridge to ${session.ip || vmIp}...\r\n`);
-        wsUrl = `${protocol}//${host}/api/ws/terminal?ticket=${encodeURIComponent(session.ticket)}&vmId=${vmId}`;
+        wsUrl = `${protocol}//${host}/api/ws/terminal?ticket=${encodeURIComponent(session.ticket)}&vmId=${vmId}&cols=${initCols}&rows=${initRows}`;
       }
 
       const ws = new WebSocket(wsUrl);
@@ -708,33 +718,14 @@ export default function WebConsoleModal({
         return true; // No selection: allow standard Ctrl+C SIGINT in bash
       }
 
-      // 2. Paste: Ctrl+V / Cmd+V
+      // 2. Paste: Ctrl+V / Cmd+V — let the browser's single native paste event into xterm's
+      // helper textarea handle it (prevents double-pasting from both clipboard API + native paste event)
       if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'v' || event.code === 'KeyV')) {
-        if (event.type === 'keydown') {
-          if (navigator.clipboard && navigator.clipboard.readText) {
-            navigator.clipboard.readText()
-              .then((text) => {
-                if (text) term.paste(text);
-              })
-              .catch(() => {});
-          }
-        }
-        return false;
+        return false; // Prevent xterm from sending raw ^V; browser native paste fires once into xterm
       }
 
       return true;
     });
-
-    // Native browser paste event listener (listens on both container & window)
-    const handleNativePaste = (e: ClipboardEvent) => {
-      const text = e.clipboardData?.getData('text/plain') || e.clipboardData?.getData('text');
-      if (text) {
-        e.preventDefault();
-        term.paste(text);
-      }
-    };
-    currentContainer.addEventListener('paste', handleNativePaste);
-    window.addEventListener('paste', handleNativePaste);
 
     // Right-click paste (PuTTY / Windows Terminal style)
     const handleContextMenu = async (e: MouseEvent) => {
@@ -742,8 +733,8 @@ export default function WebConsoleModal({
         try {
           const text = await navigator.clipboard.readText();
           if (text) {
-            term.paste(text);
             e.preventDefault();
+            term.paste(text);
           }
         } catch {}
       }
@@ -853,8 +844,6 @@ export default function WebConsoleModal({
       if (sizeBadgeTimerRef.current) clearTimeout(sizeBadgeTimerRef.current);
       window.removeEventListener('resize', handleWindowResize);
       window.removeEventListener('keydown', handleGlobalKeyZoom);
-      window.removeEventListener('paste', handleNativePaste);
-      currentContainer.removeEventListener('paste', handleNativePaste);
       currentContainer.removeEventListener('contextmenu', handleContextMenu);
       currentContainer.removeEventListener('mousedown', handlePointerFocus);
       currentContainer.removeEventListener('wheel', handleWheelZoom);

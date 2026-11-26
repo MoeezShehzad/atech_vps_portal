@@ -237,12 +237,10 @@ export function setupTerminalHttpFallback(app) {
         if (ticket) synthUrl.searchParams.set('ticket', String(ticket));
         if (vmId) synthUrl.searchParams.set('vmId', String(vmId));
         if (siteId) synthUrl.searchParams.set('siteId', String(siteId));
+        if (cols) synthUrl.searchParams.set('cols', String(cols));
+        if (rows) synthUrl.searchParams.set('rows', String(rows));
 
         handleTerminalConnection(adapter, req, synthUrl);
-
-        if (cols && rows) {
-          adapter.emitInput(JSON.stringify({ type: 'resize', cols: Number(cols), rows: Number(rows) }));
-        }
 
         // Return immediately as soon as initial banner/prompt arrives (max 120ms instead of fixed 400ms sleep)
         if (adapter.outChunks.length === 0 && adapter.readyState === 1) {
@@ -444,8 +442,8 @@ async function handleTerminalConnection(ws, request, url) {
       const workerHost = process.env.ATC_WORKER_HOST || '172.27.47.192';
       const sshConn = new SSHClient();
       let shellStream = null;
-      let ptyRows = 30;
-      let ptyCols = 100;
+      let ptyRows = Math.max(10, Math.min(200, Number(url.searchParams.get('rows')) || 30));
+      let ptyCols = Math.max(20, Math.min(500, Number(url.searchParams.get('cols')) || 100));
 
       sshConn.on('connect', () => {
         if (sshConn._sock) {
@@ -606,8 +604,8 @@ async function handleTerminalConnection(ws, request, url) {
 
     let activeConn = null;
     let shellStream = null;
-    let ptyRows = 30;
-    let ptyCols = 100;
+    let ptyRows = Math.max(10, Math.min(200, Number(url.searchParams.get('rows')) || 30));
+    let ptyCols = Math.max(20, Math.min(500, Number(url.searchParams.get('cols')) || 100));
     let retryCount = 0;
     const maxRetries = 3;
     const inputBuffer = [];
