@@ -825,7 +825,7 @@ function CheckoutContent({ stripeConfigError }: { stripeConfigError: string }) {
                             className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                           />
                           <span className="text-slate-600 text-xs font-medium">
-                            I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Terms of Service</a>, <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Privacy Policy</a>, and <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Refund Policy</a>
+                            I agree to the <a href="/Terms&Conditions" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Terms and Conditions</a>, <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Privacy Policy</a>, and <a href="/refund-policy" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-semibold">Refund Policy</a>
                           </span>
                         </label>
                         {errors.termsAccepted && <p className="text-red-500 text-[10px] font-bold mt-1">{errors.termsAccepted}</p>}
@@ -1439,8 +1439,19 @@ function CheckoutContent({ stripeConfigError }: { stripeConfigError: string }) {
                     )}
                   </div>
 
-                  <div className="p-3 bg-blue-50 border border-blue-200/70 rounded-xl text-blue-900 text-[11px] leading-relaxed">
-                    📧 An official VAT invoice and payment confirmation has been dispatched to your email address.
+                  <div className="p-3 bg-blue-50 border border-blue-200/70 rounded-xl text-blue-900 text-[11px] leading-relaxed space-y-1">
+                    <div>📧 An official VAT invoice and payment confirmation has been dispatched to your email address.</div>
+                    <div>
+                      <span className="font-semibold">Link to Terms of Contract: </span>
+                      <a
+                        href="https://www.atechconsult.com/Terms&Conditions"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-700 underline font-semibold break-all"
+                      >
+                        https://www.atechconsult.com/Terms&Conditions
+                      </a>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-2">

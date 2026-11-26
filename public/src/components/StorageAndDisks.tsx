@@ -1475,9 +1475,9 @@ export default function StorageAndDisks() {
               </div>
 
               <div className="p-3.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 text-rose-900 dark:text-rose-200 space-y-1">
-                <div className="font-semibold tracking-tight">WARNING (ATech Consult Terms of Service):</div>
+                <div className="font-semibold tracking-tight">WARNING (ATech Consult Terms and Conditions):</div>
                 <p className="text-[11px] leading-relaxed">
-                  Force-detaching while applications or terminal sessions are actively using this directory may corrupt or delete unsaved data. Per ATC Terms of Service, ATC is not responsible for data loss caused by user-initiated force detachment.
+                  Force-detaching while applications or terminal sessions are actively using this directory may corrupt or delete unsaved data. Per ATC Terms and Conditions, ATC is not responsible for data loss caused by user-initiated force detachment.
                 </p>
               </div>
             </div>
@@ -1549,7 +1549,7 @@ export default function StorageAndDisks() {
               </p>
 
               <div className="p-3.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 text-rose-900 dark:text-rose-200 space-y-1">
-                <div className="font-semibold tracking-tight">WARNING (ATech Consult Terms of Service):</div>
+                <div className="font-semibold tracking-tight">WARNING (ATech Consult Terms and Conditions):</div>
                 <p className="text-[11px] leading-relaxed">
                   This permanently erases all files stored on this volume. ATC is not responsible for any data loss resulting from user-initiated volume deletion or force delete.
                 </p>

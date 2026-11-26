@@ -16,7 +16,7 @@ import {
   processDirectBankTransfer,
   encryptSensitive,
 } from '../services/stripeService.js';
-import { sendInvoiceReceiptEmail } from '../services/emailService.js';
+import { sendInvoiceReceiptEmail, sendPaymentFailedEmail } from '../services/emailService.js';
 
 /**
  * Shared Server-Side Anti-Tampering Price Verification for Card Checkout
@@ -784,6 +784,30 @@ export async function handleStripeWebhook(req, res) {
           where: { transactionId: paymentIntent.id },
           data: { status: 'FAILED' },
         });
+
+        let recipientEmail = paymentIntent.receipt_email || paymentIntent.metadata?.customerEmail || '';
+        let recipientName = paymentIntent.metadata?.customerName || '';
+
+        if (!recipientEmail && paymentIntent.metadata?.userId) {
+          const failedUser = await prisma.user.findUnique({
+            where: { userId: Number(paymentIntent.metadata.userId) },
+          });
+          if (failedUser) {
+            recipientEmail = failedUser.email;
+            recipientName = recipientName || failedUser.fullName;
+          }
+        }
+
+        if (recipientEmail) {
+          sendPaymentFailedEmail({
+            email: recipientEmail,
+            fullName: recipientName,
+            amount: paymentIntent.amount ? Number((paymentIntent.amount / 100).toFixed(2)) : undefined,
+            currency: (paymentIntent.currency || 'usd').toUpperCase(),
+            planName: paymentIntent.metadata?.planName || 'Cloud VPS Plan',
+            failureReason: paymentIntent.last_payment_error?.message,
+          }).catch((mailErr) => console.warn('[Webhook Failed Payment Email Warning]:', mailErr.message));
+        }
       } catch (dbErr) {
         console.error('[Stripe Webhook DB Error]:', dbErr);
       }

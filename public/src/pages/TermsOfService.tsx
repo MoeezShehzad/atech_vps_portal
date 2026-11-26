@@ -8,13 +8,14 @@ import {
 } from 'lucide-react';
 
 export default function TermsOfService() {
-  const fallbackLastUpdated = "October 17, 2026";
+  const fallbackLastUpdated = "November 11, 2026";
   const [dbPolicy, setDbPolicy] = useState<any>(null);
   const [versionHistory, setVersionHistory] = useState<any[]>([]);
   const [selectedVer, setSelectedVer] = useState<string>('');
   const [loadingVer, setLoadingVer] = useState(false);
 
   useEffect(() => {
+    document.title = 'Terms and Conditions | Analytical Technical Consulting (ATC)';
     fetch('/api/policies/terms-of-service')
       .then((res) => res.json())
       .then((data) => {
@@ -64,25 +65,26 @@ export default function TermsOfService() {
   const [activeSection, setActiveSection] = useState('atc-1');
 
   const tableOfContents = [
-    { id: 'atc-1', title: '1. Services Provision & Modifications' },
-    { id: 'atc-2', title: '2. Customer Obligations & Consents' },
-    { id: 'atc-3', title: '3. Customer Data & Intellectual Property' },
-    { id: 'atc-4', title: '4. Shared Security Responsibility Model' },
-    { id: 'atc-5', title: '5. Acceptable Use Policy & High-Risk Activities' },
-    { id: 'atc-6', title: '6. Absolute Backup Disclaimer & Data Loss Immunity' },
-    { id: 'atc-7', title: '7. Service Level Agreement (SLA) & Remedies' },
-    { id: 'atc-8', title: '8. Fees, Invoicing, Billing & Taxes' },
-    { id: 'atc-9', title: '9. Service Suspension, Voluntary Deactivation & 90-Day Data Preservation' },
-    { id: 'atc-10', title: '10. Term, Termination & Data Sanitization' },
-    { id: 'atc-11', title: '11. Complete Disclaimer of Warranties ("AS IS")' },
-    { id: 'atc-12', title: '12. Strict Limitation of Liability & Damages Cap' },
-    { id: 'atc-13', title: '13. Comprehensive Customer Indemnification' },
-    { id: 'atc-14', title: '14. Mandatory Binding Individual Arbitration' },
-    { id: 'atc-15', title: '15. Governing Law, Exclusive Venue & Time Bar' },
-    { id: 'atc-16', title: '16. Safe Harbor, DMCA & Copyright Enforcement' },
-    { id: 'atc-17', title: '17. U.S. Export Controls & Trade Sanctions' },
-    { id: 'atc-18', title: '18. Force Majeure & Operational Continuity' },
-    { id: 'atc-19', title: '19. Miscellaneous & Legal Definitions' },
+    { id: 'atc-1', title: '1. Agreement and Acceptance' },
+    { id: 'atc-2', title: '2. Cloud Services Provided' },
+    { id: 'atc-3', title: '3. Account Credentials, Password Security, and Confidentiality' },
+    { id: 'atc-4', title: '4. Suspension or Termination of Services Due to Suspicious Activities or Legal Enforcement' },
+    { id: 'atc-5', title: '5. Scheduled Maintenance, Emergency Maintenance, Service Availability, and Limitation of Liability' },
+    { id: 'atc-6', title: '6. Disaster Recovery (DR), Data Backup, Restoration, and Point-in-Time Recovery (PITR)' },
+    { id: 'atc-7', title: '7. Cloud/VPN Services – Customer Insurance Requirements, Risk Allocation, and Limitation of Liability' },
+    { id: 'atc-8', title: '8. Data Ownership and Privacy' },
+    { id: 'atc-9', title: '9. Security Responsibilities' },
+    { id: 'atc-10', title: '10. Subscription Fees and Payment' },
+    { id: 'atc-11', title: '11. Resource Usage and Service Limits' },
+    { id: 'atc-12', title: '12. Suspension and Termination' },
+    { id: 'atc-13', title: '13. Limitation of Liability' },
+    { id: 'atc-14', title: '14. Third-Party Services' },
+    { id: 'atc-15', title: '15. Changes to Services and Terms' },
+    { id: 'atc-16', title: '16. Force Majeure' },
+    { id: 'atc-17', title: '17. Governing Law and Jurisdiction' },
+    { id: 'atc-18', title: '18. Contact and Support' },
+    { id: 'atc-19', title: '19. Storage Volume Detachment, Force-Delete & Customer Action Liability Waiver' },
+    { id: 'atc-20', title: '20. Final Agreement' },
   ];
 
   const scrollTo = (id: string) => {
@@ -99,31 +101,6 @@ export default function TermsOfService() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 font-sans py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         
-        {/* ARCHIVE NOTICE BANNER (IF VIEWING HISTORICAL VERSION) */}
-        {dbPolicy && !dbPolicy.isCurrent && (
-          <div className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <div className="text-xs sm:text-sm text-amber-900 dark:text-amber-200">
-                <strong>Historical Archive Notice:</strong> You are viewing archived version{' '}
-                <span className="font-mono font-bold">{dbPolicy.version}</span>.
-                {dbPolicy.summaryOfChanges && (
-                  <span className="block text-xs mt-0.5 text-amber-800 dark:text-amber-300">
-                    Reason/Summary: {dbPolicy.summaryOfChanges}
-                  </span>
-                )}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleSelectVersion('')}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 transition-colors cursor-pointer"
-            >
-              Switch to Live Version
-            </button>
-          </div>
-        )}
-
         {/* ENTERPRISE HERO */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 shadow-sm mb-10">
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6 mb-6">
@@ -133,10 +110,10 @@ export default function TermsOfService() {
               </div>
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                  Analytical Technical Consulting (ATC) • Master Services Agreement
+                  Analytical Technical Consulting (ATC) • Cloud Infrastructure Services
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white font-poppins">
-                  Cloud Platform Terms of Service
+                  {dbPolicy?.title || 'Cloud Services – Terms and Conditions'}
                 </h1>
               </div>
             </div>

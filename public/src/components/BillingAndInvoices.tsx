@@ -427,6 +427,11 @@ export default function BillingAndInvoices() {
       doc.text(`$${invTotal.toFixed(2)} USD`, 185, y + 3.5, { align: 'right' });
 
       // Footer
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(primaryBlue[0], primaryBlue[1], primaryBlue[2]);
+      doc.text('Link to Terms of Contract: https://www.atechconsult.com/Terms&Conditions', 105, 269, { align: 'center' });
+
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(mutedSlate[0], mutedSlate[1], mutedSlate[2]);
@@ -906,6 +911,17 @@ export default function BillingAndInvoices() {
                   <ShieldCheck className="w-4 h-4" /> Payment Confirmed & Verified
                 </div>
                 <div>Invoice Reference: <span className="font-mono font-semibold">{selectedInvoice.invoiceNumber}</span> • Settled in full</div>
+                <div className="pt-1">
+                  Link to Terms of Contract:{' '}
+                  <a
+                    href="https://www.atechconsult.com/Terms&Conditions"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline font-semibold text-blue-600 dark:text-blue-400 break-all"
+                  >
+                    https://www.atechconsult.com/Terms&Conditions
+                  </a>
+                </div>
               </div>
             </div>
           </div>

@@ -60,7 +60,24 @@ const SUPPORT_EMAIL = process.env.SMTP_SUPPORT_USER || 'customer-support@atechco
 const BILLING_EMAIL = process.env.SMTP_BILLING_USER || 'billing@atechconsult.com';
 const ALERTS_EMAIL = process.env.SMTP_ALERTS_USER || 'alerts@atechconsult.com';
 
-const APP_URL = process.env.FRONTEND_URL || process.env.BACKEND_URL || 'https://vps.atechconsult.com';
+const APP_URL = process.env.FRONTEND_URL || process.env.BACKEND_URL || 'https://www.atechconsult.com';
+const ATC_LOGO_URL = 'https://www.atechconsult.com/ATC_Logo.png';
+const TERMS_CONTRACT_URL = 'https://www.atechconsult.com/Terms&Conditions';
+
+function formatUSCentralEmailTime(dateInput = new Date()) {
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return new Date().toUTCString();
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short',
+  }).format(d);
+}
 
 // Helper for HTML escaping
 export function escapeHtml(text) {
@@ -74,9 +91,8 @@ export function escapeHtml(text) {
 }
 
 /**
- * Clean, Spacious, Modern ATC Email Template Wrapper
- * Avoids claustrophobic narrow cards / compressed invoice look.
- * Natural white background, elegant fluid container, clean typography.
+ * Clean, Spacious, Modern ATC Corporate Email Template Wrapper
+ * Features official ATC Logo header, refined typography, and executive layout.
  */
 function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl, categoryBadge, footerNote }) {
   return `
@@ -87,21 +103,33 @@ function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl, cate
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapeHtml(title)}</title>
   </head>
-  <body style="margin:0;padding:0;background-color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#1e293b;">
-    <div style="background-color:#ffffff;width:100%;padding:32px 16px;">
-      <div style="max-width:620px;margin:0 auto;">
+  <body style="margin:0;padding:0;background-color:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#1e293b;">
+    <div style="background-color:#f8fafc;width:100%;padding:32px 16px;box-sizing:border-box;">
+      <div style="max-width:620px;margin:0 auto;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:32px 32px 28px 32px;box-sizing:border-box;">
         
-        <!-- Minimal Brand Header -->
+        <!-- Corporate Brand Header with Official ATC Logo -->
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="padding-bottom:20px;border-bottom:1px solid #e2e8f0;">
           <tr>
             <td align="left" style="vertical-align:middle;">
-              <span style="font-size:20px;font-weight:800;letter-spacing:0.5px;color:#0f172a;text-transform:uppercase;">
-                ATC <span style="color:#2563eb;">Cloud</span>
-              </span>
+              <table border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="vertical-align:middle;padding-right:12px;">
+                    <img src="${ATC_LOGO_URL}" alt="ATC Logo" width="54" style="display:block;height:auto;max-height:38px;width:auto;border:0;outline:none;" />
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <div style="font-size:16px;font-weight:800;letter-spacing:0.2px;color:#0f172a;line-height:1.2;">
+                      Analytical Technical Consulting <span style="color:#2563eb;">(ATC)</span>
+                    </div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;letter-spacing:0.3px;margin-top:2px;">
+                      Cloud Infrastructure &amp; Enterprise Hosting
+                    </div>
+                  </td>
+                </tr>
+              </table>
             </td>
             ${categoryBadge ? `
-            <td align="right" style="vertical-align:middle;">
-              <span style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:0.5px;text-transform:uppercase;">
+            <td align="right" style="vertical-align:middle;padding-left:8px;">
+              <span style="display:inline-block;background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:4px 10px;font-size:10px;font-weight:700;color:#1d4ed8;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;">
                 ${escapeHtml(categoryBadge)}
               </span>
             </td>` : ''}
@@ -109,12 +137,12 @@ function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl, cate
         </table>
 
         <!-- Header Title & Subtitle -->
-        <div style="padding-top:28px;padding-bottom:12px;">
-          <h1 style="margin:0;font-size:22px;font-weight:700;color:#0f172a;line-height:1.3;">
+        <div style="padding-top:26px;padding-bottom:12px;">
+          <h1 style="margin:0;font-size:22px;font-weight:800;color:#0f172a;line-height:1.3;">
             ${escapeHtml(title)}
           </h1>
           ${subtitle ? `
-          <p style="margin:8px 0 0 0;font-size:15px;color:#64748b;line-height:1.5;">
+          <p style="margin:8px 0 0 0;font-size:14px;color:#64748b;line-height:1.5;">
             ${escapeHtml(subtitle)}
           </p>` : ''}
         </div>
@@ -124,8 +152,8 @@ function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl, cate
           ${contentHtml}
 
           ${ctaText && ctaUrl ? `
-          <div style="margin:32px 0 24px 0;">
-            <a href="${ctaUrl}" style="background-color:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 26px;border-radius:8px;display:inline-block;">
+          <div style="margin:28px 0 20px 0;">
+            <a href="${ctaUrl}" style="background-color:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 26px;border-radius:10px;display:inline-block;">
               ${escapeHtml(ctaText)} &rarr;
             </a>
             <p style="margin-top:14px;font-size:12px;color:#94a3b8;line-height:1.5;">
@@ -136,12 +164,12 @@ function wrapEmailTemplate({ title, subtitle, contentHtml, ctaText, ctaUrl, cate
         </div>
 
         <!-- Clean, Lightweight Footer -->
-        <div style="margin-top:40px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;line-height:1.6;">
-          <p style="margin:0 0 4px 0;">
-            ATC Cloud & Infrastructure Services • <a href="mailto:${SUPPORT_EMAIL}" style="color:#64748b;text-decoration:none;">${SUPPORT_EMAIL}</a>
+        <div style="margin-top:32px;padding-top:20px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;line-height:1.6;">
+          <p style="margin:0 0 4px 0;color:#64748b;font-weight:600;">
+            Analytical Technical Consulting (ATC) • <a href="mailto:${SUPPORT_EMAIL}" style="color:#2563eb;text-decoration:none;">${SUPPORT_EMAIL}</a>
           </p>
           <p style="margin:0;">
-            ${footerNote || 'This is an automated notification regarding your account.'}
+            ${footerNote || 'This is an automated notification regarding your ATC Cloud account.'}
           </p>
         </div>
 
@@ -624,7 +652,8 @@ export async function sendInvoiceReceiptEmail({ email, fullName, invoiceNumber, 
         </table>
       </div>
 
-      <p style="font-size:13px;color:#64748b;margin-bottom:0;">You can view and download your full printable PDF invoice anytime from the Billing & Invoices section.</p>
+      <p style="font-size:13px;color:#64748b;margin-bottom:8px;">You can view and download your full printable PDF invoice anytime from the Billing & Invoices section.</p>
+      <p style="font-size:12px;color:#334155;margin-bottom:0;"><strong>Link to Terms of Contract:</strong> <a href="https://www.atechconsult.com/Terms&Conditions" style="color:#2563eb;text-decoration:underline;">https://www.atechconsult.com/Terms&Conditions</a></p>
     `,
     ctaText: 'View Invoices in Portal',
     ctaUrl: invoiceUrl,
@@ -735,6 +764,9 @@ export async function sendSpecificationResizeReceiptEmail({
     <p style="font-size:12px;color:#64748b;line-height:1.5;">
       Your next monthly invoice will be unified automatically into a single renewal on ${formattedNextDate}. 
       You can review and download the official PDF receipt from your customer billing portal.
+    </p>
+    <p style="font-size:12px;color:#334155;line-height:1.5;margin-top:8px;">
+      <strong>Link to Terms of Contract:</strong> <a href="https://www.atechconsult.com/Terms&Conditions" style="color:#2563eb;text-decoration:underline;">https://www.atechconsult.com/Terms&Conditions</a>
     </p>
   `;
 
@@ -1006,8 +1038,11 @@ export async function sendTrialConvertedPaidEmail({ email, fullName, invoiceNumb
           </tr>
         </table>
       </div>
-      <p style="font-size:13px;line-height:1.6;color:#64748b;">
+      <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:8px;">
         Your official tax invoice receipt has been generated and is available for download in your portal.
+      </p>
+      <p style="font-size:12px;line-height:1.6;color:#334155;">
+        <strong>Link to Terms of Contract:</strong> <a href="https://www.atechconsult.com/Terms&Conditions" style="color:#2563eb;text-decoration:underline;">https://www.atechconsult.com/Terms&Conditions</a>
       </p>
     `,
     ctaText: 'View Invoice & Server Dashboard',
@@ -1024,95 +1059,103 @@ export async function sendTrialConvertedPaidEmail({ email, fullName, invoiceNumb
 }
 
 /**
- * Free Trial Cancelled Confirmation Email
+ * Free Trial Cancelled Confirmation Email (Warm, Zero-Pressure Offboarding)
  */
 export async function sendTrialCancelledEmail({ email, fullName, planName }) {
   const html = wrapEmailTemplate({
-    title: 'Your Free Trial Has Been Cancelled',
-    subtitle: `Zero charges applied to your card`,
+    title: 'Parting on Good Terms — Free Trial Cancelled',
+    subtitle: 'Zero charges applied • Thank you for taking ATC Cloud for a spin',
     categoryBadge: 'Trial Cancelled',
     contentHtml: `
       <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
         Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
       </p>
-      <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
-        This email confirms that your 30-day free trial for <strong>${escapeHtml(planName)}</strong> has been cancelled as requested.
+      <p style="font-size:14px;line-height:1.65;color:#334155;margin-bottom:20px;">
+        We have completed your cancellation request for your 30-day free trial of <strong>${escapeHtml(planName || 'Cloud VPS')}</strong>. While we are sorry to see you step away for now, we appreciate you testing your workloads on ATC Cloud infrastructure.
       </p>
-      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:24px;font-size:13px;color:#475569;">
-        ✅ <strong>No Charges:</strong> Your payment method on file has not been charged, and no future recurring payments will occur.
+      <div style="background-color:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px;margin-bottom:22px;font-size:13px;color:#166534;line-height:1.6;">
+        <strong>✓ Zero Financial Obligation:</strong> Your payment method on file was never charged, your trial virtual resources have been cleanly released, and no future recurring charges will ever occur from this trial.
       </div>
-      <p style="font-size:13px;line-height:1.6;color:#64748b;">
-        If you change your mind or need high-performance cloud compute in the future, you can resume your service anytime from the ATC Cloud Portal.
+      <p style="font-size:13px;line-height:1.65;color:#475569;margin-bottom:14px;">
+        Whenever your next project, client deployment, or production workload needs dedicated NVMe/SSD compute and 1 Gbps connectivity, your account remains ready — spin up a fresh instance in under 60 seconds anytime.
+      </p>
+      <p style="font-size:12px;line-height:1.6;color:#334155;margin-bottom:0;">
+        <strong>Link to Terms of Contract:</strong> <a href="${TERMS_CONTRACT_URL}" style="color:#2563eb;text-decoration:underline;">${TERMS_CONTRACT_URL}</a>
       </p>
     `,
-    ctaText: 'Visit ATC Cloud',
+    ctaText: 'Explore ATC Cloud Plans Anytime',
     ctaUrl: `${APP_URL}/pricing`,
-    footerNote: 'Analytical Technical Consulting (ATC) Cloud Customer Success',
+    footerNote: 'Analytical Technical Consulting (ATC) • Cloud Customer Success Team',
   });
 
   return await transporterBilling.sendMail({
-    from: `"ATC Cloud" <${BILLING_EMAIL}>`,
+    from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
     to: email,
-    subject: `Confirmation: Your 30-Day Free Trial has been cancelled`,
+    subject: `Confirmation: Your ATC Cloud Free Trial Has Been Cancelled ($0.00 Charged)`,
     html,
   });
 }
 
 
 /**
- * 14. Billing Overdue Suspension Notice (90-Day Data Preservation Model)
+ * 14. Billing Overdue Suspension Notice (90-Day Safe-Vault Data Preservation Model)
  */
 export async function sendBillingSuspendedEmail({ email, fullName, vmName, planName, overdueAmount = 0, retentionDays = 90 }) {
   const reactivateUrl = `${APP_URL}/dashboard?tab=billing`;
   const html = wrapEmailTemplate({
-    title: 'Service Suspended: Overdue Balance Notice',
-    subtitle: `Your instance has been suspended due to an overdue invoice`,
-    categoryBadge: 'Billing Suspension',
+    title: 'Compute Paused — Your Data Is Safe in Our 90-Day Vault',
+    subtitle: `Action required to bring ${vmName || 'your virtual server'} back online`,
+    categoryBadge: 'Service Paused',
     contentHtml: `
       <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
         Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
       </p>
-      <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
-        Your subscription for <strong>${escapeHtml(planName || 'Cloud VPS')}</strong> associated with instance <strong>${escapeHtml(vmName || 'Virtual Machine')}</strong> has an overdue balance of <strong>$${Number(overdueAmount).toFixed(2)} USD</strong>.
+      <p style="font-size:14px;line-height:1.65;color:#334155;margin-bottom:18px;">
+        We noticed an unsettled renewal balance of <strong>$${Number(overdueAmount).toFixed(2)} USD</strong> on your <strong>${escapeHtml(planName || 'Cloud VPS')}</strong> subscription. To protect your account from unexpected charges while keeping your work intact, we have gracefully powered down instance <strong>${escapeHtml(vmName || 'Virtual Machine')}</strong>.
       </p>
 
-      
+      <div style="background-color:#eff6ff;border:1px solid #bfdbfe;border-left:4px solid #2563eb;border-radius:10px;padding:16px 18px;margin-bottom:20px;font-size:13px;color:#1e3a8a;line-height:1.6;">
+        <strong>🛡️ Nothing Has Been Deleted:</strong> Every file, database, operating system configuration, and disk volume attached to <strong>${escapeHtml(vmName || 'your server')}</strong> is locked safely inside ATC's complimentary <strong>${retentionDays}-Day Data Preservation Vault</strong>.
+      </div>
 
-      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:24px;font-size:13px;color:#475569;">
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:22px;font-size:13px;color:#475569;">
         <table width="100%" cellpadding="6" cellspacing="0" style="font-size:13px;">
-          <tr>
-            <td style="color:#64748b;">Instance Name:</td>
-            <td style="font-weight:600;color:#0f172a;">${escapeHtml(vmName || 'VPS Instance')}</td>
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;">Protected Instance:</td>
+            <td align="right" style="font-weight:700;color:#0f172a;font-family:monospace;">${escapeHtml(vmName || 'VPS Instance')}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;">Balance Required to Resume:</td>
+            <td align="right" style="font-weight:700;color:#dc2626;">$${Number(overdueAmount).toFixed(2)} USD</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;">Storage &amp; Disk Integrity:</td>
+            <td align="right" style="font-weight:700;color:#059669;">100% Preserved &amp; Encrypted</td>
           </tr>
           <tr>
-            <td style="color:#64748b;">Overdue Balance:</td>
-            <td style="font-weight:700;color:#dc2626;">$${Number(overdueAmount).toFixed(2)} USD</td>
-          </tr>
-          <tr>
-            <td style="color:#64748b;">Data Status:</td>
-            <td style="font-weight:600;color:#f59e0b;">Suspended</td>
-          </tr>
-          <tr>
-            <td style="color:#64748b;">Retention Remaining:</td>
-            <td style="font-weight:700;color:#f59e0b;">${retentionDays} Days</td>
+            <td style="color:#64748b;">Safe-Hold Window Remaining:</td>
+            <td align="right" style="font-weight:700;color:#d97706;">${retentionDays} Days</td>
           </tr>
         </table>
       </div>
 
-      <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:20px;">
-        To reactivate your instance and resume operations, click below to settle your balance:
+      <p style="font-size:13px;line-height:1.65;color:#475569;margin-bottom:14px;">
+        Ready to pick up right where you left off? Settle your balance in one click from your billing portal and your server controls, SSH/RDP access, and web console will unlock immediately.
+      </p>
+      <p style="font-size:12px;line-height:1.6;color:#334155;margin-bottom:0;">
+        <strong>Link to Terms of Contract:</strong> <a href="${TERMS_CONTRACT_URL}" style="color:#2563eb;text-decoration:underline;">${TERMS_CONTRACT_URL}</a>
       </p>
     `,
-    ctaText: 'Reactivate Instance',
+    ctaText: 'Unlock & Reactivate Server Now',
     ctaUrl: reactivateUrl,
-    footerNote: 'ATC Cloud Billing • For billing assistance, reply to this email or contact billing@atechconsult.com',
+    footerNote: 'ATC Cloud Billing & Continuity • Reply to this email or contact billing@atechconsult.com if you need assistance.',
   });
 
   try {
     const info = await transporterBilling.sendMail({
       from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
       to: email,
-      subject: `[Action Required] Service Suspended: Overdue Balance for ${vmName || 'VPS'}`,
+      subject: `[Service Paused] ${vmName || 'Your VPS'} Is Safely Preserved — Action Required to Resume`,
       html,
     });
     console.log(`[Billing Suspension] Email dispatched to ${email} (ID: ${info.messageId})`);
@@ -1124,43 +1167,60 @@ export async function sendBillingSuspendedEmail({ email, fullName, vmName, planN
 }
 
 /**
- * 15. Retention Expiration Warning (Day 60, 30, 14, 7, 3, 1 Reminders)
+ * 15. Retention Expiration Warning (Day 60, 30, 14, 7, 3, 1 Reminders for Inactive/Paused Users)
  */
 export async function sendRetentionWarningEmail({ email, fullName, vmName, planName, daysRemaining, overdueAmount = 0 }) {
   const reactivateUrl = `${APP_URL}/dashboard?tab=billing`;
+  const isFinalCountdown = Number(daysRemaining) <= 7;
+
   const html = wrapEmailTemplate({
-    title: `Data Decommission Warning: ${daysRemaining} Days Left`,
-    subtitle: `Your instance will be decommissioned in ${daysRemaining} days if unpaid`,
-    categoryBadge: 'Retention Warning',
+    title: isFinalCountdown
+      ? `Final Call: ${daysRemaining} ${Number(daysRemaining) === 1 ? 'Day' : 'Days'} Before Permanent Data Purge`
+      : `Your Cloud Vault Still Holds ${vmName || 'Your Server'} — ${daysRemaining} Days Remaining`,
+    subtitle: isFinalCountdown
+      ? `Immediate action required to rescue your virtual disks and configurations`
+      : `Scheduled 90-day data preservation update for ${planName || 'Cloud VPS'}`,
+    categoryBadge: isFinalCountdown ? 'Final Data Notice' : 'Data Preservation Notice',
     contentHtml: `
       <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
         Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
       </p>
-      <p style="font-size:14px;line-height:1.6;color:#334155;margin-bottom:20px;">
-        This is an urgent reminder regarding your suspended instance <strong>${escapeHtml(vmName || 'Virtual Machine')}</strong> (${escapeHtml(planName || 'Cloud VPS')}).
+      <p style="font-size:14px;line-height:1.65;color:#334155;margin-bottom:18px;">
+        ${isFinalCountdown
+          ? `We are reaching out one more time before our automated lifecycle engine permanently decommissions your paused server <strong>${escapeHtml(vmName || 'Virtual Machine')}</strong> (${escapeHtml(planName || 'Cloud VPS')}).`
+          : `Even though your <strong>${escapeHtml(planName || 'Cloud VPS')}</strong> subscription is currently paused, we have continued safeguarding your server <strong>${escapeHtml(vmName || 'Virtual Machine')}</strong> inside our 90-day preservation vault.`}
       </p>
 
-      <div style="background-color:#fef2f2;border:1px solid #fee2e2;border-left:4px solid #ef4444;border-radius:8px;padding:16px;margin-bottom:20px;">
-        <h4 style="margin:0 0 8px 0;color:#991b1b;font-size:14px;font-weight:700;">⚠️ Final Retention Period Countdown: ${daysRemaining} Days Remaining</h4>
-        <p style="margin:0;font-size:13px;line-height:1.5;color:#b91c1c;">
-          Your 90-day data preservation window is approaching expiration. If your overdue balance ($${Number(overdueAmount).toFixed(2)} USD) is not settled within the next <strong>${daysRemaining} days</strong>, all associated storage disks, files, and configurations will be permanently decommissioned.
+      <div style="background-color:${isFinalCountdown ? '#fef2f2' : '#fffbeb'};border:1px solid ${isFinalCountdown ? '#fecaca' : '#fde68a'};border-left:4px solid ${isFinalCountdown ? '#dc2626' : '#d97706'};border-radius:10px;padding:18px;margin-bottom:22px;">
+        <h4 style="margin:0 0 8px 0;color:${isFinalCountdown ? '#991b1b' : '#92400e'};font-size:14px;font-weight:800;">
+          ⏳ ${daysRemaining} ${Number(daysRemaining) === 1 ? 'Day' : 'Days'} Until Permanent Cryptographic Erasure
+        </h4>
+        <p style="margin:0;font-size:13px;line-height:1.6;color:${isFinalCountdown ? '#b91c1c' : '#b45309'};">
+          In <strong>${daysRemaining} ${Number(daysRemaining) === 1 ? 'day' : 'days'}</strong>, our 90-day complimentary storage hold concludes. Unless your balance of <strong>$${Number(overdueAmount).toFixed(2)} USD</strong> is settled before the timer reaches zero, all virtual NVMe/SSD disks, databases, snapshots, and custom configurations on <strong>${escapeHtml(vmName || 'your instance')}</strong> will be permanently and irreversibly purged.
         </p>
       </div>
 
-      <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:20px;">
-        Settle your balance to reactivate your instance.
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:20px;font-size:13px;color:#475569;line-height:1.6;">
+        <strong style="color:#0f172a;">Want to bring your server back in 60 seconds?</strong><br/>
+        Click below to clear the overdue balance ($${Number(overdueAmount).toFixed(2)} USD) — your exact OS state, files, and credentials will unlock immediately with zero re-installation needed. If you no longer need this data, no action is required and no further charges will be billed.
+      </div>
+
+      <p style="font-size:12px;line-height:1.6;color:#334155;margin-bottom:0;">
+        <strong>Link to Terms of Contract:</strong> <a href="${TERMS_CONTRACT_URL}" style="color:#2563eb;text-decoration:underline;">${TERMS_CONTRACT_URL}</a>
       </p>
     `,
-    ctaText: 'Reactivate Subscription',
+    ctaText: 'Rescue My Data & Reactivate Server',
     ctaUrl: reactivateUrl,
-    footerNote: 'ATC Cloud Support & Billing • Contact support@atechconsult.com for assistance',
+    footerNote: 'Analytical Technical Consulting (ATC) • Automated Data Lifecycle & Continuity Desk',
   });
 
   try {
     const info = await transporterBilling.sendMail({
-      from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
+      from: `"ATC Cloud Continuity" <${BILLING_EMAIL}>`,
       to: email,
-      subject: `[Urgent] ${daysRemaining} Days Remaining: Data Preservation Warning for ${vmName || 'VPS'}`,
+      subject: isFinalCountdown
+        ? `[Final Notice: ${daysRemaining}d Left] Permanent Data Deletion Scheduled for ${vmName || 'Your VPS'}`
+        : `[Data Vault Notice] ${daysRemaining} Days Remaining to Restore ${vmName || 'Your ATC Cloud Server'}`,
       html,
     });
     return { success: true, messageId: info.messageId };
@@ -1211,8 +1271,11 @@ export async function sendReactivationSuccessEmail({ email, fullName, vmName, pl
         </table>
       </div>
 
-      <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:20px;">
+      <p style="font-size:13px;line-height:1.6;color:#64748b;margin-bottom:10px;">
         You can now power on your instance and launch the Web Terminal console from your dashboard:
+      </p>
+      <p style="font-size:12px;line-height:1.6;color:#334155;margin-bottom:20px;">
+        <strong>Link to Terms of Contract:</strong> <a href="https://www.atechconsult.com/Terms&Conditions" style="color:#2563eb;text-decoration:underline;">https://www.atechconsult.com/Terms&Conditions</a>
       </p>
     `,
     ctaText: 'Open VPS Dashboard',
@@ -1230,6 +1293,227 @@ export async function sendReactivationSuccessEmail({ email, fullName, vmName, pl
     return { success: true, messageId: info.messageId };
   } catch (err) {
     console.error(`[Reactivation Email Error] Email failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+
+/**
+ * 17. Refund Confirmation & Service Closure Email
+ */
+export async function sendRefundConfirmationEmail({
+  email,
+  fullName,
+  invoiceNumber,
+  refundAmount,
+  currency = 'USD',
+  planName,
+  reason = 'Customer / Administrative Refund',
+}) {
+  const billingUrl = `${APP_URL}/dashboard?tab=billing`;
+  const processedAtStr = formatUSCentralEmailTime(new Date());
+
+  const html = wrapEmailTemplate({
+    title: `Refund Issued: $${Number(refundAmount).toFixed(2)} ${escapeHtml(currency)}`,
+    subtitle: `Official refund confirmation for Invoice ${invoiceNumber || 'Receipt'}`,
+    categoryBadge: 'Refund Processed',
+    contentHtml: `
+      <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
+        Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
+      </p>
+      <p style="font-size:14px;line-height:1.65;color:#334155;margin-bottom:20px;">
+        This email confirms that a refund of <strong>$${Number(refundAmount).toFixed(2)} ${escapeHtml(currency)}</strong> has been approved and issued back to your original payment method${planName ? ` for <strong>${escapeHtml(planName)}</strong>` : ''}.
+      </p>
+
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin-bottom:22px;font-size:13px;color:#475569;">
+        <table width="100%" cellpadding="6" cellspacing="0" style="font-size:13px;">
+          ${invoiceNumber ? `
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;">Invoice Reference:</td>
+            <td align="right" style="font-weight:700;color:#0f172a;font-family:monospace;">${escapeHtml(invoiceNumber)}</td>
+          </tr>` : ''}
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;">Refund Amount:</td>
+            <td align="right" style="font-weight:800;color:#059669;font-size:15px;">$${Number(refundAmount).toFixed(2)} ${escapeHtml(currency)}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;">Processed Timestamp (US Central):</td>
+            <td align="right" style="font-weight:600;color:#0f172a;">${escapeHtml(processedAtStr)}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;">Reason / Note:</td>
+            <td align="right" style="font-weight:600;color:#334155;">${escapeHtml(reason)}</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Estimated Bank Settlement:</td>
+            <td align="right" style="font-weight:700;color:#2563eb;">5–10 Business Days</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="font-size:13px;line-height:1.65;color:#475569;margin-bottom:14px;">
+        Please note that while ATC Cloud has released the funds immediately, card networks and issuing banks typically take <strong>5 to 10 business days</strong> to post the credit to your statement. Any subscription slot tied to this refunded invoice has been cleanly closed so no future charges occur.
+      </p>
+      <p style="font-size:12px;line-height:1.6;color:#334155;margin-bottom:0;">
+        <strong>Link to Terms of Contract:</strong> <a href="${TERMS_CONTRACT_URL}" style="color:#2563eb;text-decoration:underline;">${TERMS_CONTRACT_URL}</a>
+      </p>
+    `,
+    ctaText: 'View Billing History',
+    ctaUrl: billingUrl,
+    footerNote: 'Analytical Technical Consulting (ATC) Billing • Questions? Reply to billing@atechconsult.com',
+  });
+
+  try {
+    const info = await transporterBilling.sendMail({
+      from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
+      to: email,
+      subject: `[Refund Issued] $${Number(refundAmount).toFixed(2)} ${currency}${invoiceNumber ? ` for Invoice ${invoiceNumber}` : ''}`,
+      html,
+    });
+    console.log(`[Billing Refund] Confirmation sent to ${email} (ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Billing Refund Error] Email failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * 18. Payment Declined / Failed Notice (Action Required)
+ */
+export async function sendPaymentFailedEmail({
+  email,
+  fullName,
+  amount,
+  currency = 'USD',
+  planName,
+  invoiceNumber,
+  failureReason,
+}) {
+  const billingUrl = `${APP_URL}/dashboard?tab=billing`;
+  const attemptedAtStr = formatUSCentralEmailTime(new Date());
+
+  const html = wrapEmailTemplate({
+    title: 'Payment Could Not Be Completed',
+    subtitle: `Action required to complete your ${planName || 'ATC Cloud'} payment`,
+    categoryBadge: 'Payment Notice',
+    contentHtml: `
+      <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
+        Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
+      </p>
+      <p style="font-size:14px;line-height:1.65;color:#334155;margin-bottom:18px;">
+        We were unable to process a payment${amount ? ` of <strong>$${Number(amount).toFixed(2)} ${escapeHtml(currency)}</strong>` : ''} for <strong>${escapeHtml(planName || 'your ATC Cloud service')}</strong>. No funds were captured from your account for this declined attempt.
+      </p>
+
+      <div style="background-color:#fef2f2;border:1px solid #fecaca;border-left:4px solid #dc2626;border-radius:10px;padding:16px 18px;margin-bottom:22px;font-size:13px;color:#991b1b;line-height:1.6;">
+        <strong>Why did this happen?</strong><br/>
+        ${escapeHtml(failureReason || 'Your card issuer declined the authorization (common causes include insufficient funds, international/online transaction limits, or 3D Secure verification timeout).')}
+        <div style="margin-top:8px;font-size:12px;color:#b91c1c;">Attempted: ${escapeHtml(attemptedAtStr)}${invoiceNumber ? ` • Ref: ${escapeHtml(invoiceNumber)}` : ''}</div>
+      </div>
+
+      <p style="font-size:13px;line-height:1.65;color:#475569;margin-bottom:14px;">
+        You can update your payment method or retry checkout anytime from your ATC Cloud Billing Portal, or choose Direct Bank Wire Transfer for corporate accounts.
+      </p>
+      <p style="font-size:12px;line-height:1.6;color:#334155;margin-bottom:0;">
+        <strong>Link to Terms of Contract:</strong> <a href="${TERMS_CONTRACT_URL}" style="color:#2563eb;text-decoration:underline;">${TERMS_CONTRACT_URL}</a>
+      </p>
+    `,
+    ctaText: 'Update Payment Method & Retry',
+    ctaUrl: billingUrl,
+    footerNote: 'ATC Cloud Billing • Need help completing your order? Contact billing@atechconsult.com',
+  });
+
+  try {
+    const info = await transporterBilling.sendMail({
+      from: `"ATC Cloud Billing" <${BILLING_EMAIL}>`,
+      to: email,
+      subject: `[Action Required] Payment Unsuccessful for ${planName || 'ATC Cloud Service'}`,
+      html,
+    });
+    console.log(`[Billing Failed Notice] Sent to ${email} (ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Billing Failed Notice Error] Email failed for ${email}:`, err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * 19. Final Day-90 Decommission & Permanent Data Erasure Notice
+ * Creative, dignified, and professional offboarding after 90-day safe-hold expires.
+ */
+export async function sendFinalTerminationEmail({
+  email,
+  fullName,
+  vmName,
+  planName,
+  retentionDays = 90,
+}) {
+  const pricingUrl = `${APP_URL}/pricing`;
+  const decommissionedAtStr = formatUSCentralEmailTime(new Date());
+
+  const html = wrapEmailTemplate({
+    title: 'Final Decommission Complete — Thank You for Building With Us',
+    subtitle: `${retentionDays}-day data preservation window concluded for ${vmName || 'your virtual server'}`,
+    categoryBadge: 'Service Terminated',
+    contentHtml: `
+      <p style="font-size:15px;line-height:1.6;color:#1e293b;margin-bottom:16px;">
+        Hello <strong>${escapeHtml(fullName || 'Valued Customer')}</strong>,
+      </p>
+      <p style="font-size:14px;line-height:1.65;color:#334155;margin-bottom:18px;">
+        After safeguarding your suspended server <strong>${escapeHtml(vmName || 'Virtual Machine')}</strong> (${escapeHtml(planName || 'Cloud VPS')}) in our complimentary <strong>${retentionDays}-day preservation vault</strong>, the retention period has officially concluded and the instance has now been permanently decommissioned.
+      </p>
+
+      <div style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin-bottom:22px;font-size:13px;color:#475569;">
+        <div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">
+          Decommission Certificate Summary
+        </div>
+        <table width="100%" cellpadding="6" cellspacing="0" style="font-size:13px;">
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;">Decommissioned Instance:</td>
+            <td align="right" style="font-weight:700;color:#0f172a;font-family:monospace;">${escapeHtml(vmName || 'VPS Instance')}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;">Completed Timestamp (US Central):</td>
+            <td align="right" style="font-weight:600;color:#0f172a;">${escapeHtml(decommissionedAtStr)}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="color:#64748b;">Storage &amp; Disk Sanitization:</td>
+            <td align="right" style="font-weight:700;color:#dc2626;">Permanently Purged &amp; Wiped</td>
+          </tr>
+          <tr>
+            <td style="color:#64748b;">Future Recurring Billing:</td>
+            <td align="right" style="font-weight:700;color:#059669;">Closed ($0.00 Ongoing)</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="font-size:13px;line-height:1.65;color:#475569;margin-bottom:14px;">
+        In accordance with ATC Cloud's security and privacy standards, all virtual storage blocks associated with this instance have been securely wiped so your historical data can never be accessed by future tenants.
+      </p>
+      <p style="font-size:13px;line-height:1.65;color:#475569;margin-bottom:16px;">
+        <strong>The door is always open:</strong> Your ATC Cloud portal account remains active. Whenever your next venture, application, or team needs dedicated high-speed cloud infrastructure, you can launch a brand-new server in seconds.
+      </p>
+      <p style="font-size:12px;line-height:1.6;color:#334155;margin-bottom:0;">
+        <strong>Link to Terms of Contract:</strong> <a href="${TERMS_CONTRACT_URL}" style="color:#2563eb;text-decoration:underline;">${TERMS_CONTRACT_URL}</a>
+      </p>
+    `,
+    ctaText: 'Deploy a Fresh Server Anytime',
+    ctaUrl: pricingUrl,
+    footerNote: 'Analytical Technical Consulting (ATC) • Thank you for having been part of ATC Cloud.',
+  });
+
+  try {
+    const info = await transporterBilling.sendMail({
+      from: `"ATC Cloud Infrastructure" <${BILLING_EMAIL}>`,
+      to: email,
+      subject: `[Decommission Complete] ${vmName || 'Your ATC Cloud Server'} Has Been Permanently Closed`,
+      html,
+    });
+    console.log(`[Final Termination] Notice sent to ${email} (ID: ${info.messageId})`);
+    return { success: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[Final Termination Error] Email failed for ${email}:`, err.message);
     return { success: false, error: err.message };
   }
 }
@@ -1312,4 +1596,7 @@ export default {
   sendBillingSuspendedEmail,
   sendRetentionWarningEmail,
   sendReactivationSuccessEmail,
+  sendRefundConfirmationEmail,
+  sendPaymentFailedEmail,
+  sendFinalTerminationEmail,
 };
